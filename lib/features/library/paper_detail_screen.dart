@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
+import '../notes/note_editor_screen.dart';
 import 'add_attachment_sheet.dart';
+import 'citation_formatter.dart';
 import 'papers_providers.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
@@ -24,6 +27,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   final _authorsController = TextEditingController();
   Timer? _debounce;
   bool _loaded = false;
+  CitationStyle _citationStyle = CitationStyle.apa;
 
   @override
   void initState() {
@@ -74,6 +78,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     final attachmentsAsync = ref.watch(
       attachmentsForPaperProvider(widget.paperId),
     );
+    final paperAsync = ref.watch(paperByIdProvider(widget.paperId));
+    final notesAsync = ref.watch(notesForPaperProvider(widget.paperId));
 
     return Scaffold(
       appBar: AppBar(),
@@ -131,6 +137,81 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                     );
                   },
                 ),
+                if (paperAsync.value case final paper?) ...[
+                  const SizedBox(height: 24),
+                  Text('Citation', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  SegmentedButton<CitationStyle>(
+                    segments: CitationStyle.values
+                        .map(
+                          (style) => ButtonSegment(
+                            value: style,
+                            label: Text(style.label),
+                          ),
+                        )
+                        .toList(),
+                    selected: {_citationStyle},
+                    onSelectionChanged: (selected) =>
+                        setState(() => _citationStyle = selected.first),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            formatCitation(paper, _citationStyle),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 18),
+                          tooltip: 'Copy citation',
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(
+                                text: formatCitation(paper, _citationStyle),
+                              ),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Citation copied')),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (notesAsync.value case final notes? when notes.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Referenced in notes',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  ...notes.map(
+                    (note) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.edit_note_outlined),
+                      title: Text(
+                        note.title.isEmpty ? 'Untitled' : note.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NoteEditorScreen(noteId: note.id),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
     );

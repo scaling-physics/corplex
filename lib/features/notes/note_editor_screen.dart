@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../library/paper_detail_screen.dart';
+import 'link_paper_sheet.dart';
+import 'note_papers_providers.dart';
 
 /// A single note, editable in place with no separate "edit mode" — typing
 /// autosaves after a short pause, so there's nothing to remember to save.
@@ -71,8 +74,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final linkedPapersAsync = ref.watch(
+      linkedPapersForNoteProvider(widget.noteId),
+    );
+
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.link),
+            tooltip: 'Link a paper',
+            onPressed: () => showLinkPaperSheet(context, ref, widget.noteId),
+          ),
+        ],
+      ),
       body: !_loaded
           ? const SizedBox.shrink()
           : ListView(
@@ -86,6 +101,38 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     border: InputBorder.none,
                   ),
                 ),
+                ...switch (linkedPapersAsync.value) {
+                  null || [] => const [],
+                  final papers => [
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: -8,
+                      children: papers
+                          .map(
+                            (paper) => InputChip(
+                              label: Text(
+                                paper.title,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PaperDetailScreen(paperId: paper.id),
+                                ),
+                              ),
+                              onDeleted: () => unlinkPaperFromNote(
+                                ref.read(databaseProvider),
+                                noteId: widget.noteId,
+                                paperId: paper.id,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                },
                 TextField(
                   controller: _contentController,
                   style: Theme.of(context).textTheme.bodyLarge,

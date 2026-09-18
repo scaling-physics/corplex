@@ -96,12 +96,22 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   (`image_picker`), and arbitrary files, all copied into app-managed
   storage via `lib/data/local_files.dart`.
 
-Not yet built: linking a paper to the note that references it (the
-`NotePaperRefs` join table exists but nothing writes to it — would need
-either a manual "link paper" action in the note editor or citation
-parsing), PDF viewing/annotation, and citation generation. Sync backend
-is still open. Update the sections above as those decisions are made, so
-this file stays accurate for future agent sessions.
+- **Linking**: a note's AppBar has a link icon opening a searchable sheet
+  (`lib/features/notes/link_paper_sheet.dart`) to attach/detach papers via
+  the `NotePaperRefs` join table (`lib/features/notes/note_papers_providers.dart`
+  for the note→papers side, `notesForPaperProvider` in
+  `lib/features/library/papers_providers.dart` for the reverse). Linked
+  papers show as chips in the note editor (tap to open, × to unlink) and
+  as a "Referenced in notes" list on the paper detail screen.
+- **Citations**: `lib/features/library/citation_formatter.dart` formats a
+  `Paper` as APA/MLA/BibTeX (pure function, no widget dependency — easy to
+  unit test). Paper detail screen has a style picker and a copy-to-clipboard
+  button. Author name parsing is intentionally naive (uses the raw
+  `authors` string as-is); revisit if per-author formatting is needed.
+
+Not yet built: PDF viewing/annotation, BibTeX *import*, and the sync
+backend. Update the sections above as those decisions are made, so this
+file stays accurate for future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)
 
@@ -123,3 +133,11 @@ this file stays accurate for future agent sessions.
   writes. Pin autoDispose providers alive for the test with
   `container.listen(provider, (_, _) {})` (see
   `test/features/library/papers_providers_test.dart`).
+- To assert a live update *after* a write you've already subscribed to
+  (e.g. "linking a paper updates the note's chip list"), don't call bare
+  `container.read(provider)` then `container.listen(...)` — the gap
+  between them lets autoDispose tear the provider down mid-load and
+  reject with "disposed during loading state". Use a single
+  `container.listen(provider, callback, fireImmediately: true)` and
+  resolve a `Completer` once the callback sees the value you're waiting
+  for (see `waitFor` in `test/features/notes/note_papers_providers_test.dart`).

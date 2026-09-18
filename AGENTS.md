@@ -34,9 +34,14 @@ read → annotate → note → cite loop, reconsider it before building it.
 ## Tech stack
 
 - **Framework**: Flutter (Dart) — one codebase for iPadOS, iOS, and Android.
-- **Data**: Offline-first. All data lives in a local on-device database
-  (SQLite via `drift` or `sqflite` — decide and document here once chosen)
-  and the app must be fully usable with no network connection.
+- **Data**: Offline-first. All data lives in a local on-device SQLite
+  database via `drift` (chosen over raw `sqflite` for type-safe schema,
+  compile-time query checking, and reactive `Stream` queries) and the app
+  must be fully usable with no network connection. Tables live in
+  `lib/data/tables/`, the database class in `lib/data/database.dart`.
+  After changing a table, regenerate with: `dart run build_runner build`.
+  `lib/data/database.g.dart` is generated and committed to the repo so the
+  app builds without an extra codegen step.
 - **Sync**: Cross-device sync is a planned feature layered on top of the local
   DB, not a hard dependency of core functionality. Do not build features that
   assume a live backend connection.
@@ -76,7 +81,6 @@ read → annotate → note → cite loop, reconsider it before building it.
 
 ## Status
 
-This file was created before any code exists in the repo. Update the
-sections above (state management choice, local DB library, sync backend)
-as those decisions are made, so this file stays accurate for future agent
-sessions.
+Local DB library decided: `drift` (see Tech stack). Still open: state
+management choice and sync backend. Update the sections above as those
+decisions are made, so this file stays accurate for future agent sessions.

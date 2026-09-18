@@ -85,12 +85,23 @@ read → annotate → note → cite loop, reconsider it before building it.
 ## Status
 
 Local DB (`drift`) and state management (`flutter_riverpod`) are decided
-(see Tech stack). The Notes tab is wired end-to-end: list, create, and
-autosaving edit, backed by the `Notes` table. The Library tab is still a
-placeholder — `Papers`/`Attachments` tables exist but nothing writes to
-them yet (no PDF import flow). Sync backend is still open. Update the
-sections above as those decisions are made, so this file stays accurate
-for future agent sessions.
+(see Tech stack). Both tabs are wired end-to-end:
+
+- **Notes**: list, create, and autosaving edit, backed by the `Notes` table.
+- **Library**: PDF import (`file_picker`) creates a `Papers` row; search
+  filters by title/authors (`lib/features/library/papers_providers.dart`);
+  paper detail screen has autosaving title/authors and an attachments
+  section (`lib/features/library/paper_detail_screen.dart`,
+  `add_attachment_sheet.dart`) supporting podcast links, images
+  (`image_picker`), and arbitrary files, all copied into app-managed
+  storage via `lib/data/local_files.dart`.
+
+Not yet built: linking a paper to the note that references it (the
+`NotePaperRefs` join table exists but nothing writes to it — would need
+either a manual "link paper" action in the note editor or citation
+parsing), PDF viewing/annotation, and citation generation. Sync backend
+is still open. Update the sections above as those decisions are made, so
+this file stays accurate for future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)
 
@@ -104,3 +115,11 @@ for future agent sessions.
   in `test/widget_test.dart`) — disposing the query schedules a
   zero-duration `Timer` that needs a real elapse to flush, which
   flutter_test's automatic end-of-test teardown doesn't give it.
+- When testing an `autoDispose` provider with a `ProviderContainer`
+  directly (no widget tree), insert/seed data *before* calling
+  `container.listen`/`container.read` on it. Subscribing first and then
+  writing races the provider's first stream emission against the write —
+  `.future` can resolve on an early emission and silently miss later
+  writes. Pin autoDispose providers alive for the test with
+  `container.listen(provider, (_, _) {})` (see
+  `test/features/library/papers_providers_test.dart`).

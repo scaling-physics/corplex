@@ -45,9 +45,12 @@ read → annotate → note → cite loop, reconsider it before building it.
 - **Sync**: Cross-device sync is a planned feature layered on top of the local
   DB, not a hard dependency of core functionality. Do not build features that
   assume a live backend connection.
-- **State management**: not yet decided — check for an existing pattern in
-  `lib/` before introducing a new one (e.g. Riverpod, Bloc, provider). Stay
-  consistent with whatever is already in use.
+- **State management**: Riverpod (`flutter_riverpod`), chosen for its
+  natural fit with drift's `Stream`-based reactive queries. `AppDatabase`
+  is exposed via `databaseProvider` (`lib/data/database_provider.dart`);
+  feature-specific providers live next to their feature, e.g.
+  `lib/features/notes/notes_providers.dart`. Root widget must stay wrapped
+  in `ProviderScope` (see `lib/main.dart`).
 
 ## Core v1 features
 
@@ -81,6 +84,23 @@ read → annotate → note → cite loop, reconsider it before building it.
 
 ## Status
 
-Local DB library decided: `drift` (see Tech stack). Still open: state
-management choice and sync backend. Update the sections above as those
-decisions are made, so this file stays accurate for future agent sessions.
+Local DB (`drift`) and state management (`flutter_riverpod`) are decided
+(see Tech stack). The Notes tab is wired end-to-end: list, create, and
+autosaving edit, backed by the `Notes` table. The Library tab is still a
+placeholder — `Papers`/`Attachments` tables exist but nothing writes to
+them yet (no PDF import flow). Sync backend is still open. Update the
+sections above as those decisions are made, so this file stays accurate
+for future agent sessions.
+
+### Testing gotchas (drift + Riverpod + flutter_test)
+
+- Any widget test that renders a `TextField` must set
+  `EditableText.debugDeterministicCursor = true` in `setUp` (and reset to
+  `false` in `tearDown`) — otherwise the cursor-blink `Timer` is still
+  armed when the test ends and trips flutter_test's pending-timer check.
+- A test that tears down a widget tree containing a drift `Stream` query
+  (e.g. via a Riverpod `StreamProvider`) must explicitly dispose the tree
+  itself and pump with a non-zero duration afterwards (see `_disposeTree`
+  in `test/widget_test.dart`) — disposing the query schedules a
+  zero-duration `Timer` that needs a real elapse to flush, which
+  flutter_test's automatic end-of-test teardown doesn't give it.

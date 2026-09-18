@@ -109,9 +109,32 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   button. Author name parsing is intentionally naive (uses the raw
   `authors` string as-is); revisit if per-author formatting is needed.
 
-Not yet built: PDF viewing/annotation, BibTeX *import*, and the sync
-backend. Update the sections above as those decisions are made, so this
-file stays accurate for future agent sessions.
+- **PDF viewing & annotation**: `lib/features/library/pdf_viewer_screen.dart`
+  uses `pdfrx`'s `PdfViewer` (normal pan/zoom) with freeform highlighter
+  annotation — chosen over Syncfusion's text-layer highlighting to stay
+  fully open-source and to fit the pen-input design principle; it works on
+  any PDF regardless of text layer, at the cost of "highlights" being
+  pixel strokes rather than selected text. Strokes are stored per-page in
+  the `Annotations` table (`lib/data/tables/annotations_table.dart`) as
+  normalized (0..1) points via `lib/features/library/annotations_providers.dart`,
+  so they scale correctly at any zoom/render resolution. Drawing uses
+  pdfrx's `pageOverlaysBuilder` hook, which hands back each page's
+  on-screen `Rect` — this is what lets the overlay track zoom/pan for
+  free instead of us reimplementing a transform. "Extract to note"
+  screenshots the whole viewer (`RepaintBoundary` + `toImage`), saves it
+  as a note image attachment, and auto-links the note to the paper — it
+  captures whatever's currently visible on screen, not a precisely
+  cropped single page.
+- **Note attachments UI**: the note editor now renders its own
+  attachments (`lib/features/notes/note_attachments_providers.dart`) as
+  image thumbnails or file chips below the linked-paper chips — added
+  specifically so extracted highlight screenshots are visible, since the
+  `Attachments` table supported `noteId` from the start but nothing
+  rendered it in the note editor until now.
+
+Not yet built: BibTeX *import* and the sync backend. Update the sections
+above as those decisions are made, so this file stays accurate for
+future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)
 

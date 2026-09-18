@@ -1549,6 +1549,409 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
   }
 }
 
+class $AnnotationsTable extends Annotations
+    with TableInfo<$AnnotationsTable, Annotation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AnnotationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _paperIdMeta = const VerificationMeta(
+    'paperId',
+  );
+  @override
+  late final GeneratedColumn<int> paperId = GeneratedColumn<int>(
+    'paper_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES papers (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _pageNumberMeta = const VerificationMeta(
+    'pageNumber',
+  );
+  @override
+  late final GeneratedColumn<int> pageNumber = GeneratedColumn<int>(
+    'page_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorHexMeta = const VerificationMeta(
+    'colorHex',
+  );
+  @override
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+    'color_hex',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('#FFEB3B'),
+  );
+  static const VerificationMeta _pointsJsonMeta = const VerificationMeta(
+    'pointsJson',
+  );
+  @override
+  late final GeneratedColumn<String> pointsJson = GeneratedColumn<String>(
+    'points_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    paperId,
+    pageNumber,
+    colorHex,
+    pointsJson,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'annotations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Annotation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('paper_id')) {
+      context.handle(
+        _paperIdMeta,
+        paperId.isAcceptableOrUnknown(data['paper_id']!, _paperIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paperIdMeta);
+    }
+    if (data.containsKey('page_number')) {
+      context.handle(
+        _pageNumberMeta,
+        pageNumber.isAcceptableOrUnknown(data['page_number']!, _pageNumberMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pageNumberMeta);
+    }
+    if (data.containsKey('color_hex')) {
+      context.handle(
+        _colorHexMeta,
+        colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
+      );
+    }
+    if (data.containsKey('points_json')) {
+      context.handle(
+        _pointsJsonMeta,
+        pointsJson.isAcceptableOrUnknown(data['points_json']!, _pointsJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pointsJsonMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Annotation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Annotation(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      paperId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paper_id'],
+      )!,
+      pageNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_number'],
+      )!,
+      colorHex: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_hex'],
+      )!,
+      pointsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}points_json'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AnnotationsTable createAlias(String alias) {
+    return $AnnotationsTable(attachedDatabase, alias);
+  }
+}
+
+class Annotation extends DataClass implements Insertable<Annotation> {
+  final int id;
+  final int paperId;
+  final int pageNumber;
+  final String colorHex;
+  final String pointsJson;
+  final DateTime createdAt;
+  const Annotation({
+    required this.id,
+    required this.paperId,
+    required this.pageNumber,
+    required this.colorHex,
+    required this.pointsJson,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['paper_id'] = Variable<int>(paperId);
+    map['page_number'] = Variable<int>(pageNumber);
+    map['color_hex'] = Variable<String>(colorHex);
+    map['points_json'] = Variable<String>(pointsJson);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  AnnotationsCompanion toCompanion(bool nullToAbsent) {
+    return AnnotationsCompanion(
+      id: Value(id),
+      paperId: Value(paperId),
+      pageNumber: Value(pageNumber),
+      colorHex: Value(colorHex),
+      pointsJson: Value(pointsJson),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Annotation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Annotation(
+      id: serializer.fromJson<int>(json['id']),
+      paperId: serializer.fromJson<int>(json['paperId']),
+      pageNumber: serializer.fromJson<int>(json['pageNumber']),
+      colorHex: serializer.fromJson<String>(json['colorHex']),
+      pointsJson: serializer.fromJson<String>(json['pointsJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'paperId': serializer.toJson<int>(paperId),
+      'pageNumber': serializer.toJson<int>(pageNumber),
+      'colorHex': serializer.toJson<String>(colorHex),
+      'pointsJson': serializer.toJson<String>(pointsJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Annotation copyWith({
+    int? id,
+    int? paperId,
+    int? pageNumber,
+    String? colorHex,
+    String? pointsJson,
+    DateTime? createdAt,
+  }) => Annotation(
+    id: id ?? this.id,
+    paperId: paperId ?? this.paperId,
+    pageNumber: pageNumber ?? this.pageNumber,
+    colorHex: colorHex ?? this.colorHex,
+    pointsJson: pointsJson ?? this.pointsJson,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  Annotation copyWithCompanion(AnnotationsCompanion data) {
+    return Annotation(
+      id: data.id.present ? data.id.value : this.id,
+      paperId: data.paperId.present ? data.paperId.value : this.paperId,
+      pageNumber: data.pageNumber.present
+          ? data.pageNumber.value
+          : this.pageNumber,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      pointsJson: data.pointsJson.present
+          ? data.pointsJson.value
+          : this.pointsJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Annotation(')
+          ..write('id: $id, ')
+          ..write('paperId: $paperId, ')
+          ..write('pageNumber: $pageNumber, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('pointsJson: $pointsJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, paperId, pageNumber, colorHex, pointsJson, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Annotation &&
+          other.id == this.id &&
+          other.paperId == this.paperId &&
+          other.pageNumber == this.pageNumber &&
+          other.colorHex == this.colorHex &&
+          other.pointsJson == this.pointsJson &&
+          other.createdAt == this.createdAt);
+}
+
+class AnnotationsCompanion extends UpdateCompanion<Annotation> {
+  final Value<int> id;
+  final Value<int> paperId;
+  final Value<int> pageNumber;
+  final Value<String> colorHex;
+  final Value<String> pointsJson;
+  final Value<DateTime> createdAt;
+  const AnnotationsCompanion({
+    this.id = const Value.absent(),
+    this.paperId = const Value.absent(),
+    this.pageNumber = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.pointsJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  AnnotationsCompanion.insert({
+    this.id = const Value.absent(),
+    required int paperId,
+    required int pageNumber,
+    this.colorHex = const Value.absent(),
+    required String pointsJson,
+    this.createdAt = const Value.absent(),
+  }) : paperId = Value(paperId),
+       pageNumber = Value(pageNumber),
+       pointsJson = Value(pointsJson);
+  static Insertable<Annotation> custom({
+    Expression<int>? id,
+    Expression<int>? paperId,
+    Expression<int>? pageNumber,
+    Expression<String>? colorHex,
+    Expression<String>? pointsJson,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (paperId != null) 'paper_id': paperId,
+      if (pageNumber != null) 'page_number': pageNumber,
+      if (colorHex != null) 'color_hex': colorHex,
+      if (pointsJson != null) 'points_json': pointsJson,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  AnnotationsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? paperId,
+    Value<int>? pageNumber,
+    Value<String>? colorHex,
+    Value<String>? pointsJson,
+    Value<DateTime>? createdAt,
+  }) {
+    return AnnotationsCompanion(
+      id: id ?? this.id,
+      paperId: paperId ?? this.paperId,
+      pageNumber: pageNumber ?? this.pageNumber,
+      colorHex: colorHex ?? this.colorHex,
+      pointsJson: pointsJson ?? this.pointsJson,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (paperId.present) {
+      map['paper_id'] = Variable<int>(paperId.value);
+    }
+    if (pageNumber.present) {
+      map['page_number'] = Variable<int>(pageNumber.value);
+    }
+    if (colorHex.present) {
+      map['color_hex'] = Variable<String>(colorHex.value);
+    }
+    if (pointsJson.present) {
+      map['points_json'] = Variable<String>(pointsJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AnnotationsCompanion(')
+          ..write('id: $id, ')
+          ..write('paperId: $paperId, ')
+          ..write('pageNumber: $pageNumber, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('pointsJson: $pointsJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1556,6 +1959,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PapersTable papers = $PapersTable(this);
   late final $AttachmentsTable attachments = $AttachmentsTable(this);
   late final $NotePaperRefsTable notePaperRefs = $NotePaperRefsTable(this);
+  late final $AnnotationsTable annotations = $AnnotationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1565,6 +1969,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     papers,
     attachments,
     notePaperRefs,
+    annotations,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1595,6 +2000,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('note_paper_refs', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'papers',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('annotations', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -2046,6 +2458,24 @@ final class $$PapersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$AnnotationsTable, List<Annotation>>
+  _annotationsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.annotations,
+    aliasName: 'papers__id__annotations__paper_id',
+  );
+
+  $$AnnotationsTableProcessedTableManager get annotationsRefs {
+    final manager = $$AnnotationsTableTableManager(
+      $_db,
+      $_db.annotations,
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_annotationsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PapersTableFilterComposer
@@ -2138,6 +2568,31 @@ class $$PapersTableFilterComposer
           }) => $$NotePaperRefsTableFilterComposer(
             $db: $db,
             $table: $db.notePaperRefs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> annotationsRefs(
+    Expression<bool> Function($$AnnotationsTableFilterComposer f) f,
+  ) {
+    final $$AnnotationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.annotations,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AnnotationsTableFilterComposer(
+            $db: $db,
+            $table: $db.annotations,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2280,6 +2735,31 @@ class $$PapersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> annotationsRefs<T extends Object>(
+    Expression<T> Function($$AnnotationsTableAnnotationComposer a) f,
+  ) {
+    final $$AnnotationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.annotations,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AnnotationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.annotations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PapersTableTableManager
@@ -2295,7 +2775,11 @@ class $$PapersTableTableManager
           $$PapersTableUpdateCompanionBuilder,
           (Paper, $$PapersTableReferences),
           Paper,
-          PrefetchHooks Function({bool attachmentsRefs, bool notePaperRefsRefs})
+          PrefetchHooks Function({
+            bool attachmentsRefs,
+            bool notePaperRefsRefs,
+            bool annotationsRefs,
+          })
         > {
   $$PapersTableTableManager(_$AppDatabase db, $PapersTable table)
     : super(
@@ -2357,12 +2841,17 @@ class $$PapersTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({attachmentsRefs = false, notePaperRefsRefs = false}) {
+              ({
+                attachmentsRefs = false,
+                notePaperRefsRefs = false,
+                annotationsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (attachmentsRefs) db.attachments,
                     if (notePaperRefsRefs) db.notePaperRefs,
+                    if (annotationsRefs) db.annotations,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -2409,6 +2898,27 @@ class $$PapersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (annotationsRefs)
+                        await $_getPrefetchedData<
+                          Paper,
+                          $PapersTable,
+                          Annotation
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PapersTableReferences
+                              ._annotationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PapersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).annotationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.paperId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -2429,7 +2939,11 @@ typedef $$PapersTableProcessedTableManager =
       $$PapersTableUpdateCompanionBuilder,
       (Paper, $$PapersTableReferences),
       Paper,
-      PrefetchHooks Function({bool attachmentsRefs, bool notePaperRefsRefs})
+      PrefetchHooks Function({
+        bool attachmentsRefs,
+        bool notePaperRefsRefs,
+        bool annotationsRefs,
+      })
     >;
 typedef $$AttachmentsTableCreateCompanionBuilder =
     AttachmentsCompanion Function({
@@ -3228,6 +3742,338 @@ typedef $$NotePaperRefsTableProcessedTableManager =
       NotePaperRef,
       PrefetchHooks Function({bool noteId, bool paperId})
     >;
+typedef $$AnnotationsTableCreateCompanionBuilder =
+    AnnotationsCompanion Function({
+      Value<int> id,
+      required int paperId,
+      required int pageNumber,
+      Value<String> colorHex,
+      required String pointsJson,
+      Value<DateTime> createdAt,
+    });
+typedef $$AnnotationsTableUpdateCompanionBuilder =
+    AnnotationsCompanion Function({
+      Value<int> id,
+      Value<int> paperId,
+      Value<int> pageNumber,
+      Value<String> colorHex,
+      Value<String> pointsJson,
+      Value<DateTime> createdAt,
+    });
+
+final class $$AnnotationsTableReferences
+    extends BaseReferences<_$AppDatabase, $AnnotationsTable, Annotation> {
+  $$AnnotationsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PapersTable _paperIdTable(_$AppDatabase db) =>
+      db.papers.createAlias('annotations__paper_id__papers__id');
+
+  $$PapersTableProcessedTableManager get paperId {
+    final $_column = $_itemColumn<int>('paper_id')!;
+
+    final manager = $$PapersTableTableManager(
+      $_db,
+      $_db.papers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_paperIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AnnotationsTableFilterComposer
+    extends Composer<_$AppDatabase, $AnnotationsTable> {
+  $$AnnotationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pointsJson => $composableBuilder(
+    column: $table.pointsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PapersTableFilterComposer get paperId {
+    final $$PapersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableFilterComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AnnotationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AnnotationsTable> {
+  $$AnnotationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pointsJson => $composableBuilder(
+    column: $table.pointsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PapersTableOrderingComposer get paperId {
+    final $$PapersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableOrderingComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AnnotationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AnnotationsTable> {
+  $$AnnotationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<String> get pointsJson => $composableBuilder(
+    column: $table.pointsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PapersTableAnnotationComposer get paperId {
+    final $$PapersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AnnotationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AnnotationsTable,
+          Annotation,
+          $$AnnotationsTableFilterComposer,
+          $$AnnotationsTableOrderingComposer,
+          $$AnnotationsTableAnnotationComposer,
+          $$AnnotationsTableCreateCompanionBuilder,
+          $$AnnotationsTableUpdateCompanionBuilder,
+          (Annotation, $$AnnotationsTableReferences),
+          Annotation,
+          PrefetchHooks Function({bool paperId})
+        > {
+  $$AnnotationsTableTableManager(_$AppDatabase db, $AnnotationsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AnnotationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AnnotationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AnnotationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> paperId = const Value.absent(),
+                Value<int> pageNumber = const Value.absent(),
+                Value<String> colorHex = const Value.absent(),
+                Value<String> pointsJson = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => AnnotationsCompanion(
+                id: id,
+                paperId: paperId,
+                pageNumber: pageNumber,
+                colorHex: colorHex,
+                pointsJson: pointsJson,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int paperId,
+                required int pageNumber,
+                Value<String> colorHex = const Value.absent(),
+                required String pointsJson,
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => AnnotationsCompanion.insert(
+                id: id,
+                paperId: paperId,
+                pageNumber: pageNumber,
+                colorHex: colorHex,
+                pointsJson: pointsJson,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AnnotationsTable, Annotation>(table),
+                  $$AnnotationsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({paperId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (paperId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.paperId,
+                        referencedTable: $$AnnotationsTableReferences
+                            ._paperIdTable(db),
+                        referencedColumn: $$AnnotationsTableReferences
+                            ._paperIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AnnotationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AnnotationsTable,
+      Annotation,
+      $$AnnotationsTableFilterComposer,
+      $$AnnotationsTableOrderingComposer,
+      $$AnnotationsTableAnnotationComposer,
+      $$AnnotationsTableCreateCompanionBuilder,
+      $$AnnotationsTableUpdateCompanionBuilder,
+      (Annotation, $$AnnotationsTableReferences),
+      Annotation,
+      PrefetchHooks Function({bool paperId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3240,4 +4086,6 @@ class $AppDatabaseManager {
       $$AttachmentsTableTableManager(_db, _db.attachments);
   $$NotePaperRefsTableTableManager get notePaperRefs =>
       $$NotePaperRefsTableTableManager(_db, _db.notePaperRefs);
+  $$AnnotationsTableTableManager get annotations =>
+      $$AnnotationsTableTableManager(_db, _db.annotations);
 }

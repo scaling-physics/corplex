@@ -12,6 +12,7 @@ import '../notes/note_editor_screen.dart';
 import 'add_attachment_sheet.dart';
 import 'citation_formatter.dart';
 import 'papers_providers.dart';
+import 'pdf_viewer_screen.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
   const PaperDetailScreen({super.key, required this.paperId});
@@ -104,6 +105,23 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                     border: InputBorder.none,
                   ),
                 ),
+                if (paperAsync.value?.pdfPath case final pdfPath?) ...[
+                  const SizedBox(height: 8),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.picture_as_pdf_outlined),
+                    title: const Text('View PDF'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PdfViewerScreen(
+                          paperId: widget.paperId,
+                          pdfPath: pdfPath,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

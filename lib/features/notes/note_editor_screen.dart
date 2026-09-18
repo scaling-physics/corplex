@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -6,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../data/tables/attachments_table.dart';
 import '../library/paper_detail_screen.dart';
 import 'link_paper_sheet.dart';
+import 'note_attachments_providers.dart';
 import 'note_papers_providers.dart';
 
 /// A single note, editable in place with no separate "edit mode" — typing
@@ -77,6 +80,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final linkedPapersAsync = ref.watch(
       linkedPapersForNoteProvider(widget.noteId),
     );
+    final attachmentsAsync = ref.watch(
+      attachmentsForNoteProvider(widget.noteId),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -129,6 +135,36 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             ),
                           )
                           .toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                },
+                ...switch (attachmentsAsync.value) {
+                  null || [] => const [],
+                  final attachments => [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: attachments.map((a) {
+                        if (a.type == AttachmentType.image && a.path != null) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(a.path!),
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
+                            ),
+                          );
+                        }
+                        return Chip(
+                          avatar: const Icon(Icons.attach_file, size: 16),
+                          label: Text(
+                            a.title ?? a.url ?? 'Attachment',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
                     ),
                     const SizedBox(height: 8),
                   ],

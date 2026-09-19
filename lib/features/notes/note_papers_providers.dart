@@ -6,7 +6,7 @@ import '../../data/database_provider.dart';
 
 /// Every paper linked to this note, via NotePaperRefs.
 final linkedPapersForNoteProvider = StreamProvider.autoDispose
-    .family<List<Paper>, int>((ref, noteId) {
+    .family<List<Paper>, String>((ref, noteId) {
       final db = ref.watch(databaseProvider);
       final query =
           db.select(db.papers).join([
@@ -23,8 +23,8 @@ final linkedPapersForNoteProvider = StreamProvider.autoDispose
 
 Future<void> linkPaperToNote(
   AppDatabase db, {
-  required int noteId,
-  required int paperId,
+  required String noteId,
+  required String paperId,
 }) {
   return db
       .into(db.notePaperRefs)
@@ -36,8 +36,8 @@ Future<void> linkPaperToNote(
 
 Future<void> unlinkPaperFromNote(
   AppDatabase db, {
-  required int noteId,
-  required int paperId,
+  required String noteId,
+  required String paperId,
 }) {
   return (db.delete(db.notePaperRefs)..where(
         (t) => t.noteId.equals(noteId) & t.paperId.equals(paperId),

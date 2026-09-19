@@ -4,7 +4,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 
 final attachmentsForNoteProvider = StreamProvider.autoDispose
-    .family<List<Attachment>, int>((ref, noteId) {
+    .family<List<Attachment>, String>((ref, noteId) {
       final db = ref.watch(databaseProvider);
       return (db.select(
         db.attachments,

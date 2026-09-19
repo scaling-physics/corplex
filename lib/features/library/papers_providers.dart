@@ -33,14 +33,14 @@ final filteredPapersProvider = Provider.autoDispose<AsyncValue<List<Paper>>>((
 });
 
 final attachmentsForPaperProvider = StreamProvider.autoDispose
-    .family<List<Attachment>, int>((ref, paperId) {
+    .family<List<Attachment>, String>((ref, paperId) {
       final db = ref.watch(databaseProvider);
       return (db.select(
         db.attachments,
       )..where((a) => a.paperId.equals(paperId))).watch();
     });
 
-final paperByIdProvider = StreamProvider.autoDispose.family<Paper?, int>((
+final paperByIdProvider = StreamProvider.autoDispose.family<Paper?, String>((
   ref,
   id,
 ) {
@@ -52,7 +52,7 @@ final paperByIdProvider = StreamProvider.autoDispose.family<Paper?, int>((
 
 /// Every note that links to this paper, via NotePaperRefs.
 final notesForPaperProvider = StreamProvider.autoDispose
-    .family<List<Note>, int>((ref, paperId) {
+    .family<List<Note>, String>((ref, paperId) {
       final db = ref.watch(databaseProvider);
       final query =
           db.select(db.notes).join([

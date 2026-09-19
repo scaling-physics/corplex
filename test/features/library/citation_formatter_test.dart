@@ -18,7 +18,7 @@ void main() {
     String? venue = 'NeurIPS',
     String? doi,
   }) async {
-    final id = await db.into(db.papers).insert(
+    await db.into(db.papers).insert(
           PapersCompanion.insert(
             title: title,
             authors: Value(authors),
@@ -27,9 +27,7 @@ void main() {
             doi: Value(doi),
           ),
         );
-    return (db.select(
-      db.papers,
-    )..where((p) => p.id.equals(id))).getSingle();
+    return db.select(db.papers).getSingle();
   }
 
   test('APA includes authors, parenthesized year, title, and venue', () async {

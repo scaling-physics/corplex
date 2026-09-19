@@ -17,7 +17,7 @@ import 'pdf_viewer_screen.dart';
 class PaperDetailScreen extends ConsumerStatefulWidget {
   const PaperDetailScreen({super.key, required this.paperId});
 
-  final int paperId;
+  final String paperId;
 
   @override
   ConsumerState<PaperDetailScreen> createState() => _PaperDetailScreenState();

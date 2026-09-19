@@ -14,7 +14,7 @@ import '../../data/tables/attachments_table.dart';
 Future<void> showAddAttachmentSheet(
   BuildContext context,
   WidgetRef ref,
-  int paperId,
+  String paperId,
 ) {
   return showModalBottomSheet(
     context: context,
@@ -56,7 +56,7 @@ Future<void> showAddAttachmentSheet(
 Future<void> _addPodcastLink(
   BuildContext context,
   WidgetRef ref,
-  int paperId,
+  String paperId,
 ) async {
   final controller = TextEditingController();
   final url = await showDialog<String>(
@@ -93,7 +93,7 @@ Future<void> _addPodcastLink(
       );
 }
 
-Future<void> _addImage(WidgetRef ref, int paperId) async {
+Future<void> _addImage(WidgetRef ref, String paperId) async {
   final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
   if (picked == null) return;
 
@@ -109,7 +109,7 @@ Future<void> _addImage(WidgetRef ref, int paperId) async {
       );
 }
 
-Future<void> _addFile(WidgetRef ref, int paperId) async {
+Future<void> _addFile(WidgetRef ref, String paperId) async {
   final picked = await FilePicker.pickFile();
   if (picked?.path == null) return;
 

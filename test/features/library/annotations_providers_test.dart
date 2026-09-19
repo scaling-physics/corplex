@@ -1,20 +1,23 @@
 import 'dart:ui';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/features/library/annotations_providers.dart';
 
 void main() {
   late AppDatabase db;
-  late int paperId;
+  late String paperId;
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    paperId = await db
-        .into(db.papers)
-        .insert(PapersCompanion.insert(title: 'A paper'));
+    paperId = const Uuid().v4();
+    await db.into(db.papers).insert(
+          PapersCompanion.insert(id: Value(paperId), title: 'A paper'),
+        );
   });
 
   tearDown(() => db.close());

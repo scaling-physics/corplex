@@ -18,7 +18,7 @@ import 'note_papers_providers.dart';
 class NoteEditorScreen extends ConsumerStatefulWidget {
   const NoteEditorScreen({super.key, required this.noteId});
 
-  final int noteId;
+  final String noteId;
 
   @override
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();

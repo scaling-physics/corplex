@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
@@ -15,24 +16,24 @@ void main() {
   tearDown(() => db.close());
 
   test('insert a note and read it back', () async {
-    final id = await db
+    await db
         .into(db.notes)
         .insert(NotesCompanion.insert(title: const Value('First note')));
 
-    final note = await (db.select(
-      db.notes,
-    )..where((n) => n.id.equals(id))).getSingle();
+    final note = await db.select(db.notes).getSingle();
 
     expect(note.title, 'First note');
   });
 
   test('a paper can be referenced by a note and found via the join table', () async {
-    final noteId = await db
+    final noteId = const Uuid().v4();
+    final paperId = const Uuid().v4();
+    await db
         .into(db.notes)
-        .insert(NotesCompanion.insert(title: const Value('Reading notes')));
-    final paperId = await db
-        .into(db.papers)
-        .insert(PapersCompanion.insert(title: 'Attention Is All You Need'));
+        .insert(NotesCompanion.insert(id: Value(noteId), title: const Value('Reading notes')));
+    await db.into(db.papers).insert(
+          PapersCompanion.insert(id: Value(paperId), title: 'Attention Is All You Need'),
+        );
 
     await db
         .into(db.notePaperRefs)
@@ -44,9 +45,10 @@ void main() {
   });
 
   test('an attachment can be linked to a paper', () async {
-    final paperId = await db
-        .into(db.papers)
-        .insert(PapersCompanion.insert(title: 'Some Paper'));
+    final paperId = const Uuid().v4();
+    await db.into(db.papers).insert(
+          PapersCompanion.insert(id: Value(paperId), title: 'Some Paper'),
+        );
 
     await db.into(db.attachments).insert(
           AttachmentsCompanion.insert(

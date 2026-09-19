@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -29,7 +30,7 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
     required this.pdfPath,
   });
 
-  final int paperId;
+  final String paperId;
   final String pdfPath;
 
   @override
@@ -128,9 +129,13 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
         db.papers,
       )..where((p) => p.id.equals(widget.paperId))).getSingle();
 
-      final noteId = await db
-          .into(db.notes)
-          .insert(NotesCompanion.insert(title: Value('Highlight from ${paper.title}')));
+      final noteId = const Uuid().v4();
+      await db.into(db.notes).insert(
+        NotesCompanion.insert(
+          id: Value(noteId),
+          title: Value('Highlight from ${paper.title}'),
+        ),
+      );
       await db.into(db.attachments).insert(
         AttachmentsCompanion.insert(
           noteId: Value(noteId),
@@ -161,7 +166,7 @@ class _PageHighlightOverlay extends ConsumerStatefulWidget {
     required this.color,
   });
 
-  final int paperId;
+  final String paperId;
   final int pageNumber;
   final Rect pageRect;
   final bool highlightMode;

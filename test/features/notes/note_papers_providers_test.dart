@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
@@ -37,17 +38,19 @@ Future<T> waitFor<T>(
 void main() {
   late AppDatabase db;
   late ProviderContainer container;
-  late int noteId;
-  late int paperId;
+  late String noteId;
+  late String paperId;
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    noteId = await db
-        .into(db.notes)
-        .insert(NotesCompanion.insert(title: const Value('My note')));
-    paperId = await db
-        .into(db.papers)
-        .insert(PapersCompanion.insert(title: 'A paper'));
+    noteId = const Uuid().v4();
+    paperId = const Uuid().v4();
+    await db.into(db.notes).insert(
+          NotesCompanion.insert(id: Value(noteId), title: const Value('My note')),
+        );
+    await db.into(db.papers).insert(
+          PapersCompanion.insert(id: Value(paperId), title: 'A paper'),
+        );
 
     container = ProviderContainer(
       overrides: [databaseProvider.overrideWithValue(db)],

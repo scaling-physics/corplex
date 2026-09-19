@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
 import 'notes_table.dart';
 import 'papers_table.dart';
@@ -10,12 +11,13 @@ enum AttachmentType { pdf, podcast, image, link, file }
 /// An attachment belongs to a note, a paper, or both — at least one of
 /// [noteId] / [paperId] must be set. Enforced in the DAO layer, since a
 /// portable CHECK across two nullable FKs isn't worth the SQL here.
+/// Primary key is a client-generated UUID (see notes_table.dart for why).
 class Attachments extends Table {
-  IntColumn get id => integer().autoIncrement()();
+  TextColumn get id => text().clientDefault(() => const Uuid().v4())();
 
-  IntColumn get noteId =>
-      integer().nullable().references(Notes, #id, onDelete: KeyAction.cascade)();
-  IntColumn get paperId => integer()
+  TextColumn get noteId =>
+      text().nullable().references(Notes, #id, onDelete: KeyAction.cascade)();
+  TextColumn get paperId => text()
       .nullable()
       .references(Papers, #id, onDelete: KeyAction.cascade)();
 
@@ -29,4 +31,7 @@ class Attachments extends Table {
   TextColumn get url => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }

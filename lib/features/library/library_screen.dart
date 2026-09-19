@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -26,10 +27,11 @@ class LibraryScreen extends ConsumerWidget {
     final localPath = await copyIntoAppStorage(picked!.path!, 'papers');
     final title = p.basenameWithoutExtension(picked.name);
 
+    final id = const Uuid().v4();
     final db = ref.read(databaseProvider);
-    final id = await db
-        .into(db.papers)
-        .insert(PapersCompanion.insert(title: title, pdfPath: Value(localPath)));
+    await db.into(db.papers).insert(
+      PapersCompanion.insert(id: Value(id), title: title, pdfPath: Value(localPath)),
+    );
 
     if (!context.mounted) return;
     Navigator.of(

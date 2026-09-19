@@ -11,7 +11,7 @@ final notesListProvider = StreamProvider.autoDispose<List<Note>>((ref) {
   )..orderBy([(n) => OrderingTerm.desc(n.updatedAt)])).watch();
 });
 
-final noteByIdProvider = StreamProvider.autoDispose.family<Note?, int>((
+final noteByIdProvider = StreamProvider.autoDispose.family<Note?, String>((
   ref,
   id,
 ) {

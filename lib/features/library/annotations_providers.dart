@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 
-typedef PageKey = ({int paperId, int pageNumber});
+typedef PageKey = ({String paperId, int pageNumber});
 
 final annotationsForPageProvider = StreamProvider.autoDispose
     .family<List<Annotation>, PageKey>((ref, key) {
@@ -42,7 +42,7 @@ Color colorFromHex(String hex) {
 
 Future<void> saveHighlightStroke(
   AppDatabase db, {
-  required int paperId,
+  required String paperId,
   required int pageNumber,
   required List<Offset> normalizedPoints,
   required Color color,

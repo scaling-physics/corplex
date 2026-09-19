@@ -10,16 +10,13 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
   $NotesTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    clientDefault: () => const Uuid().v4(),
   );
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
@@ -124,7 +121,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Note(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       title: attachedDatabase.typeMapping.read(
@@ -153,7 +150,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
 }
 
 class Note extends DataClass implements Insertable<Note> {
-  final int id;
+  final String id;
   final String title;
   final String content;
   final DateTime createdAt;
@@ -168,7 +165,7 @@ class Note extends DataClass implements Insertable<Note> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
     map['content'] = Variable<String>(content);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -192,7 +189,7 @@ class Note extends DataClass implements Insertable<Note> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Note(
-      id: serializer.fromJson<int>(json['id']),
+      id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
       content: serializer.fromJson<String>(json['content']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -203,7 +200,7 @@ class Note extends DataClass implements Insertable<Note> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
+      'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
       'content': serializer.toJson<String>(content),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -212,7 +209,7 @@ class Note extends DataClass implements Insertable<Note> {
   }
 
   Note copyWith({
-    int? id,
+    String? id,
     String? title,
     String? content,
     DateTime? createdAt,
@@ -260,17 +257,19 @@ class Note extends DataClass implements Insertable<Note> {
 }
 
 class NotesCompanion extends UpdateCompanion<Note> {
-  final Value<int> id;
+  final Value<String> id;
   final Value<String> title;
   final Value<String> content;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<int> rowid;
   const NotesCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.content = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   NotesCompanion.insert({
     this.id = const Value.absent(),
@@ -278,13 +277,15 @@ class NotesCompanion extends UpdateCompanion<Note> {
     this.content = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   static Insertable<Note> custom({
-    Expression<int>? id,
+    Expression<String>? id,
     Expression<String>? title,
     Expression<String>? content,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -292,15 +293,17 @@ class NotesCompanion extends UpdateCompanion<Note> {
       if (content != null) 'content': content,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   NotesCompanion copyWith({
-    Value<int>? id,
+    Value<String>? id,
     Value<String>? title,
     Value<String>? content,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<int>? rowid,
   }) {
     return NotesCompanion(
       id: id ?? this.id,
@@ -308,6 +311,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -315,7 +319,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -329,6 +333,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -339,7 +346,8 @@ class NotesCompanion extends UpdateCompanion<Note> {
           ..write('title: $title, ')
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -352,16 +360,13 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
   $PapersTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    clientDefault: () => const Uuid().v4(),
   );
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
@@ -514,7 +519,7 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Paper(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       title: attachedDatabase.typeMapping.read(
@@ -555,7 +560,7 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
 }
 
 class Paper extends DataClass implements Insertable<Paper> {
-  final int id;
+  final String id;
   final String title;
   final String authors;
   final int? year;
@@ -578,7 +583,7 @@ class Paper extends DataClass implements Insertable<Paper> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
     map['authors'] = Variable<String>(authors);
     if (!nullToAbsent || year != null) {
@@ -620,7 +625,7 @@ class Paper extends DataClass implements Insertable<Paper> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Paper(
-      id: serializer.fromJson<int>(json['id']),
+      id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
       authors: serializer.fromJson<String>(json['authors']),
       year: serializer.fromJson<int?>(json['year']),
@@ -634,7 +639,7 @@ class Paper extends DataClass implements Insertable<Paper> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
+      'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
       'authors': serializer.toJson<String>(authors),
       'year': serializer.toJson<int?>(year),
@@ -646,7 +651,7 @@ class Paper extends DataClass implements Insertable<Paper> {
   }
 
   Paper copyWith({
-    int? id,
+    String? id,
     String? title,
     String? authors,
     Value<int?> year = const Value.absent(),
@@ -710,7 +715,7 @@ class Paper extends DataClass implements Insertable<Paper> {
 }
 
 class PapersCompanion extends UpdateCompanion<Paper> {
-  final Value<int> id;
+  final Value<String> id;
   final Value<String> title;
   final Value<String> authors;
   final Value<int?> year;
@@ -718,6 +723,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<String?> doi;
   final Value<String?> pdfPath;
   final Value<DateTime> createdAt;
+  final Value<int> rowid;
   const PapersCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -727,6 +733,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.doi = const Value.absent(),
     this.pdfPath = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   PapersCompanion.insert({
     this.id = const Value.absent(),
@@ -737,9 +744,10 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.doi = const Value.absent(),
     this.pdfPath = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   }) : title = Value(title);
   static Insertable<Paper> custom({
-    Expression<int>? id,
+    Expression<String>? id,
     Expression<String>? title,
     Expression<String>? authors,
     Expression<int>? year,
@@ -747,6 +755,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? doi,
     Expression<String>? pdfPath,
     Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -757,11 +766,12 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (doi != null) 'doi': doi,
       if (pdfPath != null) 'pdf_path': pdfPath,
       if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   PapersCompanion copyWith({
-    Value<int>? id,
+    Value<String>? id,
     Value<String>? title,
     Value<String>? authors,
     Value<int?>? year,
@@ -769,6 +779,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<String?>? doi,
     Value<String?>? pdfPath,
     Value<DateTime>? createdAt,
+    Value<int>? rowid,
   }) {
     return PapersCompanion(
       id: id ?? this.id,
@@ -779,6 +790,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       doi: doi ?? this.doi,
       pdfPath: pdfPath ?? this.pdfPath,
       createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -786,7 +798,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -809,6 +821,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -822,7 +837,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('venue: $venue, ')
           ..write('doi: $doi, ')
           ..write('pdfPath: $pdfPath, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -836,24 +852,21 @@ class $AttachmentsTable extends Attachments
   $AttachmentsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    clientDefault: () => const Uuid().v4(),
   );
   static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
   @override
-  late final GeneratedColumn<int> noteId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
     'note_id',
     aliasedName,
     true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES notes (id) ON DELETE CASCADE',
@@ -863,11 +876,11 @@ class $AttachmentsTable extends Attachments
     'paperId',
   );
   @override
-  late final GeneratedColumn<int> paperId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
     'paper_id',
     aliasedName,
     true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES papers (id) ON DELETE CASCADE',
@@ -993,15 +1006,15 @@ class $AttachmentsTable extends Attachments
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Attachment(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       noteId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       ),
       paperId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}paper_id'],
       ),
       type: $AttachmentsTable.$convertertype.fromSql(
@@ -1039,9 +1052,9 @@ class $AttachmentsTable extends Attachments
 }
 
 class Attachment extends DataClass implements Insertable<Attachment> {
-  final int id;
-  final int? noteId;
-  final int? paperId;
+  final String id;
+  final String? noteId;
+  final String? paperId;
   final AttachmentType type;
   final String? title;
 
@@ -1064,12 +1077,12 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     if (!nullToAbsent || noteId != null) {
-      map['note_id'] = Variable<int>(noteId);
+      map['note_id'] = Variable<String>(noteId);
     }
     if (!nullToAbsent || paperId != null) {
-      map['paper_id'] = Variable<int>(paperId);
+      map['paper_id'] = Variable<String>(paperId);
     }
     {
       map['type'] = Variable<String>(
@@ -1114,9 +1127,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Attachment(
-      id: serializer.fromJson<int>(json['id']),
-      noteId: serializer.fromJson<int?>(json['noteId']),
-      paperId: serializer.fromJson<int?>(json['paperId']),
+      id: serializer.fromJson<String>(json['id']),
+      noteId: serializer.fromJson<String?>(json['noteId']),
+      paperId: serializer.fromJson<String?>(json['paperId']),
       type: $AttachmentsTable.$convertertype.fromJson(
         serializer.fromJson<String>(json['type']),
       ),
@@ -1130,9 +1143,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'noteId': serializer.toJson<int?>(noteId),
-      'paperId': serializer.toJson<int?>(paperId),
+      'id': serializer.toJson<String>(id),
+      'noteId': serializer.toJson<String?>(noteId),
+      'paperId': serializer.toJson<String?>(paperId),
       'type': serializer.toJson<String>(
         $AttachmentsTable.$convertertype.toJson(type),
       ),
@@ -1144,9 +1157,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   }
 
   Attachment copyWith({
-    int? id,
-    Value<int?> noteId = const Value.absent(),
-    Value<int?> paperId = const Value.absent(),
+    String? id,
+    Value<String?> noteId = const Value.absent(),
+    Value<String?> paperId = const Value.absent(),
     AttachmentType? type,
     Value<String?> title = const Value.absent(),
     Value<String?> path = const Value.absent(),
@@ -1208,14 +1221,15 @@ class Attachment extends DataClass implements Insertable<Attachment> {
 }
 
 class AttachmentsCompanion extends UpdateCompanion<Attachment> {
-  final Value<int> id;
-  final Value<int?> noteId;
-  final Value<int?> paperId;
+  final Value<String> id;
+  final Value<String?> noteId;
+  final Value<String?> paperId;
   final Value<AttachmentType> type;
   final Value<String?> title;
   final Value<String?> path;
   final Value<String?> url;
   final Value<DateTime> createdAt;
+  final Value<int> rowid;
   const AttachmentsCompanion({
     this.id = const Value.absent(),
     this.noteId = const Value.absent(),
@@ -1225,6 +1239,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.path = const Value.absent(),
     this.url = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   AttachmentsCompanion.insert({
     this.id = const Value.absent(),
@@ -1235,16 +1250,18 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.path = const Value.absent(),
     this.url = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   }) : type = Value(type);
   static Insertable<Attachment> custom({
-    Expression<int>? id,
-    Expression<int>? noteId,
-    Expression<int>? paperId,
+    Expression<String>? id,
+    Expression<String>? noteId,
+    Expression<String>? paperId,
     Expression<String>? type,
     Expression<String>? title,
     Expression<String>? path,
     Expression<String>? url,
     Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1255,18 +1272,20 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       if (path != null) 'path': path,
       if (url != null) 'url': url,
       if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   AttachmentsCompanion copyWith({
-    Value<int>? id,
-    Value<int?>? noteId,
-    Value<int?>? paperId,
+    Value<String>? id,
+    Value<String?>? noteId,
+    Value<String?>? paperId,
     Value<AttachmentType>? type,
     Value<String?>? title,
     Value<String?>? path,
     Value<String?>? url,
     Value<DateTime>? createdAt,
+    Value<int>? rowid,
   }) {
     return AttachmentsCompanion(
       id: id ?? this.id,
@@ -1277,6 +1296,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       path: path ?? this.path,
       url: url ?? this.url,
       createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -1284,13 +1304,13 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (noteId.present) {
-      map['note_id'] = Variable<int>(noteId.value);
+      map['note_id'] = Variable<String>(noteId.value);
     }
     if (paperId.present) {
-      map['paper_id'] = Variable<int>(paperId.value);
+      map['paper_id'] = Variable<String>(paperId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(
@@ -1309,6 +1329,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -1322,7 +1345,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
           ..write('title: $title, ')
           ..write('path: $path, ')
           ..write('url: $url, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -1336,11 +1360,11 @@ class $NotePaperRefsTable extends NotePaperRefs
   $NotePaperRefsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
   @override
-  late final GeneratedColumn<int> noteId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
     'note_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES notes (id) ON DELETE CASCADE',
@@ -1350,11 +1374,11 @@ class $NotePaperRefsTable extends NotePaperRefs
     'paperId',
   );
   @override
-  late final GeneratedColumn<int> paperId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
     'paper_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES papers (id) ON DELETE CASCADE',
@@ -1400,11 +1424,11 @@ class $NotePaperRefsTable extends NotePaperRefs
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return NotePaperRef(
       noteId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       )!,
       paperId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}paper_id'],
       )!,
     );
@@ -1417,14 +1441,14 @@ class $NotePaperRefsTable extends NotePaperRefs
 }
 
 class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
-  final int noteId;
-  final int paperId;
+  final String noteId;
+  final String paperId;
   const NotePaperRef({required this.noteId, required this.paperId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['note_id'] = Variable<int>(noteId);
-    map['paper_id'] = Variable<int>(paperId);
+    map['note_id'] = Variable<String>(noteId);
+    map['paper_id'] = Variable<String>(paperId);
     return map;
   }
 
@@ -1441,20 +1465,20 @@ class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return NotePaperRef(
-      noteId: serializer.fromJson<int>(json['noteId']),
-      paperId: serializer.fromJson<int>(json['paperId']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      paperId: serializer.fromJson<String>(json['paperId']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'noteId': serializer.toJson<int>(noteId),
-      'paperId': serializer.toJson<int>(paperId),
+      'noteId': serializer.toJson<String>(noteId),
+      'paperId': serializer.toJson<String>(paperId),
     };
   }
 
-  NotePaperRef copyWith({int? noteId, int? paperId}) => NotePaperRef(
+  NotePaperRef copyWith({String? noteId, String? paperId}) => NotePaperRef(
     noteId: noteId ?? this.noteId,
     paperId: paperId ?? this.paperId,
   );
@@ -1485,8 +1509,8 @@ class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
 }
 
 class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
-  final Value<int> noteId;
-  final Value<int> paperId;
+  final Value<String> noteId;
+  final Value<String> paperId;
   final Value<int> rowid;
   const NotePaperRefsCompanion({
     this.noteId = const Value.absent(),
@@ -1494,14 +1518,14 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
     this.rowid = const Value.absent(),
   });
   NotePaperRefsCompanion.insert({
-    required int noteId,
-    required int paperId,
+    required String noteId,
+    required String paperId,
     this.rowid = const Value.absent(),
   }) : noteId = Value(noteId),
        paperId = Value(paperId);
   static Insertable<NotePaperRef> custom({
-    Expression<int>? noteId,
-    Expression<int>? paperId,
+    Expression<String>? noteId,
+    Expression<String>? paperId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1512,8 +1536,8 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
   }
 
   NotePaperRefsCompanion copyWith({
-    Value<int>? noteId,
-    Value<int>? paperId,
+    Value<String>? noteId,
+    Value<String>? paperId,
     Value<int>? rowid,
   }) {
     return NotePaperRefsCompanion(
@@ -1527,10 +1551,10 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (noteId.present) {
-      map['note_id'] = Variable<int>(noteId.value);
+      map['note_id'] = Variable<String>(noteId.value);
     }
     if (paperId.present) {
-      map['paper_id'] = Variable<int>(paperId.value);
+      map['paper_id'] = Variable<String>(paperId.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1557,26 +1581,23 @@ class $AnnotationsTable extends Annotations
   $AnnotationsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    clientDefault: () => const Uuid().v4(),
   );
   static const VerificationMeta _paperIdMeta = const VerificationMeta(
     'paperId',
   );
   @override
-  late final GeneratedColumn<int> paperId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
     'paper_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES papers (id) ON DELETE CASCADE',
@@ -1698,11 +1719,11 @@ class $AnnotationsTable extends Annotations
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Annotation(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       paperId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}paper_id'],
       )!,
       pageNumber: attachedDatabase.typeMapping.read(
@@ -1731,8 +1752,8 @@ class $AnnotationsTable extends Annotations
 }
 
 class Annotation extends DataClass implements Insertable<Annotation> {
-  final int id;
-  final int paperId;
+  final String id;
+  final String paperId;
   final int pageNumber;
   final String colorHex;
   final String pointsJson;
@@ -1748,8 +1769,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['paper_id'] = Variable<int>(paperId);
+    map['id'] = Variable<String>(id);
+    map['paper_id'] = Variable<String>(paperId);
     map['page_number'] = Variable<int>(pageNumber);
     map['color_hex'] = Variable<String>(colorHex);
     map['points_json'] = Variable<String>(pointsJson);
@@ -1774,8 +1795,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Annotation(
-      id: serializer.fromJson<int>(json['id']),
-      paperId: serializer.fromJson<int>(json['paperId']),
+      id: serializer.fromJson<String>(json['id']),
+      paperId: serializer.fromJson<String>(json['paperId']),
       pageNumber: serializer.fromJson<int>(json['pageNumber']),
       colorHex: serializer.fromJson<String>(json['colorHex']),
       pointsJson: serializer.fromJson<String>(json['pointsJson']),
@@ -1786,8 +1807,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'paperId': serializer.toJson<int>(paperId),
+      'id': serializer.toJson<String>(id),
+      'paperId': serializer.toJson<String>(paperId),
       'pageNumber': serializer.toJson<int>(pageNumber),
       'colorHex': serializer.toJson<String>(colorHex),
       'pointsJson': serializer.toJson<String>(pointsJson),
@@ -1796,8 +1817,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   }
 
   Annotation copyWith({
-    int? id,
-    int? paperId,
+    String? id,
+    String? paperId,
     int? pageNumber,
     String? colorHex,
     String? pointsJson,
@@ -1854,12 +1875,13 @@ class Annotation extends DataClass implements Insertable<Annotation> {
 }
 
 class AnnotationsCompanion extends UpdateCompanion<Annotation> {
-  final Value<int> id;
-  final Value<int> paperId;
+  final Value<String> id;
+  final Value<String> paperId;
   final Value<int> pageNumber;
   final Value<String> colorHex;
   final Value<String> pointsJson;
   final Value<DateTime> createdAt;
+  final Value<int> rowid;
   const AnnotationsCompanion({
     this.id = const Value.absent(),
     this.paperId = const Value.absent(),
@@ -1867,24 +1889,27 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.colorHex = const Value.absent(),
     this.pointsJson = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   AnnotationsCompanion.insert({
     this.id = const Value.absent(),
-    required int paperId,
+    required String paperId,
     required int pageNumber,
     this.colorHex = const Value.absent(),
     required String pointsJson,
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   }) : paperId = Value(paperId),
        pageNumber = Value(pageNumber),
        pointsJson = Value(pointsJson);
   static Insertable<Annotation> custom({
-    Expression<int>? id,
-    Expression<int>? paperId,
+    Expression<String>? id,
+    Expression<String>? paperId,
     Expression<int>? pageNumber,
     Expression<String>? colorHex,
     Expression<String>? pointsJson,
     Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1893,16 +1918,18 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       if (colorHex != null) 'color_hex': colorHex,
       if (pointsJson != null) 'points_json': pointsJson,
       if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   AnnotationsCompanion copyWith({
-    Value<int>? id,
-    Value<int>? paperId,
+    Value<String>? id,
+    Value<String>? paperId,
     Value<int>? pageNumber,
     Value<String>? colorHex,
     Value<String>? pointsJson,
     Value<DateTime>? createdAt,
+    Value<int>? rowid,
   }) {
     return AnnotationsCompanion(
       id: id ?? this.id,
@@ -1911,6 +1938,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       colorHex: colorHex ?? this.colorHex,
       pointsJson: pointsJson ?? this.pointsJson,
       createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -1918,10 +1946,10 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (paperId.present) {
-      map['paper_id'] = Variable<int>(paperId.value);
+      map['paper_id'] = Variable<String>(paperId.value);
     }
     if (pageNumber.present) {
       map['page_number'] = Variable<int>(pageNumber.value);
@@ -1935,6 +1963,9 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -1946,7 +1977,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
           ..write('pageNumber: $pageNumber, ')
           ..write('colorHex: $colorHex, ')
           ..write('pointsJson: $pointsJson, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -2012,18 +2044,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 }
 
 typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
-  Value<int> id,
+  Value<String> id,
   Value<String> title,
   Value<String> content,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<int> rowid,
 });
 typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
-  Value<int> id,
+  Value<String> id,
   Value<String> title,
   Value<String> content,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<int> rowid,
 });
 
 final class $$NotesTableReferences
@@ -2040,7 +2074,7 @@ final class $$NotesTableReferences
     final manager = $$AttachmentsTableTableManager(
       $_db,
       $_db.attachments,
-    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_attachmentsRefsTable($_db));
     return ProcessedTableManager(
@@ -2058,7 +2092,7 @@ final class $$NotesTableReferences
     final manager = $$NotePaperRefsTableTableManager(
       $_db,
       $_db.notePaperRefs,
-    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_notePaperRefsRefsTable($_db));
     return ProcessedTableManager(
@@ -2075,7 +2109,7 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -2160,7 +2194,7 @@ class $$NotesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -2195,7 +2229,7 @@ class $$NotesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get title =>
@@ -2289,31 +2323,35 @@ class $$NotesTableTableManager
               $$NotesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => NotesCompanion(
                 id: id,
                 title: title,
                 content: content,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => NotesCompanion.insert(
                 id: id,
                 title: title,
                 content: content,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -2399,7 +2437,7 @@ typedef $$NotesTableProcessedTableManager =
       PrefetchHooks Function({bool attachmentsRefs, bool notePaperRefsRefs})
     >;
 typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
-  Value<int> id,
+  Value<String> id,
   required String title,
   Value<String> authors,
   Value<int?> year,
@@ -2407,9 +2445,10 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<String?> doi,
   Value<String?> pdfPath,
   Value<DateTime> createdAt,
+  Value<int> rowid,
 });
 typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
-  Value<int> id,
+  Value<String> id,
   Value<String> title,
   Value<String> authors,
   Value<int?> year,
@@ -2417,6 +2456,7 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<String?> doi,
   Value<String?> pdfPath,
   Value<DateTime> createdAt,
+  Value<int> rowid,
 });
 
 final class $$PapersTableReferences
@@ -2433,7 +2473,7 @@ final class $$PapersTableReferences
     final manager = $$AttachmentsTableTableManager(
       $_db,
       $_db.attachments,
-    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_attachmentsRefsTable($_db));
     return ProcessedTableManager(
@@ -2451,7 +2491,7 @@ final class $$PapersTableReferences
     final manager = $$NotePaperRefsTableTableManager(
       $_db,
       $_db.notePaperRefs,
-    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_notePaperRefsRefsTable($_db));
     return ProcessedTableManager(
@@ -2469,7 +2509,7 @@ final class $$PapersTableReferences
     final manager = $$AnnotationsTableTableManager(
       $_db,
       $_db.annotations,
-    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_annotationsRefsTable($_db));
     return ProcessedTableManager(
@@ -2487,7 +2527,7 @@ class $$PapersTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -2612,7 +2652,7 @@ class $$PapersTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -2662,7 +2702,7 @@ class $$PapersTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get title =>
@@ -2794,7 +2834,7 @@ class $$PapersTableTableManager
               $$PapersTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> authors = const Value.absent(),
                 Value<int?> year = const Value.absent(),
@@ -2802,6 +2842,7 @@ class $$PapersTableTableManager
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => PapersCompanion(
                 id: id,
                 title: title,
@@ -2811,10 +2852,11 @@ class $$PapersTableTableManager
                 doi: doi,
                 pdfPath: pdfPath,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 required String title,
                 Value<String> authors = const Value.absent(),
                 Value<int?> year = const Value.absent(),
@@ -2822,6 +2864,7 @@ class $$PapersTableTableManager
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => PapersCompanion.insert(
                 id: id,
                 title: title,
@@ -2831,6 +2874,7 @@ class $$PapersTableTableManager
                 doi: doi,
                 pdfPath: pdfPath,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -2947,25 +2991,27 @@ typedef $$PapersTableProcessedTableManager =
     >;
 typedef $$AttachmentsTableCreateCompanionBuilder =
     AttachmentsCompanion Function({
-      Value<int> id,
-      Value<int?> noteId,
-      Value<int?> paperId,
+      Value<String> id,
+      Value<String?> noteId,
+      Value<String?> paperId,
       required AttachmentType type,
       Value<String?> title,
       Value<String?> path,
       Value<String?> url,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 typedef $$AttachmentsTableUpdateCompanionBuilder =
     AttachmentsCompanion Function({
-      Value<int> id,
-      Value<int?> noteId,
-      Value<int?> paperId,
+      Value<String> id,
+      Value<String?> noteId,
+      Value<String?> paperId,
       Value<AttachmentType> type,
       Value<String?> title,
       Value<String?> path,
       Value<String?> url,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 
 final class $$AttachmentsTableReferences
@@ -2976,7 +3022,7 @@ final class $$AttachmentsTableReferences
       db.notes.createAlias('attachments__note_id__notes__id');
 
   $$NotesTableProcessedTableManager? get noteId {
-    final $_column = $_itemColumn<int>('note_id');
+    final $_column = $_itemColumn<String>('note_id');
     if ($_column == null) return null;
     final manager = $$NotesTableTableManager(
       $_db,
@@ -2993,7 +3039,7 @@ final class $$AttachmentsTableReferences
       db.papers.createAlias('attachments__paper_id__papers__id');
 
   $$PapersTableProcessedTableManager? get paperId {
-    final $_column = $_itemColumn<int>('paper_id');
+    final $_column = $_itemColumn<String>('paper_id');
     if ($_column == null) return null;
     final manager = $$PapersTableTableManager(
       $_db,
@@ -3016,7 +3062,7 @@ class $$AttachmentsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -3103,7 +3149,7 @@ class $$AttachmentsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3189,7 +3235,7 @@ class $$AttachmentsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<AttachmentType, String> get type =>
@@ -3282,14 +3328,15 @@ class $$AttachmentsTableTableManager
               $$AttachmentsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                Value<int?> noteId = const Value.absent(),
-                Value<int?> paperId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String?> noteId = const Value.absent(),
+                Value<String?> paperId = const Value.absent(),
                 Value<AttachmentType> type = const Value.absent(),
                 Value<String?> title = const Value.absent(),
                 Value<String?> path = const Value.absent(),
                 Value<String?> url = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => AttachmentsCompanion(
                 id: id,
                 noteId: noteId,
@@ -3299,17 +3346,19 @@ class $$AttachmentsTableTableManager
                 path: path,
                 url: url,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                Value<int?> noteId = const Value.absent(),
-                Value<int?> paperId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String?> noteId = const Value.absent(),
+                Value<String?> paperId = const Value.absent(),
                 required AttachmentType type,
                 Value<String?> title = const Value.absent(),
                 Value<String?> path = const Value.absent(),
                 Value<String?> url = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => AttachmentsCompanion.insert(
                 id: id,
                 noteId: noteId,
@@ -3319,6 +3368,7 @@ class $$AttachmentsTableTableManager
                 path: path,
                 url: url,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -3398,14 +3448,14 @@ typedef $$AttachmentsTableProcessedTableManager =
     >;
 typedef $$NotePaperRefsTableCreateCompanionBuilder =
     NotePaperRefsCompanion Function({
-      required int noteId,
-      required int paperId,
+      required String noteId,
+      required String paperId,
       Value<int> rowid,
     });
 typedef $$NotePaperRefsTableUpdateCompanionBuilder =
     NotePaperRefsCompanion Function({
-      Value<int> noteId,
-      Value<int> paperId,
+      Value<String> noteId,
+      Value<String> paperId,
       Value<int> rowid,
     });
 
@@ -3421,7 +3471,7 @@ final class $$NotePaperRefsTableReferences
       db.notes.createAlias('note_paper_refs__note_id__notes__id');
 
   $$NotesTableProcessedTableManager get noteId {
-    final $_column = $_itemColumn<int>('note_id')!;
+    final $_column = $_itemColumn<String>('note_id')!;
 
     final manager = $$NotesTableTableManager(
       $_db,
@@ -3438,7 +3488,7 @@ final class $$NotePaperRefsTableReferences
       db.papers.createAlias('note_paper_refs__paper_id__papers__id');
 
   $$PapersTableProcessedTableManager get paperId {
-    final $_column = $_itemColumn<int>('paper_id')!;
+    final $_column = $_itemColumn<String>('paper_id')!;
 
     final manager = $$PapersTableTableManager(
       $_db,
@@ -3648,8 +3698,8 @@ class $$NotePaperRefsTableTableManager
               $$NotePaperRefsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> noteId = const Value.absent(),
-                Value<int> paperId = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<String> paperId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotePaperRefsCompanion(
                 noteId: noteId,
@@ -3658,8 +3708,8 @@ class $$NotePaperRefsTableTableManager
               ),
           createCompanionCallback:
               ({
-                required int noteId,
-                required int paperId,
+                required String noteId,
+                required String paperId,
                 Value<int> rowid = const Value.absent(),
               }) => NotePaperRefsCompanion.insert(
                 noteId: noteId,
@@ -3744,21 +3794,23 @@ typedef $$NotePaperRefsTableProcessedTableManager =
     >;
 typedef $$AnnotationsTableCreateCompanionBuilder =
     AnnotationsCompanion Function({
-      Value<int> id,
-      required int paperId,
+      Value<String> id,
+      required String paperId,
       required int pageNumber,
       Value<String> colorHex,
       required String pointsJson,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 typedef $$AnnotationsTableUpdateCompanionBuilder =
     AnnotationsCompanion Function({
-      Value<int> id,
-      Value<int> paperId,
+      Value<String> id,
+      Value<String> paperId,
       Value<int> pageNumber,
       Value<String> colorHex,
       Value<String> pointsJson,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 
 final class $$AnnotationsTableReferences
@@ -3769,7 +3821,7 @@ final class $$AnnotationsTableReferences
       db.papers.createAlias('annotations__paper_id__papers__id');
 
   $$PapersTableProcessedTableManager get paperId {
-    final $_column = $_itemColumn<int>('paper_id')!;
+    final $_column = $_itemColumn<String>('paper_id')!;
 
     final manager = $$PapersTableTableManager(
       $_db,
@@ -3792,7 +3844,7 @@ class $$AnnotationsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -3850,7 +3902,7 @@ class $$AnnotationsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3908,7 +3960,7 @@ class $$AnnotationsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<int> get pageNumber => $composableBuilder(
@@ -3979,12 +4031,13 @@ class $$AnnotationsTableTableManager
               $$AnnotationsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                Value<int> paperId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> paperId = const Value.absent(),
                 Value<int> pageNumber = const Value.absent(),
                 Value<String> colorHex = const Value.absent(),
                 Value<String> pointsJson = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion(
                 id: id,
                 paperId: paperId,
@@ -3992,15 +4045,17 @@ class $$AnnotationsTableTableManager
                 colorHex: colorHex,
                 pointsJson: pointsJson,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                required int paperId,
+                Value<String> id = const Value.absent(),
+                required String paperId,
                 required int pageNumber,
                 Value<String> colorHex = const Value.absent(),
                 required String pointsJson,
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion.insert(
                 id: id,
                 paperId: paperId,
@@ -4008,6 +4063,7 @@ class $$AnnotationsTableTableManager
                 colorHex: colorHex,
                 pointsJson: pointsJson,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(

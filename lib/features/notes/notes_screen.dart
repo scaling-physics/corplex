@@ -1,6 +1,8 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -13,8 +15,9 @@ class NotesScreen extends ConsumerWidget {
   const NotesScreen({super.key});
 
   Future<void> _createNote(BuildContext context, WidgetRef ref) async {
+    final id = const Uuid().v4();
     final db = ref.read(databaseProvider);
-    final id = await db.into(db.notes).insert(const NotesCompanion());
+    await db.into(db.notes).insert(NotesCompanion.insert(id: Value(id)));
     if (!context.mounted) return;
     Navigator.of(
       context,

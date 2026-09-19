@@ -8,7 +8,7 @@ import 'note_papers_providers.dart';
 Future<void> showLinkPaperSheet(
   BuildContext context,
   WidgetRef ref,
-  int noteId,
+  String noteId,
 ) {
   return showModalBottomSheet(
     context: context,
@@ -20,7 +20,7 @@ Future<void> showLinkPaperSheet(
 class _LinkPaperSheet extends ConsumerStatefulWidget {
   const _LinkPaperSheet({required this.noteId});
 
-  final int noteId;
+  final String noteId;
 
   @override
   ConsumerState<_LinkPaperSheet> createState() => _LinkPaperSheetState();
@@ -34,7 +34,7 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
     final papersAsync = ref.watch(papersListProvider);
     final linkedAsync = ref.watch(linkedPapersForNoteProvider(widget.noteId));
     final linkedIds =
-        linkedAsync.value?.map((p) => p.id).toSet() ?? <int>{};
+        linkedAsync.value?.map((p) => p.id).toSet() ?? <String>{};
 
     return FractionallySizedBox(
       heightFactor: 0.8,
@@ -106,7 +106,7 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
     );
   }
 
-  Future<void> _toggleLink(int paperId, bool currentlyLinked) async {
+  Future<void> _toggleLink(String paperId, bool currentlyLinked) async {
     final db = ref.read(databaseProvider);
     if (currentlyLinked) {
       await unlinkPaperFromNote(db, noteId: widget.noteId, paperId: paperId);

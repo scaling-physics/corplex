@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 import 'tables/annotations_table.dart';
 import 'tables/attachments_table.dart';
@@ -22,7 +23,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -30,6 +31,23 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.createTable(annotations);
+      }
+      if (from < 3) {
+        // v3 switched every table's primary key from an autoincrement int
+        // to a client-generated UUID (required so IDs created offline on
+        // different devices never collide once sync exists). There's no
+        // production data yet, so upgrading rebuilds the schema fresh
+        // rather than migrating existing rows to new IDs.
+        for (final table in <TableInfo>[
+          annotations,
+          attachments,
+          notePaperRefs,
+          papers,
+          notes,
+        ]) {
+          await m.deleteTable(table.actualTableName);
+        }
+        await m.createAll();
       }
     },
   );

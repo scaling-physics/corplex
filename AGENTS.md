@@ -44,7 +44,9 @@ read → annotate → note → cite loop, reconsider it before building it.
   app builds without an extra codegen step.
 - **Sync**: Cross-device sync is a planned feature layered on top of the local
   DB, not a hard dependency of core functionality. Do not build features that
-  assume a live backend connection.
+  assume a live backend connection. Decided approach: **PowerSync + Supabase**,
+  both hosted (not self-hosted), with **email/password** auth — see the Sync
+  backend status entry below for what's built and what's still needed.
 - **State management**: Riverpod (`flutter_riverpod`), chosen for its
   natural fit with drift's `Stream`-based reactive queries. `AppDatabase`
   is exposed via `databaseProvider` (`lib/data/database_provider.dart`);
@@ -132,9 +134,44 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   `Attachments` table supported `noteId` from the start but nothing
   rendered it in the note editor until now.
 
-Not yet built: BibTeX *import* and the sync backend. Update the sections
-above as those decisions are made, so this file stays accurate for
-future agent sessions.
+- **UUID primary keys**: every table's primary key (and every foreign key
+  referencing it) is a client-generated UUID string (via `package:uuid`'s
+  `clientDefault`), not an autoincrement int. This was done *before* any
+  real sync backend exists, specifically so IDs created offline on two
+  different devices can never collide once sync is wired up. `drift`'s
+  `.insert()` always returns the row's internal SQLite `rowid` (an int)
+  regardless of the declared primary key type, so it's useless as "the
+  id" here — every insert call generates its own UUID up front (e.g.
+  `final id = const Uuid().v4();`) and passes it explicitly via
+  `SomeCompanion.insert(id: Value(id), ...)`, then uses that same `id` for
+  navigation/lookups. Schema v3's migration is destructive (drops and
+  recreates every table) since this changed primary key *types*, not just
+  added a column — acceptable because there's no production data yet;
+  a future breaking migration will need a real data-preserving strategy.
+- **Auth scaffolding**: `lib/features/auth/auth_service.dart` defines the
+  `AuthService` interface (`signUp`/`signIn`/`signOut`/`authStateChanges`)
+  that screens depend on, plus `StubAuthService` — an in-memory
+  placeholder (any well-formed email + 6+ char password "succeeds",
+  session lost on restart) used until a real Supabase-backed
+  implementation replaces it. Sign in/up screens live in the same folder;
+  the account icon in `HomeShell`'s AppBar is the entry point. Swapping in
+  real Supabase auth means implementing `AuthService` with
+  `supabase_flutter` and changing what `authServiceProvider` returns —
+  nothing else in the app should need to change.
+- **Sync service scaffolding**: `lib/features/sync/sync_service.dart`
+  defines a `SyncService` interface (`start`/`stop`/`statusChanges`) with
+  `NoOpSyncService` (reports permanently offline) as the current
+  `syncServiceProvider` default. No UI depends on it yet.
+
+Not yet built (needs real Supabase + PowerSync accounts, deferred per
+user request — see PR history/conversation for the account-setup
+discussion): a Postgres schema mirroring the drift tables with a
+per-row owner column, Supabase Auth wired into `AuthService`, a
+PowerSync instance + sync rules scoping each user to their own rows, a
+`PowerSyncBackendConnector` that uploads local writes to Supabase, and
+replacing `NoOpSyncService` with the real thing. Also not yet built:
+BibTeX *import*. Update the sections above as those decisions are made,
+so this file stays accurate for future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)
 

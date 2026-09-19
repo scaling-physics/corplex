@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,7 +11,7 @@ void main() {
   late ProviderContainer container;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.inMemoryForTesting();
     container = ProviderContainer(
       overrides: [databaseProvider.overrideWithValue(db)],
     );

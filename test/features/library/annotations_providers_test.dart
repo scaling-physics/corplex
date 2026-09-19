@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import 'package:drift/drift.dart' show Value;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,7 +12,7 @@ void main() {
   late String paperId;
 
   setUp(() async {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.inMemoryForTesting();
     paperId = const Uuid().v4();
     await db.into(db.papers).insert(
           PapersCompanion.insert(id: Value(paperId), title: 'A paper'),

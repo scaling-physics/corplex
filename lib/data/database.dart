@@ -8,22 +8,46 @@ import 'package:uuid/uuid.dart';
 
 import 'tables/annotations_table.dart';
 import 'tables/attachments_table.dart';
+import 'tables/folders_table.dart';
 import 'tables/note_paper_refs_table.dart';
+import 'tables/note_tags_table.dart';
 import 'tables/notes_table.dart';
 import 'tables/papers_table.dart';
+import 'tables/tags_table.dart';
 
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Notes, Papers, Attachments, NotePaperRefs, Annotations],
+  tables: [
+    Notes,
+    Papers,
+    Attachments,
+    NotePaperRefs,
+    Annotations,
+    Folders,
+    Tags,
+    NoteTags,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   AppDatabase.forTesting(super.executor);
 
+  /// An in-memory database for tests, with foreign key enforcement turned
+  /// on — SQLite has it off by default per-connection, so without this,
+  /// FK actions like `ON DELETE SET NULL`/`CASCADE` silently don't fire
+  /// and tests exercising them would pass for the wrong reason.
+  factory AppDatabase.inMemoryForTesting() {
+    return AppDatabase.forTesting(
+      NativeDatabase.memory(
+        setup: (database) => database.execute('PRAGMA foreign_keys = ON;'),
+      ),
+    );
+  }
+
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +72,14 @@ class AppDatabase extends _$AppDatabase {
           await m.deleteTable(table.actualTableName);
         }
         await m.createAll();
+      }
+      if (from < 4) {
+        // v4 adds folders and tags — purely additive, no existing data
+        // needs to change.
+        await m.createTable(folders);
+        await m.createTable(tags);
+        await m.createTable(noteTags);
+        await m.addColumn(notes, notes.folderId);
       }
     },
   );

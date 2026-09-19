@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
@@ -42,7 +41,7 @@ void main() {
   late String paperId;
 
   setUp(() async {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.inMemoryForTesting();
     noteId = const Uuid().v4();
     paperId = const Uuid().v4();
     await db.into(db.notes).insert(

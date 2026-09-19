@@ -1,4 +1,3 @@
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,7 +31,7 @@ void main() {
     // TextField's cursor blink uses a periodic Timer; without this it's
     // still armed when a test ends and trips flutter_test's timer check.
     EditableText.debugDeterministicCursor = true;
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.inMemoryForTesting();
   });
   tearDown(() {
     EditableText.debugDeterministicCursor = false;

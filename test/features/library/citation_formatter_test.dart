@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:corplex/data/database.dart';
@@ -8,7 +7,7 @@ import 'package:corplex/features/library/citation_formatter.dart';
 void main() {
   late AppDatabase db;
 
-  setUp(() => db = AppDatabase.forTesting(NativeDatabase.memory()));
+  setUp(() => db = AppDatabase.inMemoryForTesting());
   tearDown(() => db.close());
 
   Future<Paper> makePaper({

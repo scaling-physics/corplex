@@ -163,6 +163,41 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   `NoOpSyncService` (reports permanently offline) as the current
   `syncServiceProvider` default. No UI depends on it yet.
 
+- **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
+  `lib/features/notes/note_content.dart` is the single place that
+  encodes/decodes a note's `content` column: it's Quill Delta JSON now,
+  with `decodeNoteContent` falling back to treating the string as plain
+  text if it isn't valid JSON (covers notes created before rich text
+  existed, or any malformed content) so nothing crashes on old data.
+  `notePlainTextPreview` extracts a flattened one-line preview for the
+  Notes list without spinning up a full `QuillController`. The toolbar
+  (`QuillSimpleToolbar` in `note_editor_screen.dart`, pinned to
+  `bottomNavigationBar` rather than above the content, so it sits near
+  the keyboard) is deliberately pared down from Quill's defaults — no
+  font/size/color pickers, alignment, code block, or link button — to
+  match the "no distractions" principle; only bold/italic/underline/
+  strikethrough, headers, lists, and quote are exposed. **Important**:
+  `flutter_quill` requires `FlutterQuillLocalizations.delegate` (and the
+  standard Flutter ones) registered in `MaterialApp.localizationsDelegates`
+  (see `lib/app.dart`) — omitting it throws
+  `MissingFlutterQuillLocalizationException` at runtime the moment any
+  toolbar button builds, including in widget tests.
+- **Folders & tags**: both exist (per explicit user choice over
+  folders-only or tags-only). A note has at most one folder
+  (`Notes.folderId`, nullable, `ON DELETE SET NULL` so deleting a folder
+  unfiles its notes rather than deleting them) and any number of tags via
+  the `NoteTags` join table. Providers/actions in
+  `lib/features/notes/folders_providers.dart` and `tags_providers.dart`;
+  `findOrCreateTag` reuses an existing tag case-insensitively rather than
+  creating near-duplicates. The Notes screen shows a horizontal filter
+  chip row (`_FilterBar` in `notes_screen.dart`) mixing folders and
+  `#tags` as one mutually-exclusive filter dimension (never both at
+  once, to keep the UI a simple chip row instead of a filter builder) —
+  **it only appears once at least one folder or tag exists**, so an
+  unorganized notebook stays exactly as uncluttered as before this
+  feature. The note editor exposes a folder picker and tag picker via
+  AppBar icons (`folder_picker_sheet.dart`, `tag_picker_sheet.dart`).
+
 Not yet built (needs real Supabase + PowerSync accounts, deferred per
 user request — see PR history/conversation for the account-setup
 discussion): a Postgres schema mirroring the drift tables with a
@@ -201,3 +236,11 @@ so this file stays accurate for future agent sessions.
   `container.listen(provider, callback, fireImmediately: true)` and
   resolve a `Completer` once the callback sees the value you're waiting
   for (see `waitFor` in `test/features/notes/note_papers_providers_test.dart`).
+- **Always create test databases via `AppDatabase.inMemoryForTesting()`**,
+  never `AppDatabase.forTesting(NativeDatabase.memory())` directly. SQLite
+  has foreign key enforcement off by default *per connection*; without
+  turning it on, `ON DELETE SET NULL`/`CASCADE` silently don't fire and a
+  test asserting that behavior passes for the wrong reason (or, as
+  happened here, fails because the FK action never ran). The factory
+  enables `PRAGMA foreign_keys = ON` in its `setup` callback so every test
+  gets real FK behavior by default.

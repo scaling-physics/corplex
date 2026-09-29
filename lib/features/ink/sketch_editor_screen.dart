@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
 import 'ink_canvas.dart';
 import 'ink_model.dart';
+import 'pencil_taps.dart';
 
 /// Drawn on light "paper" in both themes, like a real sheet, so ink colors
 /// read the same everywhere a sketch is shown.
@@ -50,9 +53,48 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
   final _redo = <Sketch>[];
 
   _Tool _tool = _Tool.pen;
+  _Tool _previousTool = _Tool.eraser;
+  StreamSubscription<PencilAction>? _pencilTaps;
   int _penInk = 0;
   int _highlighterInk = 0;
   int _penWidth = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _pencilTaps = PencilTaps.instance.doubleTaps.listen(_onPencilTap);
+  }
+
+  @override
+  void dispose() {
+    _pencilTaps?.cancel();
+    super.dispose();
+  }
+
+  void _setTool(_Tool tool) {
+    if (tool == _tool) return;
+    _previousTool = _tool;
+    _tool = tool;
+  }
+
+  /// Double-tap on the Pencil, as configured in iPadOS Settings.
+  void _onPencilTap(PencilAction action) => setState(() {
+    switch (action) {
+      case PencilAction.switchEraser:
+        _setTool(_tool == _Tool.eraser ? _previousTool : _Tool.eraser);
+      case PencilAction.switchPrevious:
+        _setTool(_previousTool);
+      case PencilAction.showColorPalette:
+        // There's one row of inks; the tap steps to the next one.
+        if (_tool == _Tool.highlighter) {
+          _highlighterInk = (_highlighterInk + 1) % _highlighterInks.length;
+        } else if (_tool == _Tool.pen) {
+          _penInk = (_penInk + 1) % _penInks.length;
+        }
+      case PencilAction.ignore:
+        break;
+    }
+  });
 
   void _beginChange() {
     _undo.add(_sketch);
@@ -83,6 +125,31 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
     final c = Theme.of(context).colorScheme;
     final fingersDraw = _policy.fingersDraw;
 
+    return CallbackShortcuts(
+      bindings: {
+        for (final meta in const [true, false])
+          SingleActivator(
+            LogicalKeyboardKey.keyZ,
+            meta: meta,
+            control: !meta,
+          ): () {
+            if (_undo.isNotEmpty) _undoLast();
+          },
+        for (final meta in const [true, false])
+          SingleActivator(
+            LogicalKeyboardKey.keyZ,
+            meta: meta,
+            control: !meta,
+            shift: true,
+          ): () {
+            if (_redo.isNotEmpty) _redoLast();
+          },
+      },
+      child: Focus(autofocus: true, child: _buildEditor(c, fingersDraw)),
+    );
+  }
+
+  Widget _buildEditor(ColorScheme c, bool fingersDraw) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -186,7 +253,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
           inks: _tool == _Tool.highlighter ? _highlighterInks : _penInks,
           ink: _tool == _Tool.highlighter ? _highlighterInk : _penInk,
           penWidth: _penWidth,
-          onTool: (t) => setState(() => _tool = t),
+          onTool: (t) => setState(() => _setTool(t)),
           onInk: (i) => setState(() {
             if (_tool == _Tool.highlighter) {
               _highlighterInk = i;

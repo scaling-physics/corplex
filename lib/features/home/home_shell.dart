@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
@@ -7,6 +8,7 @@ import '../../data/database_provider.dart';
 import '../../data/trash.dart';
 import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
+import '../settings/appearance_settings.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
 import '../notes/notes_screen.dart';
@@ -44,6 +46,37 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final user = ref.watch(authStateProvider).value;
     final theme = Theme.of(context);
 
+    return CallbackShortcuts(
+      bindings: _shortcuts(context),
+      child: Focus(
+        autofocus: true,
+        child: _buildScaffold(context, user, theme),
+      ),
+    );
+  }
+
+  /// Hardware-keyboard shortcuts (iPad Magic Keyboard, Android/ChromeOS
+  /// keyboards): Cmd/Ctrl+N new note, +O import a PDF, +F search, +1/+2
+  /// switch tabs. Invisible until used, like everything else.
+  Map<ShortcutActivator, VoidCallback> _shortcuts(BuildContext context) {
+    void search() =>
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+    final actions = <LogicalKeyboardKey, VoidCallback>{
+      LogicalKeyboardKey.keyN: () => createNote(context, ref),
+      LogicalKeyboardKey.keyO: () => importPaper(context, ref),
+      LogicalKeyboardKey.keyF: search,
+      LogicalKeyboardKey.digit1: () => setState(() => _index = 0),
+      LogicalKeyboardKey.digit2: () => setState(() => _index = 1),
+    };
+    return {
+      for (final entry in actions.entries)
+        for (final meta in const [true, false])
+          SingleActivator(entry.key, meta: meta, control: !meta): entry.value,
+    };
+  }
+
+  Widget _buildScaffold(BuildContext context, AppUser? user, ThemeData theme) {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 72,
@@ -202,6 +235,35 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ),
               ],
               const Divider(),
+              Consumer(
+                builder: (context, ref, _) {
+                  final settings = ref.watch(appearanceSettingsProvider);
+                  return ListTile(
+                    leading: const Icon(Icons.brightness_6_outlined),
+                    title: const Text('Appearance'),
+                    trailing: SegmentedButton<ThemeMode>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          label: Text('Auto'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          label: Text('Light'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          label: Text('Dark'),
+                        ),
+                      ],
+                      selected: {settings.themeMode},
+                      onSelectionChanged: (s) =>
+                          settings.setThemeMode(s.single),
+                    ),
+                  );
+                },
+              ),
               Consumer(
                 builder: (context, ref, _) {
                   final count =

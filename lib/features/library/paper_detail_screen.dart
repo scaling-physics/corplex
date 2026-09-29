@@ -24,6 +24,7 @@ import '../../data/tables/papers_table.dart';
 import 'citation_formatter.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
+import 'split_reader.dart';
 import '../../theme/app_theme.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
@@ -473,12 +474,26 @@ class _PdfButtonState extends ConsumerState<_PdfButton> {
     if (paper == null) return const SizedBox.shrink();
     if (paper.pdfPath case final pdfPath?) {
       final resume = paper.lastPage != null && paper.lastPage! > 1;
-      return FilledButton.tonalIcon(
+      final open = FilledButton.tonalIcon(
         icon: const Icon(Icons.menu_book_outlined),
         label: Text(
           resume ? 'Continue reading · p. ${paper.lastPage}' : 'Open PDF',
         ),
         onPressed: () => _open(pdfPath, paper.lastPage),
+      );
+      // Only where there's room for two panes; nothing extra on a phone.
+      if (!canSplit(context)) return open;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          open,
+          OutlinedButton.icon(
+            icon: const Icon(Icons.vertical_split_outlined),
+            label: const Text('Read with a note'),
+            onPressed: () => openSplitReader(context, ref, paper),
+          ),
+        ],
       );
     }
     if (paper.storageKey != null) {
@@ -568,8 +583,46 @@ class _ReadingStatusRow extends ConsumerWidget {
                 selected ? status : null,
               ),
             ),
+          _StarRating(paper: paper),
         ],
       ),
+    );
+  }
+}
+
+/// Five stars for "how much this paper matters to me"; tap the current
+/// rating to clear it.
+class _StarRating extends ConsumerWidget {
+  const _StarRating({required this.paper});
+
+  final Paper paper;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rating = paper.rating ?? 0;
+    final color = Theme.of(context).colorScheme.primary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 1; i <= 5; i++)
+          InkResponse(
+            key: ValueKey('star-$i'),
+            radius: 18,
+            onTap: () => setRating(
+              ref.read(databaseProvider),
+              paper.id,
+              rating == i ? null : i,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: Icon(
+                i <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                size: 22,
+                color: i <= rating ? color : color.withValues(alpha: 0.4),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -98,4 +98,74 @@ void main() {
     expect(sketch.strokes.single.points.first.y, closeTo(0.5, 0.01));
     expect(gestures, 1);
   });
+
+  testWidgets(
+    'a hovering pen shows a ring, which goes when it leaves or touches down',
+    (tester) async {
+      await tester.pumpWidget(host());
+      final origin = tester.getTopLeft(find.byType(InkCanvas));
+      expect(find.byKey(const ValueKey('ink-hover')), findsNothing);
+
+      final pen = await tester.createGesture(kind: PointerDeviceKind.stylus);
+      await pen.addPointer(location: origin + const Offset(100, 100));
+      await pen.moveTo(origin + const Offset(120, 110));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('ink-hover')), findsOneWidget);
+
+      await pen.moveTo(const Offset(-50, -50)); // out of the canvas
+      await tester.pump();
+      expect(find.byKey(const ValueKey('ink-hover')), findsNothing);
+
+      // A finger or mouse hovering doesn't get a pen ring.
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: origin + const Offset(50, 50));
+      await mouse.moveTo(origin + const Offset(60, 60));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('ink-hover')), findsNothing);
+    },
+  );
+
+  test('the pen barrel button erases, like the eraser end', () {
+    final p = InkInputPolicy();
+    expect(
+      p.actionFor(PointerDeviceKind.stylus, eraserTool: false),
+      InkAction.draw,
+    );
+    expect(
+      p.actionFor(
+        PointerDeviceKind.stylus,
+        eraserTool: false,
+        stylusButton: true,
+      ),
+      InkAction.erase,
+    );
+    expect(
+      p.actionFor(
+        PointerDeviceKind.touch,
+        eraserTool: false,
+        stylusButton: true,
+      ),
+      InkAction.ignore,
+      reason: 'the button only means something on a stylus (fingers scroll after a pen)',
+    );
+  });
+
+  testWidgets('holding the barrel button while dragging erases strokes', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await drag(tester, const Offset(40, 40), const Offset(360, 40));
+    expect(sketch.strokes, hasLength(1));
+
+    final origin = tester.getTopLeft(find.byType(InkCanvas));
+    final g = await tester.startGesture(
+      origin + const Offset(200, 40),
+      kind: PointerDeviceKind.stylus,
+      buttons: kSecondaryStylusButton,
+    );
+    await g.moveTo(origin + const Offset(210, 40));
+    await g.up();
+    await tester.pump();
+    expect(sketch.strokes, isEmpty);
+  });
 }

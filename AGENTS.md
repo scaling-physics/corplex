@@ -111,37 +111,103 @@ existing table). Local-only columns (file paths) stay out of the spec.
   free, but not inside the Quill body; converting ink to text would need
   on-device recognition (e.g. ML Kit Digital Ink).
 
+## TODO
+
+Small, specific items to pick up next (remove when done):
+
+- **Import a paper PDF from a note's link sheet.** In the note editor, the
+  link-a-paper sheet (`lib/features/notes/link_paper_sheet.dart`, opened by
+  the link icon) only lists papers already in the Library. Add an "Import a
+  PDF" action there that runs the normal import (`importPaper` /
+  `copyIntoAppStorage` + the background DOI/arXiv enrichment) and links the
+  new paper to the note in one step — no detour to the Library tab. Keep it
+  invisible until wanted (one quiet row at the top of the sheet), per the
+  no-distractions principle.
+
 ## Later releases
 
 Ordered roughly by value to the core loop. None of these should add UI to
 the default screens until the user opts in by using the feature.
 
-### v1.1 — Literature review depth
-- Synthesis matrix: a table of papers × user-defined themes (method,
-  sample, findings), filled from notes/highlights.
-- Inline citations in notes (`[@citekey]`) with stable citekeys, and a
-  generated bibliography per note or project.
-- Highlight-to-quote blocks; literature-note templates (summary / method /
-  findings / critique).
-- Import from RIS and Zotero/Mendeley exports.
+### v1.1 — Literature review depth (built, except as noted)
+- **Citations**: every paper can get a stable `citekey` (`Papers.citekey`,
+  synced; `ensureCitekey` in `features/library/citations.dart` assigns
+  `vaswani2017`, `…a` on collision, once, never changed). In a note, type
+  `[@` or ⋮ → "Cite a paper" to insert plain-text `[@key]` (also
+  `[@a; @b]`); ⋮ → "Add bibliography" writes/rewrites a "References" H2 at
+  the end in a chosen style (`note_bibliography.dart`). Styles: APA, MLA,
+  Chicago (author-date), Harvard, IEEE (numbered), BibTeX
+  (`citation_formatter.dart`, hand-written, not CSL).
+- **Synthesis matrix** (`features/projects/matrix*.dart`, tables
+  `matrix_columns` / `matrix_cells`, schema v10): long-press a project chip
+  → "Synthesis matrix". Papers × themes; tap a cell to write or pull a
+  passage from that paper's highlights; copy/share as a Markdown table.
+  Invisible until a column is added. Deleting a column cascades its cells.
+- **Literature-note template**: note ⋮ → "Literature note template"
+  (summary / method / findings / critique headings).
+- **Import**: Library ⋮ → "Import references" reads BibTeX, RIS and CSL
+  JSON (`reference_import.dart`, format sniffed from content), so Zotero,
+  Mendeley and EndNote exports work.
+- **Project bibliography**: project chip menu → "Bibliography".
+- Highlight-to-quote blocks already existed ("Quote to note").
+- Server side: `20261003000000_literature_review.sql` (papers.citekey,
+  papers.rating, matrix tables). **Apply it before schema-v10 data syncs.**
 
-### v1.2 — Writing output
-- Export a note or project to Markdown, DOCX, or PDF with the bibliography
-  resolved.
-- Real citation styles via CSL (citeproc) rather than hand-written
-  formatters.
+### v1.2 — Writing output (built, except CSL)
+- Note ⋮ → "Export" and project chip → "Export project" produce Markdown,
+  Word (.docx) or PDF (`features/export/`). One intermediate `ExportDoc`
+  (blocks + runs) feeds all three renderers, so `[@key]` citations become
+  in-text citations and one reference list is appended exactly once (a
+  hand-inserted "References" section is replaced, not doubled). A project
+  exports its notes as chapters under one bibliography.
+- DOCX is hand-written OOXML (headings, lists, quotes, bold/italic/strike;
+  links as `text (url)`). PDF uses the `pdf` package with Roboto embedded
+  from `assets/fonts/` (curly quotes and accents render); Roboto ships no
+  italic here, so italics print regular in PDFs. Sketches export as
+  "[Sketch]".
+- **Not done: real CSL/citeproc.** Styles are hand-written formatters;
+  fine for common cases, not a full CSL engine.
 
-### v1.3 — iPad & pen
-- Split view: PDF beside note, as a first-class layout.
-- Pen input in notes is built (sketch blocks, see Status). Still to do:
-  handwriting-to-text, Apple Pencil double-tap to switch tools, hover.
-- Multiple windows, drag and drop between apps, hardware keyboard
-  shortcuts. Android stylus support.
+### v1.3 — iPad & pen (built, except as noted)
+- **Split view**: on wide windows (≥ 840 px) the paper screen shows "Read
+  with a note" — PDF left, note right (`split_reader.dart`). It picks the
+  most recent note linked to the paper or makes one. "Quote to note" in the
+  reader goes straight into that open note through `NoteEditorHandle`
+  (never via the database: the editor's autosave would overwrite it). Below
+  the breakpoint it falls back to the plain reader; nothing extra shows on
+  phones.
+- **Pen**: hover ring that previews the mark (Apple Pencil on M2 iPads,
+  Android styluses); the barrel button erases (S Pen); **Pencil
+  double-tap** follows the iPadOS preference (`SceneDelegate.swift` →
+  `corplex/pencil` channel → `pencil_taps.dart`; iOS build verified, the tap
+  itself needs a real Pencil 2 to try). Android stylus uses the same
+  `PointerDeviceKind.stylus` path as before.
+- **Hardware keyboard**: Cmd/Ctrl+N new note, +O import PDF, +F search,
+  +1/+2 tabs (HomeShell); Cmd/Ctrl+Z / +Shift+Z in the sketch editor.
+- **Not done**: multiple windows (needs iPadOS scene support Flutter
+  doesn't offer stably), drag and drop between apps (the usual plugin needs
+  a Rust toolchain in the build), handwriting-to-text (decided: later).
 
-### v1.4 — Reading comfort
-- Dark/sepia reading mode, PDF outline/table of contents, cross-paper
-  Highlights view, ratings/priority.
-- App-wide dark mode, Dynamic Type/accessibility audit, localization.
+### v1.4 — Reading comfort (built, except as noted)
+- **Reading mode**: PDF viewer ⋮ → Paper / Sepia / Night page
+  (`settings/appearance_settings.dart`). A `ColorFilter` over the page and
+  the marks on it; Night inverts and rotates the hue back so highlights
+  keep their color. Per-device (shared_preferences), not synced.
+- **Contents**: PDF viewer ⋮ → Contents shows the PDF's own outline
+  (`ContentsSheet`), tap to jump; says so if the PDF has none.
+- **All highlights**: Library ⋮ → "All highlights" — every passage across
+  papers, grouped by paper, searchable (quote, comment, paper title); tap
+  opens the PDF at the page, long-press edits.
+- **Ratings**: five stars beside the reading-status chips on the paper
+  screen (tap the current rating to clear); `★★★★` shows on the Library
+  card once rated. `Papers.rating`, synced.
+- **App-wide dark mode**: the dark scheme already followed the system; the
+  account sheet now has Auto / Light / Dark (per-device).
+- **Accessibility**: a test renders both tabs at 2× text scale with no
+  overflow. That is a smoke check, not a full Dynamic Type/VoiceOver audit.
+- **Not done: localization.** All strings are still inline English; doing
+  it means moving them to ARB files (`flutter gen-l10n`) and is a
+  cross-cutting change best done as its own pass.
 
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This
@@ -602,8 +668,7 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   feature. The note editor exposes a folder picker and tag picker via
   AppBar icons (`folder_picker_sheet.dart`, `tag_picker_sheet.dart`).
 
-Not yet built: hand-testing sync through the app UI on two devices, storage
-cleanup for deleted files, and BibTeX *import*. Update the sections above as those decisions are made,
+Not yet built: hand-testing sync through the app UI on two devices. Update the sections above as those decisions are made,
 so this file stays accurate for future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)

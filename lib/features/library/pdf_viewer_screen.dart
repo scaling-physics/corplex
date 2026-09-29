@@ -17,6 +17,7 @@ import '../../theme/app_theme.dart';
 import '../notes/note_editor_screen.dart';
 import 'annotations_providers.dart';
 import 'highlights.dart';
+import '../settings/appearance_settings.dart';
 import 'quote_to_note.dart';
 
 /// Reads a paper's PDF. Two ways to mark it up:
@@ -144,6 +145,29 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
       ? parts.single
       : parts.first.copyWith(quote: parts.map((h) => h.quote).join(' '));
 
+  /// The PDF's own table of contents (bookmarks), if it has one.
+  Future<void> _showContents() async {
+    final List<PdfOutlineNode> outline;
+    try {
+      outline = await _controller.document.loadOutline();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    if (outline.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This PDF has no table of contents.')),
+      );
+      return;
+    }
+    final page = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ContentsSheet(outline: outline),
+    );
+    if (page != null) await _controller.goToPage(pageNumber: page);
+  }
+
   Future<void> _showHighlightsList() async {
     final page = await showModalBottomSheet<int>(
       context: context,
@@ -175,8 +199,29 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
             tooltip: 'More',
             onSelected: (v) {
               if (v == 'snapshot') _extractToNote();
+              if (v == 'contents') _showContents();
+              if (v.startsWith('read:')) {
+                ref
+                    .read(appearanceSettingsProvider)
+                    .setReading(ReadingTheme.values.byName(v.substring(5)));
+              }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'contents',
+                child: ListTile(
+                  leading: Icon(Icons.toc),
+                  title: Text('Contents'),
+                ),
+              ),
+              for (final theme in ReadingTheme.values)
+                CheckedPopupMenuItem(
+                  value: 'read:${theme.name}',
+                  checked:
+                      ref.read(appearanceSettingsProvider).reading == theme,
+                  child: Text('${theme.label} page'),
+                ),
+              const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'snapshot',
                 enabled: !_extracting,
@@ -192,24 +237,29 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
       ),
       body: RepaintBoundary(
         key: _repaintKey,
-        child: PdfViewer.file(
-          widget.pdfPath,
-          controller: _controller,
-          initialPageNumber: widget.initialPage ?? 1,
-          params: PdfViewerParams(
-            backgroundColor: c.surfaceContainer,
-            onPageChanged: _onPageChanged,
-            textSelectionParams: PdfTextSelectionParams(enabled: !_inkMode),
-            customizeContextMenuItems: _customizeMenu,
-            pageOverlaysBuilder: (context, pageRect, page) => [
-              _PageOverlay(
-                paperId: widget.paperId,
-                pageNumber: page.pageNumber,
-                pageRect: pageRect,
-                inkMode: _inkMode,
-                color: _color,
-              ),
-            ],
+        child: ColorFiltered(
+          colorFilter:
+              ref.watch(appearanceSettingsProvider).reading.filter ??
+              const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+          child: PdfViewer.file(
+            widget.pdfPath,
+            controller: _controller,
+            initialPageNumber: widget.initialPage ?? 1,
+            params: PdfViewerParams(
+              backgroundColor: c.surfaceContainer,
+              onPageChanged: _onPageChanged,
+              textSelectionParams: PdfTextSelectionParams(enabled: !_inkMode),
+              customizeContextMenuItems: _customizeMenu,
+              pageOverlaysBuilder: (context, pageRect, page) => [
+                _PageOverlay(
+                  paperId: widget.paperId,
+                  pageNumber: page.pageNumber,
+                  pageRect: pageRect,
+                  inkMode: _inkMode,
+                  color: _color,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -707,6 +757,57 @@ class _HighlightsList extends ConsumerWidget {
                     ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+/// A flattened, indented view of a PDF's outline. Pops with the page number
+/// of the chosen entry.
+class ContentsSheet extends StatelessWidget {
+  const ContentsSheet({super.key, required this.outline});
+
+  final List<PdfOutlineNode> outline;
+
+  static List<({String title, int depth, int? page})> flatten(
+    List<PdfOutlineNode> nodes, [
+    int depth = 0,
+  ]) => [
+    for (final n in nodes) ...[
+      (title: n.title, depth: depth, page: n.dest?.pageNumber),
+      ...flatten(n.children, depth + 1),
+    ],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = flatten(outline);
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final e in entries)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.only(
+                  left: 20.0 + e.depth * 18,
+                  right: 20,
+                ),
+                title: Text(
+                  e.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: e.page == null ? null : Text('${e.page}'),
+                enabled: e.page != null,
+                onTap: () => Navigator.pop(context, e.page),
+              ),
+          ],
+        ),
       ),
     );
   }

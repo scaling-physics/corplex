@@ -42,12 +42,37 @@ import 'notes_providers.dart';
 import 'tag_picker_sheet.dart';
 import 'tags_providers.dart';
 
+/// Lets the reader beside a note (split view) push a quoted passage into
+/// it without going through the database: the open editor owns the note's
+/// text, and a write behind its back would be overwritten by its autosave.
+class NoteEditorHandle {
+  Future<void> Function({
+    required String paperId,
+    required String quote,
+    required int page,
+    required String pageLink,
+    String? comment,
+  })?
+  appendQuote;
+}
+
 /// A single note, editable in place with no separate "edit mode" — typing
 /// autosaves after a short pause, so there's nothing to remember to save.
 class NoteEditorScreen extends ConsumerStatefulWidget {
-  const NoteEditorScreen({super.key, required this.noteId});
+  const NoteEditorScreen({
+    super.key,
+    required this.noteId,
+    this.handle,
+    this.embedded = false,
+  });
 
   final String noteId;
+
+  /// Set when the editor sits beside a PDF; see [NoteEditorHandle].
+  final NoteEditorHandle? handle;
+
+  /// One pane of a split view: no back button (the reader has it).
+  final bool embedded;
 
   @override
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -94,7 +119,30 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _titleController.addListener(_scheduleSave);
     _quillController.addListener(_scheduleSave);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
+    widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
+  }
+
+  /// Adds a quote to the end of the open note (see [NoteEditorHandle]).
+  Future<void> _appendQuoteHere({
+    required String paperId,
+    required String quote,
+    required int page,
+    required String pageLink,
+    String? comment,
+  }) async {
+    final content = appendQuote(
+      encodeNoteContent(_quillController.document),
+      quote: quote,
+      page: page,
+      pageLink: pageLink,
+      comment: comment,
+    );
+    await _docChanges?.cancel();
+    _quillController.document = decodeNoteContent(content);
+    _docChanges = _quillController.document.changes.listen(_watchForWikilink);
+    await linkPaperToNote(_db, noteId: widget.noteId, paperId: paperId);
+    _scheduleSave();
   }
 
   void _scheduleSave() {
@@ -373,21 +421,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _export(BuildContext context) async {
     await _save();
     if (!context.mounted) return;
-    await exportNotes(
-      context,
-      ref.read(databaseProvider),
-      [
-        ExportNote(
-          _titleController.text,
-          encodeNoteContent(_quillController.document),
-        ),
-      ],
-      title: _titleController.text,
-    );
+    await exportNotes(context, ref.read(databaseProvider), [
+      ExportNote(
+        _titleController.text,
+        encodeNoteContent(_quillController.document),
+      ),
+    ], title: _titleController.text);
   }
 
   @override
   void dispose() {
+    widget.handle?.appendQuote = null;
     _docChanges?.cancel();
     // Leaving right after typing must not drop the last edit.
     if (_debounce?.isActive ?? false) _save();
@@ -418,6 +462,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         actions: [
           IconButton(
             icon: const Icon(Icons.folder_outlined),

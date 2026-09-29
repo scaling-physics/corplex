@@ -16,6 +16,7 @@ import '../projects/project_menu.dart';
 import '../projects/projects_providers.dart';
 import '../../theme/swipe_to_trash.dart';
 import '../trash/trash_actions.dart';
+import 'all_highlights_screen.dart';
 import 'library_actions.dart';
 import 'papers_providers.dart';
 import '../../theme/app_theme.dart';
@@ -96,9 +97,22 @@ class LibraryScreen extends ConsumerWidget {
                   'doi' => addPaperByIdentifier(context, ref),
                   'import' => importBibtexFile(context, ref),
                   'export' => exportLibraryBibtex(context, ref),
+                  'highlights' => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AllHighlightsScreen(),
+                    ),
+                  ),
                   _ => null,
                 },
                 itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'highlights',
+                    child: ListTile(
+                      leading: Icon(Icons.format_quote_outlined),
+                      title: Text('All highlights'),
+                      subtitle: Text('Across every paper'),
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'doi',
                     child: ListTile(
@@ -293,10 +307,13 @@ class _PaperCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium,
                     ),
-                    if (byline.isNotEmpty) ...[
+                    if (byline.isNotEmpty || paper.rating != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        byline,
+                        [
+                          if (paper.rating != null) '★' * paper.rating!,
+                          if (byline.isNotEmpty) byline,
+                        ].join('  '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
@@ -57,6 +58,10 @@ Future<String> quoteHighlightIntoNote(
   });
 }
 
+/// In split view, the note editor beside the reader; quotes go straight
+/// into it instead of asking which note. Set by the split reader.
+final pairedNoteProvider = StateProvider<NoteEditorHandle?>((ref) => null);
+
 /// Asks which note the quote goes into — a new one, notes already about
 /// this paper, or recent notes — then adds it and opens that note.
 Future<void> showQuoteToNoteSheet(
@@ -68,6 +73,26 @@ Future<void> showQuoteToNoteSheet(
   final paper = await (db.select(
     db.papers,
   )..where((p) => p.id.equals(highlight.paperId))).getSingle();
+  if (ref.read(pairedNoteProvider)?.appendQuote case final append?) {
+    await append(
+      paperId: paper.id,
+      quote: highlight.quote,
+      page: highlight.pageNumber,
+      pageLink: paperPageLink(paper.id, highlight.pageNumber),
+      comment: highlight.comment,
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Added to your note'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+    return;
+  }
   final linked =
       await (db.select(db.notes).join([
             innerJoin(

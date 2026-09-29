@@ -96,3 +96,10 @@ Future<void> setReadingStatus(
 ) => (db.update(db.papers)..where((p) => p.id.equals(paperId))).write(
   PapersCompanion(readingStatus: Value(status)),
 );
+
+/// Sets the reader's own 1–5 star rating; tapping the current rating again
+/// (or passing null) clears it.
+Future<void> setRating(AppDatabase db, String paperId, int? rating) =>
+    (db.update(db.papers)..where((p) => p.id.equals(paperId))).write(
+      PapersCompanion(rating: Value(rating?.clamp(1, 5))),
+    );

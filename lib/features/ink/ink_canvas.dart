@@ -24,14 +24,20 @@ class InkInputPolicy {
 
   bool get fingersDraw => fingerDrawsOverride ?? !stylusSeen;
 
-  InkAction actionFor(PointerDeviceKind kind, {required bool eraserTool}) {
+  /// [stylusButton] is the pen's barrel button (S Pen, Wacom-style styluses):
+  /// held while touching, it erases, like flipping a pencil over.
+  InkAction actionFor(
+    PointerDeviceKind kind, {
+    required bool eraserTool,
+    bool stylusButton = false,
+  }) {
     switch (kind) {
       case PointerDeviceKind.invertedStylus:
         stylusSeen = true;
         return InkAction.erase;
       case PointerDeviceKind.stylus:
         stylusSeen = true;
-        return eraserTool ? InkAction.erase : InkAction.draw;
+        return eraserTool || stylusButton ? InkAction.erase : InkAction.draw;
       case PointerDeviceKind.touch:
       case PointerDeviceKind.mouse:
         if (!fingersDraw) return InkAction.ignore;
@@ -85,6 +91,11 @@ class InkCanvas extends StatefulWidget {
 
 class _InkCanvasState extends State<InkCanvas> {
   final _active = ValueNotifier<InkStroke?>(null);
+
+  /// Where a hovering pen is (canvas pixels) and whether it would erase;
+  /// null when nothing hovers. Apple Pencil (M2 iPads) and Android styluses
+  /// report hover before they touch.
+  final _hover = ValueNotifier<({Offset at, bool erase})?>(null);
   int? _pointer;
   InkAction _action = InkAction.ignore;
   double _canvasWidth = 1;
@@ -100,6 +111,7 @@ class _InkCanvasState extends State<InkCanvas> {
   @override
   void dispose() {
     _active.dispose();
+    _hover.dispose();
     super.dispose();
   }
 
@@ -112,7 +124,12 @@ class _InkCanvasState extends State<InkCanvas> {
   void _down(PointerDownEvent e) {
     if (_pointer != null) return; // one stroke at a time
     final hadStylus = widget.policy.stylusSeen;
-    final action = widget.policy.actionFor(e.kind, eraserTool: widget.erasing);
+    final action = widget.policy.actionFor(
+      e.kind,
+      eraserTool: widget.erasing,
+      stylusButton: e.buttons & kSecondaryStylusButton != 0,
+    );
+    _hover.value = null;
     if (!hadStylus && widget.policy.stylusSeen) widget.onPolicyChanged?.call();
     if (action == InkAction.ignore) return;
 
@@ -150,6 +167,21 @@ class _InkCanvasState extends State<InkCanvas> {
       color: stroke.color,
       width: stroke.width,
       points: [...stroke.points, InkPoint(at.dx, at.dy, _pressure(e))],
+    );
+  }
+
+  void _hovered(PointerHoverEvent e) {
+    if (_pointer != null ||
+        (e.kind != PointerDeviceKind.stylus &&
+            e.kind != PointerDeviceKind.invertedStylus)) {
+      return;
+    }
+    _hover.value = (
+      at: e.localPosition,
+      erase:
+          widget.erasing ||
+          e.kind == PointerDeviceKind.invertedStylus ||
+          e.buttons & kSecondaryStylusButton != 0,
     );
   }
 
@@ -192,19 +224,38 @@ class _InkCanvasState extends State<InkCanvas> {
     return LayoutBuilder(
       builder: (context, constraints) {
         _canvasWidth = constraints.maxWidth;
-        return Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: _down,
-          onPointerMove: _move,
-          onPointerUp: _up,
-          onPointerCancel: _up,
-          child: SizedBox(
-            width: constraints.maxWidth,
-            height: constraints.maxWidth * widget.sketch.aspect,
-            child: RepaintBoundary(
-              child: CustomPaint(
-                painter: InkPainter(strokes: widget.sketch.strokes),
-                foregroundPainter: _ActiveStrokePainter(_active),
+        return MouseRegion(
+          onHover: _hovered,
+          onExit: (_) => _hover.value = null,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: _down,
+            onPointerMove: _move,
+            onPointerUp: _up,
+            onPointerCancel: _up,
+            child: SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxWidth * widget.sketch.aspect,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: InkPainter(strokes: widget.sketch.strokes),
+                  foregroundPainter: _ActiveStrokePainter(_active),
+                  child: ValueListenableBuilder(
+                    valueListenable: _hover,
+                    builder: (context, hover, _) => hover == null
+                        ? const SizedBox.expand()
+                        : CustomPaint(
+                            key: const ValueKey('ink-hover'),
+                            painter: _HoverPainter(
+                              at: hover.at,
+                              radius: hover.erase
+                                  ? _eraserRadius * _canvasWidth
+                                  : widget.width * _canvasWidth / 2,
+                              erase: hover.erase,
+                            ),
+                          ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -229,4 +280,30 @@ class _ActiveStrokePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ActiveStrokePainter old) => old.active != active;
+}
+
+/// The ring that follows a hovering pen: the size of the mark it would
+/// make, so you can aim before touching down.
+class _HoverPainter extends CustomPainter {
+  _HoverPainter({required this.at, required this.radius, required this.erase});
+
+  final Offset at;
+  final double radius;
+  final bool erase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawCircle(
+      at,
+      radius.clamp(3, 60),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = erase ? const Color(0xFFB5654A) : const Color(0x99000000),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HoverPainter old) =>
+      old.at != at || old.radius != radius || old.erase != erase;
 }

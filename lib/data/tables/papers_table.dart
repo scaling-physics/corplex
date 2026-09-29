@@ -1,6 +1,9 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+/// Where a paper is in the reader's queue.
+enum ReadingStatus { toRead, reading, done }
+
 /// A referenced paper/source, the unit the Library tab lists and searches.
 /// Primary key is a client-generated UUID (see notes_table.dart for why).
 class Papers extends Table {
@@ -17,6 +20,13 @@ class Papers extends Table {
   /// Object key of the PDF in cloud storage once uploaded (synced, unlike
   /// [pdfPath], which only means something on this device).
   TextColumn get storageKey => text().nullable()();
+
+  /// The page the reader was last on, so the paper reopens there.
+  IntColumn get lastPage => integer().nullable()();
+
+  /// Where the paper is in the reader's queue (see [ReadingStatus]); null
+  /// means not yet triaged.
+  TextColumn get readingStatus => textEnum<ReadingStatus>().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 

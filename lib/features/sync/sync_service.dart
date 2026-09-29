@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import 'sync_engine.dart';
+import 'sync_remote.dart';
 
 enum SyncStatus { offline, syncing, upToDate, error }
 
@@ -161,7 +162,10 @@ class EngineSyncService implements SyncService {
       _emit(SyncStatus.upToDate);
     } catch (e) {
       _accountMismatch = e is SyncAccountMismatch;
-      _lastError = e is SyncAccountMismatch || e is SyncFilesIncomplete
+      _lastError =
+          e is SyncAccountMismatch ||
+              e is SyncFilesIncomplete ||
+              e is SyncServerOutdated
           ? e.toString()
           : 'Couldn\'t sync. Your notes are safe on this device.';
       _emit(SyncStatus.error);

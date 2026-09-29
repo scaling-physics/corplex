@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
+import 'package:corplex/data/tables/papers_table.dart';
 import 'package:corplex/features/sync/sync_engine.dart';
 
 import '../../support/fake_sync_remote.dart';
@@ -94,9 +95,33 @@ void main() {
           ),
         );
 
+    await a
+        .into(a.highlights)
+        .insert(
+          HighlightsCompanion.insert(
+            id: const Value('h1'),
+            paperId: 'p1',
+            pageNumber: 2,
+            quote: 'Attention is all you need',
+            rectsJson: '[[0.1,0.2,0.9,0.22]]',
+          ),
+        );
+    await (a.update(a.papers)..where((p) => p.id.equals('p1'))).write(
+      const PapersCompanion(
+        lastPage: Value(7),
+        readingStatus: Value(ReadingStatus.reading),
+      ),
+    );
+
     await both();
 
+    expect(
+      (await b.select(b.highlights).getSingle()).quote,
+      'Attention is all you need',
+    );
     final paper = await b.select(b.papers).getSingle();
+    expect(paper.lastPage, 7);
+    expect(paper.readingStatus, ReadingStatus.reading);
     expect(paper.title, 'Attention Is All You Need');
     expect(paper.year, 2017);
     expect(paper.pdfPath, isNull, reason: 'device-local paths never sync');

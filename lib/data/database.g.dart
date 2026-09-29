@@ -796,6 +796,26 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lastPageMeta = const VerificationMeta(
+    'lastPage',
+  );
+  @override
+  late final GeneratedColumn<int> lastPage = GeneratedColumn<int>(
+    'last_page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<ReadingStatus?, String>
+  readingStatus = GeneratedColumn<String>(
+    'reading_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<ReadingStatus?>($PapersTable.$converterreadingStatusn);
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -830,6 +850,8 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     doi,
     pdfPath,
     storageKey,
+    lastPage,
+    readingStatus,
     createdAt,
     updatedAt,
   ];
@@ -892,6 +914,12 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         storageKey.isAcceptableOrUnknown(data['storage_key']!, _storageKeyMeta),
       );
     }
+    if (data.containsKey('last_page')) {
+      context.handle(
+        _lastPageMeta,
+        lastPage.isAcceptableOrUnknown(data['last_page']!, _lastPageMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -945,6 +973,16 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         DriftSqlType.string,
         data['${effectivePrefix}storage_key'],
       ),
+      lastPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_page'],
+      ),
+      readingStatus: $PapersTable.$converterreadingStatusn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}reading_status'],
+        ),
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -960,6 +998,15 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
   $PapersTable createAlias(String alias) {
     return $PapersTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<ReadingStatus, String, String>
+  $converterreadingStatus = const EnumNameConverter<ReadingStatus>(
+    ReadingStatus.values,
+  );
+  static JsonTypeConverter2<ReadingStatus?, String?, String?>
+  $converterreadingStatusn = JsonTypeConverter2.asNullable(
+    $converterreadingStatus,
+  );
 }
 
 class Paper extends DataClass implements Insertable<Paper> {
@@ -976,6 +1023,13 @@ class Paper extends DataClass implements Insertable<Paper> {
   /// Object key of the PDF in cloud storage once uploaded (synced, unlike
   /// [pdfPath], which only means something on this device).
   final String? storageKey;
+
+  /// The page the reader was last on, so the paper reopens there.
+  final int? lastPage;
+
+  /// Where the paper is in the reader's queue (see [ReadingStatus]); null
+  /// means not yet triaged.
+  final ReadingStatus? readingStatus;
   final DateTime createdAt;
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
@@ -989,6 +1043,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     this.doi,
     this.pdfPath,
     this.storageKey,
+    this.lastPage,
+    this.readingStatus,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1013,6 +1069,14 @@ class Paper extends DataClass implements Insertable<Paper> {
     if (!nullToAbsent || storageKey != null) {
       map['storage_key'] = Variable<String>(storageKey);
     }
+    if (!nullToAbsent || lastPage != null) {
+      map['last_page'] = Variable<int>(lastPage);
+    }
+    if (!nullToAbsent || readingStatus != null) {
+      map['reading_status'] = Variable<String>(
+        $PapersTable.$converterreadingStatusn.toSql(readingStatus),
+      );
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1034,6 +1098,12 @@ class Paper extends DataClass implements Insertable<Paper> {
       storageKey: storageKey == null && nullToAbsent
           ? const Value.absent()
           : Value(storageKey),
+      lastPage: lastPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastPage),
+      readingStatus: readingStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readingStatus),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1053,6 +1123,10 @@ class Paper extends DataClass implements Insertable<Paper> {
       doi: serializer.fromJson<String?>(json['doi']),
       pdfPath: serializer.fromJson<String?>(json['pdfPath']),
       storageKey: serializer.fromJson<String?>(json['storageKey']),
+      lastPage: serializer.fromJson<int?>(json['lastPage']),
+      readingStatus: $PapersTable.$converterreadingStatusn.fromJson(
+        serializer.fromJson<String?>(json['readingStatus']),
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1069,6 +1143,10 @@ class Paper extends DataClass implements Insertable<Paper> {
       'doi': serializer.toJson<String?>(doi),
       'pdfPath': serializer.toJson<String?>(pdfPath),
       'storageKey': serializer.toJson<String?>(storageKey),
+      'lastPage': serializer.toJson<int?>(lastPage),
+      'readingStatus': serializer.toJson<String?>(
+        $PapersTable.$converterreadingStatusn.toJson(readingStatus),
+      ),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1083,6 +1161,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     Value<String?> doi = const Value.absent(),
     Value<String?> pdfPath = const Value.absent(),
     Value<String?> storageKey = const Value.absent(),
+    Value<int?> lastPage = const Value.absent(),
+    Value<ReadingStatus?> readingStatus = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Paper(
@@ -1094,6 +1174,10 @@ class Paper extends DataClass implements Insertable<Paper> {
     doi: doi.present ? doi.value : this.doi,
     pdfPath: pdfPath.present ? pdfPath.value : this.pdfPath,
     storageKey: storageKey.present ? storageKey.value : this.storageKey,
+    lastPage: lastPage.present ? lastPage.value : this.lastPage,
+    readingStatus: readingStatus.present
+        ? readingStatus.value
+        : this.readingStatus,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1109,6 +1193,10 @@ class Paper extends DataClass implements Insertable<Paper> {
       storageKey: data.storageKey.present
           ? data.storageKey.value
           : this.storageKey,
+      lastPage: data.lastPage.present ? data.lastPage.value : this.lastPage,
+      readingStatus: data.readingStatus.present
+          ? data.readingStatus.value
+          : this.readingStatus,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1125,6 +1213,8 @@ class Paper extends DataClass implements Insertable<Paper> {
           ..write('doi: $doi, ')
           ..write('pdfPath: $pdfPath, ')
           ..write('storageKey: $storageKey, ')
+          ..write('lastPage: $lastPage, ')
+          ..write('readingStatus: $readingStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1141,6 +1231,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     doi,
     pdfPath,
     storageKey,
+    lastPage,
+    readingStatus,
     createdAt,
     updatedAt,
   );
@@ -1156,6 +1248,8 @@ class Paper extends DataClass implements Insertable<Paper> {
           other.doi == this.doi &&
           other.pdfPath == this.pdfPath &&
           other.storageKey == this.storageKey &&
+          other.lastPage == this.lastPage &&
+          other.readingStatus == this.readingStatus &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1169,6 +1263,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<String?> doi;
   final Value<String?> pdfPath;
   final Value<String?> storageKey;
+  final Value<int?> lastPage;
+  final Value<ReadingStatus?> readingStatus;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1181,6 +1277,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.doi = const Value.absent(),
     this.pdfPath = const Value.absent(),
     this.storageKey = const Value.absent(),
+    this.lastPage = const Value.absent(),
+    this.readingStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1194,6 +1292,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.doi = const Value.absent(),
     this.pdfPath = const Value.absent(),
     this.storageKey = const Value.absent(),
+    this.lastPage = const Value.absent(),
+    this.readingStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1207,6 +1307,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? doi,
     Expression<String>? pdfPath,
     Expression<String>? storageKey,
+    Expression<int>? lastPage,
+    Expression<String>? readingStatus,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1220,6 +1322,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (doi != null) 'doi': doi,
       if (pdfPath != null) 'pdf_path': pdfPath,
       if (storageKey != null) 'storage_key': storageKey,
+      if (lastPage != null) 'last_page': lastPage,
+      if (readingStatus != null) 'reading_status': readingStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1235,6 +1339,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<String?>? doi,
     Value<String?>? pdfPath,
     Value<String?>? storageKey,
+    Value<int?>? lastPage,
+    Value<ReadingStatus?>? readingStatus,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1248,6 +1354,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       doi: doi ?? this.doi,
       pdfPath: pdfPath ?? this.pdfPath,
       storageKey: storageKey ?? this.storageKey,
+      lastPage: lastPage ?? this.lastPage,
+      readingStatus: readingStatus ?? this.readingStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1281,6 +1389,14 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     if (storageKey.present) {
       map['storage_key'] = Variable<String>(storageKey.value);
     }
+    if (lastPage.present) {
+      map['last_page'] = Variable<int>(lastPage.value);
+    }
+    if (readingStatus.present) {
+      map['reading_status'] = Variable<String>(
+        $PapersTable.$converterreadingStatusn.toSql(readingStatus.value),
+      );
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1304,6 +1420,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('doi: $doi, ')
           ..write('pdfPath: $pdfPath, ')
           ..write('storageKey: $storageKey, ')
+          ..write('lastPage: $lastPage, ')
+          ..write('readingStatus: $readingStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -3238,6 +3356,571 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
   }
 }
 
+class $HighlightsTable extends Highlights
+    with TableInfo<$HighlightsTable, Highlight> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HighlightsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _paperIdMeta = const VerificationMeta(
+    'paperId',
+  );
+  @override
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
+    'paper_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES papers (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _pageNumberMeta = const VerificationMeta(
+    'pageNumber',
+  );
+  @override
+  late final GeneratedColumn<int> pageNumber = GeneratedColumn<int>(
+    'page_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quoteMeta = const VerificationMeta('quote');
+  @override
+  late final GeneratedColumn<String> quote = GeneratedColumn<String>(
+    'quote',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rectsJsonMeta = const VerificationMeta(
+    'rectsJson',
+  );
+  @override
+  late final GeneratedColumn<String> rectsJson = GeneratedColumn<String>(
+    'rects_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorHexMeta = const VerificationMeta(
+    'colorHex',
+  );
+  @override
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+    'color_hex',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('#f2d66b'),
+  );
+  static const VerificationMeta _commentMeta = const VerificationMeta(
+    'comment',
+  );
+  @override
+  late final GeneratedColumn<String> comment = GeneratedColumn<String>(
+    'comment',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    paperId,
+    pageNumber,
+    quote,
+    rectsJson,
+    colorHex,
+    comment,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'highlights';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Highlight> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('paper_id')) {
+      context.handle(
+        _paperIdMeta,
+        paperId.isAcceptableOrUnknown(data['paper_id']!, _paperIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paperIdMeta);
+    }
+    if (data.containsKey('page_number')) {
+      context.handle(
+        _pageNumberMeta,
+        pageNumber.isAcceptableOrUnknown(data['page_number']!, _pageNumberMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pageNumberMeta);
+    }
+    if (data.containsKey('quote')) {
+      context.handle(
+        _quoteMeta,
+        quote.isAcceptableOrUnknown(data['quote']!, _quoteMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_quoteMeta);
+    }
+    if (data.containsKey('rects_json')) {
+      context.handle(
+        _rectsJsonMeta,
+        rectsJson.isAcceptableOrUnknown(data['rects_json']!, _rectsJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rectsJsonMeta);
+    }
+    if (data.containsKey('color_hex')) {
+      context.handle(
+        _colorHexMeta,
+        colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
+      );
+    }
+    if (data.containsKey('comment')) {
+      context.handle(
+        _commentMeta,
+        comment.isAcceptableOrUnknown(data['comment']!, _commentMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Highlight map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Highlight(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      paperId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paper_id'],
+      )!,
+      pageNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_number'],
+      )!,
+      quote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quote'],
+      )!,
+      rectsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rects_json'],
+      )!,
+      colorHex: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_hex'],
+      )!,
+      comment: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}comment'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $HighlightsTable createAlias(String alias) {
+    return $HighlightsTable(attachedDatabase, alias);
+  }
+}
+
+class Highlight extends DataClass implements Insertable<Highlight> {
+  final String id;
+  final String paperId;
+  final int pageNumber;
+
+  /// The highlighted passage, as extracted from the PDF's text layer.
+  final String quote;
+
+  /// One box per line, as `[[left, top, right, bottom], …]` fractions of the
+  /// page's width/height, so it lines up at any zoom level.
+  final String rectsJson;
+  final String colorHex;
+
+  /// The reader's own remark about the passage.
+  final String? comment;
+  final DateTime createdAt;
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  final DateTime updatedAt;
+  const Highlight({
+    required this.id,
+    required this.paperId,
+    required this.pageNumber,
+    required this.quote,
+    required this.rectsJson,
+    required this.colorHex,
+    this.comment,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['paper_id'] = Variable<String>(paperId);
+    map['page_number'] = Variable<int>(pageNumber);
+    map['quote'] = Variable<String>(quote);
+    map['rects_json'] = Variable<String>(rectsJson);
+    map['color_hex'] = Variable<String>(colorHex);
+    if (!nullToAbsent || comment != null) {
+      map['comment'] = Variable<String>(comment);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  HighlightsCompanion toCompanion(bool nullToAbsent) {
+    return HighlightsCompanion(
+      id: Value(id),
+      paperId: Value(paperId),
+      pageNumber: Value(pageNumber),
+      quote: Value(quote),
+      rectsJson: Value(rectsJson),
+      colorHex: Value(colorHex),
+      comment: comment == null && nullToAbsent
+          ? const Value.absent()
+          : Value(comment),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Highlight.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Highlight(
+      id: serializer.fromJson<String>(json['id']),
+      paperId: serializer.fromJson<String>(json['paperId']),
+      pageNumber: serializer.fromJson<int>(json['pageNumber']),
+      quote: serializer.fromJson<String>(json['quote']),
+      rectsJson: serializer.fromJson<String>(json['rectsJson']),
+      colorHex: serializer.fromJson<String>(json['colorHex']),
+      comment: serializer.fromJson<String?>(json['comment']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'paperId': serializer.toJson<String>(paperId),
+      'pageNumber': serializer.toJson<int>(pageNumber),
+      'quote': serializer.toJson<String>(quote),
+      'rectsJson': serializer.toJson<String>(rectsJson),
+      'colorHex': serializer.toJson<String>(colorHex),
+      'comment': serializer.toJson<String?>(comment),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  Highlight copyWith({
+    String? id,
+    String? paperId,
+    int? pageNumber,
+    String? quote,
+    String? rectsJson,
+    String? colorHex,
+    Value<String?> comment = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Highlight(
+    id: id ?? this.id,
+    paperId: paperId ?? this.paperId,
+    pageNumber: pageNumber ?? this.pageNumber,
+    quote: quote ?? this.quote,
+    rectsJson: rectsJson ?? this.rectsJson,
+    colorHex: colorHex ?? this.colorHex,
+    comment: comment.present ? comment.value : this.comment,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  Highlight copyWithCompanion(HighlightsCompanion data) {
+    return Highlight(
+      id: data.id.present ? data.id.value : this.id,
+      paperId: data.paperId.present ? data.paperId.value : this.paperId,
+      pageNumber: data.pageNumber.present
+          ? data.pageNumber.value
+          : this.pageNumber,
+      quote: data.quote.present ? data.quote.value : this.quote,
+      rectsJson: data.rectsJson.present ? data.rectsJson.value : this.rectsJson,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      comment: data.comment.present ? data.comment.value : this.comment,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Highlight(')
+          ..write('id: $id, ')
+          ..write('paperId: $paperId, ')
+          ..write('pageNumber: $pageNumber, ')
+          ..write('quote: $quote, ')
+          ..write('rectsJson: $rectsJson, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('comment: $comment, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    paperId,
+    pageNumber,
+    quote,
+    rectsJson,
+    colorHex,
+    comment,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Highlight &&
+          other.id == this.id &&
+          other.paperId == this.paperId &&
+          other.pageNumber == this.pageNumber &&
+          other.quote == this.quote &&
+          other.rectsJson == this.rectsJson &&
+          other.colorHex == this.colorHex &&
+          other.comment == this.comment &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class HighlightsCompanion extends UpdateCompanion<Highlight> {
+  final Value<String> id;
+  final Value<String> paperId;
+  final Value<int> pageNumber;
+  final Value<String> quote;
+  final Value<String> rectsJson;
+  final Value<String> colorHex;
+  final Value<String?> comment;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const HighlightsCompanion({
+    this.id = const Value.absent(),
+    this.paperId = const Value.absent(),
+    this.pageNumber = const Value.absent(),
+    this.quote = const Value.absent(),
+    this.rectsJson = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.comment = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HighlightsCompanion.insert({
+    this.id = const Value.absent(),
+    required String paperId,
+    required int pageNumber,
+    required String quote,
+    required String rectsJson,
+    this.colorHex = const Value.absent(),
+    this.comment = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : paperId = Value(paperId),
+       pageNumber = Value(pageNumber),
+       quote = Value(quote),
+       rectsJson = Value(rectsJson);
+  static Insertable<Highlight> custom({
+    Expression<String>? id,
+    Expression<String>? paperId,
+    Expression<int>? pageNumber,
+    Expression<String>? quote,
+    Expression<String>? rectsJson,
+    Expression<String>? colorHex,
+    Expression<String>? comment,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (paperId != null) 'paper_id': paperId,
+      if (pageNumber != null) 'page_number': pageNumber,
+      if (quote != null) 'quote': quote,
+      if (rectsJson != null) 'rects_json': rectsJson,
+      if (colorHex != null) 'color_hex': colorHex,
+      if (comment != null) 'comment': comment,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HighlightsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? paperId,
+    Value<int>? pageNumber,
+    Value<String>? quote,
+    Value<String>? rectsJson,
+    Value<String>? colorHex,
+    Value<String?>? comment,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return HighlightsCompanion(
+      id: id ?? this.id,
+      paperId: paperId ?? this.paperId,
+      pageNumber: pageNumber ?? this.pageNumber,
+      quote: quote ?? this.quote,
+      rectsJson: rectsJson ?? this.rectsJson,
+      colorHex: colorHex ?? this.colorHex,
+      comment: comment ?? this.comment,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (paperId.present) {
+      map['paper_id'] = Variable<String>(paperId.value);
+    }
+    if (pageNumber.present) {
+      map['page_number'] = Variable<int>(pageNumber.value);
+    }
+    if (quote.present) {
+      map['quote'] = Variable<String>(quote.value);
+    }
+    if (rectsJson.present) {
+      map['rects_json'] = Variable<String>(rectsJson.value);
+    }
+    if (colorHex.present) {
+      map['color_hex'] = Variable<String>(colorHex.value);
+    }
+    if (comment.present) {
+      map['comment'] = Variable<String>(comment.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HighlightsCompanion(')
+          ..write('id: $id, ')
+          ..write('paperId: $paperId, ')
+          ..write('pageNumber: $pageNumber, ')
+          ..write('quote: $quote, ')
+          ..write('rectsJson: $rectsJson, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('comment: $comment, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3249,6 +3932,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AnnotationsTable annotations = $AnnotationsTable(this);
   late final $TagsTable tags = $TagsTable(this);
   late final $NoteTagsTable noteTags = $NoteTagsTable(this);
+  late final $HighlightsTable highlights = $HighlightsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3262,6 +3946,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     annotations,
     tags,
     noteTags,
+    highlights,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3320,6 +4005,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('note_tags', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'papers',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('highlights', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -4223,6 +4915,8 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<String?> doi,
   Value<String?> pdfPath,
   Value<String?> storageKey,
+  Value<int?> lastPage,
+  Value<ReadingStatus?> readingStatus,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -4236,6 +4930,8 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<String?> doi,
   Value<String?> pdfPath,
   Value<String?> storageKey,
+  Value<int?> lastPage,
+  Value<ReadingStatus?> readingStatus,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -4298,6 +4994,24 @@ final class $$PapersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$HighlightsTable, List<Highlight>>
+  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.highlights,
+    aliasName: 'papers__id__highlights__paper_id',
+  );
+
+  $$HighlightsTableProcessedTableManager get highlightsRefs {
+    final manager = $$HighlightsTableTableManager(
+      $_db,
+      $_db.highlights,
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PapersTableFilterComposer
@@ -4347,6 +5061,17 @@ class $$PapersTableFilterComposer
   ColumnFilters<String> get storageKey => $composableBuilder(
     column: $table.storageKey,
     builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastPage => $composableBuilder(
+    column: $table.lastPage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<ReadingStatus?, ReadingStatus, String>
+  get readingStatus => $composableBuilder(
+    column: $table.readingStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
@@ -4433,6 +5158,31 @@ class $$PapersTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> highlightsRefs(
+    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  ) {
+    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableFilterComposer(
+            $db: $db,
+            $table: $db.highlights,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PapersTableOrderingComposer
@@ -4484,6 +5234,16 @@ class $$PapersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get lastPage => $composableBuilder(
+    column: $table.lastPage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get readingStatus => $composableBuilder(
+    column: $table.readingStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -4529,6 +5289,15 @@ class $$PapersTableAnnotationComposer
     column: $table.storageKey,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get lastPage =>
+      $composableBuilder(column: $table.lastPage, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<ReadingStatus?, String> get readingStatus =>
+      $composableBuilder(
+        column: $table.readingStatus,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -4610,6 +5379,31 @@ class $$PapersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> highlightsRefs<T extends Object>(
+    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  ) {
+    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.highlights,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PapersTableTableManager
@@ -4629,6 +5423,7 @@ class $$PapersTableTableManager
             bool attachmentsRefs,
             bool notePaperRefsRefs,
             bool annotationsRefs,
+            bool highlightsRefs,
           })
         > {
   $$PapersTableTableManager(_$AppDatabase db, $PapersTable table)
@@ -4652,6 +5447,8 @@ class $$PapersTableTableManager
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
                 Value<String?> storageKey = const Value.absent(),
+                Value<int?> lastPage = const Value.absent(),
+                Value<ReadingStatus?> readingStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4664,6 +5461,8 @@ class $$PapersTableTableManager
                 doi: doi,
                 pdfPath: pdfPath,
                 storageKey: storageKey,
+                lastPage: lastPage,
+                readingStatus: readingStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -4678,6 +5477,8 @@ class $$PapersTableTableManager
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
                 Value<String?> storageKey = const Value.absent(),
+                Value<int?> lastPage = const Value.absent(),
+                Value<ReadingStatus?> readingStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4690,6 +5491,8 @@ class $$PapersTableTableManager
                 doi: doi,
                 pdfPath: pdfPath,
                 storageKey: storageKey,
+                lastPage: lastPage,
+                readingStatus: readingStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -4707,6 +5510,7 @@ class $$PapersTableTableManager
                 attachmentsRefs = false,
                 notePaperRefsRefs = false,
                 annotationsRefs = false,
+                highlightsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -4714,6 +5518,7 @@ class $$PapersTableTableManager
                     if (attachmentsRefs) db.attachments,
                     if (notePaperRefsRefs) db.notePaperRefs,
                     if (annotationsRefs) db.annotations,
+                    if (highlightsRefs) db.highlights,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -4781,6 +5586,27 @@ class $$PapersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (highlightsRefs)
+                        await $_getPrefetchedData<
+                          Paper,
+                          $PapersTable,
+                          Highlight
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PapersTableReferences
+                              ._highlightsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PapersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).highlightsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.paperId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -4805,6 +5631,7 @@ typedef $$PapersTableProcessedTableManager =
         bool attachmentsRefs,
         bool notePaperRefsRefs,
         bool annotationsRefs,
+        bool highlightsRefs,
       })
     >;
 typedef $$AttachmentsTableCreateCompanionBuilder =
@@ -6659,6 +7486,397 @@ typedef $$NoteTagsTableProcessedTableManager =
       NoteTag,
       PrefetchHooks Function({bool noteId, bool tagId})
     >;
+typedef $$HighlightsTableCreateCompanionBuilder = HighlightsCompanion Function({
+  Value<String> id,
+  required String paperId,
+  required int pageNumber,
+  required String quote,
+  required String rectsJson,
+  Value<String> colorHex,
+  Value<String?> comment,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+typedef $$HighlightsTableUpdateCompanionBuilder = HighlightsCompanion Function({
+  Value<String> id,
+  Value<String> paperId,
+  Value<int> pageNumber,
+  Value<String> quote,
+  Value<String> rectsJson,
+  Value<String> colorHex,
+  Value<String?> comment,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+final class $$HighlightsTableReferences
+    extends BaseReferences<_$AppDatabase, $HighlightsTable, Highlight> {
+  $$HighlightsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PapersTable _paperIdTable(_$AppDatabase db) =>
+      db.papers.createAlias('highlights__paper_id__papers__id');
+
+  $$PapersTableProcessedTableManager get paperId {
+    final $_column = $_itemColumn<String>('paper_id')!;
+
+    final manager = $$PapersTableTableManager(
+      $_db,
+      $_db.papers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_paperIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$HighlightsTableFilterComposer
+    extends Composer<_$AppDatabase, $HighlightsTable> {
+  $$HighlightsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quote => $composableBuilder(
+    column: $table.quote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rectsJson => $composableBuilder(
+    column: $table.rectsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get comment => $composableBuilder(
+    column: $table.comment,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PapersTableFilterComposer get paperId {
+    final $$PapersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableFilterComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$HighlightsTableOrderingComposer
+    extends Composer<_$AppDatabase, $HighlightsTable> {
+  $$HighlightsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quote => $composableBuilder(
+    column: $table.quote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rectsJson => $composableBuilder(
+    column: $table.rectsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get comment => $composableBuilder(
+    column: $table.comment,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PapersTableOrderingComposer get paperId {
+    final $$PapersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableOrderingComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$HighlightsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HighlightsTable> {
+  $$HighlightsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get quote =>
+      $composableBuilder(column: $table.quote, builder: (column) => column);
+
+  GeneratedColumn<String> get rectsJson =>
+      $composableBuilder(column: $table.rectsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<String> get comment =>
+      $composableBuilder(column: $table.comment, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$PapersTableAnnotationComposer get paperId {
+    final $$PapersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$HighlightsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $HighlightsTable,
+          Highlight,
+          $$HighlightsTableFilterComposer,
+          $$HighlightsTableOrderingComposer,
+          $$HighlightsTableAnnotationComposer,
+          $$HighlightsTableCreateCompanionBuilder,
+          $$HighlightsTableUpdateCompanionBuilder,
+          (Highlight, $$HighlightsTableReferences),
+          Highlight,
+          PrefetchHooks Function({bool paperId})
+        > {
+  $$HighlightsTableTableManager(_$AppDatabase db, $HighlightsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HighlightsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HighlightsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$HighlightsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> paperId = const Value.absent(),
+                Value<int> pageNumber = const Value.absent(),
+                Value<String> quote = const Value.absent(),
+                Value<String> rectsJson = const Value.absent(),
+                Value<String> colorHex = const Value.absent(),
+                Value<String?> comment = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HighlightsCompanion(
+                id: id,
+                paperId: paperId,
+                pageNumber: pageNumber,
+                quote: quote,
+                rectsJson: rectsJson,
+                colorHex: colorHex,
+                comment: comment,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String paperId,
+                required int pageNumber,
+                required String quote,
+                required String rectsJson,
+                Value<String> colorHex = const Value.absent(),
+                Value<String?> comment = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HighlightsCompanion.insert(
+                id: id,
+                paperId: paperId,
+                pageNumber: pageNumber,
+                quote: quote,
+                rectsJson: rectsJson,
+                colorHex: colorHex,
+                comment: comment,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$HighlightsTable, Highlight>(table),
+                  $$HighlightsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({paperId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (paperId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.paperId,
+                        referencedTable: $$HighlightsTableReferences
+                            ._paperIdTable(db),
+                        referencedColumn: $$HighlightsTableReferences
+                            ._paperIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$HighlightsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $HighlightsTable,
+      Highlight,
+      $$HighlightsTableFilterComposer,
+      $$HighlightsTableOrderingComposer,
+      $$HighlightsTableAnnotationComposer,
+      $$HighlightsTableCreateCompanionBuilder,
+      $$HighlightsTableUpdateCompanionBuilder,
+      (Highlight, $$HighlightsTableReferences),
+      Highlight,
+      PrefetchHooks Function({bool paperId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6678,4 +7896,6 @@ class $AppDatabaseManager {
   $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
   $$NoteTagsTableTableManager get noteTags =>
       $$NoteTagsTableTableManager(_db, _db.noteTags);
+  $$HighlightsTableTableManager get highlights =>
+      $$HighlightsTableTableManager(_db, _db.highlights);
 }

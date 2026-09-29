@@ -10,6 +10,7 @@ import 'sync_schema.dart';
 import 'tables/annotations_table.dart';
 import 'tables/attachments_table.dart';
 import 'tables/folders_table.dart';
+import 'tables/highlights_table.dart';
 import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
 import 'tables/notes_table.dart';
@@ -28,6 +29,7 @@ part 'database.g.dart';
     Folders,
     Tags,
     NoteTags,
+    Highlights,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -48,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -80,10 +82,16 @@ class AppDatabase extends _$AppDatabase {
       if (from < 4) {
         // v4 adds folders and tags — purely additive, no existing data
         // needs to change.
-        await m.createTable(folders);
-        await m.createTable(tags);
-        await m.createTable(noteTags);
-        await m.addColumn(notes, notes.folderId);
+        // Guarded: a database upgraded from <3 was rebuilt with the
+        // current schema above, so these may already exist.
+        for (final table in <TableInfo>[folders, tags, noteTags]) {
+          if (!await _hasTable(table.actualTableName)) {
+            await m.createTable(table);
+          }
+        }
+        if (!await _hasColumn('notes', 'folder_id')) {
+          await m.addColumn(notes, notes.folderId);
+        }
       }
       if (from < 5) {
         // v5 adds `updated_at` everywhere (last-write-wins sync needs it)
@@ -114,8 +122,28 @@ class AppDatabase extends _$AppDatabase {
           }
         }
       }
+      if (from < 7) {
+        // v7: text highlights, and per-paper reading position/status.
+        if (!await _hasTable('highlights')) await m.createTable(highlights);
+        if (!await _hasColumn('papers', 'last_page')) {
+          await m.addColumn(papers, papers.lastPage);
+        }
+        if (!await _hasColumn('papers', 'reading_status')) {
+          await m.addColumn(papers, papers.readingStatus);
+        }
+        // Change-tracking triggers for the new table (idempotent).
+        await _createSyncSchema();
+      }
     },
   );
+
+  Future<bool> _hasTable(String table) async {
+    final rows = await customSelect(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+      variables: [Variable.withString(table)],
+    ).get();
+    return rows.isNotEmpty;
+  }
 
   Future<bool> _hasColumn(String table, String column) async {
     final columns = await customSelect('PRAGMA table_info($table)').get();
@@ -135,7 +163,11 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _createSyncSchema() async {
-    for (final statement in syncSchemaStatements()) {
+    final tables = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    ).get();
+    final existing = {for (final t in tables) t.read<String>('name')};
+    for (final statement in syncSchemaStatements(existingTables: existing)) {
       await customStatement(statement);
     }
   }

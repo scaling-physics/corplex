@@ -9,6 +9,17 @@ import '../../data/sync_schema.dart';
 ///
 /// Conflict rule (enforced by the server): a write whose `updated_at` is
 /// older than the stored row's is silently ignored — last write wins.
+/// The server is missing tables or columns this version of the app syncs:
+/// its `supabase/migrations` haven't all been applied yet.
+class SyncServerOutdated implements Exception {
+  const SyncServerOutdated();
+
+  @override
+  String toString() =>
+      'Your sync server needs a database update. Run the newest files in '
+      'supabase/migrations on your Supabase project.';
+}
+
 abstract class SyncRemote {
   Future<void> upsertRows(String table, List<Map<String, Object?>> rows);
 
@@ -32,13 +43,28 @@ class SupabaseSyncRemote implements SyncRemote {
 
   final SupabaseClient _client;
 
+  /// PostgREST's "no such table/column" (schema cache) and Postgres's
+  /// undefined table/column.
+  static const _outdatedCodes = {'PGRST204', 'PGRST205', '42P01', '42703'};
+
+  Future<T> _guard<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } on PostgrestException catch (e) {
+      if (_outdatedCodes.contains(e.code)) throw const SyncServerOutdated();
+      rethrow;
+    }
+  }
+
   static const _pageSize = 500;
 
   @override
   Future<void> upsertRows(String table, List<Map<String, Object?>> rows) async {
     if (rows.isEmpty) return;
     final spec = syncTables.firstWhere((t) => t.name == table);
-    await _client.from(table).upsert(rows, onConflict: spec.keys.join(','));
+    await _guard(
+      () => _client.from(table).upsert(rows, onConflict: spec.keys.join(',')),
+    );
   }
 
   @override
@@ -47,12 +73,14 @@ class SupabaseSyncRemote implements SyncRemote {
     Map<String, Object?> key,
     String deletedAtIso,
   ) async {
-    await _client
-        .from(table)
-        .update({'deleted_at': deletedAtIso, 'updated_at': deletedAtIso})
-        .match(key.cast<String, Object>())
-        // Older than what the server holds means a newer edit exists.
-        .lte('updated_at', deletedAtIso);
+    await _guard(
+      () => _client
+          .from(table)
+          .update({'deleted_at': deletedAtIso, 'updated_at': deletedAtIso})
+          .match(key.cast<String, Object>())
+          // Older than what the server holds means a newer edit exists.
+          .lte('updated_at', deletedAtIso),
+    );
   }
 
   @override
@@ -65,11 +93,13 @@ class SupabaseSyncRemote implements SyncRemote {
     for (var offset = 0; ; offset += _pageSize) {
       var query = _client.from(table).select();
       if (sinceIso != null) query = query.gte('synced_at', sinceIso);
-      final page = await query
-          // postgrest-dart sorts *descending* unless told otherwise.
-          .order('synced_at', ascending: true)
-          .order(spec.keys.first, ascending: true)
-          .range(offset, offset + _pageSize - 1);
+      final page = await _guard(
+        () => query
+            // postgrest-dart sorts *descending* unless told otherwise.
+            .order('synced_at', ascending: true)
+            .order(spec.keys.first, ascending: true)
+            .range(offset, offset + _pageSize - 1),
+      );
       result.addAll(page.cast<Map<String, Object?>>());
       if (page.length < _pageSize) return result;
     }

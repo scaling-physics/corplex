@@ -64,12 +64,10 @@ the rest are the remaining v1 work, in priority order.
 
 1. **Rich-text notes (built)** — folders/tags, Quill rich-text editor.
    Remaining: `[[wikilinks]]` with a backlinks panel, and Markdown export.
-2. **PDF import & annotation (built, needs rework)** — freeform ink
-   highlighting exists. Remaining: **text-selection highlights** using
-   pdfrx's text layer, each anchored to a page with an optional comment, so
-   "extract to note" inserts the quoted text plus a link back to the paper
-   and page rather than a screenshot. Ink stays as a second mode. Also:
-   resume at last-read page, and a per-paper Highlights list.
+2. **PDF import & annotation (built)** — text-selection highlights with
+   comments, "Quote to note" (quote + tappable page link), a per-paper
+   Highlights list, resume at last-read page; freeform ink as a second
+   mode.
 3. **Citation management (partly built)** — APA/MLA/BibTeX formatting
    exists. Remaining: BibTeX import, **metadata lookup from DOI/arXiv ID**
    (Crossref/arXiv; strictly optional online, manual entry always works),
@@ -225,7 +223,22 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   button. Author name parsing is intentionally naive (uses the raw
   `authors` string as-is); revisit if per-author formatting is needed.
 
-- **PDF viewing & annotation**: `lib/features/library/pdf_viewer_screen.dart`
+- **Text highlights** (`lib/features/library/highlights.dart`,
+  `pdf_viewer_screen.dart`, `quote_to_note.dart`): selecting text in the
+  PDF adds "Highlight" and "Quote to note" to pdfrx's own selection menu
+  (via `customizeContextMenuItems`, so Copy/Select all stay native).
+  A `Highlights` row keeps the passage's real `quote` (cleaned of PDF line
+  breaks/hyphenation), its page, a comment, and one box per line as
+  fractions of the page (`lineRects` merges pdfrx's per-character rects,
+  converted with `PdfRect.toRect(page:)`). A selection spanning pages
+  becomes one highlight per page. Tap a highlight for its sheet
+  (recolor, comment, quote, copy, delete). Quoting appends a block quote
+  plus "— p. N" linked to `corplex://paper/<id>?page=N` (`appendQuote` in
+  `note_content.dart`) and links the note to the paper; tapping that link
+  in the editor reopens the PDF at the page. `Papers.lastPage` (synced)
+  reopens the viewer where you left off. Both kinds of marks live in one
+  per-page overlay (`_PageOverlay`); ink mode disables text selection.
+- **PDF viewing & annotation (ink)**: `lib/features/library/pdf_viewer_screen.dart`
   uses `pdfrx`'s `PdfViewer` (normal pan/zoom) with freeform highlighter
   annotation — chosen over Syncfusion's text-layer highlighting to stay
   fully open-source and to fit the pen-input design principle; it works on
@@ -315,6 +328,16 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     made each sync re-download everything since. `SupabaseSyncRemote`
     now passes `ascending: true` explicitly; `FakeSyncRemote.newestFirst`
     and an integration test guard both halves.
+  * **What counts as an edit**: update triggers fire only when a
+    *synced* column changes (`NEW.c IS NOT OLD.c` over the spec's
+    columns), so setting a device-local path never syncs the row. The
+    automatic stamp is `MAX(now, OLD.updated_at + 1)` and also applies
+    when a writer's own `updatedAt` isn't newer than the stored one — an
+    edit can't lose to older data because another device's clock ran
+    ahead. Trigger changes reach existing installs only when a migration
+    step re-runs `_createSyncSchema()`; `syncSchemaStatements` takes the
+    set of existing tables because earlier steps run before later tables
+    exist.
   * **Conflicts** are last-write-wins per row on client `updated_at`,
     enforced on both ends (server `sync_guard` trigger; client `_apply`).
     Two devices editing the same note offline: the later edit wins

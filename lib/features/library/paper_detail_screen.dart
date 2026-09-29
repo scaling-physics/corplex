@@ -14,6 +14,7 @@ import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
+import 'highlights.dart';
 import 'citation_formatter.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
@@ -125,6 +126,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                 ),
                 const SizedBox(height: 12),
                 _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
+                _HighlightsSection(paper: paperAsync.value),
                 _Section(
                   title: 'Attachments',
                   trailing: TextButton.icon(
@@ -256,12 +258,19 @@ class _PdfButton extends StatelessWidget {
     final paper = this.paper;
     if (paper == null) return const SizedBox.shrink();
     if (paper.pdfPath case final pdfPath?) {
+      final resume = paper.lastPage != null && paper.lastPage! > 1;
       return FilledButton.tonalIcon(
         icon: const Icon(Icons.menu_book_outlined),
-        label: const Text('Open PDF'),
+        label: Text(
+          resume ? 'Continue reading · p. ${paper.lastPage}' : 'Open PDF',
+        ),
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => PdfViewerScreen(paperId: paperId, pdfPath: pdfPath),
+            builder: (_) => PdfViewerScreen(
+              paperId: paperId,
+              pdfPath: pdfPath,
+              initialPage: paper.lastPage,
+            ),
           ),
         ),
       );
@@ -274,6 +283,75 @@ class _PdfButton extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+/// The paper's highlighted passages, each opening the PDF at its page.
+/// Hidden until there is at least one.
+class _HighlightsSection extends ConsumerWidget {
+  const _HighlightsSection({required this.paper});
+
+  final Paper? paper;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paper = this.paper;
+    if (paper == null) return const SizedBox.shrink();
+    final highlights =
+        ref.watch(highlightsForPaperProvider(paper.id)).value ?? const [];
+    if (highlights.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return _Section(
+      title: 'Highlights',
+      child: Column(
+        children: [
+          for (final h in highlights)
+            ListTile(
+              leading: Container(
+                width: 5,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colorFromHex(h.colorHex),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              title: Text(
+                h.quote,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              subtitle: Text(
+                ['p. ${h.pageNumber}', ?h.comment].join(' · '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: paper.pdfPath == null
+                  ? () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => HighlightSheet(highlightId: h.id),
+                    )
+                  : () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PdfViewerScreen(
+                          paperId: paper.id,
+                          pdfPath: paper.pdfPath!,
+                          initialPage: h.pageNumber,
+                        ),
+                      ),
+                    ),
+              onLongPress: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => HighlightSheet(highlightId: h.id),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

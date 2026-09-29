@@ -4,8 +4,10 @@
 /// Sync is last-write-wins per row, keyed on `updated_at`. Rather than
 /// touching every query in the app, change tracking lives in the database:
 ///
-/// * an AFTER UPDATE trigger bumps `updated_at` when the writer didn't;
-/// * AFTER INSERT/UPDATE triggers mark the row in `sync_dirty`, the queue
+/// * an AFTER UPDATE trigger moves `updated_at` forward when the writer
+///   didn't (never backwards, even past a skewed clock);
+/// * AFTER INSERT/UPDATE triggers mark the row in `sync_dirty` (updates
+///   only when a *synced* column changed), the queue
 ///   of rows still to be pushed (an explicit queue, not a timestamp
 ///   cursor, because `updated_at` only has one-second resolution);
 /// * an AFTER DELETE trigger records a tombstone in `sync_tombstones`
@@ -60,6 +62,8 @@ const syncTables = [
       'venue',
       'doi',
       'storage_key',
+      'last_page',
+      'reading_status',
       'created_at',
       'updated_at',
     ],
@@ -94,6 +98,20 @@ const syncTables = [
     ],
   ),
   SyncTableSpec(
+    'highlights',
+    keys: ['id'],
+    columns: [
+      'paper_id',
+      'page_number',
+      'quote',
+      'rects_json',
+      'color_hex',
+      'comment',
+      'created_at',
+      'updated_at',
+    ],
+  ),
+  SyncTableSpec(
     'annotations',
     keys: ['id'],
     columns: [
@@ -112,7 +130,11 @@ const _notApplying = '(SELECT applying FROM sync_meta WHERE id = 1) = 0';
 
 /// Idempotent DDL for the sync bookkeeping tables and change-tracking
 /// triggers. Run on create and on upgrade to schema v5.
-List<String> syncSchemaStatements() {
+///
+/// [existingTables] limits the per-table triggers to tables that exist:
+/// an upgrade step runs this before later steps have created newer tables,
+/// and those steps call it again once they have.
+List<String> syncSchemaStatements({Set<String>? existingTables}) {
   final statements = <String>[
     'CREATE TABLE IF NOT EXISTS sync_meta ('
         'id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1), '
@@ -136,9 +158,18 @@ List<String> syncSchemaStatements() {
   ];
 
   for (final t in syncTables) {
+    if (existingTables != null && !existingTables.contains(t.name)) continue;
     final oldKey = t.keys.map((k) => "'$k', OLD.$k").join(', ');
     final newKey = t.keys.map((k) => "'$k', NEW.$k").join(', ');
     final rowKey = t.keys.map((k) => "'$k', $k").join(', ');
+    // Only changes to synced columns are edits. Device-local columns (a
+    // PDF's path on this device) must not mark the row as changed, or
+    // setting them would push the row and could override a real edit made
+    // on another device.
+    final changed = t.allColumns
+        .where((c) => c != 'updated_at')
+        .map((c) => 'NEW.$c IS NOT OLD.$c')
+        .join(' OR ');
     // Delete-then-insert rather than INSERT OR REPLACE: when a trigger
     // fires from an outer statement (e.g. an FK action), SQLite overrides
     // the trigger's own ON CONFLICT clause with the outer one.
@@ -162,12 +193,16 @@ List<String> syncSchemaStatements() {
           'AND row_key = json_object($newKey); END',
       'DROP TRIGGER IF EXISTS sync_${t.name}_upd_dirty',
       'CREATE TRIGGER sync_${t.name}_upd_dirty AFTER UPDATE ON ${t.name} '
-          'WHEN $_notApplying BEGIN $markDirty; END',
+          'WHEN $_notApplying AND ($changed) BEGIN $markDirty; END',
       'DROP TRIGGER IF EXISTS sync_${t.name}_upd',
+      // An edit must always move updated_at forward: to now, or — if the
+      // row carries a later time from another device's clock — one second
+      // past it. Otherwise the edit could lose to older data.
       'CREATE TRIGGER sync_${t.name}_upd AFTER UPDATE ON ${t.name} '
-          'WHEN NEW.updated_at = OLD.updated_at AND $_notApplying BEGIN '
-          'UPDATE ${t.name} SET updated_at = $_now WHERE rowid = NEW.rowid; '
-          'END',
+          'WHEN NEW.updated_at <= OLD.updated_at AND $_notApplying '
+          'AND ($changed) BEGIN '
+          'UPDATE ${t.name} SET updated_at = MAX($_now, OLD.updated_at + 1) '
+          'WHERE rowid = NEW.rowid; END',
       'DROP TRIGGER IF EXISTS sync_${t.name}_del',
       'CREATE TRIGGER sync_${t.name}_del AFTER DELETE ON ${t.name} '
           'WHEN $_notApplying BEGIN '

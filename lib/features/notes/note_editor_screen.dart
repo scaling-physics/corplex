@@ -16,7 +16,9 @@ import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import '../ink/sketch_embed.dart';
 import '../library/add_attachment_sheet.dart';
+import '../library/highlights.dart';
 import '../library/paper_detail_screen.dart';
+import '../library/pdf_viewer_screen.dart';
 import 'folder_picker_sheet.dart';
 import 'folders_providers.dart';
 import 'link_paper_sheet.dart';
@@ -120,6 +122,32 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (latest != null && audioSourceOf(latest) != null) {
       await ref.read(audioPlaybackProvider).open(latest);
     }
+  }
+
+  /// Opens a quoted paper at the cited page (the PDF if it's on this
+  /// device, otherwise the paper's details).
+  Future<void> _openPaperAt(String paperId, int page) async {
+    final paper = await (_db.select(
+      _db.papers,
+    )..where((p) => p.id.equals(paperId))).getSingleOrNull();
+    if (!mounted) return;
+    if (paper == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('That paper was removed.')));
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => paper.pdfPath == null
+            ? PaperDetailScreen(paperId: paperId)
+            : PdfViewerScreen(
+                paperId: paperId,
+                pdfPath: paper.pdfPath!,
+                initialPage: page,
+              ),
+      ),
+    );
   }
 
   /// Plays the recording a timestamp points at, from that moment.
@@ -386,13 +414,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     // keep Quill's default long-press menu.
                     customRecognizerBuilder: (attribute, leaf) {
                       if (attribute.key != Attribute.link.key) return null;
-                      final target = parseAudioTimestampLink(
-                        attribute.value?.toString() ?? '',
-                      );
-                      if (target == null) return null;
-                      return TapGestureRecognizer()
-                        ..onTap = () =>
-                            _playFrom(target.attachmentId, target.at);
+                      final link = attribute.value?.toString() ?? '';
+                      if (parseAudioTimestampLink(link) case final t?) {
+                        return TapGestureRecognizer()
+                          ..onTap = () => _playFrom(t.attachmentId, t.at);
+                      }
+                      if (parsePaperPageLink(link) case final p?) {
+                        return TapGestureRecognizer()
+                          ..onTap = () => _openPaperAt(p.paperId, p.page);
+                      }
+                      return null;
                     },
                   ),
                 ),

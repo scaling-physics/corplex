@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -129,10 +129,70 @@ void main() {
       expect((await old.select(old.folders).getSingle()).name, 'Thesis');
       expect(await old.select(old.notePaperRefs).get(), hasLength(1));
 
+      // v7's highlights table exists, with sync triggers.
+      await old
+          .into(old.highlights)
+          .insert(
+            HighlightsCompanion.insert(
+              paperId: 'p1',
+              pageNumber: 1,
+              quote: 'q',
+              rectsJson: '[]',
+            ),
+          );
+      expect((await old.select(old.papers).getSingle()).lastPage, isNull);
+
       // Triggers exist after migration.
       await old.delete(old.papers).go();
       expect(await _tombstoneCount(old, 'papers'), 1);
       expect(await _tombstoneCount(old, 'note_paper_refs'), 1);
+      expect(await _tombstoneCount(old, 'highlights'), 1, reason: 'cascaded');
     },
   );
+
+  test('changing only a device-local column is not an edit', () async {
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: const Value('p1'),
+            title: 'T',
+            updatedAt: Value(DateTime.utc(2020)),
+          ),
+        );
+    await db.customStatement('DELETE FROM sync_dirty');
+
+    await (db.update(db.papers)..where((p) => p.id.equals('p1'))).write(
+      const PapersCompanion(pdfPath: Value('/here/p.pdf')),
+    );
+
+    final paper = await db.select(db.papers).getSingle();
+    expect(paper.updatedAt.toUtc(), DateTime.utc(2020));
+    final dirty = await db
+        .customSelect('SELECT COUNT(*) c FROM sync_dirty')
+        .getSingle();
+    expect(dirty.read<int>('c'), 0);
+  });
+
+  test('an edit never moves updated_at backwards', () async {
+    // A row stamped by a device whose clock runs far ahead.
+    final future = DateTime.utc(2099);
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            updatedAt: Value(future),
+          ),
+        );
+
+    // A writer stamping "now" (earlier than the row's time) …
+    await (db.update(db.notes)..where((n) => n.id.equals('n1'))).write(
+      NotesCompanion(title: const Value('x'), updatedAt: Value(DateTime.now())),
+    );
+
+    // … still ends up after it.
+    final note = await db.select(db.notes).getSingle();
+    expect(note.updatedAt.isAfter(future), isTrue);
+  });
 }

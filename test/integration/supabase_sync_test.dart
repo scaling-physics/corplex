@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
+import 'package:corplex/data/tables/papers_table.dart';
 import 'package:corplex/features/auth/auth_service.dart';
 import 'package:corplex/features/auth/supabase_auth_service.dart';
 import 'package:corplex/features/sync/file_sync.dart';
@@ -178,10 +179,33 @@ void main() {
             ),
           );
 
+      await db
+          .into(db.highlights)
+          .insert(
+            HighlightsCompanion.insert(
+              paperId: paper,
+              pageNumber: 4,
+              quote: 'Multi-head attention',
+              rectsJson: '[[0.1,0.2,0.8,0.22]]',
+              comment: const Value('Key idea'),
+            ),
+          );
+      await (db.update(db.papers)..where((p) => p.id.equals(paper))).write(
+        const PapersCompanion(
+          lastPage: Value(4),
+          readingStatus: Value(ReadingStatus.reading),
+        ),
+      );
+
       await a.engine.sync(userId: userId);
       await b.engine.sync(userId: userId);
 
+      final bh = await b.db.select(b.db.highlights).getSingle();
+      expect(bh.quote, 'Multi-head attention');
+      expect(bh.comment, 'Key idea');
       final bp = await b.db.select(b.db.papers).getSingle();
+      expect(bp.lastPage, 4);
+      expect(bp.readingStatus, ReadingStatus.reading);
       expect(bp.title, 'Attention Is All You Need');
       expect(bp.year, 2017);
       expect(bp.doi, '10.5555/3295222.3295349');

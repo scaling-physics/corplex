@@ -35,6 +35,10 @@ abstract class SyncService {
   /// Wipes all local data and files, then re-syncs if a user is signed in.
   Future<void> eraseLocalData();
 
+  /// Downloads one file now (a paper's PDF or an attachment), regardless of
+  /// the Wi-Fi/on-demand settings. Returns whether it is on this device.
+  Future<bool> downloadFile({String? paperId, String? attachmentId});
+
   /// Runs a sync now. A no-op when not started or one is already running.
   Future<void> syncNow();
 
@@ -63,6 +67,10 @@ class NoOpSyncService implements SyncService {
   Future<void> eraseLocalData() async {}
 
   @override
+  Future<bool> downloadFile({String? paperId, String? attachmentId}) async =>
+      false;
+
+  @override
   Future<void> start({required String userId}) async {}
 
   @override
@@ -82,7 +90,12 @@ class EngineSyncService implements SyncService {
     this._engine, {
     this.debounce = const Duration(seconds: 5),
     this.pollInterval = const Duration(minutes: 5),
+    this.networkChanges,
   });
+
+  /// Fires when connectivity changes (e.g. Wi-Fi came back), so files that
+  /// were waiting for it go up/down without waiting for the next poll.
+  final Stream<Object?>? networkChanges;
 
   final AppDatabase _db;
   final SyncEngine _engine;
@@ -97,6 +110,7 @@ class EngineSyncService implements SyncService {
   bool _running = false;
 
   StreamSubscription<Object?>? _localChanges;
+  StreamSubscription<Object?>? _network;
   Timer? _debounceTimer;
   Timer? _pollTimer;
 
@@ -114,6 +128,10 @@ class EngineSyncService implements SyncService {
 
   @override
   Future<int> pendingChanges() => _engine.pendingChanges();
+
+  @override
+  Future<bool> downloadFile({String? paperId, String? attachmentId}) =>
+      _engine.fetchFile(paperId: paperId, attachmentId: attachmentId);
 
   @override
   Future<void> eraseLocalData() async {
@@ -146,6 +164,7 @@ class EngineSyncService implements SyncService {
       });
     });
     _pollTimer = Timer.periodic(pollInterval, (_) => syncNow());
+    _network = networkChanges?.listen((_) => syncNow());
     await syncNow();
   }
 
@@ -181,6 +200,8 @@ class EngineSyncService implements SyncService {
     _pollTimer?.cancel();
     await _localChanges?.cancel();
     _localChanges = null;
+    await _network?.cancel();
+    _network = null;
     _lastError = null;
     _accountMismatch = false;
     _emit(SyncStatus.offline);

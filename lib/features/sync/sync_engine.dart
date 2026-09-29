@@ -92,6 +92,15 @@ class SyncEngine {
     }
   }
 
+  /// Fetches one file on request (see [FileSync.fetchPaper]).
+  Future<bool> fetchFile({String? paperId, String? attachmentId}) async {
+    final files = _files;
+    if (files == null) return false;
+    if (paperId != null) return files.fetchPaper(paperId);
+    if (attachmentId != null) return files.fetchAttachment(attachmentId);
+    return false;
+  }
+
   /// Changes that exist only on this device: unpushed edits, unpushed
   /// deletes, and files not yet uploaded.
   Future<int> pendingChanges() async {

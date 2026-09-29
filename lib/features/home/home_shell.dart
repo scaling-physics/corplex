@@ -8,6 +8,7 @@ import '../../data/trash.dart';
 import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../sync/sync_service.dart';
+import '../sync/transfer_settings.dart';
 import '../notes/notes_screen.dart';
 import '../search/search_screen.dart';
 import '../trash/trash_screen.dart';
@@ -170,6 +171,35 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                     ),
                     onTap: () => Navigator.pop(context, 'switch'),
                   ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final t = ref.watch(transferSettingsProvider);
+                    return Column(
+                      children: [
+                        SwitchListTile(
+                          secondary: const Icon(Icons.wifi),
+                          title: const Text('Send files on Wi-Fi only'),
+                          subtitle: const Text(
+                            'Notes always sync. Opening a file downloads it '
+                            'on any network.',
+                          ),
+                          value: t.wifiOnly,
+                          onChanged: t.setWifiOnly,
+                        ),
+                        SwitchListTile(
+                          secondary: const Icon(Icons.cloud_download_outlined),
+                          title: const Text('Download files when opened'),
+                          subtitle: const Text(
+                            'Otherwise papers and audio download in the '
+                            'background.',
+                          ),
+                          value: t.onDemand,
+                          onChanged: t.setOnDemand,
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
               const Divider(),
               Consumer(

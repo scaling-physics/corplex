@@ -18,6 +18,7 @@ import 'highlights.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
+import '../sync/sync_service.dart';
 import 'metadata_lookup.dart';
 import '../../data/tables/papers_table.dart';
 import 'citation_formatter.dart';
@@ -423,17 +424,52 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   }
 }
 
-/// "Open PDF" when the file is on this device; a quiet placeholder while
-/// sync is still downloading it; nothing for papers without a PDF.
-class _PdfButton extends StatelessWidget {
+/// "Open PDF" when the file is on this device; "Download PDF" when it is
+/// only in the cloud (Wi-Fi-only / on-demand settings, or still syncing);
+/// nothing for papers without a PDF.
+class _PdfButton extends ConsumerStatefulWidget {
   const _PdfButton({required this.paperId, required this.paper});
 
   final String paperId;
   final Paper? paper;
 
   @override
+  ConsumerState<_PdfButton> createState() => _PdfButtonState();
+}
+
+class _PdfButtonState extends ConsumerState<_PdfButton> {
+  bool _downloading = false;
+
+  void _open(String pdfPath, int? page) => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => PdfViewerScreen(
+        paperId: widget.paperId,
+        pdfPath: pdfPath,
+        initialPage: page,
+      ),
+    ),
+  );
+
+  Future<void> _download() async {
+    setState(() => _downloading = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
+        .read(syncServiceProvider)
+        .downloadFile(paperId: widget.paperId);
+    if (!mounted) return;
+    setState(() => _downloading = false);
+    if (!ok) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Couldn\'t download the PDF. Try again.')),
+      );
+    }
+    // On success the paper row updates with its local path, which rebuilds
+    // this button as "Open PDF".
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final paper = this.paper;
+    final paper = widget.paper;
     if (paper == null) return const SizedBox.shrink();
     if (paper.pdfPath case final pdfPath?) {
       final resume = paper.lastPage != null && paper.lastPage! > 1;
@@ -442,22 +478,20 @@ class _PdfButton extends StatelessWidget {
         label: Text(
           resume ? 'Continue reading · p. ${paper.lastPage}' : 'Open PDF',
         ),
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PdfViewerScreen(
-              paperId: paperId,
-              pdfPath: pdfPath,
-              initialPage: paper.lastPage,
-            ),
-          ),
-        ),
+        onPressed: () => _open(pdfPath, paper.lastPage),
       );
     }
     if (paper.storageKey != null) {
       return FilledButton.tonalIcon(
-        icon: const Icon(Icons.cloud_download_outlined),
-        label: const Text('PDF is syncing to this device…'),
-        onPressed: null,
+        icon: _downloading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.cloud_download_outlined),
+        label: Text(_downloading ? 'Downloading…' : 'Download PDF'),
+        onPressed: _downloading ? null : _download,
       );
     }
     return const SizedBox.shrink();
@@ -674,6 +708,42 @@ class _AttachmentTile extends ConsumerWidget {
     }
   }
 
+  /// Its file is in the cloud but hasn't been downloaded to this device.
+  bool get _inCloudOnly =>
+      attachment.path == null && attachment.storageKey != null;
+
+  Future<void> _downloadThenOpen(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool audio,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final playback = ref.read(audioPlaybackProvider);
+    final db = ref.read(databaseProvider);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Downloading…'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    final ok = await ref
+        .read(syncServiceProvider)
+        .downloadFile(attachmentId: attachment.id);
+    if (!ok) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Couldn\'t download the file. Try again.'),
+        ),
+      );
+      return;
+    }
+    if (!audio) return;
+    final fresh = await (db.select(
+      db.attachments,
+    )..where((t) => t.id.equals(attachment.id))).getSingleOrNull();
+    if (fresh != null) await playback.open(fresh);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final a = attachment;
@@ -694,11 +764,17 @@ class _AttachmentTile extends ConsumerWidget {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: audio
-          ? const Icon(Icons.play_arrow)
+          ? Icon(
+              _inCloudOnly ? Icons.cloud_download_outlined : Icons.play_arrow,
+            )
           : url != null
           ? const Icon(Icons.open_in_new, size: 20)
+          : _inCloudOnly
+          ? const Icon(Icons.cloud_download_outlined)
           : null,
-      onTap: audio
+      onTap: _inCloudOnly
+          ? () => _downloadThenOpen(context, ref, audio: audio)
+          : audio
           ? () => playback!.open(a)
           : url != null
           ? () =>

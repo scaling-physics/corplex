@@ -103,16 +103,13 @@ existing table). Local-only columns (file paths) stay out of the spec.
 
 ### Open decisions (resolve before implementing)
 
-- **File storage transfer**: files download eagerly (fully in memory) on
-  every device and upload on any network. Decide Wi-Fi-only transfer and
-  lazy download-on-open. (Size limit and orphan cleanup are done, see the
-  Files entry under Sync engine.)
-- **Clock skew**: last-write-wins trusts each device's clock. A device with
-  a badly wrong clock can lose (or win) edits it shouldn't.
-- **Handwriting to text**: sketches stay drawings. iPadOS Scribble works
-  in plain `TextField`s (note/paper titles) for free, but not inside the
-  Quill body; converting ink to text would need on-device recognition
-  (e.g. ML Kit Digital Ink) — undecided.
+- **Clock skew** (decided: accepted): last-write-wins trusts each
+  device's clock. A badly wrong clock can lose or win edits it shouldn't;
+  we don't compensate.
+- **Handwriting to text** (decided: later): sketches stay drawings.
+  iPadOS Scribble works in plain `TextField`s (note/paper titles) for
+  free, but not inside the Quill body; converting ink to text would need
+  on-device recognition (e.g. ML Kit Digital Ink).
 
 ## Later releases
 
@@ -399,6 +396,16 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     device hasn't applied can't make its file look orphaned), that no local
     row names (unpushed), and that are over a day old (`orphanGrace`:
     another device may have uploaded a file and not pushed its row yet).
+    **Transfer settings** (`transfer_settings.dart`, per-device, in
+    shared_preferences, not synced; two switches in the account sheet):
+    "Send files on Wi-Fi only" (default on: uploads and background
+    downloads only on Wi-Fi/Ethernet; metadata always syncs) and "Download
+    files when opened" (default off: never download in the background).
+    Opening always downloads, on any network (`SyncService.downloadFile`
+    → `FileSync.fetchPaper/fetchAttachment`): the paper screen shows
+    "Download PDF", an audio attachment downloads then plays. A connectivity
+    change triggers a sync so waiting files move when Wi-Fi returns. Files
+    are still read fully into memory on download.
     Restoring from trash clears `storage_key` when the file is still on
     disk, so it uploads again if cleanup removed the object.
   * **Watchers**: pull applies rows with raw SQL, which drift can't see, so

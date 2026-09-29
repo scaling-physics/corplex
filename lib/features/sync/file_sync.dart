@@ -72,6 +72,22 @@ class SupabaseFileRemote implements FileRemote {
   }
 }
 
+/// What file transfers are allowed right now. Metadata always syncs;
+/// this only governs the (large) files.
+class FileTransferPolicy {
+  const FileTransferPolicy({this.upload = true, this.autoDownload = true});
+
+  final bool upload;
+
+  /// Fetch files nobody has asked for yet. When false, a file is fetched
+  /// only when the reader opens it (see [FileSync.fetchPaper]).
+  final bool autoDownload;
+
+  static const always = FileTransferPolicy();
+}
+
+typedef PolicyResolver = Future<FileTransferPolicy> Function();
+
 /// Files larger than this aren't uploaded (see [FileSync.maxUploadBytes]).
 const defaultMaxUploadBytes = 50 * 1024 * 1024;
 
@@ -103,7 +119,10 @@ class FileSync {
     this._remote,
     this._allocate, {
     this.maxUploadBytes = defaultMaxUploadBytes,
-  });
+    PolicyResolver? policy,
+  }) : _policy = policy ?? (() async => FileTransferPolicy.always);
+
+  final PolicyResolver _policy;
 
   /// Bigger files stay on this device only: they are skipped, not retried
   /// as failures, and don't count as pending changes.
@@ -127,6 +146,7 @@ class FileSync {
   /// (an ordinary write, so it is pushed with the rest of the metadata).
   Future<void> upload(String userId) async {
     tooLarge = 0;
+    if (!(await _policy()).upload) return;
     final papers = await (_db.select(
       _db.papers,
     )..where((t) => t.pdfPath.isNotNull() & t.storageKey.isNull())).get();
@@ -170,6 +190,7 @@ class FileSync {
   /// including ones whose local copy has gone missing (e.g. after a
   /// reinstall moved the app's storage folder).
   Future<void> download() async {
+    if (!(await _policy()).autoDownload) return;
     final papers = await (_db.select(
       _db.papers,
     )..where((t) => t.storageKey.isNotNull())).get();
@@ -198,6 +219,47 @@ class FileSync {
         );
         await _setLocalPath('attachments', 'path', attachment.id, path);
       });
+    }
+  }
+
+  /// Downloads one paper's PDF now, whatever the policy: the reader asked
+  /// for it. Returns whether the file is on this device afterwards.
+  Future<bool> fetchPaper(String paperId) async {
+    final paper = await (_db.select(
+      _db.papers,
+    )..where((t) => t.id.equals(paperId))).getSingleOrNull();
+    if (paper == null) return false;
+    if (_present(paper.pdfPath)) return true;
+    final key = paper.storageKey;
+    if (key == null) return false;
+    try {
+      final path = await _fetch(key, 'papers', '${paper.id}.pdf');
+      await _setLocalPath('papers', 'pdf_path', paper.id, path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Like [fetchPaper], for an attachment's file.
+  Future<bool> fetchAttachment(String attachmentId) async {
+    final attachment = await (_db.select(
+      _db.attachments,
+    )..where((t) => t.id.equals(attachmentId))).getSingleOrNull();
+    if (attachment == null) return false;
+    if (_present(attachment.path)) return true;
+    final key = attachment.storageKey;
+    if (key == null) return false;
+    try {
+      final path = await _fetch(
+        key,
+        'attachments',
+        '${attachment.id}${p.extension(key)}',
+      );
+      await _setLocalPath('attachments', 'path', attachment.id, path);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

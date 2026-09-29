@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -13,12 +14,13 @@ import 'file_sync.dart';
 import 'sync_engine.dart';
 import 'sync_remote.dart';
 import 'sync_service.dart';
+import 'transfer_settings.dart';
 
 /// Initializes Supabase and returns the provider overrides that swap the
 /// offline stand-ins for the real auth and sync services. Returns no
 /// overrides when Supabase isn't configured (or can't initialize), leaving
 /// the app fully usable offline — sync is additive, never required.
-Future<List<Override>> supabaseOverrides() async {
+Future<List<Override>> supabaseOverrides(TransferSettings transfer) async {
   if (!SupabaseConfig.isConfigured) return const [];
   try {
     await Supabase.initialize(
@@ -47,8 +49,9 @@ Future<List<Override>> supabaseOverrides() async {
             final dir = Directory(p.join(docs.path, subfolder));
             await dir.create(recursive: true);
             return p.join(dir.path, fileName);
-          }),
+          }, policy: liveTransferPolicy(transfer)),
         ),
+        networkChanges: Connectivity().onConnectivityChanged,
       );
       ref.onDispose(service.stop);
       return service;

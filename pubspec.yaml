@@ -54,6 +54,8 @@ dependencies:
   receive_sharing_intent: ^1.9.0
   archive: ^4.3.0
   sqlite3: ^3.6.0
+  connectivity_plus: ^7.3.1
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

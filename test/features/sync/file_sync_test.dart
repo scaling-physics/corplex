@@ -8,6 +8,8 @@ import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
 import 'package:corplex/data/trash.dart';
 import 'package:corplex/features/sync/sync_remote.dart';
+import 'package:corplex/features/sync/transfer_settings.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:corplex/features/sync/file_sync.dart';
 import 'package:corplex/features/sync/sync_engine.dart';
 
@@ -19,17 +21,24 @@ class _Device {
     FakeSyncRemote server,
     FakeFileRemote files, {
     int? maxUploadBytes,
+    PolicyResolver? policy,
   }) {
     dir = Directory.systemTemp.createTempSync('corplex_$name');
     db = AppDatabase.inMemoryForTesting();
     engine = SyncEngine(
       db,
       server,
-      files: FileSync(db, files, (subfolder, fileName) async {
-        final d = Directory(p.join(dir.path, subfolder))
-          ..createSync(recursive: true);
-        return p.join(d.path, fileName);
-      }, maxUploadBytes: maxUploadBytes ?? defaultMaxUploadBytes),
+      files: FileSync(
+        db,
+        files,
+        (subfolder, fileName) async {
+          final d = Directory(p.join(dir.path, subfolder))
+            ..createSync(recursive: true);
+          return p.join(d.path, fileName);
+        },
+        maxUploadBytes: maxUploadBytes ?? defaultMaxUploadBytes,
+        policy: policy,
+      ),
     );
   }
 
@@ -388,5 +397,116 @@ void main() {
         expect(await small.engine.pendingChanges(), 0);
       },
     );
+  });
+
+  group('transfer policy', () {
+    Future<void> addPdf(_Device d, String id, List<int> bytes) => d.db
+        .into(d.db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: Value(id),
+            title: id,
+            pdfPath: Value(d.writeFile('$id.pdf', bytes).path),
+          ),
+        );
+
+    test('uploads wait for an allowed network, metadata does not', () async {
+      var policy = const FileTransferPolicy(upload: false);
+      final phone = _Device('phone', server, files, policy: () async => policy);
+      addTearDown(phone.dispose);
+      await addPdf(phone, 'p1', [1]);
+
+      await phone.sync();
+      expect(files.objects, isEmpty);
+      expect((await b.db.select(b.db.papers).get()), isEmpty);
+      await b.sync();
+      expect(await b.db.select(b.db.papers).getSingle(), isNotNull);
+      expect(await phone.engine.pendingChanges(), 1, reason: 'file waits');
+
+      policy = FileTransferPolicy.always;
+      await phone.sync();
+      expect(files.objects.keys, ['u1/papers/p1.pdf']);
+      expect(await phone.engine.pendingChanges(), 0);
+    });
+
+    test('on-demand devices fetch a file only when asked', () async {
+      final lazy = _Device(
+        'lazy',
+        server,
+        files,
+        policy: () async => const FileTransferPolicy(autoDownload: false),
+      );
+      addTearDown(lazy.dispose);
+      await addPdf(a, 'p1', [4, 2]);
+      await a.sync();
+
+      await lazy.sync();
+      var paper = await lazy.db.select(lazy.db.papers).getSingle();
+      expect(paper.storageKey, isNotNull);
+      expect(paper.pdfPath, isNull, reason: 'not downloaded in the background');
+
+      expect(await lazy.engine.fetchFile(paperId: 'p1'), isTrue);
+      paper = await lazy.db.select(lazy.db.papers).getSingle();
+      expect(File(paper.pdfPath!).readAsBytesSync(), [4, 2]);
+      expect(await lazy.engine.pendingChanges(), 0);
+    });
+
+    test(
+      'an on-demand attachment fetch, and a failed one reports false',
+      () async {
+        final lazy = _Device(
+          'lazy',
+          server,
+          files,
+          policy: () async => const FileTransferPolicy(autoDownload: false),
+        );
+        addTearDown(lazy.dispose);
+        await a.db
+            .into(a.db.notes)
+            .insert(NotesCompanion.insert(id: const Value('n1')));
+        await a.db
+            .into(a.db.attachments)
+            .insert(
+              AttachmentsCompanion.insert(
+                id: const Value('at1'),
+                noteId: const Value('n1'),
+                type: AttachmentType.podcast,
+                path: Value(a.writeFile('talk.m4a', [8]).path),
+              ),
+            );
+        await a.sync();
+        await lazy.sync();
+
+        files.failing = true;
+        expect(await lazy.engine.fetchFile(attachmentId: 'at1'), isFalse);
+        files.failing = false;
+        expect(await lazy.engine.fetchFile(attachmentId: 'at1'), isTrue);
+        final row = await lazy.db.select(lazy.db.attachments).getSingle();
+        expect(p.extension(row.path!), '.m4a');
+      },
+    );
+
+    test('policyFor: Wi-Fi only, on-demand, and both', () {
+      expect(policyFor(TransferSettings(), unmetered: false).upload, isFalse);
+      final wifi = policyFor(TransferSettings(), unmetered: true);
+      expect((wifi.upload, wifi.autoDownload), (true, true));
+      final demand = policyFor(
+        TransferSettings(onDemand: true),
+        unmetered: true,
+      );
+      expect((demand.upload, demand.autoDownload), (true, false));
+      final anyNetwork = policyFor(
+        TransferSettings(wifiOnly: false),
+        unmetered: false,
+      );
+      expect((anyNetwork.upload, anyNetwork.autoDownload), (true, true));
+      expect(isUnmetered([ConnectivityResult.mobile]), isFalse);
+      expect(
+        isUnmetered([ConnectivityResult.mobile, ConnectivityResult.wifi]),
+        isTrue,
+      );
+      expect(isUnmetered([ConnectivityResult.ethernet]), isTrue);
+      expect(isUnmetered([ConnectivityResult.none]), isFalse);
+    });
   });
 }

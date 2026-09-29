@@ -88,6 +88,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   late final AppDatabase _db = ref.read(databaseProvider);
   StreamSubscription<DocChange>? _docChanges;
 
+  // Owned here, not left to QuillEditor.basic: it makes a fresh FocusNode on
+  // every build, so any rebuild (e.g. after an autosave) dropped the body's
+  // focus and the keyboard jumped to the title mid-sentence.
+  final _bodyFocus = FocusNode();
+  final _bodyScroll = ScrollController();
+
   /// What's in the database, so a save only happens for a real change.
   /// Merely opening a note, or moving the cursor, fires the listeners too;
   /// saving then would bump updatedAt, reorder the list and re-sync.
@@ -437,6 +443,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (_debounce?.isActive ?? false) _save();
     _debounce?.cancel();
     _titleController.dispose();
+    _bodyFocus.dispose();
+    _bodyScroll.dispose();
     if (_loaded) _quillController.dispose();
     super.dispose();
   }
@@ -729,6 +737,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 },
                 QuillEditor.basic(
                   controller: _quillController,
+                  focusNode: _bodyFocus,
+                  scrollController: _bodyScroll,
                   config: QuillEditorConfig(
                     scrollable: false,
                     padding: EdgeInsets.zero,

@@ -1,4 +1,5 @@
 import '../../data/database.dart';
+import 'authors.dart';
 
 enum CitationStyle {
   apa('APA'),
@@ -11,7 +12,7 @@ enum CitationStyle {
 }
 
 String formatCitation(Paper paper, CitationStyle style) {
-  final authors = paper.authors.trim();
+  final list = parseAuthors(paper.authors);
   final title = paper.title.trim();
   final venue = paper.venue?.trim() ?? '';
   final year = paper.year?.toString() ?? 'n.d.';
@@ -19,27 +20,25 @@ String formatCitation(Paper paper, CitationStyle style) {
   switch (style) {
     case CitationStyle.apa:
       final buffer = StringBuffer();
-      if (authors.isNotEmpty) buffer.write('$authors ');
+      final apa = authorsApa(list);
+      if (apa.isNotEmpty) buffer.write('$apa ');
       buffer.write('($year). $title.');
       if (venue.isNotEmpty) buffer.write(' $venue.');
       return buffer.toString().trim();
 
     case CitationStyle.mla:
       final buffer = StringBuffer();
-      if (authors.isNotEmpty) {
-        buffer.write(authors);
-        if (!authors.endsWith('.')) buffer.write('.');
-        buffer.write(' ');
-      }
+      final mla = authorsMla(list);
+      if (mla.isNotEmpty) buffer.write('$mla ');
       buffer.write('"$title."');
       if (venue.isNotEmpty) buffer.write(' $venue,');
       buffer.write(' $year.');
       return buffer.toString().trim();
 
     case CitationStyle.bibtex:
-      final lines = <String>['@article{${_bibtexKey(paper)},'];
+      final lines = <String>['@article{${bibtexKey(paper)},'];
       lines.add('  title={$title},');
-      if (authors.isNotEmpty) lines.add('  author={$authors},');
+      if (!list.isEmpty) lines.add('  author={${authorsBibtex(list)}},');
       if (venue.isNotEmpty) lines.add('  journal={$venue},');
       if (paper.year != null) lines.add('  year={$year},');
       if ((paper.doi ?? '').isNotEmpty) lines.add('  doi={${paper.doi}},');
@@ -48,10 +47,13 @@ String formatCitation(Paper paper, CitationStyle style) {
   }
 }
 
-String _bibtexKey(Paper paper) {
-  final firstAuthorWord = paper.authors
-      .split(RegExp(r'[ ,]+'))
-      .firstWhere((s) => s.isNotEmpty, orElse: () => 'paper');
+/// `Vaswani2017Attention`: first author's family name, year, first word of
+/// the title — stable, readable and unlikely to collide.
+String bibtexKey(Paper paper) {
+  final authors = parseAuthors(paper.authors).authors;
+  final firstAuthorWord = authors.isEmpty
+      ? 'paper'
+      : authors.first.family.split(' ').last;
   final firstTitleWord = paper.title
       .split(' ')
       .firstWhere((s) => s.isNotEmpty, orElse: () => '');

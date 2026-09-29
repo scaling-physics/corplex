@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/gestures.dart';
-import 'package:flutter_quill/flutter_quill.dart' hide Text;
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +11,7 @@ import 'package:corplex/app.dart';
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
+import 'package:corplex/data/tables/papers_table.dart';
 import 'package:corplex/features/audio/audio_playback.dart';
 import 'package:corplex/features/ink/ink_canvas.dart';
 import 'package:corplex/features/ink/ink_model.dart';
@@ -281,20 +282,24 @@ void main() {
   testWidgets('typing [[ links another note, which then shows a backlink', (
     tester,
   ) async {
-    await db.into(db.notes).insert(
-      NotesCompanion.insert(
-        id: const Value('target'),
-        title: const Value('Transformers'),
-        updatedAt: Value(DateTime(2025)),
-      ),
-    );
-    await db.into(db.notes).insert(
-      NotesCompanion.insert(
-        id: const Value('source'),
-        title: const Value('Reading list'),
-        content: const Value('[{"insert":"See \\n"}]'),
-      ),
-    );
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('target'),
+            title: const Value('Transformers'),
+            updatedAt: Value(DateTime(2025)),
+          ),
+        );
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('source'),
+            title: const Value('Reading list'),
+            content: const Value('[{"insert":"See \\n"}]'),
+          ),
+        );
     await tester.pumpWidget(_appWithDb(db));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Reading list'));
@@ -317,10 +322,9 @@ void main() {
     await tester.tap(find.text('Transformers').last);
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
-    final saved = (await (db.select(db.notes)
-              ..where((n) => n.id.equals('source')))
-            .getSingle())
-        .content;
+    final saved = (await (db.select(
+      db.notes,
+    )..where((n) => n.id.equals('source'))).getSingle()).content;
     expect(saved, contains('corplex://note/target'));
     expect(saved, isNot(contains('[[')));
 
@@ -331,6 +335,118 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Linked from'), findsOneWidget);
     expect(find.text('Reading list'), findsOneWidget);
+
+    await _disposeTree(tester);
+  });
+
+  testWidgets('reading status: chips on the paper, a filter once one is set', (
+    tester,
+  ) async {
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(id: const Value('p1'), title: 'Attention'),
+        );
+    await db
+        .into(db.papers)
+        .insert(PapersCompanion.insert(id: const Value('p2'), title: 'BERT'));
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+
+    // No status anywhere: no filter row.
+    expect(find.widgetWithText(ChoiceChip, 'To read'), findsNothing);
+
+    await tester.tap(find.text('Attention'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Reading'));
+    await tester.pumpAndSettle();
+    expect(
+      (await (db.select(
+        db.papers,
+      )..where((p) => p.id.equals('p1'))).getSingle()).readingStatus,
+      ReadingStatus.reading,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    // Now the filter row exists; choose "Reading" to hide BERT.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Reading'));
+    await tester.pumpAndSettle();
+    expect(find.text('Attention'), findsOneWidget);
+    expect(find.text('BERT'), findsNothing);
+
+    // Tapping the status again on the paper clears it.
+    await tester.tap(find.text('Attention'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Reading'));
+    await tester.pumpAndSettle();
+    expect(
+      (await (db.select(
+        db.papers,
+      )..where((p) => p.id.equals('p1'))).getSingle()).readingStatus,
+      isNull,
+    );
+
+    await _disposeTree(tester);
+  });
+
+  testWidgets('paper details are editable and saved', (tester) async {
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(id: const Value('p1'), title: 'Attention'),
+        );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Attention'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, 'Year'), '2017');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Journal or conference'),
+      'NeurIPS',
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    final paper = await db.select(db.papers).getSingle();
+    expect(paper.year, 2017);
+    expect(paper.venue, 'NeurIPS');
+    await _disposeTree(tester);
+  });
+
+  testWidgets('outside changes update untouched fields, not ones being edited', (
+    tester,
+  ) async {
+    await db.into(db.papers).insert(
+      PapersCompanion.insert(id: const Value('p1'), title: 'upload_final'),
+    );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('upload_final'));
+    await tester.pumpAndSettle();
+
+    // The reader starts typing an author…
+    await tester.enterText(find.widgetWithText(TextField, 'Authors'), 'Me, Myself');
+    // …while a background lookup fills in the rest.
+    await (db.update(db.papers)..where((p) => p.id.equals('p1'))).write(
+      const PapersCompanion(
+        title: Value('Attention Is All You Need'),
+        authors: Value('Vaswani, Ashish'),
+        venue: Value('NeurIPS'),
+      ),
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    expect(find.text('Attention Is All You Need'), findsOneWidget, reason: 'untouched: updated');
+    expect(find.text('NeurIPS'), findsOneWidget);
+    expect(find.text('Me, Myself'), findsOneWidget, reason: 'being edited: kept');
+    expect((await db.select(db.papers).getSingle()).authors, 'Me, Myself');
 
     await _disposeTree(tester);
   });

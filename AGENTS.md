@@ -69,11 +69,10 @@ the rest are the remaining v1 work, in priority order.
    comments, "Quote to note" (quote + tappable page link), a per-paper
    Highlights list, resume at last-read page; freeform ink as a second
    mode.
-3. **Citation management (partly built)** — APA/MLA/BibTeX formatting
-   exists. Remaining: BibTeX import, **metadata lookup from DOI/arXiv ID**
-   (Crossref/arXiv; strictly optional online, manual entry always works),
-   title/DOI extraction from an imported PDF, duplicate-paper detection, and
-   structured author names (needed for correct citation styles).
+3. **Citation management (built)** — APA/MLA/BibTeX with structured
+   authors, DOI/arXiv lookup (Crossref/arXiv; optional online), identifier
+   extraction from imported PDFs, duplicate detection, BibTeX
+   import/export.
 4. **Paper & note attachments (built)** — audio (e.g. NotebookLM audio
    overviews) with an in-app player and tap-to-seek timestamps in notes,
    podcast links, images, arbitrary files.
@@ -218,11 +217,35 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   `lib/features/library/papers_providers.dart` for the reverse). Linked
   papers show as chips in the note editor (tap to open, × to unlink) and
   as a "Referenced in notes" list on the paper detail screen.
-- **Citations**: `lib/features/library/citation_formatter.dart` formats a
-  `Paper` as APA/MLA/BibTeX (pure function, no widget dependency — easy to
-  unit test). Paper detail screen has a style picker and a copy-to-clipboard
-  button. Author name parsing is intentionally naive (uses the raw
-  `authors` string as-is); revisit if per-author formatting is needed.
+- **Citations**: `citation_formatter.dart` formats a `Paper` as
+  APA/MLA/BibTeX (pure, unit-tested). Authors stay a single string in the
+  DB but are parsed by `authors.dart` (`parseAuthors`: `A B; C D`, `and`,
+  BibTeX `Family, Given`, comma lists, particles like "van der Berg",
+  "et al.") into `Author{family, given}`, then rendered per style (APA
+  initials + `&`, MLA `et al.` from 3 authors, BibTeX `and others`). The
+  canonical stored form is `Family, Given; Family, Given`
+  (`authorsToStored`), what BibTeX import and lookups write. Existing raw
+  "Vaswani et al." strings keep their old output.
+- **Metadata & BibTeX** (`metadata_lookup.dart`, `bibtex.dart`,
+  `library_actions.dart`): `parseIdentifier` recognizes DOIs, doi.org
+  links, arXiv ids/links; `MetadataLookup` (injected `http.Client`, so
+  tests use `MockClient`) queries Crossref and arXiv — verified against
+  the live services — and distinguishes "not found" (null) from "couldn't
+  reach" (`LookupFailed`). Importing a PDF reads its first two pages for a
+  printed DOI/arXiv id, looks it up, and `fillMissingMetadata` fills only
+  empty fields (the title is replaced only if it's still the file name);
+  all silent and optional. `findDuplicate` matches by DOI or normalized
+  title (+ compatible year) and is used by add-by-ID, BibTeX import and
+  PDF enrichment. `parseBibtex` is a real tokenizer (nested braces,
+  `"…"`, `@string`, LaTeX accents, DOI from `url`); `exportBibtex` makes
+  keys unique. Library ⋮ menu: Add by DOI/arXiv ID, Import BibTeX, Export.
+  The paper screen has editable Details (DOI, venue, year) with "Look up",
+  and it *absorbs outside changes* into fields the reader hasn't touched
+  (`_absorbOutsideChanges`), so a background lookup or a sync shows up
+  without clobbering typing.
+- **Reading status**: `Papers.readingStatus` (`ReadingStatus`), chips on
+  the paper screen (tap again to clear); the Library filter row appears
+  only once some paper has a status.
 
 - **Text highlights** (`lib/features/library/highlights.dart`,
   `pdf_viewer_screen.dart`, `quote_to_note.dart`): selecting text in the

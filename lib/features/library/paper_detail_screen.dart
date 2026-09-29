@@ -15,6 +15,8 @@ import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
 import 'highlights.dart';
+import 'metadata_lookup.dart';
+import '../../data/tables/papers_table.dart';
 import 'citation_formatter.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
@@ -32,6 +34,10 @@ class PaperDetailScreen extends ConsumerStatefulWidget {
 class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   final _titleController = TextEditingController();
   final _authorsController = TextEditingController();
+  final _yearController = TextEditingController();
+  final _venueController = TextEditingController();
+  final _doiController = TextEditingController();
+  bool _lookingUp = false;
   Timer? _debounce;
   bool _loaded = false;
   CitationStyle _citationStyle = CitationStyle.apa;
@@ -42,6 +48,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _loadPaper();
     _titleController.addListener(_scheduleSave);
     _authorsController.addListener(_scheduleSave);
+    _yearController.addListener(_scheduleSave);
+    _venueController.addListener(_scheduleSave);
+    _doiController.addListener(_scheduleSave);
   }
 
   Future<void> _loadPaper() async {
@@ -50,10 +59,87 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       db.papers,
     )..where((p) => p.id.equals(widget.paperId))).getSingleOrNull();
     if (paper != null && mounted) {
-      _titleController.text = paper.title;
-      _authorsController.text = paper.authors;
+      _showPaper(paper);
     }
     setState(() => _loaded = true);
+  }
+
+  /// What each field last held according to the database, so an outside
+  /// change (a background lookup, a sync from another device) can update a
+  /// field the reader hasn't touched without clobbering one they have.
+  final _fromDb = <TextEditingController, String>{};
+
+  Map<TextEditingController, String> _fieldValues(Paper paper) => {
+    _titleController: paper.title,
+    _authorsController: paper.authors,
+    _yearController: paper.year?.toString() ?? '',
+    _venueController: paper.venue ?? '',
+    _doiController: paper.doi ?? '',
+  };
+
+  void _showPaper(Paper paper) {
+    for (final entry in _fieldValues(paper).entries) {
+      entry.key.text = entry.value;
+      _fromDb[entry.key] = entry.value;
+    }
+  }
+
+  void _absorbOutsideChanges(Paper? paper) {
+    if (paper == null || !_loaded) return;
+    for (final entry in _fieldValues(paper).entries) {
+      final controller = entry.key;
+      final untouched = controller.text == _fromDb[controller];
+      if (entry.value != _fromDb[controller]) {
+        _fromDb[controller] = entry.value;
+        if (untouched) controller.text = entry.value;
+      }
+    }
+  }
+
+  /// Fills empty details from the DOI or arXiv ID in the DOI field.
+  Future<void> _lookUp() async {
+    final id = parseIdentifier(_doiController.text);
+    final messenger = ScaffoldMessenger.of(context);
+    if (id == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Enter a DOI or arXiv ID first.')),
+      );
+      return;
+    }
+    setState(() => _lookingUp = true);
+    try {
+      await _save();
+      final meta = await ref.read(metadataLookupProvider).lookup(id);
+      if (!mounted) return;
+      if (meta == null) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('No paper found for ${id.value}.')),
+        );
+        return;
+      }
+      final db = ref.read(databaseProvider);
+      final changed = await fillMissingMetadata(db, widget.paperId, meta);
+      final paper = await (db.select(
+        db.papers,
+      )..where((p) => p.id.equals(widget.paperId))).getSingle();
+      if (!mounted) return;
+      _showPaper(paper);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            changed
+                ? 'Filled in the missing details.'
+                : 'Nothing new to fill in.',
+          ),
+        ),
+      );
+    } on LookupFailed {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Couldn\'t reach the lookup service.')),
+      );
+    } finally {
+      if (mounted) setState(() => _lookingUp = false);
+    }
   }
 
   void _scheduleSave() {
@@ -69,6 +155,17 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       PapersCompanion(
         title: Value(_titleController.text),
         authors: Value(_authorsController.text),
+        year: Value(int.tryParse(_yearController.text.trim())),
+        venue: Value(
+          _venueController.text.trim().isEmpty
+              ? null
+              : _venueController.text.trim(),
+        ),
+        doi: Value(
+          _doiController.text.trim().isEmpty
+              ? null
+              : _doiController.text.trim(),
+        ),
       ),
     );
   }
@@ -78,6 +175,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _debounce?.cancel();
     _titleController.dispose();
     _authorsController.dispose();
+    _yearController.dispose();
+    _venueController.dispose();
+    _doiController.dispose();
     super.dispose();
   }
 
@@ -87,6 +187,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       attachmentsForPaperProvider(widget.paperId),
     );
     final paperAsync = ref.watch(paperByIdProvider(widget.paperId));
+    ref.listen(paperByIdProvider(widget.paperId), (_, next) {
+      _absorbOutsideChanges(next.value);
+    });
     final notesAsync = ref.watch(notesForPaperProvider(widget.paperId));
 
     return Scaffold(
@@ -126,6 +229,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                 ),
                 const SizedBox(height: 12),
                 _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
+                _ReadingStatusRow(paper: paperAsync.value),
                 _HighlightsSection(paper: paperAsync.value),
                 _Section(
                   title: 'Attachments',
@@ -163,6 +267,48 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                             .toList(),
                       );
                     },
+                  ),
+                ),
+                _Section(
+                  title: 'Details',
+                  trailing: TextButton.icon(
+                    icon: _lookingUp
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.travel_explore, size: 18),
+                    label: const Text('Look up'),
+                    onPressed: _lookingUp ? null : _lookUp,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _doiController,
+                          keyboardType: TextInputType.url,
+                          decoration: const InputDecoration(
+                            labelText: 'DOI or arXiv ID',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _venueController,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Journal or conference',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _yearController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Year'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 if (paperAsync.value case final paper?)
@@ -283,6 +429,43 @@ class _PdfButton extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+/// To read / Reading / Done — tap a status again to clear it.
+class _ReadingStatusRow extends ConsumerWidget {
+  const _ReadingStatusRow({required this.paper});
+
+  final Paper? paper;
+
+  static const _labels = {
+    ReadingStatus.toRead: 'To read',
+    ReadingStatus.reading: 'Reading',
+    ReadingStatus.done: 'Done',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paper = this.paper;
+    if (paper == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(
+        spacing: 8,
+        children: [
+          for (final status in ReadingStatus.values)
+            ChoiceChip(
+              label: Text(_labels[status]!),
+              selected: paper.readingStatus == status,
+              onSelected: (selected) => setReadingStatus(
+                ref.read(databaseProvider),
+                paper.id,
+                selected ? status : null,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +11,10 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import 'paper_detail_screen.dart';
+import '../../data/tables/papers_table.dart';
+import 'library_actions.dart';
 import 'papers_providers.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
 /// Picks a PDF, copies it into app storage, creates its paper record and
@@ -36,6 +41,14 @@ Future<void> importPaper(BuildContext context, WidgetRef ref) async {
         ),
       );
 
+  // Fill in the real title/authors/year from the PDF's DOI or arXiv ID in
+  // the background; the paper is usable straight away.
+  if (context.mounted) {
+    unawaited(
+      enrichImportedPaper(ref, context, id, localPath, importedTitle: title),
+    );
+  }
+
   if (!context.mounted) return;
   Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => PaperDetailScreen(paperId: id)));
@@ -52,16 +65,95 @@ class LibraryScreen extends ConsumerWidget {
     final papersAsync = ref.watch(filteredPapersProvider);
     final searching = ref.watch(librarySearchProvider).trim().isNotEmpty;
 
+    final statusFilter = ref.watch(libraryStatusFilterProvider);
+    final anyStatus = (ref.watch(papersListProvider).value ?? const []).any(
+      (p) => p.readingStatus != null,
+    );
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: SearchBar(
-            hintText: 'Search papers',
-            leading: const Icon(Icons.search),
-            onChanged: (value) =>
-                ref.read(librarySearchProvider.notifier).state = value,
+          padding: const EdgeInsets.fromLTRB(16, 4, 4, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: SearchBar(
+                  hintText: 'Search papers',
+                  leading: const Icon(Icons.search),
+                  onChanged: (value) =>
+                      ref.read(librarySearchProvider.notifier).state = value,
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'More',
+                onSelected: (v) => switch (v) {
+                  'doi' => addPaperByIdentifier(context, ref),
+                  'import' => importBibtexFile(context, ref),
+                  'export' => exportLibraryBibtex(context, ref),
+                  _ => null,
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'doi',
+                    child: ListTile(
+                      leading: Icon(Icons.travel_explore),
+                      title: Text('Add by DOI or arXiv ID'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'import',
+                    child: ListTile(
+                      leading: Icon(Icons.file_download_outlined),
+                      title: Text('Import BibTeX'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'export',
+                    child: ListTile(
+                      leading: Icon(Icons.ios_share),
+                      title: Text('Export as BibTeX'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
+        ),
+        AnimatedSize(
+          duration: AppMotion.medium,
+          curve: AppMotion.standard,
+          alignment: Alignment.topCenter,
+          child: anyStatus
+              ? SizedBox(
+                  height: 44,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children: [
+                      for (final status in [null, ...ReadingStatus.values])
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: ChoiceChip(
+                            label: Text(switch (status) {
+                              null => 'All',
+                              ReadingStatus.toRead => 'To read',
+                              ReadingStatus.reading => 'Reading',
+                              ReadingStatus.done => 'Done',
+                            }),
+                            selected: statusFilter == status,
+                            onSelected: (_) =>
+                                ref
+                                        .read(
+                                          libraryStatusFilterProvider.notifier,
+                                        )
+                                        .state =
+                                    status,
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
         ),
         Expanded(
           child: StateSwitcher(

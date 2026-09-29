@@ -43,6 +43,11 @@ class TagFilter extends NotesFilter {
   final String tagId;
 }
 
+class ProjectFilter extends NotesFilter {
+  const ProjectFilter(this.projectId);
+  final String projectId;
+}
+
 final notesFilterProvider = StateProvider.autoDispose<NotesFilter>(
   (ref) => const AllNotes(),
 );
@@ -61,13 +66,23 @@ final visibleNotesProvider = StreamProvider.autoDispose<List<Note>>((ref) {
             ..where((n) => n.folderId.equals(folderId))
             ..orderBy([(n) => OrderingTerm.desc(n.updatedAt)]))
           .watch();
-    case TagFilter(:final tagId):
+    case ProjectFilter(:final projectId):
       final query =
           db.select(db.notes).join([
               innerJoin(
-                db.noteTags,
-                db.noteTags.noteId.equalsExp(db.notes.id),
+                db.projectNotes,
+                db.projectNotes.noteId.equalsExp(db.notes.id),
               ),
+            ])
+            ..where(db.projectNotes.projectId.equals(projectId))
+            ..orderBy([OrderingTerm.desc(db.notes.updatedAt)]);
+      return query.watch().map(
+        (rows) => rows.map((row) => row.readTable(db.notes)).toList(),
+      );
+    case TagFilter(:final tagId):
+      final query =
+          db.select(db.notes).join([
+              innerJoin(db.noteTags, db.noteTags.noteId.equalsExp(db.notes.id)),
             ])
             ..where(db.noteTags.tagId.equals(tagId))
             ..orderBy([OrderingTerm.desc(db.notes.updatedAt)]);

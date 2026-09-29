@@ -15,6 +15,8 @@ import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
 import 'highlights.dart';
+import '../projects/project_picker_sheet.dart';
+import '../projects/projects_providers.dart';
 import 'metadata_lookup.dart';
 import '../../data/tables/papers_table.dart';
 import 'citation_formatter.dart';
@@ -230,6 +232,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                 const SizedBox(height: 12),
                 _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
                 _ReadingStatusRow(paper: paperAsync.value),
+                _ProjectChips(paperId: widget.paperId),
                 _HighlightsSection(paper: paperAsync.value),
                 _Section(
                   title: 'Attachments',
@@ -429,6 +432,45 @@ class _PdfButton extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+/// The projects this paper is in, plus a chip to add it to more.
+class _ProjectChips extends ConsumerWidget {
+  const _ProjectChips({required this.paperId});
+
+  final String paperId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final projects =
+        ref.watch(projectsForPaperProvider(paperId)).value ?? const [];
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final project in projects)
+            InputChip(
+              avatar: const Icon(Icons.folder_special_outlined, size: 16),
+              label: Text(project.name),
+              onPressed: () =>
+                  showProjectPickerSheet(context, paperId: paperId),
+              onDeleted: () => removePaperFromProject(
+                ref.read(databaseProvider),
+                projectId: project.id,
+                paperId: paperId,
+              ),
+            ),
+          ActionChip(
+            avatar: const Icon(Icons.add, size: 16),
+            label: Text(projects.isEmpty ? 'Add to project' : 'Project'),
+            onPressed: () => showProjectPickerSheet(context, paperId: paperId),
+          ),
+        ],
+      ),
+    );
   }
 }
 

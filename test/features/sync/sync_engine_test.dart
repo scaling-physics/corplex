@@ -161,6 +161,26 @@ void main() {
     expect(paper.pdfPath, '/device/b/copy.pdf');
   });
 
+  test('projects and their memberships sync, including removals', () async {
+    await a.into(a.papers).insert(PapersCompanion.insert(id: const Value('p1'), title: 'T'));
+    await a.into(a.notes).insert(NotesCompanion.insert(id: const Value('n1')));
+    await a.into(a.projects).insert(ProjectsCompanion.insert(id: const Value('pr1'), name: 'Review'));
+    await a.into(a.projectPapers).insert(ProjectPapersCompanion.insert(projectId: 'pr1', paperId: 'p1'));
+    await a.into(a.projectNotes).insert(ProjectNotesCompanion.insert(projectId: 'pr1', noteId: 'n1'));
+
+    await both();
+
+    expect((await b.select(b.projects).getSingle()).name, 'Review');
+    expect(await b.select(b.projectPapers).get(), hasLength(1));
+    expect(await b.select(b.projectNotes).get(), hasLength(1));
+
+    await a.delete(a.projectPapers).go();
+    await both();
+    expect(await b.select(b.projectPapers).get(), isEmpty);
+    expect(await b.select(b.projectNotes).get(), hasLength(1));
+    expect(await b.select(b.papers).get(), hasLength(1));
+  });
+
   test('edits propagate', () async {
     await a
         .into(a.notes)

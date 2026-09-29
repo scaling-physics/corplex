@@ -17,6 +17,8 @@ import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import '../ink/sketch_embed.dart';
 import '../../theme/app_theme.dart';
+import '../projects/project_picker_sheet.dart';
+import '../projects/projects_providers.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
 import 'note_markdown.dart';
@@ -349,11 +351,22 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           PopupMenuButton<String>(
             tooltip: 'More',
             onSelected: (v) => switch (v) {
+              'project' => showProjectPickerSheet(
+                context,
+                noteId: widget.noteId,
+              ),
               'link' => _linkNote(context),
               'markdown' => _shareMarkdown(),
               _ => null,
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'project',
+                child: ListTile(
+                  leading: Icon(Icons.folder_special_outlined),
+                  title: Text('Add to project'),
+                ),
+              ),
               PopupMenuItem(
                 value: 'link',
                 child: ListTile(
@@ -447,6 +460,37 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             ),
                           )
                           .toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                },
+                ...switch (ref
+                    .watch(projectsForNoteProvider(widget.noteId))
+                    .value) {
+                  null || [] => const [],
+                  final projects => [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: -8,
+                      children: [
+                        for (final project in projects)
+                          InputChip(
+                            avatar: const Icon(
+                              Icons.folder_special_outlined,
+                              size: 16,
+                            ),
+                            label: Text(project.name),
+                            onPressed: () => showProjectPickerSheet(
+                              context,
+                              noteId: widget.noteId,
+                            ),
+                            onDeleted: () => removeNoteFromProject(
+                              ref.read(databaseProvider),
+                              projectId: project.id,
+                              noteId: widget.noteId,
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                   ],

@@ -11,6 +11,8 @@ import 'note_content.dart';
 import 'note_editor_screen.dart';
 import 'notes_providers.dart';
 import 'tags_providers.dart';
+import '../projects/project_menu.dart';
+import '../projects/projects_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
@@ -35,6 +37,10 @@ Future<void> createNote(BuildContext context, WidgetRef ref) async {
   if (filter is TagFilter) {
     await addTagToNote(db, noteId: id, tagId: filter.tagId);
   }
+  // A note started while viewing a project belongs to it.
+  if (filter is ProjectFilter) {
+    await addNoteToProject(db, noteId: id, projectId: filter.projectId);
+  }
 }
 
 /// Distraction-free notes space: quick capture that mixes text, images,
@@ -49,8 +55,11 @@ class NotesScreen extends ConsumerWidget {
     final foldersAsync = ref.watch(foldersListProvider);
     final tagsAsync = ref.watch(tagsListProvider);
     final folders = foldersAsync.value ?? const <Folder>[];
+    final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
     final showFilterBar =
-        folders.isNotEmpty || (tagsAsync.value?.isNotEmpty ?? false);
+        folders.isNotEmpty ||
+        (tagsAsync.value?.isNotEmpty ?? false) ||
+        projects.isNotEmpty;
     final filter = ref.watch(notesFilterProvider);
     final folderNames = {for (final f in folders) f.id: f.name};
 
@@ -61,7 +70,11 @@ class NotesScreen extends ConsumerWidget {
           curve: AppMotion.standard,
           alignment: Alignment.topCenter,
           child: showFilterBar
-              ? _FilterBar(folders: folders, tags: tagsAsync.value ?? const [])
+              ? _FilterBar(
+                  folders: folders,
+                  tags: tagsAsync.value ?? const [],
+                  projects: projects,
+                )
               : const SizedBox(width: double.infinity),
         ),
         Expanded(
@@ -204,10 +217,15 @@ class _NoteCard extends StatelessWidget {
 }
 
 class _FilterBar extends ConsumerWidget {
-  const _FilterBar({required this.folders, required this.tags});
+  const _FilterBar({
+    required this.folders,
+    required this.tags,
+    required this.projects,
+  });
 
   final List<Folder> folders;
   final List<Tag> tags;
+  final List<Project> projects;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -228,6 +246,22 @@ class _FilterBar extends ConsumerWidget {
                   const AllNotes(),
             ),
           ),
+          for (final project in projects)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: GestureDetector(
+                onLongPress: () => showProjectMenu(context, ref, project),
+                child: ChoiceChip(
+                  avatar: const Icon(Icons.folder_special_outlined, size: 18),
+                  label: Text(project.name),
+                  selected:
+                      filter is ProjectFilter && filter.projectId == project.id,
+                  onSelected: (_) =>
+                      ref.read(notesFilterProvider.notifier).state =
+                          ProjectFilter(project.id),
+                ),
+              ),
+            ),
           for (final folder in folders)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),

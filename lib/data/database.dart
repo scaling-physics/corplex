@@ -15,6 +15,7 @@ import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
 import 'tables/notes_table.dart';
 import 'tables/papers_table.dart';
+import 'tables/projects_table.dart';
 import 'tables/tags_table.dart';
 
 part 'database.g.dart';
@@ -30,6 +31,9 @@ part 'database.g.dart';
     Tags,
     NoteTags,
     Highlights,
+    Projects,
+    ProjectPapers,
+    ProjectNotes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -50,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -132,6 +136,15 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(papers, papers.readingStatus);
         }
         // Change-tracking triggers for the new table (idempotent).
+        await _createSyncSchema();
+      }
+      if (from < 8) {
+        // v8: projects (groups of papers and notes).
+        for (final table in <TableInfo>[projects, projectPapers, projectNotes]) {
+          if (!await _hasTable(table.actualTableName)) {
+            await m.createTable(table);
+          }
+        }
         await _createSyncSchema();
       }
     },

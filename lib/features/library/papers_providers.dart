@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/papers_table.dart';
+import '../projects/projects_providers.dart';
 
 final papersListProvider = StreamProvider.autoDispose<List<Paper>>((ref) {
   final db = ref.watch(databaseProvider);
@@ -22,18 +23,28 @@ final libraryStatusFilterProvider = StateProvider.autoDispose<ReadingStatus?>(
   (ref) => null,
 );
 
+/// Narrows the Library to one project (null = everything).
+final libraryProjectFilterProvider = StateProvider.autoDispose<String?>(
+  (ref) => null,
+);
+
 final filteredPapersProvider = Provider.autoDispose<AsyncValue<List<Paper>>>((
   ref,
 ) {
   final query = ref.watch(librarySearchProvider).trim().toLowerCase();
   final status = ref.watch(libraryStatusFilterProvider);
+  final projectId = ref.watch(libraryProjectFilterProvider);
+  final inProject = projectId == null
+      ? null
+      : ref.watch(projectPaperIdsProvider(projectId)).value ?? const <String>{};
   final papersAsync = ref.watch(papersListProvider);
-  if (query.isEmpty && status == null) return papersAsync;
+  if (query.isEmpty && status == null && inProject == null) return papersAsync;
   return papersAsync.whenData(
     (papers) => papers
         .where(
           (p) =>
               (status == null || p.readingStatus == status) &&
+              (inProject == null || inProject.contains(p.id)) &&
               (query.isEmpty ||
                   p.title.toLowerCase().contains(query) ||
                   p.authors.toLowerCase().contains(query) ||

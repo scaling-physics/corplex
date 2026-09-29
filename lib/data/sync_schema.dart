@@ -69,6 +69,11 @@ const syncTables = [
     ],
   ),
   SyncTableSpec(
+    'projects',
+    keys: ['id'],
+    columns: ['name', 'created_at', 'updated_at'],
+  ),
+  SyncTableSpec(
     'notes',
     keys: ['id'],
     columns: ['title', 'content', 'folder_id', 'created_at', 'updated_at'],
@@ -81,6 +86,16 @@ const syncTables = [
   SyncTableSpec(
     'note_paper_refs',
     keys: ['note_id', 'paper_id'],
+    columns: ['updated_at'],
+  ),
+  SyncTableSpec(
+    'project_papers',
+    keys: ['project_id', 'paper_id'],
+    columns: ['updated_at'],
+  ),
+  SyncTableSpec(
+    'project_notes',
+    keys: ['project_id', 'note_id'],
     columns: ['updated_at'],
   ),
   SyncTableSpec(

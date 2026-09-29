@@ -12,6 +12,8 @@ import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import 'paper_detail_screen.dart';
 import '../../data/tables/papers_table.dart';
+import '../projects/project_menu.dart';
+import '../projects/projects_providers.dart';
 import 'library_actions.dart';
 import 'papers_providers.dart';
 import '../../theme/app_theme.dart';
@@ -66,6 +68,8 @@ class LibraryScreen extends ConsumerWidget {
     final searching = ref.watch(librarySearchProvider).trim().isNotEmpty;
 
     final statusFilter = ref.watch(libraryStatusFilterProvider);
+    final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
+    final projectFilter = ref.watch(libraryProjectFilterProvider);
     final anyStatus = (ref.watch(papersListProvider).value ?? const []).any(
       (p) => p.readingStatus != null,
     );
@@ -123,33 +127,59 @@ class LibraryScreen extends ConsumerWidget {
           duration: AppMotion.medium,
           curve: AppMotion.standard,
           alignment: Alignment.topCenter,
-          child: anyStatus
+          child: (anyStatus || projects.isNotEmpty)
               ? SizedBox(
                   height: 44,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: [
-                      for (final status in [null, ...ReadingStatus.values])
+                      for (final project in projects)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: ChoiceChip(
-                            label: Text(switch (status) {
-                              null => 'All',
-                              ReadingStatus.toRead => 'To read',
-                              ReadingStatus.reading => 'Reading',
-                              ReadingStatus.done => 'Done',
-                            }),
-                            selected: statusFilter == status,
-                            onSelected: (_) =>
-                                ref
-                                        .read(
-                                          libraryStatusFilterProvider.notifier,
-                                        )
-                                        .state =
-                                    status,
+                          child: GestureDetector(
+                            onLongPress: () =>
+                                showProjectMenu(context, ref, project),
+                            child: ChoiceChip(
+                              avatar: const Icon(
+                                Icons.folder_special_outlined,
+                                size: 18,
+                              ),
+                              label: Text(project.name),
+                              selected: projectFilter == project.id,
+                              onSelected: (selected) =>
+                                  ref
+                                      .read(
+                                        libraryProjectFilterProvider.notifier,
+                                      )
+                                      .state = selected
+                                  ? project.id
+                                  : null,
+                            ),
                           ),
                         ),
+                      if (anyStatus)
+                        for (final status in [null, ...ReadingStatus.values])
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: ChoiceChip(
+                              label: Text(switch (status) {
+                                null => 'All',
+                                ReadingStatus.toRead => 'To read',
+                                ReadingStatus.reading => 'Reading',
+                                ReadingStatus.done => 'Done',
+                              }),
+                              selected: statusFilter == status,
+                              onSelected: (_) =>
+                                  ref
+                                          .read(
+                                            libraryStatusFilterProvider
+                                                .notifier,
+                                          )
+                                          .state =
+                                      status,
+                            ),
+                          ),
                     ],
                   ),
                 )

@@ -147,6 +147,9 @@ void main() {
       expect(await _tombstoneCount(old, 'papers'), 1);
       expect(await _tombstoneCount(old, 'note_paper_refs'), 1);
       expect(await _tombstoneCount(old, 'highlights'), 1, reason: 'cascaded');
+    // v8's project tables exist too.
+    await old.into(old.projects).insert(ProjectsCompanion.insert(id: const Value('pr'), name: 'x'));
+    expect(await old.select(old.projects).get(), hasLength(1));
     },
   );
 

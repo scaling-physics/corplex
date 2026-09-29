@@ -197,8 +197,28 @@ void main() {
         ),
       );
 
+      final project = _id();
+      await db
+          .into(db.projects)
+          .insert(ProjectsCompanion.insert(id: Value(project), name: 'Thesis'));
+      await db
+          .into(db.projectPapers)
+          .insert(
+            ProjectPapersCompanion.insert(projectId: project, paperId: paper),
+          );
+      await db
+          .into(db.projectNotes)
+          .insert(
+            ProjectNotesCompanion.insert(projectId: project, noteId: note),
+          );
+
       await a.engine.sync(userId: userId);
       await b.engine.sync(userId: userId);
+
+      final bpr = await b.db.select(b.db.projects).getSingle();
+      expect(bpr.name, 'Thesis');
+      expect(await b.db.select(b.db.projectPapers).get(), hasLength(1));
+      expect(await b.db.select(b.db.projectNotes).get(), hasLength(1));
 
       final bh = await b.db.select(b.db.highlights).getSingle();
       expect(bh.quote, 'Multi-head attention');

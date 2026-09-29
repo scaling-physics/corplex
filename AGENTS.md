@@ -79,9 +79,9 @@ the rest are the remaining v1 work, in priority order.
 5. **Library tab & search (built)** — searchable Library, reading status,
    and an app-wide full-text search (SQLite FTS5) over notes, papers and
    highlights.
-6. **Projects/collections** — a named group of papers and notes (one per
-   literature review or thesis chapter). Must stay invisible until the user
-   creates one, like folders/tags.
+6. **Projects/collections (built)** — a named group of papers and notes
+   (one per literature review or thesis chapter); invisible until one is
+   created.
 7. **Capture from other apps** — iOS/Android share-sheet import for PDFs
    and links, so adding a paper is a couple of taps.
 8. **Data safety** — full export/backup (database + files as a zip), trash
@@ -475,6 +475,19 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   If FTS5 isn't compiled into the platform's SQLite, `search` falls back to
   a substring scan (`available` reports it) — FTS5 is present in the test
   and Android builds.
+- **Projects** (`lib/features/projects/`, schema v8): `Projects` plus two
+  join tables `ProjectPapers` / `ProjectNotes` (FKs with cascade, so
+  deleting a paper/note leaves its projects and deleting a project leaves
+  its papers/notes — the grouping only). A paper/note can be in several,
+  unlike a note's single folder. **Hidden until created**: the only way
+  in is "Add to project" on a paper (chip row) or a note (⋮ menu), whose
+  picker also creates projects (`findOrCreateProject` is case-insensitive).
+  Once any exists, project chips join the Notes filter bar
+  (`ProjectFilter`) and the Library filter row (`libraryProjectFilterProvider`);
+  long-press a chip to rename/delete. A note created while filtering by a
+  project joins it. There is deliberately no project *page* yet — the
+  filtered lists are the view; the synthesis matrix (v1.1) is the natural
+  first thing to give it one. Server side: `20261002000000_projects.sql`.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

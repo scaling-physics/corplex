@@ -535,4 +535,92 @@ void main() {
     expect(find.text('No matches'), findsOneWidget);
     await _disposeTree(tester);
   });
+
+  testWidgets('projects: hidden until made, then filter notes and papers', (
+    tester,
+  ) async {
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            title: const Value('In project'),
+          ),
+        );
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n2'),
+            title: const Value('Elsewhere'),
+          ),
+        );
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: const Value('p1'),
+            title: 'Paper in project',
+          ),
+        );
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(id: const Value('p2'), title: 'Other paper'),
+        );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+
+    // Nothing project-related on screen until one exists.
+    expect(find.byIcon(Icons.folder_special_outlined), findsNothing);
+
+    // Make one from the paper's screen.
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Paper in project'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add to project'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'New project'),
+      'Thesis',
+    );
+    await tester.tap(find.byTooltip('Create and add'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(CheckboxListTile, 'Thesis'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10)); // dismiss the sheet
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(InputChip, 'Thesis'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // The Library now has a Thesis chip that filters papers.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Thesis'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paper in project'), findsOneWidget);
+    expect(find.text('Other paper'), findsNothing);
+
+    // Put a note in the project from the note editor, then filter notes.
+    await tester.tap(find.text('Notes'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('In project'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add to project'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Thesis'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Thesis'));
+    await tester.pumpAndSettle();
+    expect(find.text('In project'), findsOneWidget);
+    expect(find.text('Elsewhere'), findsNothing);
+
+    await _disposeTree(tester);
+  });
 }

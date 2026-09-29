@@ -238,8 +238,13 @@ class SyncEngine {
         _db.notifyUpdates({TableUpdate(table.name)});
       }
 
-      // Server rows are ordered by synced_at, so the last one is newest.
-      newCursors[table.name] = changes.last['synced_at']! as String;
+      // The newest synced_at seen, computed rather than taken from the last
+      // row so the cursor can't silently stall if the order is ever wrong.
+      newCursors[table.name] = changes
+          .map((r) => r['synced_at']! as String)
+          .reduce(
+            (a, b) => DateTime.parse(a).isAfter(DateTime.parse(b)) ? a : b,
+          );
     }
     await _db.customStatement('UPDATE sync_meta SET last_pull = ?', [
       jsonEncode(newCursors),

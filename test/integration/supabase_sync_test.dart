@@ -270,6 +270,29 @@ void main() {
     expect(rows.single['deleted_at'], isNotNull);
   }, skip: skip);
 
+  test('changes come back oldest-first and the pull cursor advances', () async {
+    final remote = SupabaseSyncRemote(client);
+    for (final name in ['first', 'second', 'third']) {
+      await remote.upsertRows('folders', [
+        {
+          'id': _id(),
+          'name': name,
+          'created_at': '2030-01-01T00:00:00Z',
+          'updated_at': '2030-01-01T00:00:00Z',
+          'deleted_at': null,
+        },
+      ]);
+    }
+    final rows = await remote.fetchChanges('folders');
+    expect(rows.map((r) => r['name']), ['first', 'second', 'third']);
+
+    await a.engine.sync(userId: userId);
+    final cursor =
+        (await a.db.customSelect('SELECT last_pull FROM sync_meta').getSingle())
+            .read<String>('last_pull');
+    expect(cursor, contains(rows.last['synced_at']! as String));
+  }, skip: skip);
+
   test('users cannot see or modify each other\'s data', () async {
     final id = _id();
     await SupabaseSyncRemote(client).upsertRows('folders', [

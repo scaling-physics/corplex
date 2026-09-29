@@ -317,4 +317,43 @@ void main() {
 
     expect((await b.select(b.notes).getSingle()).title, 'offline');
   });
+
+  test(
+    'the pull cursor advances to the newest change, whatever the order',
+    () async {
+      server.newestFirst = true;
+      Future<String> notesCursor(AppDatabase db) async =>
+          (await db.customSelect('SELECT last_pull FROM sync_meta').getSingle())
+              .read<String>('last_pull');
+
+      await a
+          .into(a.notes)
+          .insert(NotesCompanion.insert(id: const Value('n1')));
+      await a
+          .into(a.notes)
+          .insert(NotesCompanion.insert(id: const Value('n2')));
+      await both();
+      final newest = server.tables['notes']!.values
+          .map((r) => r['synced_at']! as String)
+          .reduce((x, y) => x.compareTo(y) > 0 ? x : y);
+      expect(await notesCursor(b), contains(newest));
+
+      // A later change moves it forward again.
+      await (a.update(a.notes)..where((n) => n.id.equals('n1'))).write(
+        NotesCompanion(
+          title: const Value('edited'),
+          updatedAt: Value(DateTime.utc(2031)),
+        ),
+      );
+      await both();
+      final edited = server.tables['notes']!['n1']!['synced_at']! as String;
+      expect(await notesCursor(b), contains(edited));
+      expect(
+        (await (b.select(
+          b.notes,
+        )..where((n) => n.id.equals('n1'))).getSingle()).title,
+        'edited',
+      );
+    },
+  );
 }

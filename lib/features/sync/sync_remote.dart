@@ -66,8 +66,9 @@ class SupabaseSyncRemote implements SyncRemote {
       var query = _client.from(table).select();
       if (sinceIso != null) query = query.gte('synced_at', sinceIso);
       final page = await query
-          .order('synced_at')
-          .order(spec.keys.first)
+          // postgrest-dart sorts *descending* unless told otherwise.
+          .order('synced_at', ascending: true)
+          .order(spec.keys.first, ascending: true)
           .range(offset, offset + _pageSize - 1);
       result.addAll(page.cast<Map<String, Object?>>());
       if (page.length < _pageSize) return result;

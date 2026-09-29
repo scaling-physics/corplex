@@ -307,6 +307,12 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   * **Pull** uses per-table server `synced_at` cursors (immune to device
     clock skew), applies parents-before-children inside a transaction,
     skips rows that lose to a newer local edit or whose parent is gone.
+    The cursor is the *max* `synced_at` of the fetched rows, computed —
+    never "the last row": postgrest-dart's `.order()` defaults to
+    **descending**, which once pinned every cursor at its first value and
+    made each sync re-download everything since. `SupabaseSyncRemote`
+    now passes `ascending: true` explicitly; `FakeSyncRemote.newestFirst`
+    and an integration test guard both halves.
   * **Conflicts** are last-write-wins per row on client `updated_at`,
     enforced on both ends (server `sync_guard` trigger; client `_apply`).
     Two devices editing the same note offline: the later edit wins

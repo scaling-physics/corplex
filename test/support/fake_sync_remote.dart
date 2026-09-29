@@ -12,6 +12,10 @@ class FakeSyncRemote implements SyncRemote {
   final Map<String, Map<String, Map<String, Object?>>> tables = {};
   int _clock = 0;
 
+  /// Return changes newest-first, like postgrest-dart's default order, to
+  /// check the engine doesn't depend on the order it receives rows in.
+  bool newestFirst = false;
+
   /// Strictly increasing so `synced_at` ordering is deterministic.
   String _nextSyncedAt() => DateTime.utc(
     2030,
@@ -76,7 +80,7 @@ class FakeSyncRemote implements SyncRemote {
           (a, b) =>
               (a['synced_at']! as String).compareTo(b['synced_at']! as String),
         );
-    return rows;
+    return newestFirst ? rows.reversed.toList() : rows;
   }
 }
 

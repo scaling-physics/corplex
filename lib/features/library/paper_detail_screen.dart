@@ -13,6 +13,7 @@ import 'add_attachment_sheet.dart';
 import 'citation_formatter.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
+import '../../theme/app_theme.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
   const PaperDetailScreen({super.key, required this.paperId});
@@ -57,13 +58,14 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
 
   Future<void> _save() async {
     final db = ref.read(databaseProvider);
-    await (db.update(db.papers)..where((p) => p.id.equals(widget.paperId)))
-        .write(
-          PapersCompanion(
-            title: Value(_titleController.text),
-            authors: Value(_authorsController.text),
-          ),
-        );
+    await (db.update(
+      db.papers,
+    )..where((p) => p.id.equals(widget.paperId))).write(
+      PapersCompanion(
+        title: Value(_titleController.text),
+        authors: Value(_authorsController.text),
+      ),
+    );
   }
 
   @override
@@ -87,151 +89,226 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       body: !_loaded
           ? const SizedBox.shrink()
           : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               children: [
                 TextField(
                   controller: _titleController,
                   style: Theme.of(context).textTheme.headlineSmall,
+                  maxLines: null,
                   decoration: const InputDecoration(
                     hintText: 'Title',
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),
                 TextField(
                   controller: _authorsController,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   decoration: const InputDecoration(
                     hintText: 'Authors',
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),
-                if (paperAsync.value?.pdfPath case final pdfPath?) ...[
-                  const SizedBox(height: 8),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.picture_as_pdf_outlined),
-                    title: const Text('View PDF'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PdfViewerScreen(
-                          paperId: widget.paperId,
-                          pdfPath: pdfPath,
-                        ),
-                      ),
-                    ),
+                const SizedBox(height: 12),
+                _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
+                _Section(
+                  title: 'Attachments',
+                  trailing: TextButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add'),
+                    onPressed: () =>
+                        showAddAttachmentSheet(context, ref, widget.paperId),
                   ),
-                ],
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Attachments',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      tooltip: 'Add attachment',
-                      onPressed: () =>
-                          showAddAttachmentSheet(context, ref, widget.paperId),
-                    ),
-                  ],
-                ),
-                attachmentsAsync.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (error, _) => Text('Could not load attachments: $error'),
-                  data: (attachments) {
-                    if (attachments.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text('No attachments yet.'),
+                  child: attachmentsAsync.when(
+                    loading: () => const SizedBox(height: 56),
+                    error: (error, _) =>
+                        Text('Could not load attachments: $error'),
+                    data: (attachments) {
+                      if (attachments.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Podcasts, images, links or files for this paper.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                        );
+                      }
+                      return Column(
+                        children: attachments
+                            .map((a) => _AttachmentTile(attachment: a))
+                            .toList(),
                       );
-                    }
-                    return Column(
-                      children: attachments
-                          .map((a) => _AttachmentTile(attachment: a))
-                          .toList(),
-                    );
-                  },
+                    },
+                  ),
                 ),
-                if (paperAsync.value case final paper?) ...[
-                  const SizedBox(height: 24),
-                  Text('Citation', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  SegmentedButton<CitationStyle>(
-                    segments: CitationStyle.values
-                        .map(
-                          (style) => ButtonSegment(
-                            value: style,
-                            label: Text(style.label),
+                if (paperAsync.value case final paper?)
+                  _Section(
+                    title: 'Citation',
+                    trailing: IconButton(
+                      icon: const Icon(Icons.copy_outlined, size: 20),
+                      tooltip: 'Copy citation',
+                      onPressed: () {
+                        Clipboard.setData(
+                          ClipboardData(
+                            text: formatCitation(paper, _citationStyle),
                           ),
-                        )
-                        .toList(),
-                    selected: {_citationStyle},
-                    onSelectionChanged: (selected) =>
-                        setState(() => _citationStyle = selected.first),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Citation copied')),
+                        );
+                      },
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: SelectableText(
-                            formatCitation(paper, _citationStyle),
-                            style: Theme.of(context).textTheme.bodySmall,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SegmentedButton<CitationStyle>(
+                            showSelectedIcon: false,
+                            segments: CitationStyle.values
+                                .map(
+                                  (style) => ButtonSegment(
+                                    value: style,
+                                    label: Text(style.label),
+                                  ),
+                                )
+                                .toList(),
+                            selected: {_citationStyle},
+                            onSelectionChanged: (selected) =>
+                                setState(() => _citationStyle = selected.first),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy, size: 18),
-                          tooltip: 'Copy citation',
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(
-                                text: formatCitation(paper, _citationStyle),
+                          const SizedBox(height: 12),
+                          AnimatedSwitcher(
+                            duration: AppMotion.medium,
+                            child: SelectableText(
+                              formatCitation(paper, _citationStyle),
+                              key: ValueKey(_citationStyle),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (notesAsync.value case final notes? when notes.isNotEmpty)
+                  _Section(
+                    title: 'Referenced in notes',
+                    child: Column(
+                      children: notes
+                          .map(
+                            (note) => ListTile(
+                              leading: const Icon(Icons.edit_note_outlined),
+                              title: Text(
+                                note.title.isEmpty ? 'Untitled' : note.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Citation copied')),
-                            );
-                          },
-                        ),
-                      ],
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      NoteEditorScreen(noteId: note.id),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
-                ],
-                if (notesAsync.value case final notes? when notes.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Text(
-                    'Referenced in notes',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  ...notes.map(
-                    (note) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.edit_note_outlined),
-                      title: Text(
-                        note.title.isEmpty ? 'Untitled' : note.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => NoteEditorScreen(noteId: note.id),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
+    );
+  }
+}
+
+/// "Open PDF" when the file is on this device; a quiet placeholder while
+/// sync is still downloading it; nothing for papers without a PDF.
+class _PdfButton extends StatelessWidget {
+  const _PdfButton({required this.paperId, required this.paper});
+
+  final String paperId;
+  final Paper? paper;
+
+  @override
+  Widget build(BuildContext context) {
+    final paper = this.paper;
+    if (paper == null) return const SizedBox.shrink();
+    if (paper.pdfPath case final pdfPath?) {
+      return FilledButton.tonalIcon(
+        icon: const Icon(Icons.menu_book_outlined),
+        label: const Text('Open PDF'),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PdfViewerScreen(paperId: paperId, pdfPath: pdfPath),
+          ),
+        ),
+      );
+    }
+    if (paper.storageKey != null) {
+      return FilledButton.tonalIcon(
+        icon: const Icon(Icons.cloud_download_outlined),
+        label: const Text('PDF is syncing to this device…'),
+        onPressed: null,
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+/// A titled group on the paper screen: small header, content in a card.
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.child, this.trailing});
+
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 40,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                ?trailing,
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Card(
+            child: AnimatedSize(
+              duration: AppMotion.medium,
+              curve: AppMotion.standard,
+              alignment: Alignment.topCenter,
+              child: child,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -259,8 +336,7 @@ class _AttachmentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(_icon),
+      leading: Icon(_icon, color: Theme.of(context).colorScheme.primary),
       title: Text(
         attachment.title ?? attachment.url ?? attachment.path ?? 'Attachment',
         maxLines: 1,

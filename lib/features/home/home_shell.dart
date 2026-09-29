@@ -6,6 +6,8 @@ import '../auth/sign_in_screen.dart';
 import '../library/library_screen.dart';
 import '../sync/sync_service.dart';
 import '../notes/notes_screen.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/motion_widgets.dart';
 
 /// Top-level shell switching between the two primary spaces of the app:
 /// quick note capture and the auto-organized paper library.
@@ -25,29 +27,55 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).value;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_index]),
-        actions: [
-          IconButton(
-            icon: Icon(
-              user == null
-                  ? Icons.account_circle_outlined
-                  : Icons.account_circle,
+        toolbarHeight: 72,
+        titleSpacing: 20,
+        title: AnimatedSwitcher(
+          duration: AppMotion.medium,
+          switchInCurve: AppMotion.enter,
+          switchOutCurve: Curves.easeOut,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween(
+                begin: const Offset(0, 0.25),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
             ),
-            tooltip: user == null ? 'Sign in' : user.email,
-            onPressed: () => user == null
-                ? Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SignInScreen()),
-                  )
-                : _showAccountMenu(context),
+          ),
+          layoutBuilder: (current, previous) => Stack(
+            alignment: Alignment.centerLeft,
+            children: [...previous, ?current],
+          ),
+          child: Text(
+            _titles[_index],
+            key: ValueKey(_index),
+            style: theme.textTheme.headlineMedium,
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _AccountButton(
+              email: user?.email,
+              onPressed: () => user == null
+                  ? Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SignInScreen()),
+                    )
+                  : _showAccountMenu(context),
+            ),
           ),
         ],
       ),
-      body: _screens[_index],
+      body: FadeThroughIndexedStack(index: _index, children: _screens),
+      floatingActionButton: _PrimaryAction(index: _index),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
+        animationDuration: AppMotion.medium,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
           NavigationDestination(
@@ -72,7 +100,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+              child: Text(
+                ref.read(authServiceProvider).currentUser?.email ?? '',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
             // Sync detail lives here, not on the main screens: it's
             // background plumbing until the user goes looking for it.
             Consumer(
@@ -179,4 +215,71 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         SyncStatus.upToDate => 'Up to date',
         SyncStatus.error => error ?? 'Sync failed',
       };
+}
+
+/// The one main action for the current tab, labelled so it's obvious what
+/// it does. Morphs between tabs rather than popping.
+class _PrimaryAction extends ConsumerWidget {
+  const _PrimaryAction({required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (icon, label, action) = switch (index) {
+      0 => (Icons.add, 'New note', createNote),
+      _ => (Icons.upload_file_outlined, 'Import PDF', importPaper),
+    };
+    return FloatingActionButton.extended(
+      heroTag: null,
+      onPressed: () => action(context, ref),
+      icon: AnimatedSwitcher(
+        duration: AppMotion.short,
+        child: Icon(icon, key: ValueKey(icon)),
+      ),
+      label: AnimatedSize(
+        duration: AppMotion.medium,
+        curve: AppMotion.standard,
+        child: AnimatedSwitcher(
+          duration: AppMotion.short,
+          child: Text(label, key: ValueKey(label)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Signed out: a plain outline icon. Signed in: a sage disc with the
+/// account's initial.
+class _AccountButton extends StatelessWidget {
+  const _AccountButton({required this.email, required this.onPressed});
+
+  final String? email;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final email = this.email;
+    return IconButton(
+      tooltip: email ?? 'Sign in',
+      onPressed: onPressed,
+      icon: AnimatedSwitcher(
+        duration: AppMotion.medium,
+        child: email == null
+            ? const Icon(Icons.account_circle_outlined, key: ValueKey('out'))
+            : CircleAvatar(
+                key: const ValueKey('in'),
+                radius: 15,
+                backgroundColor: c.primaryContainer,
+                foregroundColor: c.onPrimaryContainer,
+                child: Text(
+                  email.isEmpty ? '?' : email[0].toUpperCase(),
+                  style: Theme.of(context).textTheme.labelLarge
+                      ?.copyWith(color: c.onPrimaryContainer),
+                ),
+              ),
+      ),
+    );
+  }
 }

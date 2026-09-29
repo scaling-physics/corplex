@@ -4,6 +4,7 @@ import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations
 
 import 'features/home/home_shell.dart';
 import 'features/sync/sync_coordinator.dart';
+import 'theme/app_theme.dart';
 
 class CorplexApp extends StatelessWidget {
   const CorplexApp({super.key});
@@ -19,17 +20,10 @@ class CorplexApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.indigo,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeAnimationDuration: AppMotion.long,
+      themeAnimationCurve: AppMotion.standard,
       home: const SyncCoordinator(child: HomeShell()),
     );
   }

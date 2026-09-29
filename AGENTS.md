@@ -157,6 +157,32 @@ the default screens until the user opts in by using the feature.
   and large PDFs.
 - App Store / Play Store release setup; privacy-respecting crash reporting.
 
+## Visual design
+
+- **Palette**: sage green is the single accent on warm, paper-like
+  neutrals, with a soft clay tertiary used sparingly. Both schemes are
+  hand-tuned, explicit `ColorScheme`s in `lib/theme/app_theme.dart` (not
+  `fromSeed`, which drifted too saturated). Widgets read
+  `Theme.of(context).colorScheme` and never hard-code colors; the only
+  literal colors outside the theme are the PDF highlighter inks
+  (`pdf_viewer_screen.dart`), kept soft/pastel on purpose.
+- **Component defaults live in the theme** (cards, chips, sheets with
+  drag handles, dialogs, filled inputs, navigation bar), so screens stay
+  free of styling code. Note: the input theme is *filled* — borderless
+  in-page fields (note/paper titles) must set `filled: false` and the
+  `none` borders explicitly, or they render as grey boxes.
+- **Motion**: shared durations/curves in `AppMotion` (short, decelerating,
+  never bouncy). `lib/theme/motion_widgets.dart` has the reusable pieces:
+  `FadeThroughIndexedStack` (tab switching that keeps each tab's state),
+  `EntranceTransition` (staggered list-item fade/slide), `StateSwitcher`
+  (cross-fade between loading/empty/content) and `EmptyState`. Page
+  routes use predictive-back on Android and Cupertino slides on iOS/macOS
+  via `pageTransitionsTheme`, so plain `MaterialPageRoute`s get them.
+- **Primary actions**: each tab's main action is one labelled extended FAB
+  owned by `HomeShell` (`New note` / `Import PDF`), morphing between tabs.
+  The actions themselves are top-level functions (`createNote`,
+  `importPaper`) next to their screens.
+
 ## Conventions
 
 - Prefer Flutter/Dart idioms and the standard `lib/`, `test/` project layout

@@ -36,16 +36,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   late final QuillController _quillController;
   Timer? _debounce;
   bool _loaded = false;
+  // Captured up front: dispose() must be able to flush a pending save, and
+  // `ref` can't be used there.
+  late final AppDatabase _db = ref.read(databaseProvider);
+
+  /// What's in the database, so a save only happens for a real change.
+  /// Merely opening a note, or moving the cursor, fires the listeners too;
+  /// saving then would bump updatedAt, reorder the list and re-sync.
+  String? _savedTitle;
+  String? _savedContent;
 
   @override
   void initState() {
     super.initState();
     _loadNote();
-    _titleController.addListener(_scheduleSave);
   }
 
   Future<void> _loadNote() async {
-    final db = ref.read(databaseProvider);
+    final db = _db;
     final note = await (db.select(
       db.notes,
     )..where((n) => n.id.equals(widget.noteId))).getSingleOrNull();
@@ -57,8 +65,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (note != null && mounted) {
       _titleController.text = note.title;
     }
+    _savedTitle = _titleController.text;
+    _savedContent = encodeNoteContent(_quillController.document);
+    // Attached after the initial text is in place, so loading isn't an edit.
+    _titleController.addListener(_scheduleSave);
     _quillController.addListener(_scheduleSave);
-    setState(() => _loaded = true);
+    if (mounted) setState(() => _loaded = true);
   }
 
   void _scheduleSave() {
@@ -67,19 +79,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   Future<void> _save() async {
-    final db = ref.read(databaseProvider);
-    await (db.update(db.notes)..where((n) => n.id.equals(widget.noteId)))
-        .write(
-          NotesCompanion(
-            title: Value(_titleController.text),
-            content: Value(encodeNoteContent(_quillController.document)),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+    _debounce?.cancel();
+    final title = _titleController.text;
+    final content = encodeNoteContent(_quillController.document);
+    if (title == _savedTitle && content == _savedContent) return;
+    _savedTitle = title;
+    _savedContent = content;
+    await (_db.update(
+      _db.notes,
+    )..where((n) => n.id.equals(widget.noteId))).write(
+      NotesCompanion(
+        title: Value(title),
+        content: Value(content),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   @override
   void dispose() {
+    // Leaving right after typing must not drop the last edit.
+    if (_debounce?.isActive ?? false) _save();
     _debounce?.cancel();
     _titleController.dispose();
     if (_loaded) _quillController.dispose();
@@ -129,14 +149,19 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       body: !_loaded
           ? const SizedBox.shrink()
           : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
               children: [
                 TextField(
                   controller: _titleController,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     hintText: 'Title',
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),
                 if (folderName != null)
@@ -162,7 +187,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             folderName,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context).colorScheme.secondary,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondary,
                                 ),
                           ),
                         ],
@@ -178,9 +205,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       children: tags
                           .map(
                             (tag) => InputChip(
-                              label: Text('#${tag.name}'),
-                              onPressed: () =>
-                                  showTagPickerSheet(context, ref, widget.noteId),
+                              avatar: const Icon(Icons.tag, size: 16),
+                              label: Text(tag.name),
+                              onPressed: () => showTagPickerSheet(
+                                context,
+                                ref,
+                                widget.noteId,
+                              ),
                               onDeleted: () => removeTagFromNote(
                                 ref.read(databaseProvider),
                                 noteId: widget.noteId,
@@ -203,6 +234,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       children: papers
                           .map(
                             (paper) => InputChip(
+                              avatar: const Icon(
+                                Icons.article_outlined,
+                                size: 16,
+                              ),
                               label: Text(
                                 paper.title,
                                 overflow: TextOverflow.ellipsis,
@@ -234,7 +269,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       children: attachments.map((a) {
                         if (a.type == AttachmentType.image && a.path != null) {
                           return ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
                             child: Image.file(
                               File(a.path!),
                               width: 96,
@@ -267,31 +302,47 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ),
       bottomNavigationBar: !_loaded
           ? null
-          : SafeArea(
-              child: QuillSimpleToolbar(
-                controller: _quillController,
-                config: const QuillSimpleToolbarConfig(
-                  multiRowsDisplay: false,
-                  showFontFamily: false,
-                  showFontSize: false,
-                  showSmallButton: false,
-                  showLineHeightButton: false,
-                  showInlineCode: false,
-                  showColorButton: false,
-                  showBackgroundColorButton: false,
-                  showClearFormat: false,
-                  showAlignmentButtons: false,
-                  showListCheck: false,
-                  showCodeBlock: false,
-                  showIndent: false,
-                  showLink: false,
-                  showDirection: false,
-                  showSearchButton: false,
-                  showSubscript: false,
-                  showSuperscript: false,
-                  showUndo: false,
-                  showRedo: false,
-                  showDividers: false,
+          : Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: QuillSimpleToolbar(
+                    controller: _quillController,
+                    config: const QuillSimpleToolbarConfig(
+                      multiRowsDisplay: false,
+                      showFontFamily: false,
+                      showFontSize: false,
+                      showSmallButton: false,
+                      showLineHeightButton: false,
+                      showInlineCode: false,
+                      showColorButton: false,
+                      showBackgroundColorButton: false,
+                      showClearFormat: false,
+                      showAlignmentButtons: false,
+                      showListCheck: false,
+                      showCodeBlock: false,
+                      showIndent: false,
+                      showLink: false,
+                      showDirection: false,
+                      showSearchButton: false,
+                      showSubscript: false,
+                      showSuperscript: false,
+                      showUndo: false,
+                      showRedo: false,
+                      showDividers: false,
+                    ),
+                  ),
                 ),
               ),
             ),

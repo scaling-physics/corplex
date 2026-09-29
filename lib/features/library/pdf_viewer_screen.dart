@@ -14,11 +14,12 @@ import '../../data/tables/attachments_table.dart';
 import '../notes/note_editor_screen.dart';
 import 'annotations_providers.dart';
 
+/// Soft, paper-friendly highlighter inks (drawn at 40% opacity).
 const _highlightColors = [
-  Color(0xFFFFEB3B), // yellow
-  Color(0xFF69F0AE), // green
-  Color(0xFFFF80AB), // pink
-  Color(0xFF80D8FF), // blue
+  Color(0xFFF2D66B), // butter
+  Color(0xFF9CC79A), // sage
+  Color(0xFFEBA9A4), // rose
+  Color(0xFF9DC3DE), // mist blue
 ];
 
 /// Views a paper's PDF with freeform highlighter annotation. Tap the pen

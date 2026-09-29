@@ -11,6 +11,31 @@ import 'note_content.dart';
 import 'note_editor_screen.dart';
 import 'notes_providers.dart';
 import 'tags_providers.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/motion_widgets.dart';
+
+/// Creates an empty note (filed into whatever folder/tag is being viewed,
+/// so it doesn't vanish from the list) and opens it. Used by the home
+/// screen's "New note" button.
+Future<void> createNote(BuildContext context, WidgetRef ref) async {
+  final id = const Uuid().v4();
+  final db = ref.read(databaseProvider);
+  final filter = ref.read(notesFilterProvider);
+  await db
+      .into(db.notes)
+      .insert(
+        NotesCompanion.insert(
+          id: Value(id),
+          folderId: Value(filter is FolderFilter ? filter.folderId : null),
+        ),
+      );
+  if (!context.mounted) return;
+  Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: id)));
+  if (filter is TagFilter) {
+    await addTagToNote(db, noteId: id, tagId: filter.tagId);
+  }
+}
 
 /// Distraction-free notes space: quick capture that mixes text, images,
 /// and pen input in a single note. Folder/tag filtering only appears once
@@ -18,79 +43,70 @@ import 'tags_providers.dart';
 class NotesScreen extends ConsumerWidget {
   const NotesScreen({super.key});
 
-  Future<void> _createNote(BuildContext context, WidgetRef ref) async {
-    final id = const Uuid().v4();
-    final db = ref.read(databaseProvider);
-    final filter = ref.read(notesFilterProvider);
-    await db.into(db.notes).insert(
-      NotesCompanion.insert(
-        id: Value(id),
-        folderId: Value(filter is FolderFilter ? filter.folderId : null),
-      ),
-    );
-    if (!context.mounted) return;
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: id)));
-    if (filter is TagFilter) {
-      await addTagToNote(db, noteId: id, tagId: filter.tagId);
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notesAsync = ref.watch(visibleNotesProvider);
     final foldersAsync = ref.watch(foldersListProvider);
     final tagsAsync = ref.watch(tagsListProvider);
+    final folders = foldersAsync.value ?? const <Folder>[];
     final showFilterBar =
-        (foldersAsync.value?.isNotEmpty ?? false) ||
-        (tagsAsync.value?.isNotEmpty ?? false);
+        folders.isNotEmpty || (tagsAsync.value?.isNotEmpty ?? false);
+    final filter = ref.watch(notesFilterProvider);
+    final folderNames = {for (final f in folders) f.id: f.name};
 
-    return Scaffold(
-      body: Column(
-        children: [
-          if (showFilterBar)
-            _FilterBar(
-              folders: foldersAsync.value ?? const [],
-              tags: tagsAsync.value ?? const [],
-            ),
-          Expanded(
+    return Column(
+      children: [
+        AnimatedSize(
+          duration: AppMotion.medium,
+          curve: AppMotion.standard,
+          alignment: Alignment.topCenter,
+          child: showFilterBar
+              ? _FilterBar(folders: folders, tags: tagsAsync.value ?? const [])
+              : const SizedBox(width: double.infinity),
+        ),
+        Expanded(
+          child: StateSwitcher(
+            stateKey: switch (notesAsync) {
+              AsyncData(value: []) => 'empty',
+              AsyncData() => filter,
+              AsyncError() => 'error',
+              _ => 'loading',
+            },
             child: notesAsync.when(
               loading: () => const SizedBox.shrink(),
               error: (error, _) =>
                   Center(child: Text('Something went wrong: $error')),
               data: (notes) {
                 if (notes.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No notes yet.\nTap + to capture your first one.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  );
+                  return filter is AllNotes
+                      ? const EmptyState(
+                          icon: Icons.edit_note_outlined,
+                          title: 'No notes yet',
+                          message:
+                              'Tap New note to capture your first thought.',
+                        )
+                      : const EmptyState(
+                          icon: Icons.filter_list,
+                          title: 'Nothing here yet',
+                          message: 'Notes you add while this filter is on land here.',
+                        );
                 }
                 return ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  // Clear of the floating "New note" button.
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                   itemCount: notes.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final note = notes[index];
-                    return ListTile(
-                      title: Text(
-                        note.title.isEmpty ? 'Untitled' : note.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        notePlainTextPreview(note.content),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Text(DateFormat.MMMd().format(note.updatedAt)),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => NoteEditorScreen(noteId: note.id),
-                        ),
+                    return EntranceTransition(
+                      key: ValueKey(note.id),
+                      index: index,
+                      child: _NoteCard(
+                        note: note,
+                        // The folder is redundant while filtering by it.
+                        folderName: filter is FolderFilter
+                            ? null
+                            : folderNames[note.folderId],
                       ),
                     );
                   },
@@ -98,14 +114,92 @@ class NotesScreen extends ConsumerWidget {
               },
             ),
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _createNote(context, ref),
-        tooltip: 'New note',
-        child: const Icon(Icons.add),
+        ),
+      ],
+    );
+  }
+}
+
+class _NoteCard extends StatelessWidget {
+  const _NoteCard({required this.note, required this.folderName});
+
+  final Note note;
+  final String? folderName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final c = theme.colorScheme;
+    final preview = notePlainTextPreview(note.content);
+    final meta = theme.textTheme.labelMedium?.copyWith(
+      color: c.onSurfaceVariant,
+    );
+
+    return Card(
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: note.id)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                note.title.isEmpty ? 'Untitled' : note.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: note.title.isEmpty ? c.onSurfaceVariant : null,
+                ),
+              ),
+              if (preview.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: c.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(_friendlyDate(note.updatedAt), style: meta),
+                  if (folderName case final name?) ...[
+                    const SizedBox(width: 12),
+                    Icon(Icons.folder_outlined, size: 14, color: c.primary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: meta?.copyWith(color: c.primary),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  static String _friendlyDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return 'Today, ${DateFormat.jm().format(date)}';
+    if (diff == 1) return 'Yesterday';
+    if (diff < 7) return DateFormat.EEEE().format(date);
+    if (date.year == now.year) return DateFormat.MMMd().format(date);
+    return DateFormat.yMMMd().format(date);
   }
 }
 
@@ -120,18 +214,18 @@ class _FilterBar extends ConsumerWidget {
     final filter = ref.watch(notesFilterProvider);
 
     return SizedBox(
-      height: 48,
+      height: 52,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ChoiceChip(
               label: const Text('All'),
               selected: filter is AllNotes,
-              onSelected: (_) =>
-                  ref.read(notesFilterProvider.notifier).state = const AllNotes(),
+              onSelected: (_) => ref.read(notesFilterProvider.notifier).state =
+                  const AllNotes(),
             ),
           ),
           for (final folder in folders)
@@ -156,11 +250,13 @@ class _FilterBar extends ConsumerWidget {
               child: GestureDetector(
                 onLongPress: () => _confirmDeleteTag(context, ref, tag),
                 child: ChoiceChip(
-                  label: Text('#${tag.name}'),
+                  avatar: const Icon(Icons.tag, size: 16),
+                  label: Text(tag.name),
                   selected: filter is TagFilter && filter.tagId == tag.id,
                   onSelected: (_) =>
-                      ref.read(notesFilterProvider.notifier).state =
-                          TagFilter(tag.id),
+                      ref.read(notesFilterProvider.notifier).state = TagFilter(
+                        tag.id,
+                      ),
                 ),
               ),
             ),
@@ -168,7 +264,7 @@ class _FilterBar extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ActionChip(
               avatar: const Icon(Icons.add, size: 18),
-              label: const Text('New'),
+              label: const Text('Folder or tag'),
               onPressed: () => _showCreateSheet(context, ref),
             ),
           ),
@@ -201,9 +297,8 @@ class _FilterBar extends ConsumerWidget {
     );
     if (confirmed == true) {
       final db = ref.read(databaseProvider);
-      if (ref.read(notesFilterProvider) case FolderFilter(
-        folderId: final id,
-      ) when id == folder.id) {
+      if (ref.read(notesFilterProvider) case FolderFilter(folderId: final id)
+          when id == folder.id) {
         ref.read(notesFilterProvider.notifier).state = const AllNotes();
       }
       await deleteFolder(db, folder.id);

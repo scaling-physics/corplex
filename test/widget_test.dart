@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,18 +45,18 @@ void main() {
     await tester.pumpWidget(_appWithDb(db));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('No notes yet.\nTap + to capture your first one.'),
-      findsOneWidget,
-    );
+    expect(find.text('No notes yet'), findsOneWidget);
 
     await tester.tap(find.text('Library'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Your library is empty'), findsOneWidget);
     expect(
-      find.text('Papers you reference in notes will show up here.\nTap + to import a PDF.'),
-      findsOneWidget,
+      find.text('No notes yet'),
+      findsNothing,
+      reason: 'Notes tab is offstage',
     );
+    expect(find.text('Import PDF'), findsOneWidget);
 
     await _disposeTree(tester);
   });
@@ -66,10 +67,13 @@ void main() {
     await tester.pumpWidget(_appWithDb(db));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(find.text('New note'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'My first paper notes');
+    await tester.enterText(
+      find.byType(TextField).first,
+      'My first paper notes',
+    );
     await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
     await tester.pageBack();
@@ -78,5 +82,52 @@ void main() {
     expect(find.text('My first paper notes'), findsOneWidget);
 
     await _disposeTree(tester);
+  });
+
+  testWidgets('opening a note without editing it does not touch it', (
+    tester,
+  ) async {
+    final stamp = DateTime(2025, 1, 2, 3, 4, 5);
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            title: const Value('Old note'),
+            updatedAt: Value(stamp),
+          ),
+        );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Old note'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TextField).first); // cursor, no typing
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    final note = await db.select(db.notes).getSingle();
+    expect(note.updatedAt, stamp);
+    await _disposeTree(tester);
+  });
+
+  testWidgets('an edit made just before leaving is still saved', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New note'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Quick thought');
+    // Tear the editor down at once, well inside the autosave debounce (a
+    // back navigation's animation would outlast it and hide the bug).
+    await _disposeTree(tester);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+
+    expect((await db.select(db.notes).getSingle()).title, 'Quick thought');
   });
 }

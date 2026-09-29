@@ -7,6 +7,7 @@ import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../sync/sync_service.dart';
 import '../notes/notes_screen.dart';
+import '../search/search_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
@@ -59,6 +60,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Search',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _AccountButton(

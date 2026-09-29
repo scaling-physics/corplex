@@ -76,9 +76,9 @@ the rest are the remaining v1 work, in priority order.
 4. **Paper & note attachments (built)** — audio (e.g. NotebookLM audio
    overviews) with an in-app player and tap-to-seek timestamps in notes,
    podcast links, images, arbitrary files.
-5. **Library tab (built)** — remaining: full-text search (SQLite FTS5) over
-   notes, highlights, and paper metadata; reading status (to read /
-   reading / done).
+5. **Library tab & search (built)** — searchable Library, reading status,
+   and an app-wide full-text search (SQLite FTS5) over notes, papers and
+   highlights.
 6. **Projects/collections** — a named group of papers and notes (one per
    literature review or thesis chapter). Must stay invisible until the user
    creates one, like folders/tags.
@@ -460,6 +460,21 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   `customRecognizerBuilder`. "Share as Markdown" converts the Delta
   (`noteToMarkdown`): headings shift down one level under the title,
   app-internal links become plain text, sketches become `[Sketch]`.
+- **Search** (`lib/features/search/`): a magnifier in the home app bar
+  opens `SearchScreen` (results as you type; notes / papers / highlights;
+  a highlight opens its PDF at the page). `SearchIndex` keeps an FTS5
+  virtual table `search_index` (tokenizer `unicode61 remove_diacritics 2`,
+  title weighted 2× in bm25) *outside* the synced schema — it is derived,
+  each device builds its own. `refresh()` runs before every search and
+  diffs each row's `updated_at` against the stamp it was indexed at, so
+  edits, deletes, new rows *and rows applied by a sync* are all picked up,
+  and only changed rows are re-read (note text must be extracted from Quill
+  JSON in Dart, which is why SQL triggers can't maintain it). Queries are
+  reduced to words and matched as prefixes joined by AND, so FTS syntax
+  characters can never cause an error (operators like AND are just words).
+  If FTS5 isn't compiled into the platform's SQLite, `search` falls back to
+  a substring scan (`available` reports it) — FTS5 is present in the test
+  and Android builds.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

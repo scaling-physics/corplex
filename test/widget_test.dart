@@ -418,36 +418,121 @@ void main() {
     await _disposeTree(tester);
   });
 
-  testWidgets('outside changes update untouched fields, not ones being edited', (
-    tester,
-  ) async {
-    await db.into(db.papers).insert(
-      PapersCompanion.insert(id: const Value('p1'), title: 'upload_final'),
-    );
+  testWidgets(
+    'outside changes update untouched fields, not ones being edited',
+    (tester) async {
+      await db
+          .into(db.papers)
+          .insert(
+            PapersCompanion.insert(
+              id: const Value('p1'),
+              title: 'upload_final',
+            ),
+          );
+      await tester.pumpWidget(_appWithDb(db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Library'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('upload_final'));
+      await tester.pumpAndSettle();
+
+      // The reader starts typing an author…
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Authors'),
+        'Me, Myself',
+      );
+      // …while a background lookup fills in the rest.
+      await (db.update(db.papers)..where((p) => p.id.equals('p1'))).write(
+        const PapersCompanion(
+          title: Value('Attention Is All You Need'),
+          authors: Value('Vaswani, Ashish'),
+          venue: Value('NeurIPS'),
+        ),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+      expect(
+        find.text('Attention Is All You Need'),
+        findsOneWidget,
+        reason: 'untouched: updated',
+      );
+      expect(find.text('NeurIPS'), findsOneWidget);
+      expect(
+        find.text('Me, Myself'),
+        findsOneWidget,
+        reason: 'being edited: kept',
+      );
+      expect((await db.select(db.papers).getSingle()).authors, 'Me, Myself');
+
+      await _disposeTree(tester);
+    },
+  );
+
+  testWidgets(
+    'searching finds a note, a paper and a highlight, and opens them',
+    (tester) async {
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: const Value('n1'),
+              title: const Value('Lecture 3'),
+              content: const Value(
+                '[{"insert":"backpropagation through time\\n"}]',
+              ),
+            ),
+          );
+      await db
+          .into(db.papers)
+          .insert(
+            PapersCompanion.insert(
+              id: const Value('p1'),
+              title: 'Backpropagation applied to zip codes',
+            ),
+          );
+      await db
+          .into(db.highlights)
+          .insert(
+            HighlightsCompanion.insert(
+              paperId: 'p1',
+              pageNumber: 2,
+              quote: 'Gradient descent via backpropagation',
+              rectsJson: '[]',
+            ),
+          );
+      await tester.pumpWidget(_appWithDb(db));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      expect(find.text('Search everything'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'backprop');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Notes'), findsOneWidget);
+      expect(find.text('Papers'), findsOneWidget);
+      expect(find.text('Highlights'), findsOneWidget);
+      expect(find.text('Lecture 3'), findsOneWidget);
+
+      await tester.tap(find.text('Lecture 3'));
+      await tester.pumpAndSettle();
+      expect(find.text('Lecture 3'), findsWidgets); // the editor's title field
+
+      await _disposeTree(tester);
+    },
+  );
+
+  testWidgets('a search with no matches says so', (tester) async {
     await tester.pumpWidget(_appWithDb(db));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Library'));
+    await tester.tap(find.byTooltip('Search'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('upload_final'));
+    await tester.enterText(find.byType(TextField), 'zzzz');
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-
-    // The reader starts typing an author…
-    await tester.enterText(find.widgetWithText(TextField, 'Authors'), 'Me, Myself');
-    // …while a background lookup fills in the rest.
-    await (db.update(db.papers)..where((p) => p.id.equals('p1'))).write(
-      const PapersCompanion(
-        title: Value('Attention Is All You Need'),
-        authors: Value('Vaswani, Ashish'),
-        venue: Value('NeurIPS'),
-      ),
-    );
-    await tester.pumpAndSettle(const Duration(milliseconds: 600));
-
-    expect(find.text('Attention Is All You Need'), findsOneWidget, reason: 'untouched: updated');
-    expect(find.text('NeurIPS'), findsOneWidget);
-    expect(find.text('Me, Myself'), findsOneWidget, reason: 'being edited: kept');
-    expect((await db.select(db.papers).getSingle()).authors, 'Me, Myself');
-
+    expect(find.text('No matches'), findsOneWidget);
     await _disposeTree(tester);
   });
 }

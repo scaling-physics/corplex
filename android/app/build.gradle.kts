@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.corplex.corplex"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37 // receive_sharing_intent requires API 37+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

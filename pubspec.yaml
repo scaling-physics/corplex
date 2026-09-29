@@ -56,6 +56,7 @@ dependencies:
   sqlite3: ^3.6.0
   connectivity_plus: ^7.3.1
   shared_preferences: ^2.5.5
+  pdf: ^3.13.1
 
 dev_dependencies:
   flutter_test:
@@ -82,6 +83,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Roboto (Apache 2.0), embedded into exported PDFs, since the PDF base
+  # fonts can't show curly quotes, dashes or accented letters.
+  assets:
+    - assets/fonts/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

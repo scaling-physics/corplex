@@ -6,7 +6,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/database.dart';
@@ -15,6 +14,8 @@ import '../../data/tables/attachments_table.dart';
 import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
+import '../export/export_actions.dart';
+import '../export/export_model.dart';
 import '../ink/sketch_embed.dart';
 import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
@@ -24,7 +25,6 @@ import 'cite_paper_sheet.dart';
 import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
-import 'note_markdown.dart';
 import 'note_templates.dart';
 import '../library/add_attachment_sheet.dart';
 import '../library/citation_formatter.dart';
@@ -370,17 +370,19 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await deleteNoteWithUndo(ref, messenger, widget.noteId, title);
   }
 
-  Future<void> _shareMarkdown() async {
+  Future<void> _export(BuildContext context) async {
     await _save();
-    final markdown = noteToMarkdown(
+    if (!context.mounted) return;
+    await exportNotes(
+      context,
+      ref.read(databaseProvider),
+      [
+        ExportNote(
+          _titleController.text,
+          encodeNoteContent(_quillController.document),
+        ),
+      ],
       title: _titleController.text,
-      content: encodeNoteContent(_quillController.document),
-    );
-    await SharePlus.instance.share(
-      ShareParams(
-        text: markdown,
-        subject: _titleController.text.isEmpty ? null : _titleController.text,
-      ),
     );
   }
 
@@ -449,7 +451,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               'cite' => _citePaper(context),
               'template' => _insertTemplate(),
               'bibliography' => _addBibliography(context),
-              'markdown' => _shareMarkdown(),
+              'export' => _export(context),
               'trash' => _moveToTrash(),
               _ => null,
             },
@@ -493,10 +495,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 ),
               ),
               PopupMenuItem(
-                value: 'markdown',
+                value: 'export',
                 child: ListTile(
                   leading: Icon(Icons.ios_share),
-                  title: Text('Share as Markdown'),
+                  title: Text('Export'),
+                  subtitle: Text('Markdown, Word or PDF, with references'),
                 ),
               ),
               PopupMenuItem(

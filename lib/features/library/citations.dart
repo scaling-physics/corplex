@@ -133,25 +133,29 @@ List<String> referenceList(List<Paper> papers, CitationStyle style) {
   return lines;
 }
 
-/// Replaces every `[@key]` in [text] with its in-text form for [style]
-/// (numbers for IEEE) and returns the papers cited, in citation order.
-/// Citations whose key is unknown are left as written.
-({String text, List<Paper> cited}) replaceCitations(
-  String text,
-  Map<String, Paper> byKey,
-  CitationStyle style,
-) {
-  final order = <String>[];
-  final out = text.replaceAllMapped(_group, (m) {
+/// Resolves `[@key]` citations across several pieces of text, keeping one
+/// citation order so numbered styles (IEEE) stay consistent. Citations
+/// whose key is unknown are left as written.
+class CitationResolver {
+  CitationResolver(this.byKey, this.style);
+
+  final Map<String, Paper> byKey;
+  final CitationStyle style;
+  final _order = <String>[];
+
+  /// The papers cited so far, in citation order.
+  List<Paper> get cited => [for (final k in _order) byKey[k]!];
+
+  String replace(String text) => text.replaceAllMapped(_group, (m) {
     final keys = _keysIn(m.group(0)!).toList();
     if (keys.isEmpty || keys.any((k) => !byKey.containsKey(k))) {
       return m.group(0)!;
     }
     for (final k in keys) {
-      if (!order.contains(k)) order.add(k);
+      if (!_order.contains(k)) _order.add(k);
     }
     if (style == CitationStyle.ieee) {
-      return keys.map((k) => '[${order.indexOf(k) + 1}]').join('');
+      return keys.map((k) => '[${_order.indexOf(k) + 1}]').join('');
     }
     if (keys.length == 1) return inTextCitation(byKey[keys.single]!, style);
     // (A, 2017; B, 2019)
@@ -161,5 +165,16 @@ List<String> referenceList(List<Paper> papers, CitationStyle style) {
     ];
     return '(${parts.join('; ')})';
   });
-  return (text: out, cited: [for (final k in order) byKey[k]!]);
+}
+
+/// Replaces every `[@key]` in [text] with its in-text form for [style]
+/// (numbers for IEEE) and returns the papers cited, in citation order.
+({String text, List<Paper> cited}) replaceCitations(
+  String text,
+  Map<String, Paper> byKey,
+  CitationStyle style,
+) {
+  final resolver = CitationResolver(byKey, style);
+  final out = resolver.replace(text);
+  return (text: out, cited: resolver.cited);
 }

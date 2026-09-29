@@ -1,8 +1,11 @@
+import 'package:drift/drift.dart' show OrderingTerm, innerJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../export/export_actions.dart';
+import '../export/export_model.dart';
 import 'matrix_screen.dart';
 import 'project_bibliography.dart';
 import 'projects_providers.dart';
@@ -33,6 +36,12 @@ Future<void> showProjectMenu(
             onTap: () => Navigator.pop(context, 'bibliography'),
           ),
           ListTile(
+            leading: const Icon(Icons.ios_share),
+            title: const Text('Export project'),
+            subtitle: const Text('Its notes as one document'),
+            onTap: () => Navigator.pop(context, 'export'),
+          ),
+          ListTile(
             leading: const Icon(Icons.edit_outlined),
             title: const Text('Rename'),
             onTap: () => Navigator.pop(context, 'rename'),
@@ -54,6 +63,10 @@ Future<void> showProjectMenu(
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => MatrixScreen(project: project)));
+    return;
+  }
+  if (action == 'export') {
+    await exportProject(context, db, project);
     return;
   }
   if (action == 'bibliography') {
@@ -110,4 +123,34 @@ Future<void> showProjectMenu(
     );
     if (confirmed == true) await deleteProject(db, project.id);
   }
+}
+
+/// Exports every note in [project] as one document, oldest first, under
+/// one reference list.
+Future<void> exportProject(
+  BuildContext context,
+  AppDatabase db,
+  Project project,
+) async {
+  final notes =
+      await (db.select(db.notes).join([
+              innerJoin(
+                db.projectNotes,
+                db.projectNotes.noteId.equalsExp(db.notes.id),
+              ),
+            ])
+            ..where(db.projectNotes.projectId.equals(project.id))
+            ..orderBy([OrderingTerm.asc(db.notes.createdAt)]))
+          .map((r) => r.readTable(db.notes))
+          .get();
+  if (!context.mounted) return;
+  if (notes.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No notes in this project yet.')),
+    );
+    return;
+  }
+  await exportNotes(context, db, [
+    for (final n in notes) ExportNote(n.title, n.content),
+  ], title: project.name);
 }

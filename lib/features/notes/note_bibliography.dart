@@ -59,10 +59,13 @@ Future<int> insertBibliography(
   final end = doc.length - 1; // before the final newline
   var at = start ?? end;
   if (start != null) controller.replaceText(start, end - start, '', null);
-  // A blank line before the heading, unless the note is empty there.
-  if (at > 0 && doc.toPlainText()[at - 1] != '\n') {
-    controller.replaceText(at, 0, '\n', null);
-    at++;
+  // A blank line before the heading, so it doesn't sit against the last
+  // paragraph (unless the note is empty there).
+  if (at > 0) {
+    final before = doc.toPlainText().substring(0, at);
+    final gap = before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+    controller.replaceText(at, 0, gap, null);
+    at += gap.length;
   }
   final refs = referenceList(papers, style);
   controller.replaceText(at, 0, '$referencesHeading\n${refs.join('\n')}', null);

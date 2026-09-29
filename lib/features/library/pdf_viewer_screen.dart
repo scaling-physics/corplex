@@ -248,7 +248,24 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
             params: PdfViewerParams(
               backgroundColor: c.surfaceContainer,
               onPageChanged: _onPageChanged,
-              textSelectionParams: PdfTextSelectionParams(enabled: !_inkMode),
+              textSelectionParams: PdfTextSelectionParams(
+                enabled: !_inkMode,
+                buildSelectionHandle: (context, anchor, state) =>
+                    SelectionHandle(
+                      // pdfrx places handle A above-left of the first
+                      // character and B below-right of the last; each
+                      // teardrop points at its corner of the selection.
+                      pointsTo:
+                          (anchor.type == PdfTextSelectionAnchorType.a) ==
+                              (anchor.direction != PdfTextDirection.rtl &&
+                                  anchor.direction != PdfTextDirection.vrtl)
+                          ? Alignment.bottomRight
+                          : Alignment.topLeft,
+                      active:
+                          state !=
+                          PdfViewerTextSelectionAnchorHandleState.normal,
+                    ),
+              ),
               customizeContextMenuItems: _customizeMenu,
               pageOverlaysBuilder: (context, pageRect, page) => [
                 _PageOverlay(
@@ -808,6 +825,46 @@ class ContentsSheet extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A small teardrop selection handle in the theme's primary color: a circle
+/// with one square corner, which touches the selected text. (pdfrx's own
+/// is a 30 px triangle that sits over neighbouring lines.)
+class SelectionHandle extends StatelessWidget {
+  const SelectionHandle({
+    super.key,
+    required this.pointsTo,
+    this.active = false,
+  });
+
+  /// [Alignment.bottomRight] or [Alignment.topLeft]: the pointed corner.
+  final Alignment pointsTo;
+  final bool active;
+
+  static const size = 24.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    const r = Radius.circular(size / 2);
+    final bottomRight = pointsTo == Alignment.bottomRight;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: active ? color : color.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.only(
+          topLeft: bottomRight ? r : Radius.zero,
+          topRight: r,
+          bottomLeft: r,
+          bottomRight: bottomRight ? Radius.zero : r,
+        ),
+        boxShadow: active
+            ? null
+            : const [BoxShadow(color: Colors.black26, blurRadius: 3)],
       ),
     );
   }

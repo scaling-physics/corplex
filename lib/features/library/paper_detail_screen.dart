@@ -367,19 +367,23 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SegmentedButton<CitationStyle>(
-                            showSelectedIcon: false,
-                            segments: CitationStyle.values
-                                .map(
-                                  (style) => ButtonSegment(
-                                    value: style,
-                                    label: Text(style.label),
-                                  ),
-                                )
-                                .toList(),
-                            selected: {_citationStyle},
-                            onSelectionChanged: (selected) =>
-                                setState(() => _citationStyle = selected.first),
+                          // Chips wrap onto a second line on a phone; a
+                          // segmented bar squeezed six styles until their
+                          // names broke mid-word.
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final style in CitationStyle.values)
+                                ChoiceChip(
+                                  label: Text(style.label),
+                                  selected: _citationStyle == style,
+                                  showCheckmark: false,
+                                  visualDensity: VisualDensity.compact,
+                                  onSelected: (_) =>
+                                      setState(() => _citationStyle = style),
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           AnimatedSwitcher(

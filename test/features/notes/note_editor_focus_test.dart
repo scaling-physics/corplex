@@ -88,4 +88,49 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  testWidgets('the formatting toolbar rides above the keyboard', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          audioEngineProvider.overrideWithValue(FakeAudioEngine()),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            FlutterQuillLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: NoteEditorScreen(noteId: 'n1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final screen =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+
+    // A 300 logical-pixel keyboard slides up.
+    tester.view.viewInsets = FakeViewPadding(
+      bottom: 300 * tester.view.devicePixelRatio,
+    );
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+
+    final draw = tester.getRect(find.byTooltip('Draw'));
+    expect(draw.bottom, lessThanOrEqualTo(screen - 300));
+    expect(
+      draw.bottom,
+      greaterThan(screen - 300 - 80),
+      reason: 'right on top of it',
+    );
+    // The body still ends above the toolbar.
+    expect(tester.getRect(find.byType(QuillEditor)).top, lessThan(draw.top));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
 }

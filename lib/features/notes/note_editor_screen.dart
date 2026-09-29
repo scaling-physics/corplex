@@ -469,6 +469,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               .firstOrNull;
 
     return Scaffold(
+      // The toolbar rides on top of the keyboard (see bottomNavigationBar),
+      // so the body must not also shrink for it.
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         automaticallyImplyLeading: !widget.embedded,
         actions: [
@@ -769,76 +772,85 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 _Backlinks(noteId: widget.noteId),
               ],
             ),
+      // A Scaffold leaves its bottom bar under the keyboard; pad it up by the
+      // keyboard's height so formatting and Draw stay in reach while typing.
       bottomNavigationBar: !_loaded
           ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AudioPlayerBar(onMark: _insertTimestamp),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLow,
-                    border: Border(
-                      top: BorderSide(
-                        color: Theme.of(context).colorScheme.outlineVariant,
+          : Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AudioPlayerBar(onMark: _insertTimestamp),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                     ),
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      child: Row(
-                        children: [
-                          // Pen input sits first and always visible, not at
-                          // the scrolled-off end of the formatting row.
-                          IconButton(
-                            icon: const Icon(Icons.draw_outlined),
-                            tooltip: 'Draw',
-                            onPressed: () =>
-                                insertSketch(context, _quillController),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 24,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          Expanded(
-                            child: QuillSimpleToolbar(
-                              controller: _quillController,
-                              config: const QuillSimpleToolbarConfig(
-                                multiRowsDisplay: false,
-                                showFontFamily: false,
-                                showFontSize: false,
-                                showSmallButton: false,
-                                showLineHeightButton: false,
-                                showInlineCode: false,
-                                showColorButton: false,
-                                showBackgroundColorButton: false,
-                                showClearFormat: false,
-                                showAlignmentButtons: false,
-                                showListCheck: false,
-                                showCodeBlock: false,
-                                showIndent: false,
-                                showLink: false,
-                                showDirection: false,
-                                showSearchButton: false,
-                                showSubscript: false,
-                                showSuperscript: false,
-                                showUndo: false,
-                                showRedo: false,
-                                showDividers: false,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        child: Row(
+                          children: [
+                            // Pen input sits first and always visible, not at
+                            // the scrolled-off end of the formatting row.
+                            IconButton(
+                              icon: const Icon(Icons.draw_outlined),
+                              tooltip: 'Draw',
+                              onPressed: () =>
+                                  insertSketch(context, _quillController),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 24,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant,
+                            ),
+                            Expanded(
+                              child: QuillSimpleToolbar(
+                                controller: _quillController,
+                                config: const QuillSimpleToolbarConfig(
+                                  multiRowsDisplay: false,
+                                  showFontFamily: false,
+                                  showFontSize: false,
+                                  showSmallButton: false,
+                                  showLineHeightButton: false,
+                                  showInlineCode: false,
+                                  showColorButton: false,
+                                  showBackgroundColorButton: false,
+                                  showClearFormat: false,
+                                  showAlignmentButtons: false,
+                                  showListCheck: false,
+                                  showCodeBlock: false,
+                                  showIndent: false,
+                                  showLink: false,
+                                  showDirection: false,
+                                  showSearchButton: false,
+                                  showSubscript: false,
+                                  showSuperscript: false,
+                                  showUndo: false,
+                                  showRedo: false,
+                                  showDividers: false,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }

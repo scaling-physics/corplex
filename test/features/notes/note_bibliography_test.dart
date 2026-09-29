@@ -49,7 +49,7 @@ void main() {
     expect(await insertBibliography(controller, db, CitationStyle.apa), 2);
 
     final text = controller.document.toPlainText();
-    expect(text, contains('\nReferences\n'));
+    expect(text, contains('.\n\nReferences\n'), reason: 'a blank line before');
     expect(
       text.indexOf('Adams'),
       lessThan(text.indexOf('Smith, J. (2020)')),

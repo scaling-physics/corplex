@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database_provider.dart';
+import '../library/library_screen.dart' show importPaperFile;
 import '../library/papers_providers.dart';
 import 'note_papers_providers.dart';
 
@@ -33,8 +34,7 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
   Widget build(BuildContext context) {
     final papersAsync = ref.watch(papersListProvider);
     final linkedAsync = ref.watch(linkedPapersForNoteProvider(widget.noteId));
-    final linkedIds =
-        linkedAsync.value?.map((p) => p.id).toSet() ?? <String>{};
+    final linkedIds = linkedAsync.value?.map((p) => p.id).toSet() ?? <String>{};
 
     return FractionallySizedBox(
       heightFactor: 0.8,
@@ -52,6 +52,14 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
                   leading: const Icon(Icons.search),
                   onChanged: (value) => setState(() => _query = value),
                 ),
+              ),
+              // One quiet row: bring in a PDF without leaving the note. It
+              // is imported like any other (real title looked up in the
+              // background) and linked here in the same step.
+              ListTile(
+                leading: const Icon(Icons.upload_file_outlined),
+                title: const Text('Import a PDF'),
+                onTap: _importAndLink,
               ),
               Expanded(
                 child: papersAsync.when(
@@ -103,6 +111,16 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _importAndLink() async {
+    final id = await importPaperFile(context, ref);
+    if (id == null) return;
+    await linkPaperToNote(
+      ref.read(databaseProvider),
+      noteId: widget.noteId,
+      paperId: id,
     );
   }
 

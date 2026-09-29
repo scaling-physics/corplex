@@ -22,14 +22,17 @@ import 'papers_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
-/// Picks a PDF, copies it into app storage, creates its paper record and
-/// opens it. Used by the home screen's "Import PDF" button.
-Future<void> importPaper(BuildContext context, WidgetRef ref) async {
+/// Picks a PDF, copies it into app storage and creates its paper record,
+/// then fills in the real title/authors/year from its DOI or arXiv ID in
+/// the background (the paper is usable straight away). Returns the new
+/// paper's id, or null if nothing was picked. Shared by the Library's
+/// "Import PDF" and the note editor's link-a-paper sheet.
+Future<String?> importPaperFile(BuildContext context, WidgetRef ref) async {
   final picked = await FilePicker.pickFile(
     type: FileType.custom,
     allowedExtensions: ['pdf'],
   );
-  if (picked?.path == null) return;
+  if (picked?.path == null) return null;
 
   final localPath = await copyIntoAppStorage(picked!.path!, 'papers');
   final title = p.basenameWithoutExtension(picked.name);
@@ -46,15 +49,19 @@ Future<void> importPaper(BuildContext context, WidgetRef ref) async {
         ),
       );
 
-  // Fill in the real title/authors/year from the PDF's DOI or arXiv ID in
-  // the background; the paper is usable straight away.
   if (context.mounted) {
     unawaited(
       enrichImportedPaper(ref, context, id, localPath, importedTitle: title),
     );
   }
+  return id;
+}
 
-  if (!context.mounted) return;
+/// Imports a PDF and opens it. Used by the home screen's "Import PDF"
+/// button.
+Future<void> importPaper(BuildContext context, WidgetRef ref) async {
+  final id = await importPaperFile(context, ref);
+  if (id == null || !context.mounted) return;
   Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => PaperDetailScreen(paperId: id)));
 }

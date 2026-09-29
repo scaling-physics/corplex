@@ -115,14 +115,7 @@ existing table). Local-only columns (file paths) stay out of the spec.
 
 Small, specific items to pick up next (remove when done):
 
-- **Import a paper PDF from a note's link sheet.** In the note editor, the
-  link-a-paper sheet (`lib/features/notes/link_paper_sheet.dart`, opened by
-  the link icon) only lists papers already in the Library. Add an "Import a
-  PDF" action there that runs the normal import (`importPaper` /
-  `copyIntoAppStorage` + the background DOI/arXiv enrichment) and links the
-  new paper to the note in one step — no detour to the Library tab. Keep it
-  invisible until wanted (one quiet row at the top of the sheet), per the
-  no-distractions principle.
+(Nothing queued.)
 
 ## Later releases
 
@@ -279,7 +272,10 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   for the note→papers side, `notesForPaperProvider` in
   `lib/features/library/papers_providers.dart` for the reverse). Linked
   papers show as chips in the note editor (tap to open, × to unlink) and
-  as a "Referenced in notes" list on the paper detail screen.
+  as a "Referenced in notes" list on the paper detail screen. The sheet's
+  first row, "Import a PDF", picks a PDF with the same `importPaperFile` the
+  Library uses (background DOI/arXiv lookup included) and links the new
+  paper to the note in one step.
 - **Citations**: `citation_formatter.dart` formats a `Paper` as
   APA/MLA/BibTeX (pure, unit-tested). Authors stay a single string in the
   DB but are parsed by `authors.dart` (`parseAuthors`: `A B; C D`, `and`,

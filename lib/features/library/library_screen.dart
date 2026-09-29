@@ -110,7 +110,8 @@ class LibraryScreen extends ConsumerWidget {
                     value: 'import',
                     child: ListTile(
                       leading: Icon(Icons.file_download_outlined),
-                      title: Text('Import BibTeX'),
+                      title: Text('Import references'),
+                      subtitle: Text('BibTeX, RIS or CSL JSON (Zotero, Mendeley)'),
                     ),
                   ),
                   PopupMenuItem(

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database_provider.dart';
 import 'bibtex.dart';
+import 'reference_import.dart';
 import 'metadata_lookup.dart';
 import 'paper_detail_screen.dart';
 
@@ -102,20 +103,21 @@ Future<void> addPaperFromIdentifier(
   }
 }
 
-/// Imports every entry of a `.bib` file, skipping papers already in the
-/// library, and reports what happened.
+/// Imports every entry of a BibTeX, RIS or CSL JSON file (what Zotero,
+/// Mendeley and EndNote export), skipping papers already in the library,
+/// and reports what happened.
 Future<void> importBibtexFile(BuildContext context, WidgetRef ref) async {
   final picked = await FilePicker.pickFile(
     type: FileType.custom,
-    allowedExtensions: ['bib', 'bibtex', 'txt'],
+    allowedExtensions: ['bib', 'bibtex', 'ris', 'json', 'txt'],
   );
   if (picked?.path == null || !context.mounted) return;
 
   final text = await File(picked!.path!).readAsString();
   if (!context.mounted) return;
-  final entries = parseBibtex(text);
+  final entries = parseReferences(text);
   if (entries.isEmpty) {
-    _say(context, 'No BibTeX entries found in that file.');
+    _say(context, 'No references found in that file.');
     return;
   }
   final db = ref.read(databaseProvider);

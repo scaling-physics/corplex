@@ -25,6 +25,7 @@ import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
 import 'note_markdown.dart';
+import 'note_templates.dart';
 import '../library/add_attachment_sheet.dart';
 import '../library/citation_formatter.dart';
 import '../library/citations.dart';
@@ -282,6 +283,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
+  void _insertTemplate() {
+    final controller = _quillController;
+    final cursor = controller.selection.baseOffset;
+    final docEnd = controller.document.length - 1;
+    insertLiteratureTemplate(
+      controller,
+      cursor < 0 || cursor > docEnd ? docEnd : cursor,
+    );
+  }
+
   Future<void> _addBibliography(BuildContext context) async {
     final style = await showDialog<CitationStyle>(
       context: context,
@@ -436,6 +447,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ),
               'link' => _linkNote(context),
               'cite' => _citePaper(context),
+              'template' => _insertTemplate(),
               'bibliography' => _addBibliography(context),
               'markdown' => _shareMarkdown(),
               'trash' => _moveToTrash(),
@@ -463,6 +475,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   leading: Icon(Icons.format_quote),
                   title: Text('Cite a paper'),
                   subtitle: Text('Or type [@ while writing'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'template',
+                child: ListTile(
+                  leading: Icon(Icons.article_outlined),
+                  title: Text('Literature note template'),
+                  subtitle: Text('Summary, method, findings, critique'),
                 ),
               ),
               PopupMenuItem(

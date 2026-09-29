@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import 'matrix_screen.dart';
+import 'project_bibliography.dart';
 import 'projects_providers.dart';
 
 /// Long-press menu on a project chip: rename or delete. Deleting removes
@@ -18,6 +20,18 @@ Future<void> showProjectMenu(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ListTile(
+            leading: const Icon(Icons.table_chart_outlined),
+            title: const Text('Synthesis matrix'),
+            subtitle: const Text('Compare its papers by theme'),
+            onTap: () => Navigator.pop(context, 'matrix'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.list_alt),
+            title: const Text('Bibliography'),
+            subtitle: const Text('All its papers, in a citation style'),
+            onTap: () => Navigator.pop(context, 'bibliography'),
+          ),
           ListTile(
             leading: const Icon(Icons.edit_outlined),
             title: const Text('Rename'),
@@ -35,6 +49,17 @@ Future<void> showProjectMenu(
   );
   if (action == null || !context.mounted) return;
   final db = ref.read(databaseProvider);
+
+  if (action == 'matrix') {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => MatrixScreen(project: project)));
+    return;
+  }
+  if (action == 'bibliography') {
+    await shareProjectBibliography(context, ref, project);
+    return;
+  }
 
   if (action == 'rename') {
     final controller = TextEditingController(text: project.name);

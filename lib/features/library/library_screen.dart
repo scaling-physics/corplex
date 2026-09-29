@@ -64,7 +64,7 @@ class LibraryScreen extends ConsumerWidget {
                 if (papers.isEmpty) {
                   return Center(
                     child: Text(
-                      'Papers you reference in notes will show up here.',
+                      'Papers you reference in notes will show up here.\nTap + to import a PDF.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),

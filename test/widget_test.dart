@@ -53,7 +53,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Papers you reference in notes will show up here.'),
+      find.text('Papers you reference in notes will show up here.\nTap + to import a PDF.'),
       findsOneWidget,
     );
 

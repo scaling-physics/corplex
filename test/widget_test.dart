@@ -16,14 +16,29 @@ import 'package:corplex/features/audio/audio_playback.dart';
 import 'package:corplex/features/ink/ink_canvas.dart';
 import 'package:corplex/features/ink/ink_model.dart';
 import 'package:corplex/features/notes/note_content.dart';
+import 'package:corplex/features/share/share_import.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'support/fake_audio_engine.dart';
+
+class _NoShares implements ShareIntentSource {
+  @override
+  Future<List<SharedMediaFile>> initial() async => const [];
+
+  @override
+  Stream<List<SharedMediaFile>> get stream => const Stream.empty();
+
+  @override
+  Future<void> reset() async {}
+}
 
 Widget _appWithDb(AppDatabase db, {FakeAudioEngine? audio}) {
   return ProviderScope(
     overrides: [
       databaseProvider.overrideWithValue(db),
       audioEngineProvider.overrideWithValue(audio ?? FakeAudioEngine()),
+      // The real share plugin has no implementation under `flutter test`.
+      shareIntentSourceProvider.overrideWithValue(_NoShares()),
     ],
     child: const CorplexApp(),
   );

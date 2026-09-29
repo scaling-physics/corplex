@@ -57,6 +57,16 @@ Future<void> addPaperByIdentifier(BuildContext context, WidgetRef ref) async {
     _say(context, 'That doesn\'t look like a DOI or arXiv ID.');
     return;
   }
+  await addPaperFromIdentifier(context, ref, id);
+}
+
+/// Looks [id] up and adds the paper (unless it's already in the library),
+/// opening it when new. Says what happened either way.
+Future<void> addPaperFromIdentifier(
+  BuildContext context,
+  WidgetRef ref,
+  PaperIdentifier id,
+) async {
   _say(context, 'Looking it up…');
   final db = ref.read(databaseProvider);
   try {
@@ -66,7 +76,11 @@ Future<void> addPaperByIdentifier(BuildContext context, WidgetRef ref) async {
       _say(context, 'No paper found for ${id.value}.');
       return;
     }
-    final result = await addPaperFromMetadata(db, meta, id: const Uuid().v4());
+    final result = await addPaperFromMetadata(
+      db,
+      meta,
+      id: const Uuid().v4(),
+    );
     if (!context.mounted) return;
     if (result.existing case final existing?) {
       _say(

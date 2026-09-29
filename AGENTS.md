@@ -82,8 +82,9 @@ the rest are the remaining v1 work, in priority order.
 6. **Projects/collections (built)** — a named group of papers and notes
    (one per literature review or thesis chapter); invisible until one is
    created.
-7. **Capture from other apps** — iOS/Android share-sheet import for PDFs
-   and links, so adding a paper is a couple of taps.
+7. **Capture from other apps (Android built; iOS not)** — Android
+   share-sheet/Open-with import for PDFs, audio, DOIs/arXiv links, links and
+   text. iOS needs an Xcode Share Extension target — see Status.
 8. **Data safety** — full export/backup (database + files as a zip), trash
    with undo instead of immediate delete, and data-preserving schema
    migrations (the destructive v3 migration must not be repeated once real
@@ -488,6 +489,27 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   project joins it. There is deliberately no project *page* yet — the
   filtered lists are the view; the synthesis matrix (v1.1) is the natural
   first thing to give it one. Server side: `20261002000000_projects.sql`.
+- **Share-sheet import** (`lib/features/share/`): `ShareCoordinator`
+  (wrapped around `HomeShell`, invisible) listens to the launch share and
+  later ones through a `ShareIntentSource` seam (`receive_sharing_intent`
+  in production; tests override `shareIntentSourceProvider`, since the
+  plugin has no implementation under `flutter test`). `classifyShared`
+  sorts items: PDF → paper (copied to app storage, then the same
+  background DOI/arXiv enrichment as a manual import); audio → asks what to
+  attach it to (new note / recent notes / papers); DOI/arXiv id, bare or
+  inside a shared page → `addPaperFromIdentifier`; other URL → a note whose
+  body is the link; other text → a note. Every outcome ends in a snackbar
+  with an Open action. Android: intent filters for `SEND`
+  (`application/pdf`, `audio/*`, `text/plain`) and `VIEW` on PDFs, and the
+  activity is `singleTask` (required so a share reaches the running app).
+  **iOS is not done**: sharing *into* an iOS app needs a Share Extension
+  target created in Xcode (plus an App Group), which can't be scripted
+  here or tested without a device; `receive_sharing_intent`'s README lists
+  the steps. Until then iOS users import PDFs with the in-app picker.
+  **Testing IO in widget tests**: real file IO never completes under the
+  fake clock, and each awaited step needs its own round trip — see
+  `settle()` in `test/features/share/share_test.dart` (alternate `pump()`
+  with `runAsync` delays), and fake `PathProviderPlatform.instance`.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

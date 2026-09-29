@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 
 import 'features/home/home_shell.dart';
+import 'features/share/share_import.dart';
 import 'features/sync/sync_coordinator.dart';
 import 'theme/app_theme.dart';
 
@@ -24,7 +26,7 @@ class CorplexApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeAnimationDuration: AppMotion.long,
       themeAnimationCurve: AppMotion.standard,
-      home: const SyncCoordinator(child: HomeShell()),
+      home: const SyncCoordinator(child: ShareCoordinator(child: HomeShell())),
     );
   }
 }

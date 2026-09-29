@@ -8,6 +8,10 @@ class Tags extends Table {
   TextColumn get name => text()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
+
   @override
   Set<Column> get primaryKey => {id};
 }

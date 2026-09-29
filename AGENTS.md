@@ -44,9 +44,11 @@ read → annotate → note → cite loop, reconsider it before building it.
   app builds without an extra codegen step.
 - **Sync**: Cross-device sync is a planned feature layered on top of the local
   DB, not a hard dependency of core functionality. Do not build features that
-  assume a live backend connection. Decided approach: **PowerSync + Supabase**,
-  both hosted (not self-hosted), with **email/password** auth — see the Sync
-  backend status entry below for what's built and what's still needed.
+  assume a live backend connection. Decided approach: **hosted Supabase**
+  (Postgres + Auth) with **email/password** auth and a small hand-written,
+  last-write-wins sync engine over the existing drift database. PowerSync
+  was considered and dropped: it wants to own the local SQLite database,
+  which fights drift. See the Sync engine status entry below.
 - **State management**: Riverpod (`flutter_riverpod`), chosen for its
   natural fit with drift's `Stream`-based reactive queries. `AppDatabase`
   is exposed via `databaseProvider` (`lib/data/database_provider.dart`);
@@ -56,20 +58,104 @@ read → annotate → note → cite loop, reconsider it before building it.
 
 ## Core v1 features
 
-1. Rich-text note taking — folders/tags, markdown or rich-text editor,
-   backlinks between notes.
-2. PDF import & annotation — import papers as PDF, highlight/annotate,
-   extract highlights into notes.
-3. Citation management — store metadata (authors, year, journal, DOI),
-   generate citations (APA/MLA/etc.), BibTeX import/export.
-4. Cross-device sync — notes and library sync across iPhone/iPad/Android
-   (design so local-first storage remains the source of truth).
-5. Paper attachments — attach external media to a paper's record, e.g. a
-   NotebookLM-style audio/podcast summary, links, or other files, so all
-   material related to a paper lives in one place.
-6. Library tab — a dedicated, searchable tab that automatically aggregates
-   every paper referenced across notes/citations, giving quick access to
-   each paper and its attachments without hunting through individual notes.
+v1 is the smallest release that completes the read → annotate → note → cite
+loop *and* cannot lose a user's data. Items marked **(built)** exist today;
+the rest are the remaining v1 work, in priority order.
+
+1. **Rich-text notes (built)** — folders/tags, Quill rich-text editor.
+   Remaining: `[[wikilinks]]` with a backlinks panel, and Markdown export.
+2. **PDF import & annotation (built, needs rework)** — freeform ink
+   highlighting exists. Remaining: **text-selection highlights** using
+   pdfrx's text layer, each anchored to a page with an optional comment, so
+   "extract to note" inserts the quoted text plus a link back to the paper
+   and page rather than a screenshot. Ink stays as a second mode. Also:
+   resume at last-read page, and a per-paper Highlights list.
+3. **Citation management (partly built)** — APA/MLA/BibTeX formatting
+   exists. Remaining: BibTeX import, **metadata lookup from DOI/arXiv ID**
+   (Crossref/arXiv; strictly optional online, manual entry always works),
+   title/DOI extraction from an imported PDF, duplicate-paper detection, and
+   structured author names (needed for correct citation styles).
+4. **Paper attachments (built)** — podcast links, images, arbitrary files.
+5. **Library tab (built)** — remaining: full-text search (SQLite FTS5) over
+   notes, highlights, and paper metadata; reading status (to read /
+   reading / done).
+6. **Projects/collections** — a named group of papers and notes (one per
+   literature review or thesis chapter). Must stay invisible until the user
+   creates one, like folders/tags.
+7. **Capture from other apps** — iOS/Android share-sheet import for PDFs
+   and links, so adding a paper is a couple of taps.
+8. **Data safety** — full export/backup (database + files as a zip), trash
+   with undo instead of immediate delete, and data-preserving schema
+   migrations (the destructive v3 migration must not be repeated once real
+   users exist).
+9. **Cross-device sync (built; verified on a local Supabase stack)** —
+   Supabase + drift, last-write-wins. Metadata and files (PDFs, images,
+   audio) sync; see the Sync engine entry under Status. Needs a real
+   Supabase project before it can run.
+
+### Adding a new synced table
+
+Every table that syncs needs: an `updatedAt` column, an entry in
+`syncTables` (`lib/data/sync_schema.dart`, parents before children), and a
+matching table in a new Supabase migration under `supabase/migrations/`
+(user_id, deleted_at, synced_at, RLS, `sync_guard` trigger — copy an
+existing table). Local-only columns (file paths) stay out of the spec.
+
+### Open decisions (resolve before implementing)
+
+- **File storage limits**: files upload whole, unconditionally, and
+  download eagerly (fully in memory) on every device. Decide size limits,
+  Wi-Fi-only transfer, lazy download-on-open, and cleanup of storage
+  objects orphaned when a paper/attachment is deleted (none today).
+- **Clock skew**: last-write-wins trusts each device's clock. A device with
+  a badly wrong clock can lose (or win) edits it shouldn't.
+- **Pen input inside notes**: AGENTS.md's design principle promises text +
+  images + pen in one note, but `flutter_quill` has no ink support. Options:
+  an embedded drawing block (custom Quill embed), or a per-note ink layer.
+  Decide and record it; if it can't be done well, say so in the principles
+  rather than leaving the promise unmet.
+
+## Later releases
+
+Ordered roughly by value to the core loop. None of these should add UI to
+the default screens until the user opts in by using the feature.
+
+### v1.1 — Literature review depth
+- Synthesis matrix: a table of papers × user-defined themes (method,
+  sample, findings), filled from notes/highlights.
+- Inline citations in notes (`[@citekey]`) with stable citekeys, and a
+  generated bibliography per note or project.
+- Highlight-to-quote blocks; literature-note templates (summary / method /
+  findings / critique).
+- Import from RIS and Zotero/Mendeley exports.
+
+### v1.2 — Writing output
+- Export a note or project to Markdown, DOCX, or PDF with the bibliography
+  resolved.
+- Real citation styles via CSL (citeproc) rather than hand-written
+  formatters.
+
+### v1.3 — iPad & pen
+- Split view: PDF beside note, as a first-class layout.
+- Apple Pencil handwriting in notes (per the open decision above), Scribble.
+- Multiple windows, drag and drop between apps, hardware keyboard
+  shortcuts. Android stylus support.
+
+### v1.4 — Reading comfort
+- Dark/sepia reading mode, PDF outline/table of contents, cross-paper
+  Highlights view, ratings/priority.
+- App-wide dark mode, Dynamic Type/accessibility audit, localization.
+
+### Exploratory (needs a decision before any work)
+- AI assistance (summarize a paper, ask questions across the library). This
+  conflicts with offline-first, so it would be strictly additive and
+  opt-in, like sync. Not committed.
+
+### Engineering (ongoing, start now)
+- CI running `flutter analyze` and `flutter test` on every push.
+- Integration tests on real devices; a performance pass with 1,000+ papers
+  and large PDFs.
+- App Store / Play Store release setup; privacy-respecting crash reporting.
 
 ## Conventions
 
@@ -148,20 +234,86 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   recreates every table) since this changed primary key *types*, not just
   added a column — acceptable because there's no production data yet;
   a future breaking migration will need a real data-preserving strategy.
-- **Auth scaffolding**: `lib/features/auth/auth_service.dart` defines the
-  `AuthService` interface (`signUp`/`signIn`/`signOut`/`authStateChanges`)
-  that screens depend on, plus `StubAuthService` — an in-memory
-  placeholder (any well-formed email + 6+ char password "succeeds",
-  session lost on restart) used until a real Supabase-backed
-  implementation replaces it. Sign in/up screens live in the same folder;
-  the account icon in `HomeShell`'s AppBar is the entry point. Swapping in
-  real Supabase auth means implementing `AuthService` with
-  `supabase_flutter` and changing what `authServiceProvider` returns —
-  nothing else in the app should need to change.
-- **Sync service scaffolding**: `lib/features/sync/sync_service.dart`
-  defines a `SyncService` interface (`start`/`stop`/`statusChanges`) with
-  `NoOpSyncService` (reports permanently offline) as the current
-  `syncServiceProvider` default. No UI depends on it yet.
+- **Auth**: `lib/features/auth/auth_service.dart` defines the
+  `AuthService` interface that screens depend on. Two implementations:
+  `StubAuthService` (in-memory, any well-formed email + 6+ char password
+  "succeeds") is the default when Supabase isn't configured, and
+  `SupabaseAuthService` (`supabase_auth_service.dart`, persisted session)
+  replaces it via provider overrides in `supabase_setup.dart`. Sign in/up
+  screens live in the same folder; the account icon in `HomeShell`'s
+  AppBar is the entry point.
+- **Supabase config**: credentials come from `--dart-define=SUPABASE_URL`
+  and `--dart-define=SUPABASE_PUBLISHABLE_KEY` (`lib/config/supabase_config.dart`),
+  never the repo. Without both, `main()` installs no overrides and the
+  app runs offline exactly as before (tests rely on this). To stand up a
+  backend: create a Supabase project, run
+  `supabase/migrations/20260929000000_sync_schema.sql` in its SQL editor,
+  then launch with the two defines (also run
+  `20260930000000_file_sync.sql`, and turn off "Confirm email" in the
+  project's Auth settings or sign-up stops at a confirmation step).
+  **Verified** against a local Supabase stack (`supabase start`, needs
+  Docker; `supabase/config.toml` is committed) by
+  `test/integration/supabase_sync_test.dart`, which runs the real engine,
+  auth, PostgREST and Storage: two-device sync of every table plus files,
+  edits, deletes, server-side LWW rejection, and row-level-security
+  isolation between users. Run it with:
+  `flutter test test/integration --dart-define=SUPABASE_URL=http://127.0.0.1:54321 --dart-define=SUPABASE_PUBLISHABLE_KEY=<from supabase status>`
+  (skipped without the defines, so plain `flutter test` stays offline).
+  *Not yet run against a hosted project*; email confirmation and
+  hosted-only settings are untested. The unit tests still use
+  `test/support/fake_sync_remote.dart`.
+- **Sync engine**: `SyncEngine` (`lib/features/sync/sync_engine.dart`)
+  pushes then pulls through the narrow `SyncRemote` interface
+  (`sync_remote.dart`; `SupabaseSyncRemote` is the real one). Design:
+  * **Change tracking lives in SQLite triggers** (`lib/data/sync_schema.dart`),
+    not in app code, so no feature query needed changing: inserts/updates
+    enqueue the row in `sync_dirty`, updates bump `updated_at` if the
+    writer didn't, deletes (including FK cascades) write `sync_tombstones`.
+    All are suppressed while `sync_meta.applying = 1` (pulling), so
+    applied rows never echo back. Triggers use delete-then-insert, not
+    `INSERT OR REPLACE`: an outer statement's conflict clause (e.g. an FK
+    `SET NULL`) overrides a trigger's own.
+  * **Push uses the dirty queue, not a timestamp cursor**: `updated_at`
+    has one-second resolution, and a cursor version let a device's echo
+    push resurrect a row deleted in the same second.
+  * **Pull** uses per-table server `synced_at` cursors (immune to device
+    clock skew), applies parents-before-children inside a transaction,
+    skips rows that lose to a newer local edit or whose parent is gone.
+  * **Conflicts** are last-write-wins per row on client `updated_at`,
+    enforced on both ends (server `sync_guard` trigger; client `_apply`).
+    Two devices editing the same note offline: the later edit wins
+    wholesale — no merging. Device clocks are trusted for this.
+  * **Accounts**: a database syncs for exactly one user. Data created
+    signed-out uploads to whoever signs in first; a *different* account
+    then gets `SyncAccountMismatch` rather than mixing libraries. Two
+    account-sheet actions resolve this, both via `eraseLocalData()`:
+    "Use this account on this device" (mismatch) and "Sign out and clear
+    this device". Both warn with the count of unsynced changes
+    (`pendingChanges()`), which are lost for good.
+  * **Files** (`file_sync.dart`): `FileSync` uploads before the metadata
+    push (so `storage_key` goes out in the same round) and downloads after
+    the pull. Objects are keyed by row id (`<user>/papers/<id>.pdf`,
+    `<user>/attachments/<id><ext>`), so retries are idempotent. Local paths
+    never sync; a downloaded path is written with tracking suppressed so
+    it doesn't look like an edit. A file whose local copy is missing (e.g.
+    after a reinstall) is re-downloaded. Per-file failures don't block
+    metadata; they surface as `SyncFilesIncomplete` and retry next sync.
+    Needs `20260930000000_file_sync.sql` (Storage bucket + policies).
+  * **Watchers**: pull applies rows with raw SQL, which drift can't see, so
+    the engine calls `notifyUpdates` itself — only when something really
+    changed (rows are compared by content first), otherwise the inclusive
+    cursor would re-wake every watcher on every sync. Local-change syncs
+    are also skipped unless `pendingChanges() > 0`, so pulls/downloads
+    can't retrigger a sync loop.
+  * `EngineSyncService` schedules it: on start, ~5 s after any local
+    write (debounced), and every 5 minutes. `SyncCoordinator` starts/stops
+    it from auth state. The only UI is a "Sync now" row in the account
+    sheet — no badges or banners, per the no-distractions principle.
+  * Schema v6 added `storage_key` to papers and attachments. Schema v5 added `updated_at` to every table (migration backfills from
+    `created_at`; `ALTER TABLE` can't default to "now", so migrated DBs have
+    `DEFAULT 0` while fresh ones rely on drift's `clientDefault`) and the
+    `sync_*` tables/triggers. `test/data/v4_schema.dart` is the real v4
+    schema, used to test the v4→v5 migration.
 
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
@@ -198,14 +350,9 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   feature. The note editor exposes a folder picker and tag picker via
   AppBar icons (`folder_picker_sheet.dart`, `tag_picker_sheet.dart`).
 
-Not yet built (needs real Supabase + PowerSync accounts, deferred per
-user request — see PR history/conversation for the account-setup
-discussion): a Postgres schema mirroring the drift tables with a
-per-row owner column, Supabase Auth wired into `AuthService`, a
-PowerSync instance + sync rules scoping each user to their own rows, a
-`PowerSyncBackendConnector` that uploads local writes to Supabase, and
-replacing `NoOpSyncService` with the real thing. Also not yet built:
-BibTeX *import*. Update the sections above as those decisions are made,
+Not yet built: verification against a hosted Supabase project (needs the
+account owner; only a local stack has been tested), storage
+cleanup for deleted files, and BibTeX *import*. Update the sections above as those decisions are made,
 so this file stays accurate for future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)

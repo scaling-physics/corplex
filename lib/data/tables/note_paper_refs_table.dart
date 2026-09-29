@@ -11,6 +11,10 @@ class NotePaperRefs extends Table {
   TextColumn get paperId =>
       text().references(Papers, #id, onDelete: KeyAction.cascade)();
 
+  /// When the link was made; sync uses it for last-write-wins.
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
+
   @override
   Set<Column> get primaryKey => {noteId, paperId};
 }

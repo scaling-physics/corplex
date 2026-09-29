@@ -39,8 +39,20 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -70,6 +82,12 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -91,6 +109,10 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -104,13 +126,22 @@ class Folder extends DataClass implements Insertable<Folder> {
   final String id;
   final String name;
   final DateTime createdAt;
-  const Folder({required this.id, required this.name, required this.createdAt});
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  final DateTime updatedAt;
+  const Folder({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -119,6 +150,7 @@ class Folder extends DataClass implements Insertable<Folder> {
       id: Value(id),
       name: Value(name),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -131,6 +163,7 @@ class Folder extends DataClass implements Insertable<Folder> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -140,19 +173,27 @@ class Folder extends DataClass implements Insertable<Folder> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
-  Folder copyWith({String? id, String? name, DateTime? createdAt}) => Folder(
+  Folder copyWith({
+    String? id,
+    String? name,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Folder(
     id: id ?? this.id,
     name: name ?? this.name,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   Folder copyWithCompanion(FoldersCompanion data) {
     return Folder(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -161,49 +202,56 @@ class Folder extends DataClass implements Insertable<Folder> {
     return (StringBuffer('Folder(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, createdAt);
+  int get hashCode => Object.hash(id, name, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Folder &&
           other.id == this.id &&
           other.name == this.name &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class FoldersCompanion extends UpdateCompanion<Folder> {
   final Value<String> id;
   final Value<String> name;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const FoldersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FoldersCompanion.insert({
     this.id = const Value.absent(),
     required String name,
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Folder> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -212,12 +260,14 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     Value<String>? id,
     Value<String>? name,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return FoldersCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -234,6 +284,9 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -246,6 +299,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -731,6 +785,17 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _storageKeyMeta = const VerificationMeta(
+    'storageKey',
+  );
+  @override
+  late final GeneratedColumn<String> storageKey = GeneratedColumn<String>(
+    'storage_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -743,6 +808,18 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -752,7 +829,9 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     venue,
     doi,
     pdfPath,
+    storageKey,
     createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -807,10 +886,22 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         pdfPath.isAcceptableOrUnknown(data['pdf_path']!, _pdfPathMeta),
       );
     }
+    if (data.containsKey('storage_key')) {
+      context.handle(
+        _storageKeyMeta,
+        storageKey.isAcceptableOrUnknown(data['storage_key']!, _storageKeyMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
     return context;
@@ -850,9 +941,17 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         DriftSqlType.string,
         data['${effectivePrefix}pdf_path'],
       ),
+      storageKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}storage_key'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
     );
   }
@@ -873,7 +972,14 @@ class Paper extends DataClass implements Insertable<Paper> {
 
   /// Local file path to the imported PDF, if any.
   final String? pdfPath;
+
+  /// Object key of the PDF in cloud storage once uploaded (synced, unlike
+  /// [pdfPath], which only means something on this device).
+  final String? storageKey;
   final DateTime createdAt;
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  final DateTime updatedAt;
   const Paper({
     required this.id,
     required this.title,
@@ -882,7 +988,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     this.venue,
     this.doi,
     this.pdfPath,
+    this.storageKey,
     required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -902,7 +1010,11 @@ class Paper extends DataClass implements Insertable<Paper> {
     if (!nullToAbsent || pdfPath != null) {
       map['pdf_path'] = Variable<String>(pdfPath);
     }
+    if (!nullToAbsent || storageKey != null) {
+      map['storage_key'] = Variable<String>(storageKey);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -919,7 +1031,11 @@ class Paper extends DataClass implements Insertable<Paper> {
       pdfPath: pdfPath == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfPath),
+      storageKey: storageKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storageKey),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -936,7 +1052,9 @@ class Paper extends DataClass implements Insertable<Paper> {
       venue: serializer.fromJson<String?>(json['venue']),
       doi: serializer.fromJson<String?>(json['doi']),
       pdfPath: serializer.fromJson<String?>(json['pdfPath']),
+      storageKey: serializer.fromJson<String?>(json['storageKey']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -950,7 +1068,9 @@ class Paper extends DataClass implements Insertable<Paper> {
       'venue': serializer.toJson<String?>(venue),
       'doi': serializer.toJson<String?>(doi),
       'pdfPath': serializer.toJson<String?>(pdfPath),
+      'storageKey': serializer.toJson<String?>(storageKey),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -962,7 +1082,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     Value<String?> venue = const Value.absent(),
     Value<String?> doi = const Value.absent(),
     Value<String?> pdfPath = const Value.absent(),
+    Value<String?> storageKey = const Value.absent(),
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) => Paper(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -971,7 +1093,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     venue: venue.present ? venue.value : this.venue,
     doi: doi.present ? doi.value : this.doi,
     pdfPath: pdfPath.present ? pdfPath.value : this.pdfPath,
+    storageKey: storageKey.present ? storageKey.value : this.storageKey,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   Paper copyWithCompanion(PapersCompanion data) {
     return Paper(
@@ -982,7 +1106,11 @@ class Paper extends DataClass implements Insertable<Paper> {
       venue: data.venue.present ? data.venue.value : this.venue,
       doi: data.doi.present ? data.doi.value : this.doi,
       pdfPath: data.pdfPath.present ? data.pdfPath.value : this.pdfPath,
+      storageKey: data.storageKey.present
+          ? data.storageKey.value
+          : this.storageKey,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -996,14 +1124,26 @@ class Paper extends DataClass implements Insertable<Paper> {
           ..write('venue: $venue, ')
           ..write('doi: $doi, ')
           ..write('pdfPath: $pdfPath, ')
-          ..write('createdAt: $createdAt')
+          ..write('storageKey: $storageKey, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, authors, year, venue, doi, pdfPath, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    authors,
+    year,
+    venue,
+    doi,
+    pdfPath,
+    storageKey,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1015,7 +1155,9 @@ class Paper extends DataClass implements Insertable<Paper> {
           other.venue == this.venue &&
           other.doi == this.doi &&
           other.pdfPath == this.pdfPath &&
-          other.createdAt == this.createdAt);
+          other.storageKey == this.storageKey &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class PapersCompanion extends UpdateCompanion<Paper> {
@@ -1026,7 +1168,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<String?> venue;
   final Value<String?> doi;
   final Value<String?> pdfPath;
+  final Value<String?> storageKey;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const PapersCompanion({
     this.id = const Value.absent(),
@@ -1036,7 +1180,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.venue = const Value.absent(),
     this.doi = const Value.absent(),
     this.pdfPath = const Value.absent(),
+    this.storageKey = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PapersCompanion.insert({
@@ -1047,7 +1193,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.venue = const Value.absent(),
     this.doi = const Value.absent(),
     this.pdfPath = const Value.absent(),
+    this.storageKey = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : title = Value(title);
   static Insertable<Paper> custom({
@@ -1058,7 +1206,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? venue,
     Expression<String>? doi,
     Expression<String>? pdfPath,
+    Expression<String>? storageKey,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1069,7 +1219,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (venue != null) 'venue': venue,
       if (doi != null) 'doi': doi,
       if (pdfPath != null) 'pdf_path': pdfPath,
+      if (storageKey != null) 'storage_key': storageKey,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1082,7 +1234,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<String?>? venue,
     Value<String?>? doi,
     Value<String?>? pdfPath,
+    Value<String?>? storageKey,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return PapersCompanion(
@@ -1093,7 +1247,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       venue: venue ?? this.venue,
       doi: doi ?? this.doi,
       pdfPath: pdfPath ?? this.pdfPath,
+      storageKey: storageKey ?? this.storageKey,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1122,8 +1278,14 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     if (pdfPath.present) {
       map['pdf_path'] = Variable<String>(pdfPath.value);
     }
+    if (storageKey.present) {
+      map['storage_key'] = Variable<String>(storageKey.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1141,7 +1303,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('venue: $venue, ')
           ..write('doi: $doi, ')
           ..write('pdfPath: $pdfPath, ')
+          ..write('storageKey: $storageKey, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1226,6 +1390,17 @@ class $AttachmentsTable extends Attachments
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _storageKeyMeta = const VerificationMeta(
+    'storageKey',
+  );
+  @override
+  late final GeneratedColumn<String> storageKey = GeneratedColumn<String>(
+    'storage_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1238,6 +1413,18 @@ class $AttachmentsTable extends Attachments
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1247,7 +1434,9 @@ class $AttachmentsTable extends Attachments
     title,
     path,
     url,
+    storageKey,
     createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1294,10 +1483,22 @@ class $AttachmentsTable extends Attachments
         url.isAcceptableOrUnknown(data['url']!, _urlMeta),
       );
     }
+    if (data.containsKey('storage_key')) {
+      context.handle(
+        _storageKeyMeta,
+        storageKey.isAcceptableOrUnknown(data['storage_key']!, _storageKeyMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
     return context;
@@ -1339,9 +1540,17 @@ class $AttachmentsTable extends Attachments
         DriftSqlType.string,
         data['${effectivePrefix}url'],
       ),
+      storageKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}storage_key'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
     );
   }
@@ -1367,7 +1576,14 @@ class Attachment extends DataClass implements Insertable<Attachment> {
 
   /// External link, for things like a NotebookLM podcast share URL.
   final String? url;
+
+  /// Object key of the file in cloud storage once uploaded (synced, unlike
+  /// [path], which only means something on this device).
+  final String? storageKey;
   final DateTime createdAt;
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  final DateTime updatedAt;
   const Attachment({
     required this.id,
     this.noteId,
@@ -1376,7 +1592,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     this.title,
     this.path,
     this.url,
+    this.storageKey,
     required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1402,7 +1620,11 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     if (!nullToAbsent || url != null) {
       map['url'] = Variable<String>(url);
     }
+    if (!nullToAbsent || storageKey != null) {
+      map['storage_key'] = Variable<String>(storageKey);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -1421,7 +1643,11 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           : Value(title),
       path: path == null && nullToAbsent ? const Value.absent() : Value(path),
       url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      storageKey: storageKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storageKey),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -1440,7 +1666,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       title: serializer.fromJson<String?>(json['title']),
       path: serializer.fromJson<String?>(json['path']),
       url: serializer.fromJson<String?>(json['url']),
+      storageKey: serializer.fromJson<String?>(json['storageKey']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -1456,7 +1684,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       'title': serializer.toJson<String?>(title),
       'path': serializer.toJson<String?>(path),
       'url': serializer.toJson<String?>(url),
+      'storageKey': serializer.toJson<String?>(storageKey),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -1468,7 +1698,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     Value<String?> title = const Value.absent(),
     Value<String?> path = const Value.absent(),
     Value<String?> url = const Value.absent(),
+    Value<String?> storageKey = const Value.absent(),
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) => Attachment(
     id: id ?? this.id,
     noteId: noteId.present ? noteId.value : this.noteId,
@@ -1477,7 +1709,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     title: title.present ? title.value : this.title,
     path: path.present ? path.value : this.path,
     url: url.present ? url.value : this.url,
+    storageKey: storageKey.present ? storageKey.value : this.storageKey,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   Attachment copyWithCompanion(AttachmentsCompanion data) {
     return Attachment(
@@ -1488,7 +1722,11 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       title: data.title.present ? data.title.value : this.title,
       path: data.path.present ? data.path.value : this.path,
       url: data.url.present ? data.url.value : this.url,
+      storageKey: data.storageKey.present
+          ? data.storageKey.value
+          : this.storageKey,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -1502,14 +1740,26 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           ..write('title: $title, ')
           ..write('path: $path, ')
           ..write('url: $url, ')
-          ..write('createdAt: $createdAt')
+          ..write('storageKey: $storageKey, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, noteId, paperId, type, title, path, url, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    noteId,
+    paperId,
+    type,
+    title,
+    path,
+    url,
+    storageKey,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1521,7 +1771,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           other.title == this.title &&
           other.path == this.path &&
           other.url == this.url &&
-          other.createdAt == this.createdAt);
+          other.storageKey == this.storageKey &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class AttachmentsCompanion extends UpdateCompanion<Attachment> {
@@ -1532,7 +1784,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
   final Value<String?> title;
   final Value<String?> path;
   final Value<String?> url;
+  final Value<String?> storageKey;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const AttachmentsCompanion({
     this.id = const Value.absent(),
@@ -1542,7 +1796,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.title = const Value.absent(),
     this.path = const Value.absent(),
     this.url = const Value.absent(),
+    this.storageKey = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AttachmentsCompanion.insert({
@@ -1553,7 +1809,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.title = const Value.absent(),
     this.path = const Value.absent(),
     this.url = const Value.absent(),
+    this.storageKey = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : type = Value(type);
   static Insertable<Attachment> custom({
@@ -1564,7 +1822,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     Expression<String>? title,
     Expression<String>? path,
     Expression<String>? url,
+    Expression<String>? storageKey,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1575,7 +1835,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       if (title != null) 'title': title,
       if (path != null) 'path': path,
       if (url != null) 'url': url,
+      if (storageKey != null) 'storage_key': storageKey,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1588,7 +1850,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     Value<String?>? title,
     Value<String?>? path,
     Value<String?>? url,
+    Value<String?>? storageKey,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return AttachmentsCompanion(
@@ -1599,7 +1863,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       title: title ?? this.title,
       path: path ?? this.path,
       url: url ?? this.url,
+      storageKey: storageKey ?? this.storageKey,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1630,8 +1896,14 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     if (url.present) {
       map['url'] = Variable<String>(url.value);
     }
+    if (storageKey.present) {
+      map['storage_key'] = Variable<String>(storageKey.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1649,7 +1921,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
           ..write('title: $title, ')
           ..write('path: $path, ')
           ..write('url: $url, ')
+          ..write('storageKey: $storageKey, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1688,8 +1962,20 @@ class $NotePaperRefsTable extends NotePaperRefs
       'REFERENCES papers (id) ON DELETE CASCADE',
     ),
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [noteId, paperId];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [noteId, paperId, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1718,6 +2004,12 @@ class $NotePaperRefsTable extends NotePaperRefs
     } else if (isInserting) {
       context.missing(_paperIdMeta);
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -1735,6 +2027,10 @@ class $NotePaperRefsTable extends NotePaperRefs
         DriftSqlType.string,
         data['${effectivePrefix}paper_id'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -1747,12 +2043,20 @@ class $NotePaperRefsTable extends NotePaperRefs
 class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
   final String noteId;
   final String paperId;
-  const NotePaperRef({required this.noteId, required this.paperId});
+
+  /// When the link was made; sync uses it for last-write-wins.
+  final DateTime updatedAt;
+  const NotePaperRef({
+    required this.noteId,
+    required this.paperId,
+    required this.updatedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['note_id'] = Variable<String>(noteId);
     map['paper_id'] = Variable<String>(paperId);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -1760,6 +2064,7 @@ class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
     return NotePaperRefsCompanion(
       noteId: Value(noteId),
       paperId: Value(paperId),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -1771,6 +2076,7 @@ class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
     return NotePaperRef(
       noteId: serializer.fromJson<String>(json['noteId']),
       paperId: serializer.fromJson<String>(json['paperId']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -1779,17 +2085,24 @@ class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
     return <String, dynamic>{
       'noteId': serializer.toJson<String>(noteId),
       'paperId': serializer.toJson<String>(paperId),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
-  NotePaperRef copyWith({String? noteId, String? paperId}) => NotePaperRef(
+  NotePaperRef copyWith({
+    String? noteId,
+    String? paperId,
+    DateTime? updatedAt,
+  }) => NotePaperRef(
     noteId: noteId ?? this.noteId,
     paperId: paperId ?? this.paperId,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   NotePaperRef copyWithCompanion(NotePaperRefsCompanion data) {
     return NotePaperRef(
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
       paperId: data.paperId.present ? data.paperId.value : this.paperId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -1797,44 +2110,51 @@ class NotePaperRef extends DataClass implements Insertable<NotePaperRef> {
   String toString() {
     return (StringBuffer('NotePaperRef(')
           ..write('noteId: $noteId, ')
-          ..write('paperId: $paperId')
+          ..write('paperId: $paperId, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(noteId, paperId);
+  int get hashCode => Object.hash(noteId, paperId, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is NotePaperRef &&
           other.noteId == this.noteId &&
-          other.paperId == this.paperId);
+          other.paperId == this.paperId &&
+          other.updatedAt == this.updatedAt);
 }
 
 class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
   final Value<String> noteId;
   final Value<String> paperId;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const NotePaperRefsCompanion({
     this.noteId = const Value.absent(),
     this.paperId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotePaperRefsCompanion.insert({
     required String noteId,
     required String paperId,
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : noteId = Value(noteId),
        paperId = Value(paperId);
   static Insertable<NotePaperRef> custom({
     Expression<String>? noteId,
     Expression<String>? paperId,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (noteId != null) 'note_id': noteId,
       if (paperId != null) 'paper_id': paperId,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1842,11 +2162,13 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
   NotePaperRefsCompanion copyWith({
     Value<String>? noteId,
     Value<String>? paperId,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return NotePaperRefsCompanion(
       noteId: noteId ?? this.noteId,
       paperId: paperId ?? this.paperId,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1860,6 +2182,9 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
     if (paperId.present) {
       map['paper_id'] = Variable<String>(paperId.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1871,6 +2196,7 @@ class NotePaperRefsCompanion extends UpdateCompanion<NotePaperRef> {
     return (StringBuffer('NotePaperRefsCompanion(')
           ..write('noteId: $noteId, ')
           ..write('paperId: $paperId, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1953,6 +2279,18 @@ class $AnnotationsTable extends Annotations
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1961,6 +2299,7 @@ class $AnnotationsTable extends Annotations
     colorHex,
     pointsJson,
     createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2013,6 +2352,12 @@ class $AnnotationsTable extends Annotations
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -2046,6 +2391,10 @@ class $AnnotationsTable extends Annotations
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -2062,6 +2411,9 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   final String colorHex;
   final String pointsJson;
   final DateTime createdAt;
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  final DateTime updatedAt;
   const Annotation({
     required this.id,
     required this.paperId,
@@ -2069,6 +2421,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     required this.colorHex,
     required this.pointsJson,
     required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2079,6 +2432,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     map['color_hex'] = Variable<String>(colorHex);
     map['points_json'] = Variable<String>(pointsJson);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -2090,6 +2444,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       colorHex: Value(colorHex),
       pointsJson: Value(pointsJson),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -2105,6 +2460,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       colorHex: serializer.fromJson<String>(json['colorHex']),
       pointsJson: serializer.fromJson<String>(json['pointsJson']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -2117,6 +2473,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       'colorHex': serializer.toJson<String>(colorHex),
       'pointsJson': serializer.toJson<String>(pointsJson),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -2127,6 +2484,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     String? colorHex,
     String? pointsJson,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) => Annotation(
     id: id ?? this.id,
     paperId: paperId ?? this.paperId,
@@ -2134,6 +2492,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     colorHex: colorHex ?? this.colorHex,
     pointsJson: pointsJson ?? this.pointsJson,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   Annotation copyWithCompanion(AnnotationsCompanion data) {
     return Annotation(
@@ -2147,6 +2506,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ? data.pointsJson.value
           : this.pointsJson,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -2158,14 +2518,22 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ..write('pageNumber: $pageNumber, ')
           ..write('colorHex: $colorHex, ')
           ..write('pointsJson: $pointsJson, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, paperId, pageNumber, colorHex, pointsJson, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    paperId,
+    pageNumber,
+    colorHex,
+    pointsJson,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2175,7 +2543,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           other.pageNumber == this.pageNumber &&
           other.colorHex == this.colorHex &&
           other.pointsJson == this.pointsJson &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class AnnotationsCompanion extends UpdateCompanion<Annotation> {
@@ -2185,6 +2554,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
   final Value<String> colorHex;
   final Value<String> pointsJson;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const AnnotationsCompanion({
     this.id = const Value.absent(),
@@ -2193,6 +2563,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.colorHex = const Value.absent(),
     this.pointsJson = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AnnotationsCompanion.insert({
@@ -2202,6 +2573,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.colorHex = const Value.absent(),
     required String pointsJson,
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : paperId = Value(paperId),
        pageNumber = Value(pageNumber),
@@ -2213,6 +2585,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Expression<String>? colorHex,
     Expression<String>? pointsJson,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2222,6 +2595,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       if (colorHex != null) 'color_hex': colorHex,
       if (pointsJson != null) 'points_json': pointsJson,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2233,6 +2607,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Value<String>? colorHex,
     Value<String>? pointsJson,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return AnnotationsCompanion(
@@ -2242,6 +2617,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       colorHex: colorHex ?? this.colorHex,
       pointsJson: pointsJson ?? this.pointsJson,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2267,6 +2643,9 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2282,6 +2661,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
           ..write('colorHex: $colorHex, ')
           ..write('pointsJson: $pointsJson, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2324,8 +2704,20 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2355,6 +2747,12 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -2376,6 +2774,10 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -2389,13 +2791,22 @@ class Tag extends DataClass implements Insertable<Tag> {
   final String id;
   final String name;
   final DateTime createdAt;
-  const Tag({required this.id, required this.name, required this.createdAt});
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  final DateTime updatedAt;
+  const Tag({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -2404,6 +2815,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       id: Value(id),
       name: Value(name),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -2416,6 +2828,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -2425,19 +2838,27 @@ class Tag extends DataClass implements Insertable<Tag> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
-  Tag copyWith({String? id, String? name, DateTime? createdAt}) => Tag(
+  Tag copyWith({
+    String? id,
+    String? name,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Tag(
     id: id ?? this.id,
     name: name ?? this.name,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   Tag copyWithCompanion(TagsCompanion data) {
     return Tag(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -2446,49 +2867,56 @@ class Tag extends DataClass implements Insertable<Tag> {
     return (StringBuffer('Tag(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, createdAt);
+  int get hashCode => Object.hash(id, name, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Tag &&
           other.id == this.id &&
           other.name == this.name &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class TagsCompanion extends UpdateCompanion<Tag> {
   final Value<String> id;
   final Value<String> name;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const TagsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TagsCompanion.insert({
     this.id = const Value.absent(),
     required String name,
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Tag> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2497,12 +2925,14 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     Value<String>? id,
     Value<String>? name,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return TagsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2519,6 +2949,9 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2531,6 +2964,7 @@ class TagsCompanion extends UpdateCompanion<Tag> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2566,8 +3000,20 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
       'REFERENCES tags (id) ON DELETE CASCADE',
     ),
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [noteId, tagId];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [noteId, tagId, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2596,6 +3042,12 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
     } else if (isInserting) {
       context.missing(_tagIdMeta);
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -2613,6 +3065,10 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
         DriftSqlType.string,
         data['${effectivePrefix}tag_id'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -2625,17 +3081,29 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
 class NoteTag extends DataClass implements Insertable<NoteTag> {
   final String noteId;
   final String tagId;
-  const NoteTag({required this.noteId, required this.tagId});
+
+  /// When the link was made; sync uses it for last-write-wins.
+  final DateTime updatedAt;
+  const NoteTag({
+    required this.noteId,
+    required this.tagId,
+    required this.updatedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['note_id'] = Variable<String>(noteId);
     map['tag_id'] = Variable<String>(tagId);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
   NoteTagsCompanion toCompanion(bool nullToAbsent) {
-    return NoteTagsCompanion(noteId: Value(noteId), tagId: Value(tagId));
+    return NoteTagsCompanion(
+      noteId: Value(noteId),
+      tagId: Value(tagId),
+      updatedAt: Value(updatedAt),
+    );
   }
 
   factory NoteTag.fromJson(
@@ -2646,6 +3114,7 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
     return NoteTag(
       noteId: serializer.fromJson<String>(json['noteId']),
       tagId: serializer.fromJson<String>(json['tagId']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -2654,15 +3123,21 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
     return <String, dynamic>{
       'noteId': serializer.toJson<String>(noteId),
       'tagId': serializer.toJson<String>(tagId),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
-  NoteTag copyWith({String? noteId, String? tagId}) =>
-      NoteTag(noteId: noteId ?? this.noteId, tagId: tagId ?? this.tagId);
+  NoteTag copyWith({String? noteId, String? tagId, DateTime? updatedAt}) =>
+      NoteTag(
+        noteId: noteId ?? this.noteId,
+        tagId: tagId ?? this.tagId,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
   NoteTag copyWithCompanion(NoteTagsCompanion data) {
     return NoteTag(
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
       tagId: data.tagId.present ? data.tagId.value : this.tagId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -2670,44 +3145,51 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
   String toString() {
     return (StringBuffer('NoteTag(')
           ..write('noteId: $noteId, ')
-          ..write('tagId: $tagId')
+          ..write('tagId: $tagId, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(noteId, tagId);
+  int get hashCode => Object.hash(noteId, tagId, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is NoteTag &&
           other.noteId == this.noteId &&
-          other.tagId == this.tagId);
+          other.tagId == this.tagId &&
+          other.updatedAt == this.updatedAt);
 }
 
 class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
   final Value<String> noteId;
   final Value<String> tagId;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const NoteTagsCompanion({
     this.noteId = const Value.absent(),
     this.tagId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NoteTagsCompanion.insert({
     required String noteId,
     required String tagId,
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : noteId = Value(noteId),
        tagId = Value(tagId);
   static Insertable<NoteTag> custom({
     Expression<String>? noteId,
     Expression<String>? tagId,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (noteId != null) 'note_id': noteId,
       if (tagId != null) 'tag_id': tagId,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2715,11 +3197,13 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
   NoteTagsCompanion copyWith({
     Value<String>? noteId,
     Value<String>? tagId,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return NoteTagsCompanion(
       noteId: noteId ?? this.noteId,
       tagId: tagId ?? this.tagId,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2733,6 +3217,9 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
     if (tagId.present) {
       map['tag_id'] = Variable<String>(tagId.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2744,6 +3231,7 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
     return (StringBuffer('NoteTagsCompanion(')
           ..write('noteId: $noteId, ')
           ..write('tagId: $tagId, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2840,12 +3328,14 @@ typedef $$FoldersTableCreateCompanionBuilder = FoldersCompanion Function({
   Value<String> id,
   required String name,
   Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 typedef $$FoldersTableUpdateCompanionBuilder = FoldersCompanion Function({
   Value<String> id,
   Value<String> name,
   Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 
@@ -2894,6 +3384,11 @@ class $$FoldersTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2946,6 +3441,11 @@ class $$FoldersTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FoldersTableAnnotationComposer
@@ -2965,6 +3465,9 @@ class $$FoldersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> notesRefs<T extends Object>(
     Expression<T> Function($$NotesTableAnnotationComposer a) f,
@@ -3023,11 +3526,13 @@ class $$FoldersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FoldersCompanion(
                 id: id,
                 name: name,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3035,11 +3540,13 @@ class $$FoldersTableTableManager
                 Value<String> id = const Value.absent(),
                 required String name,
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FoldersCompanion.insert(
                 id: id,
                 name: name,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3715,7 +4222,9 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<String?> venue,
   Value<String?> doi,
   Value<String?> pdfPath,
+  Value<String?> storageKey,
   Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
@@ -3726,7 +4235,9 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<String?> venue,
   Value<String?> doi,
   Value<String?> pdfPath,
+  Value<String?> storageKey,
   Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 
@@ -3833,8 +4344,18 @@ class $$PapersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get storageKey => $composableBuilder(
+    column: $table.storageKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3958,8 +4479,18 @@ class $$PapersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get storageKey => $composableBuilder(
+    column: $table.storageKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -3994,8 +4525,16 @@ class $$PapersTableAnnotationComposer
   GeneratedColumn<String> get pdfPath =>
       $composableBuilder(column: $table.pdfPath, builder: (column) => column);
 
+  GeneratedColumn<String> get storageKey => $composableBuilder(
+    column: $table.storageKey,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> attachmentsRefs<T extends Object>(
     Expression<T> Function($$AttachmentsTableAnnotationComposer a) f,
@@ -4112,7 +4651,9 @@ class $$PapersTableTableManager
                 Value<String?> venue = const Value.absent(),
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
+                Value<String?> storageKey = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PapersCompanion(
                 id: id,
@@ -4122,7 +4663,9 @@ class $$PapersTableTableManager
                 venue: venue,
                 doi: doi,
                 pdfPath: pdfPath,
+                storageKey: storageKey,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4134,7 +4677,9 @@ class $$PapersTableTableManager
                 Value<String?> venue = const Value.absent(),
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
+                Value<String?> storageKey = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PapersCompanion.insert(
                 id: id,
@@ -4144,7 +4689,9 @@ class $$PapersTableTableManager
                 venue: venue,
                 doi: doi,
                 pdfPath: pdfPath,
+                storageKey: storageKey,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4269,7 +4816,9 @@ typedef $$AttachmentsTableCreateCompanionBuilder =
       Value<String?> title,
       Value<String?> path,
       Value<String?> url,
+      Value<String?> storageKey,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 typedef $$AttachmentsTableUpdateCompanionBuilder =
@@ -4281,7 +4830,9 @@ typedef $$AttachmentsTableUpdateCompanionBuilder =
       Value<String?> title,
       Value<String?> path,
       Value<String?> url,
+      Value<String?> storageKey,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -4359,8 +4910,18 @@ class $$AttachmentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get storageKey => $composableBuilder(
+    column: $table.storageKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4445,8 +5006,18 @@ class $$AttachmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get storageKey => $composableBuilder(
+    column: $table.storageKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4521,8 +5092,16 @@ class $$AttachmentsTableAnnotationComposer
   GeneratedColumn<String> get url =>
       $composableBuilder(column: $table.url, builder: (column) => column);
 
+  GeneratedColumn<String> get storageKey => $composableBuilder(
+    column: $table.storageKey,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$NotesTableAnnotationComposer get noteId {
     final $$NotesTableAnnotationComposer composer = $composerBuilder(
@@ -4606,7 +5185,9 @@ class $$AttachmentsTableTableManager
                 Value<String?> title = const Value.absent(),
                 Value<String?> path = const Value.absent(),
                 Value<String?> url = const Value.absent(),
+                Value<String?> storageKey = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttachmentsCompanion(
                 id: id,
@@ -4616,7 +5197,9 @@ class $$AttachmentsTableTableManager
                 title: title,
                 path: path,
                 url: url,
+                storageKey: storageKey,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4628,7 +5211,9 @@ class $$AttachmentsTableTableManager
                 Value<String?> title = const Value.absent(),
                 Value<String?> path = const Value.absent(),
                 Value<String?> url = const Value.absent(),
+                Value<String?> storageKey = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttachmentsCompanion.insert(
                 id: id,
@@ -4638,7 +5223,9 @@ class $$AttachmentsTableTableManager
                 title: title,
                 path: path,
                 url: url,
+                storageKey: storageKey,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4721,12 +5308,14 @@ typedef $$NotePaperRefsTableCreateCompanionBuilder =
     NotePaperRefsCompanion Function({
       required String noteId,
       required String paperId,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 typedef $$NotePaperRefsTableUpdateCompanionBuilder =
     NotePaperRefsCompanion Function({
       Value<String> noteId,
       Value<String> paperId,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -4782,6 +5371,11 @@ class $$NotePaperRefsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$NotesTableFilterComposer get noteId {
     final $$NotesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -4838,6 +5432,11 @@ class $$NotePaperRefsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$NotesTableOrderingComposer get noteId {
     final $$NotesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -4894,6 +5493,9 @@ class $$NotePaperRefsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
   $$NotesTableAnnotationComposer get noteId {
     final $$NotesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -4971,20 +5573,24 @@ class $$NotePaperRefsTableTableManager
               ({
                 Value<String> noteId = const Value.absent(),
                 Value<String> paperId = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotePaperRefsCompanion(
                 noteId: noteId,
                 paperId: paperId,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String noteId,
                 required String paperId,
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotePaperRefsCompanion.insert(
                 noteId: noteId,
                 paperId: paperId,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5071,6 +5677,7 @@ typedef $$AnnotationsTableCreateCompanionBuilder =
       Value<String> colorHex,
       required String pointsJson,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 typedef $$AnnotationsTableUpdateCompanionBuilder =
@@ -5081,6 +5688,7 @@ typedef $$AnnotationsTableUpdateCompanionBuilder =
       Value<String> colorHex,
       Value<String> pointsJson,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -5137,6 +5745,11 @@ class $$AnnotationsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5198,6 +5811,11 @@ class $$AnnotationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PapersTableOrderingComposer get paperId {
     final $$PapersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5249,6 +5867,9 @@ class $$AnnotationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$PapersTableAnnotationComposer get paperId {
     final $$PapersTableAnnotationComposer composer = $composerBuilder(
@@ -5308,6 +5929,7 @@ class $$AnnotationsTableTableManager
                 Value<String> colorHex = const Value.absent(),
                 Value<String> pointsJson = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion(
                 id: id,
@@ -5316,6 +5938,7 @@ class $$AnnotationsTableTableManager
                 colorHex: colorHex,
                 pointsJson: pointsJson,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5326,6 +5949,7 @@ class $$AnnotationsTableTableManager
                 Value<String> colorHex = const Value.absent(),
                 required String pointsJson,
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion.insert(
                 id: id,
@@ -5334,6 +5958,7 @@ class $$AnnotationsTableTableManager
                 colorHex: colorHex,
                 pointsJson: pointsJson,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5405,12 +6030,14 @@ typedef $$TagsTableCreateCompanionBuilder = TagsCompanion Function({
   Value<String> id,
   required String name,
   Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 typedef $$TagsTableUpdateCompanionBuilder = TagsCompanion Function({
   Value<String> id,
   Value<String> name,
   Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 
@@ -5458,6 +6085,11 @@ class $$TagsTableFilterComposer extends Composer<_$AppDatabase, $TagsTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5509,6 +6141,11 @@ class $$TagsTableOrderingComposer extends Composer<_$AppDatabase, $TagsTable> {
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TagsTableAnnotationComposer
@@ -5528,6 +6165,9 @@ class $$TagsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> noteTagsRefs<T extends Object>(
     Expression<T> Function($$NoteTagsTableAnnotationComposer a) f,
@@ -5586,11 +6226,13 @@ class $$TagsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TagsCompanion(
                 id: id,
                 name: name,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5598,11 +6240,13 @@ class $$TagsTableTableManager
                 Value<String> id = const Value.absent(),
                 required String name,
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TagsCompanion.insert(
                 id: id,
                 name: name,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5657,11 +6301,13 @@ typedef $$TagsTableProcessedTableManager =
 typedef $$NoteTagsTableCreateCompanionBuilder = NoteTagsCompanion Function({
   required String noteId,
   required String tagId,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 typedef $$NoteTagsTableUpdateCompanionBuilder = NoteTagsCompanion Function({
   Value<String> noteId,
   Value<String> tagId,
+  Value<DateTime> updatedAt,
   Value<int> rowid,
 });
 
@@ -5713,6 +6359,11 @@ class $$NoteTagsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$NotesTableFilterComposer get noteId {
     final $$NotesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -5769,6 +6420,11 @@ class $$NoteTagsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$NotesTableOrderingComposer get noteId {
     final $$NotesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5825,6 +6481,9 @@ class $$NoteTagsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
   $$NotesTableAnnotationComposer get noteId {
     final $$NotesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -5898,19 +6557,28 @@ class $$NoteTagsTableTableManager
               $$NoteTagsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$NoteTagsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<String> noteId = const Value.absent(),
-            Value<String> tagId = const Value.absent(),
-            Value<int> rowid = const Value.absent(),
-          }) => NoteTagsCompanion(noteId: noteId, tagId: tagId, rowid: rowid),
+          updateCompanionCallback:
+              ({
+                Value<String> noteId = const Value.absent(),
+                Value<String> tagId = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteTagsCompanion(
+                noteId: noteId,
+                tagId: tagId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
           createCompanionCallback:
               ({
                 required String noteId,
                 required String tagId,
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NoteTagsCompanion.insert(
                 noteId: noteId,
                 tagId: tagId,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

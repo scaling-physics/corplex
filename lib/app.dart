@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 
 import 'features/home/home_shell.dart';
+import 'features/sync/sync_coordinator.dart';
 
 class CorplexApp extends StatelessWidget {
   const CorplexApp({super.key});
@@ -29,7 +30,7 @@ class CorplexApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const HomeShell(),
+      home: const SyncCoordinator(child: HomeShell()),
     );
   }
 }

@@ -10,6 +10,10 @@ class NoteTags extends Table {
   TextColumn get tagId =>
       text().references(Tags, #id, onDelete: KeyAction.cascade)();
 
+  /// When the link was made; sync uses it for last-write-wins.
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
+
   @override
   Set<Column> get primaryKey => {noteId, tagId};
 }

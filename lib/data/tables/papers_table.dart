@@ -14,7 +14,15 @@ class Papers extends Table {
   /// Local file path to the imported PDF, if any.
   TextColumn get pdfPath => text().nullable()();
 
+  /// Object key of the PDF in cloud storage once uploaded (synced, unlike
+  /// [pdfPath], which only means something on this device).
+  TextColumn get storageKey => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
 
   @override
   Set<Column> get primaryKey => {id};

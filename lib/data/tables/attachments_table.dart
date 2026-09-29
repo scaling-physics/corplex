@@ -30,7 +30,15 @@ class Attachments extends Table {
   /// External link, for things like a NotebookLM podcast share URL.
   TextColumn get url => text().nullable()();
 
+  /// Object key of the file in cloud storage once uploaded (synced, unlike
+  /// [path], which only means something on this device).
+  TextColumn get storageKey => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -232,7 +232,10 @@ class _HitTile extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: _marked(
                 context,
-                [if (hit.page != null) 'p. ${hit.page} · ', hit.snippet].join(),
+                [
+                  if (hit.page != null) 'p. ${hit.page}',
+                  if (hit.snippet.isNotEmpty) hit.snippet,
+                ].join(' · '),
                 theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

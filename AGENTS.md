@@ -362,6 +362,15 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     step re-runs `_createSyncSchema()`; `syncSchemaStatements` takes the
     set of existing tables because earlier steps run before later tables
     exist.
+  * **A server behind the app**: after an app update the hosted project
+    may lack the newest `supabase/migrations` (a missing table or column
+    answers PGRST205/PGRST204/42P01/42703 → `SyncServerOutdated`). The
+    engine *skips just those tables* (`_unlessOutdated`) — their changes
+    stay queued in `sync_dirty`/tombstones and their cursors don't move —
+    syncs everything else, and only then reports "Your sync server needs a
+    database update". So an un-migrated `projects` table never blocks
+    notes. **Every new migration file must be applied to the hosted
+    project by its owner before the matching app version's data syncs.**
   * **Conflicts** are last-write-wins per row on client `updated_at`,
     enforced on both ends (server `sync_guard` trigger; client `_apply`).
     Two devices editing the same note offline: the later edit wins

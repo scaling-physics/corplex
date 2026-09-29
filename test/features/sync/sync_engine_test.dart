@@ -5,6 +5,7 @@ import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
 import 'package:corplex/data/tables/papers_table.dart';
 import 'package:corplex/features/sync/sync_engine.dart';
+import 'package:corplex/features/sync/sync_remote.dart';
 
 import '../../support/fake_sync_remote.dart';
 
@@ -162,11 +163,21 @@ void main() {
   });
 
   test('projects and their memberships sync, including removals', () async {
-    await a.into(a.papers).insert(PapersCompanion.insert(id: const Value('p1'), title: 'T'));
+    await a
+        .into(a.papers)
+        .insert(PapersCompanion.insert(id: const Value('p1'), title: 'T'));
     await a.into(a.notes).insert(NotesCompanion.insert(id: const Value('n1')));
-    await a.into(a.projects).insert(ProjectsCompanion.insert(id: const Value('pr1'), name: 'Review'));
-    await a.into(a.projectPapers).insert(ProjectPapersCompanion.insert(projectId: 'pr1', paperId: 'p1'));
-    await a.into(a.projectNotes).insert(ProjectNotesCompanion.insert(projectId: 'pr1', noteId: 'n1'));
+    await a
+        .into(a.projects)
+        .insert(
+          ProjectsCompanion.insert(id: const Value('pr1'), name: 'Review'),
+        );
+    await a
+        .into(a.projectPapers)
+        .insert(ProjectPapersCompanion.insert(projectId: 'pr1', paperId: 'p1'));
+    await a
+        .into(a.projectNotes)
+        .insert(ProjectNotesCompanion.insert(projectId: 'pr1', noteId: 'n1'));
 
     await both();
 
@@ -401,4 +412,48 @@ void main() {
       );
     },
   );
+
+  test('an un-migrated table is skipped, not fatal: the rest syncs and its changes wait', () async {
+    server.missingTables.addAll({'projects', 'project_papers', 'highlights'});
+    await a
+        .into(a.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            title: const Value('syncs fine'),
+          ),
+        );
+    await a
+        .into(a.papers)
+        .insert(PapersCompanion.insert(id: const Value('p1'), title: 'P'));
+    await a
+        .into(a.projects)
+        .insert(
+          ProjectsCompanion.insert(id: const Value('pr'), name: 'Waiting'),
+        );
+
+    // Reported, but everything the server does have went through.
+    await expectLater(
+      syncA.sync(userId: 'u1'),
+      throwsA(isA<SyncServerOutdated>()),
+    );
+    await expectLater(
+      syncB.sync(userId: 'u1'),
+      throwsA(isA<SyncServerOutdated>()),
+    );
+    expect((await b.select(b.notes).getSingle()).title, 'syncs fine');
+    expect(await b.select(b.papers).get(), hasLength(1));
+    expect(await b.select(b.projects).get(), isEmpty);
+    expect(
+      await syncA.pendingChanges(),
+      1,
+      reason: 'the project change is still queued',
+    );
+
+    // Once the server is migrated, the waiting change goes up.
+    server.missingTables.clear();
+    await both();
+    expect((await b.select(b.projects).getSingle()).name, 'Waiting');
+    expect(await syncA.pendingChanges(), 0);
+  });
 }

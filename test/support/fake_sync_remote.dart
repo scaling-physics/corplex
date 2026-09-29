@@ -12,6 +12,14 @@ class FakeSyncRemote implements SyncRemote {
   final Map<String, Map<String, Map<String, Object?>>> tables = {};
   int _clock = 0;
 
+  /// Tables this fake "server" hasn't been migrated to have: any call for
+  /// them answers like PostgREST does for a missing table.
+  final Set<String> missingTables = {};
+
+  void _requireTable(String table) {
+    if (missingTables.contains(table)) throw const SyncServerOutdated();
+  }
+
   /// Return changes newest-first, like postgrest-dart's default order, to
   /// check the engine doesn't depend on the order it receives rows in.
   bool newestFirst = false;
@@ -33,6 +41,7 @@ class FakeSyncRemote implements SyncRemote {
 
   @override
   Future<void> upsertRows(String table, List<Map<String, Object?>> rows) async {
+    _requireTable(table);
     for (final row in rows) {
       final id = _id(table, row);
       final existing = _table(table)[id];
@@ -51,6 +60,7 @@ class FakeSyncRemote implements SyncRemote {
     Map<String, Object?> key,
     String deletedAtIso,
   ) async {
+    _requireTable(table);
     final id = _id(table, key);
     final existing = _table(table)[id];
     if (existing == null) return;
@@ -71,6 +81,7 @@ class FakeSyncRemote implements SyncRemote {
     String table, {
     String? sinceIso,
   }) async {
+    _requireTable(table);
     final since = sinceIso == null ? null : DateTime.parse(sinceIso);
     final rows =
         _table(table).values.where((r) {

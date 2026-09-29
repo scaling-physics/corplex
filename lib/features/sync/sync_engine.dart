@@ -57,12 +57,35 @@ class SyncEngine {
 
     final files = _files;
     files?.failures = 0;
+    _skipped.clear();
     // Upload first so the storage keys go out in this same push.
     await files?.upload(userId);
     await _push();
     await _pull(meta.cursors);
     await files?.download();
+    // Tables the server doesn't have (yet) were skipped, not fatal: their
+    // changes stay queued here and everything else synced. Say so.
+    if (_skipped.isNotEmpty) throw const SyncServerOutdated();
     if (files != null && files.failures > 0) throw const SyncFilesIncomplete();
+  }
+
+  /// Tables the server rejected as missing this round. Syncing carries on
+  /// without them, so one un-migrated table doesn't block the whole
+  /// library; their queued changes wait for the migration.
+  final _skipped = <String>{};
+
+  /// Runs [action] for [table] unless the server is known to lack it;
+  /// a "missing table/column" answer marks it skipped instead of failing.
+  Future<void> _unlessOutdated(
+    String table,
+    Future<void> Function() action,
+  ) async {
+    if (_skipped.contains(table)) return;
+    try {
+      await action();
+    } on SyncServerOutdated {
+      _skipped.add(table);
+    }
   }
 
   /// Changes that exist only on this device: unpushed edits, unpushed
@@ -138,18 +161,20 @@ class SyncEngine {
             variables: [Variable.withString(table.name)],
           )
           .get();
-      for (var i = 0; i < rows.length; i += _batchSize) {
-        final batch = rows.skip(i).take(_batchSize).toList();
-        await _remote.upsertRows(table.name, [
-          for (final row in batch) _toRemote(row.data),
-        ]);
-        // By sequence id, so an edit made mid-push stays queued.
-        for (final row in batch) {
-          await _db.customStatement('DELETE FROM sync_dirty WHERE id = ?', [
-            row.read<int>('_seq'),
+      await _unlessOutdated(table.name, () async {
+        for (var i = 0; i < rows.length; i += _batchSize) {
+          final batch = rows.skip(i).take(_batchSize).toList();
+          await _remote.upsertRows(table.name, [
+            for (final row in batch) _toRemote(row.data),
           ]);
+          // By sequence id, so an edit made mid-push stays queued.
+          for (final row in batch) {
+            await _db.customStatement('DELETE FROM sync_dirty WHERE id = ?', [
+              row.read<int>('_seq'),
+            ]);
+          }
         }
-      }
+      });
     }
 
     // Deletes go children-first, mirroring how they were applied locally.
@@ -168,22 +193,24 @@ class SyncEngine {
     for (final t in sorted) {
       final key = (jsonDecode(t.read<String>('row_key')) as Map)
           .cast<String, Object?>();
-      await _remote.markDeleted(
-        t.read<String>('table_name'),
-        key,
-        _toIso(t.read<int>('deleted_at')),
-      );
-      // Only drop the tombstone we just sent; a re-created row's newer
-      // state is handled by the row push above.
-      await _db.customStatement(
-        'DELETE FROM sync_tombstones WHERE table_name = ? AND row_key = ? '
-        'AND deleted_at = ?',
-        [
+      await _unlessOutdated(t.read<String>('table_name'), () async {
+        await _remote.markDeleted(
           t.read<String>('table_name'),
-          t.read<String>('row_key'),
-          t.read<int>('deleted_at'),
-        ],
-      );
+          key,
+          _toIso(t.read<int>('deleted_at')),
+        );
+        // Only drop the tombstone we just sent; a re-created row's newer
+        // state is handled by the row push above.
+        await _db.customStatement(
+          'DELETE FROM sync_tombstones WHERE table_name = ? AND row_key = ? '
+          'AND deleted_at = ?',
+          [
+            t.read<String>('table_name'),
+            t.read<String>('row_key'),
+            t.read<int>('deleted_at'),
+          ],
+        );
+      });
     }
   }
 
@@ -204,10 +231,17 @@ class SyncEngine {
   Future<void> _pull(Map<String, String> cursors) async {
     final newCursors = {...cursors};
     for (final table in syncTables) {
-      final changes = await _remote.fetchChanges(
-        table.name,
-        sinceIso: cursors[table.name],
-      );
+      if (_skipped.contains(table.name)) continue;
+      final List<Map<String, Object?>> changes;
+      try {
+        changes = await _remote.fetchChanges(
+          table.name,
+          sinceIso: cursors[table.name],
+        );
+      } on SyncServerOutdated {
+        _skipped.add(table.name);
+        continue;
+      }
       if (changes.isEmpty) continue;
 
       var wrote = false;

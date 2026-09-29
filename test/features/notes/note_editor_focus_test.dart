@@ -124,7 +124,7 @@ void main() {
     expect(draw.bottom, lessThanOrEqualTo(screen - 300));
     expect(
       draw.bottom,
-      greaterThan(screen - 300 - 80),
+      greaterThan(screen - 300 - 60),
       reason: 'right on top of it',
     );
     // The body still ends above the toolbar.

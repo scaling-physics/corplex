@@ -794,6 +794,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       ),
                     ),
                     child: SafeArea(
+                      // The keyboard covers the system bar; no gap above it.
+                      bottom: MediaQuery.viewInsetsOf(context).bottom == 0,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,

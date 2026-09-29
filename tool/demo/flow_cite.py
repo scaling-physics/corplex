@@ -1,0 +1,16 @@
+from d import *
+setup_quoted_note()
+f = Flow('cite')
+f.tap(*P(600, 630), wait=1.0, caption='Write your own words…', hold=0.8)
+f.key(66, wait=0.3); f.key(66, wait=0.4)
+for chunk in ['Attention', ' alone', ' is enough ']:
+    f.type(chunk, wait=0.8); f.shot(hold=0.45, wait=0.1)
+f.type('[@', wait=2.0)
+f.shot(hold=1.4, caption='Type [@ to cite a paper')
+f.tap(*P(300, 730), wait=1.5)
+f.shot(hold=1.4, caption='A stable citekey goes in')
+f.key(4, wait=0.8)
+f.tap(*P(847, 172), wait=1.2, caption='Then More, Add bibliography')
+f.tap(600, 972, wait=1.2)
+f.tap(*P(225, 910), wait=1.5, caption='Pick a style')
+f.shot(hold=2.6, caption='The reference list writes itself')

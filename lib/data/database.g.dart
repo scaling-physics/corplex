@@ -4768,6 +4768,418 @@ class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
   }
 }
 
+class $TrashItemsTable extends TrashItems
+    with TableInfo<$TrashItemsTable, TrashItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TrashItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<TrashKind, String> kind =
+      GeneratedColumn<String>(
+        'kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<TrashKind>($TrashItemsTable.$converterkind);
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    kind,
+    itemId,
+    title,
+    payloadJson,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'trash_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TrashItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(
+        _itemIdMeta,
+        itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TrashItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TrashItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      kind: $TrashItemsTable.$converterkind.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}kind'],
+        )!,
+      ),
+      itemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TrashItemsTable createAlias(String alias) {
+    return $TrashItemsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<TrashKind, String, String> $converterkind =
+      const EnumNameConverter<TrashKind>(TrashKind.values);
+}
+
+class TrashItem extends DataClass implements Insertable<TrashItem> {
+  final String id;
+  final TrashKind kind;
+
+  /// The deleted row's id (a note or paper id).
+  final String itemId;
+  final String title;
+  final String payloadJson;
+  final DateTime deletedAt;
+  const TrashItem({
+    required this.id,
+    required this.kind,
+    required this.itemId,
+    required this.title,
+    required this.payloadJson,
+    required this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    {
+      map['kind'] = Variable<String>(
+        $TrashItemsTable.$converterkind.toSql(kind),
+      );
+    }
+    map['item_id'] = Variable<String>(itemId);
+    map['title'] = Variable<String>(title);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['deleted_at'] = Variable<DateTime>(deletedAt);
+    return map;
+  }
+
+  TrashItemsCompanion toCompanion(bool nullToAbsent) {
+    return TrashItemsCompanion(
+      id: Value(id),
+      kind: Value(kind),
+      itemId: Value(itemId),
+      title: Value(title),
+      payloadJson: Value(payloadJson),
+      deletedAt: Value(deletedAt),
+    );
+  }
+
+  factory TrashItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TrashItem(
+      id: serializer.fromJson<String>(json['id']),
+      kind: $TrashItemsTable.$converterkind.fromJson(
+        serializer.fromJson<String>(json['kind']),
+      ),
+      itemId: serializer.fromJson<String>(json['itemId']),
+      title: serializer.fromJson<String>(json['title']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'kind': serializer.toJson<String>(
+        $TrashItemsTable.$converterkind.toJson(kind),
+      ),
+      'itemId': serializer.toJson<String>(itemId),
+      'title': serializer.toJson<String>(title),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'deletedAt': serializer.toJson<DateTime>(deletedAt),
+    };
+  }
+
+  TrashItem copyWith({
+    String? id,
+    TrashKind? kind,
+    String? itemId,
+    String? title,
+    String? payloadJson,
+    DateTime? deletedAt,
+  }) => TrashItem(
+    id: id ?? this.id,
+    kind: kind ?? this.kind,
+    itemId: itemId ?? this.itemId,
+    title: title ?? this.title,
+    payloadJson: payloadJson ?? this.payloadJson,
+    deletedAt: deletedAt ?? this.deletedAt,
+  );
+  TrashItem copyWithCompanion(TrashItemsCompanion data) {
+    return TrashItem(
+      id: data.id.present ? data.id.value : this.id,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      title: data.title.present ? data.title.value : this.title,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TrashItem(')
+          ..write('id: $id, ')
+          ..write('kind: $kind, ')
+          ..write('itemId: $itemId, ')
+          ..write('title: $title, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, kind, itemId, title, payloadJson, deletedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TrashItem &&
+          other.id == this.id &&
+          other.kind == this.kind &&
+          other.itemId == this.itemId &&
+          other.title == this.title &&
+          other.payloadJson == this.payloadJson &&
+          other.deletedAt == this.deletedAt);
+}
+
+class TrashItemsCompanion extends UpdateCompanion<TrashItem> {
+  final Value<String> id;
+  final Value<TrashKind> kind;
+  final Value<String> itemId;
+  final Value<String> title;
+  final Value<String> payloadJson;
+  final Value<DateTime> deletedAt;
+  final Value<int> rowid;
+  const TrashItemsCompanion({
+    this.id = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TrashItemsCompanion.insert({
+    this.id = const Value.absent(),
+    required TrashKind kind,
+    required String itemId,
+    this.title = const Value.absent(),
+    required String payloadJson,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : kind = Value(kind),
+       itemId = Value(itemId),
+       payloadJson = Value(payloadJson);
+  static Insertable<TrashItem> custom({
+    Expression<String>? id,
+    Expression<String>? kind,
+    Expression<String>? itemId,
+    Expression<String>? title,
+    Expression<String>? payloadJson,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (kind != null) 'kind': kind,
+      if (itemId != null) 'item_id': itemId,
+      if (title != null) 'title': title,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TrashItemsCompanion copyWith({
+    Value<String>? id,
+    Value<TrashKind>? kind,
+    Value<String>? itemId,
+    Value<String>? title,
+    Value<String>? payloadJson,
+    Value<DateTime>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return TrashItemsCompanion(
+      id: id ?? this.id,
+      kind: kind ?? this.kind,
+      itemId: itemId ?? this.itemId,
+      title: title ?? this.title,
+      payloadJson: payloadJson ?? this.payloadJson,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(
+        $TrashItemsTable.$converterkind.toSql(kind.value),
+      );
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TrashItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('kind: $kind, ')
+          ..write('itemId: $itemId, ')
+          ..write('title: $title, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4783,6 +5195,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ProjectsTable projects = $ProjectsTable(this);
   late final $ProjectPapersTable projectPapers = $ProjectPapersTable(this);
   late final $ProjectNotesTable projectNotes = $ProjectNotesTable(this);
+  late final $TrashItemsTable trashItems = $TrashItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4800,6 +5213,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     projects,
     projectPapers,
     projectNotes,
+    trashItems,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -10048,6 +10462,232 @@ typedef $$ProjectNotesTableProcessedTableManager =
       ProjectNote,
       PrefetchHooks Function({bool projectId, bool noteId})
     >;
+typedef $$TrashItemsTableCreateCompanionBuilder = TrashItemsCompanion Function({
+  Value<String> id,
+  required TrashKind kind,
+  required String itemId,
+  Value<String> title,
+  required String payloadJson,
+  Value<DateTime> deletedAt,
+  Value<int> rowid,
+});
+typedef $$TrashItemsTableUpdateCompanionBuilder = TrashItemsCompanion Function({
+  Value<String> id,
+  Value<TrashKind> kind,
+  Value<String> itemId,
+  Value<String> title,
+  Value<String> payloadJson,
+  Value<DateTime> deletedAt,
+  Value<int> rowid,
+});
+
+class $$TrashItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $TrashItemsTable> {
+  $$TrashItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<TrashKind, TrashKind, String> get kind =>
+      $composableBuilder(
+        column: $table.kind,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TrashItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TrashItemsTable> {
+  $$TrashItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TrashItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TrashItemsTable> {
+  $$TrashItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<TrashKind, String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$TrashItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TrashItemsTable,
+          TrashItem,
+          $$TrashItemsTableFilterComposer,
+          $$TrashItemsTableOrderingComposer,
+          $$TrashItemsTableAnnotationComposer,
+          $$TrashItemsTableCreateCompanionBuilder,
+          $$TrashItemsTableUpdateCompanionBuilder,
+          (
+            TrashItem,
+            BaseReferences<_$AppDatabase, $TrashItemsTable, TrashItem>,
+          ),
+          TrashItem,
+          PrefetchHooks Function()
+        > {
+  $$TrashItemsTableTableManager(_$AppDatabase db, $TrashItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TrashItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TrashItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TrashItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<TrashKind> kind = const Value.absent(),
+                Value<String> itemId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TrashItemsCompanion(
+                id: id,
+                kind: kind,
+                itemId: itemId,
+                title: title,
+                payloadJson: payloadJson,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required TrashKind kind,
+                required String itemId,
+                Value<String> title = const Value.absent(),
+                required String payloadJson,
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TrashItemsCompanion.insert(
+                id: id,
+                kind: kind,
+                itemId: itemId,
+                title: title,
+                payloadJson: payloadJson,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TrashItemsTable, TrashItem>(table),
+                  BaseReferences<_$AppDatabase, $TrashItemsTable, TrashItem>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TrashItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TrashItemsTable,
+      TrashItem,
+      $$TrashItemsTableFilterComposer,
+      $$TrashItemsTableOrderingComposer,
+      $$TrashItemsTableAnnotationComposer,
+      $$TrashItemsTableCreateCompanionBuilder,
+      $$TrashItemsTableUpdateCompanionBuilder,
+      (TrashItem, BaseReferences<_$AppDatabase, $TrashItemsTable, TrashItem>),
+      TrashItem,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10075,4 +10715,6 @@ class $AppDatabaseManager {
       $$ProjectPapersTableTableManager(_db, _db.projectPapers);
   $$ProjectNotesTableTableManager get projectNotes =>
       $$ProjectNotesTableTableManager(_db, _db.projectNotes);
+  $$TrashItemsTableTableManager get trashItems =>
+      $$TrashItemsTableTableManager(_db, _db.trashItems);
 }

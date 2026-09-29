@@ -14,6 +14,8 @@ import 'paper_detail_screen.dart';
 import '../../data/tables/papers_table.dart';
 import '../projects/project_menu.dart';
 import '../projects/projects_providers.dart';
+import '../../theme/swipe_to_trash.dart';
+import '../trash/trash_actions.dart';
 import 'library_actions.dart';
 import 'papers_providers.dart';
 import '../../theme/app_theme.dart';
@@ -218,7 +220,16 @@ class LibraryScreen extends ConsumerWidget {
                   itemBuilder: (context, index) => EntranceTransition(
                     key: ValueKey(papers[index].id),
                     index: index,
-                    child: _PaperCard(paper: papers[index]),
+                    child: SwipeToTrash(
+                      dismissKey: ValueKey('swipe-${papers[index].id}'),
+                      onTrash: () => deletePaperWithUndo(
+                        ref,
+                        ScaffoldMessenger.of(context),
+                        papers[index].id,
+                        papers[index].title,
+                      ),
+                      child: _PaperCard(paper: papers[index]),
+                    ),
                   ),
                 );
               },

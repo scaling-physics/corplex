@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'backup.dart';
 import 'sync_schema.dart';
 import 'tables/annotations_table.dart';
 import 'tables/attachments_table.dart';
@@ -17,6 +18,7 @@ import 'tables/notes_table.dart';
 import 'tables/papers_table.dart';
 import 'tables/projects_table.dart';
 import 'tables/tags_table.dart';
+import 'tables/trash_table.dart';
 
 part 'database.g.dart';
 
@@ -34,6 +36,7 @@ part 'database.g.dart';
     Projects,
     ProjectPapers,
     ProjectNotes,
+    TrashItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -54,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -147,6 +150,10 @@ class AppDatabase extends _$AppDatabase {
         }
         await _createSyncSchema();
       }
+      if (from < 9) {
+        // v9: local-only trash (not part of sync).
+        if (!await _hasTable('trash_items')) await m.createTable(trashItems);
+      }
     },
   );
 
@@ -189,6 +196,8 @@ class AppDatabase extends _$AppDatabase {
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
+    // A restored backup is swapped in here, before the database opens.
+    await applyPendingRestore(dbFolder);
     final file = File(p.join(dbFolder.path, 'corplex.sqlite'));
     return NativeDatabase.createInBackground(
       file,

@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
 import '../auth/sign_in_screen.dart';
+import '../../data/database_provider.dart';
+import '../../data/trash.dart';
 import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../sync/sync_service.dart';
 import '../notes/notes_screen.dart';
 import '../search/search_screen.dart';
+import '../trash/trash_screen.dart';
+import 'data_actions.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
@@ -22,6 +26,14 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Housekeeping: items that have sat in the trash past the retention
+    // period go for good. Never worth failing startup over.
+    purgeTrash(ref.read(databaseProvider)).catchError((_) => 0);
+  }
 
   static const _screens = [NotesScreen(), LibraryScreen()];
   static const _titles = ['Notes', 'Library'];
@@ -63,19 +75,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: 'Search',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SearchScreen()),
-            ),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const SearchScreen())),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _AccountButton(
               email: user?.email,
-              onPressed: () => user == null
-                  ? Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SignInScreen()),
-                    )
-                  : _showAccountMenu(context),
+              onPressed: () => _showAccountMenu(context),
             ),
           ),
         ],
@@ -109,69 +116,124 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     );
   }
 
+  /// Everything that isn't the reading/writing loop lives behind the
+  /// account button: sync and sign-in, trash, backup and restore.
   Future<void> _showAccountMenu(BuildContext context) async {
     final sync = ref.read(syncServiceProvider);
-    final signOut = await showModalBottomSheet<bool>(
+    final user = ref.read(authServiceProvider).currentUser;
+    final action = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-              child: Text(
-                ref.read(authServiceProvider).currentUser?.email ?? '',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-            ),
-            // Sync detail lives here, not on the main screens: it's
-            // background plumbing until the user goes looking for it.
-            Consumer(
-              builder: (context, ref, _) {
-                final status =
-                    ref.watch(syncStatusProvider).value ?? sync.currentStatus;
-                return ListTile(
-                  leading: const Icon(Icons.sync),
-                  title: const Text('Sync now'),
-                  subtitle: Text(_syncLabel(status, sync.lastError)),
-                  enabled: status != SyncStatus.offline,
-                  onTap: sync.syncNow,
-                );
-              },
-            ),
-            if (sync.accountMismatch)
-              ListTile(
-                leading: const Icon(Icons.swap_horiz),
-                title: const Text('Use this account on this device'),
-                subtitle: const Text(
-                  'Replaces what\'s on this device with this account\'s data.',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (user == null)
+                ListTile(
+                  leading: const Icon(Icons.account_circle_outlined),
+                  title: const Text('Sign in'),
+                  subtitle: const Text('Sync your library across devices'),
+                  onTap: () => Navigator.pop(context, 'signin'),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                  child: Text(
+                    user.email,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _eraseDevice(context, signOutAfter: false);
+                // Sync detail lives here, not on the main screens: it's
+                // background plumbing until the user goes looking for it.
+                Consumer(
+                  builder: (context, ref, _) {
+                    final status =
+                        ref.watch(syncStatusProvider).value ??
+                        sync.currentStatus;
+                    return ListTile(
+                      leading: const Icon(Icons.sync),
+                      title: const Text('Sync now'),
+                      subtitle: Text(_syncLabel(status, sync.lastError)),
+                      enabled: status != SyncStatus.offline,
+                      onTap: sync.syncNow,
+                    );
+                  },
+                ),
+                if (sync.accountMismatch)
+                  ListTile(
+                    leading: const Icon(Icons.swap_horiz),
+                    title: const Text('Use this account on this device'),
+                    subtitle: const Text(
+                      'Replaces what\'s on this device with this account\'s data.',
+                    ),
+                    onTap: () => Navigator.pop(context, 'switch'),
+                  ),
+              ],
+              const Divider(),
+              Consumer(
+                builder: (context, ref, _) {
+                  final count =
+                      ref.watch(trashItemsProvider).value?.length ?? 0;
+                  return ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Trash'),
+                    subtitle: count == 0
+                        ? null
+                        : Text('$count item${count == 1 ? '' : 's'}'),
+                    onTap: () => Navigator.pop(context, 'trash'),
+                  );
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Sign out'),
-              onTap: () => Navigator.pop(context, true),
-            ),
-            if (sync.currentStatus != SyncStatus.offline)
               ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Sign out and clear this device'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _eraseDevice(context, signOutAfter: true);
-                },
+                leading: const Icon(Icons.save_alt_outlined),
+                title: const Text('Back up to a file'),
+                subtitle: const Text('Notes, papers and files in one zip'),
+                onTap: () => Navigator.pop(context, 'backup'),
               ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.settings_backup_restore),
+                title: const Text('Restore from a backup'),
+                onTap: () => Navigator.pop(context, 'restore'),
+              ),
+              if (user != null) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Sign out'),
+                  onTap: () => Navigator.pop(context, 'signout'),
+                ),
+                if (sync.currentStatus != SyncStatus.offline)
+                  ListTile(
+                    leading: const Icon(Icons.layers_clear_outlined),
+                    title: const Text('Sign out and clear this device'),
+                    onTap: () => Navigator.pop(context, 'clear'),
+                  ),
+              ],
+            ],
+          ),
         ),
       ),
     );
-    if (signOut == true) {
-      await ref.read(authServiceProvider).signOut();
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case 'signin':
+        await Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const SignInScreen()));
+      case 'switch':
+        await _eraseDevice(context, signOutAfter: false);
+      case 'trash':
+        await Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const TrashScreen()));
+      case 'backup':
+        await backUpToFile(context, ref);
+      case 'restore':
+        await restoreFromBackupFile(context, ref);
+      case 'signout':
+        await ref.read(authServiceProvider).signOut();
+      case 'clear':
+        await _eraseDevice(context, signOutAfter: true);
     }
   }
 

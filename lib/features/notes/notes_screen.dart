@@ -11,7 +11,9 @@ import 'note_content.dart';
 import 'note_editor_screen.dart';
 import 'notes_providers.dart';
 import 'tags_providers.dart';
+import '../../theme/swipe_to_trash.dart';
 import '../projects/project_menu.dart';
+import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
@@ -114,12 +116,21 @@ class NotesScreen extends ConsumerWidget {
                     return EntranceTransition(
                       key: ValueKey(note.id),
                       index: index,
-                      child: _NoteCard(
+                      child: SwipeToTrash(
+                        dismissKey: ValueKey('swipe-${note.id}'),
+                        onTrash: () => deleteNoteWithUndo(
+                          ref,
+                          ScaffoldMessenger.of(context),
+                          note.id,
+                          note.title,
+                        ),
+                        child: _NoteCard(
                         note: note,
                         // The folder is redundant while filtering by it.
                         folderName: filter is FolderFilter
                             ? null
                             : folderNames[note.folderId],
+                        ),
                       ),
                     );
                   },

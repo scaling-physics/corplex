@@ -638,4 +638,130 @@ void main() {
 
     await _disposeTree(tester);
   });
+
+  testWidgets(
+    'swiping a note away moves it to the trash, and Undo brings it back',
+    (tester) async {
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: const Value('n1'),
+              title: const Value('Draft'),
+            ),
+          );
+      await tester.pumpWidget(_appWithDb(db));
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.text('Draft'), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Draft'), findsNothing);
+      expect(find.textContaining('moved to trash'), findsOneWidget);
+      expect(await db.select(db.notes).get(), isEmpty);
+      expect(await db.select(db.trashItems).get(), hasLength(1));
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Draft'), findsOneWidget);
+      expect(await db.select(db.notes).get(), hasLength(1));
+      expect(await db.select(db.trashItems).get(), isEmpty);
+
+      await _disposeTree(tester);
+    },
+  );
+
+  testWidgets(
+    'a paper can be trashed from its screen and restored from the Trash',
+    (tester) async {
+      await db
+          .into(db.papers)
+          .insert(
+            PapersCompanion.insert(
+              id: const Value('p1'),
+              title: 'Doomed paper',
+            ),
+          );
+      await tester.pumpWidget(_appWithDb(db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Library'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Doomed paper'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move to trash'));
+      await tester.pumpAndSettle();
+
+      // Back on the library, which no longer lists it.
+      expect(find.text('Your library is empty'), findsOneWidget);
+
+      // Account sheet -> Trash -> Restore.
+      await tester.tap(find.byTooltip('Sign in'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 item'), findsOneWidget);
+      await tester.tap(find.text('Trash'));
+      await tester.pumpAndSettle();
+      expect(find.text('Doomed paper'), findsOneWidget);
+      expect(find.textContaining('days left'), findsOneWidget);
+      await tester.tap(find.text('Restore'));
+      await tester.pumpAndSettle();
+      expect(find.text('Trash is empty'), findsOneWidget);
+      expect(await db.select(db.papers).get(), hasLength(1));
+
+      await _disposeTree(tester);
+    },
+  );
+
+  testWidgets(
+    'the account sheet works signed out: sign in, trash, backup, restore',
+    (tester) async {
+      await tester.pumpWidget(_appWithDb(db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Sign in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign in'), findsWidgets);
+      expect(find.text('Trash'), findsOneWidget);
+      expect(find.text('Back up to a file'), findsOneWidget);
+      expect(find.text('Restore from a backup'), findsOneWidget);
+      expect(find.text('Sign out'), findsNothing);
+
+      await _disposeTree(tester);
+    },
+  );
+
+  testWidgets(
+    'trashing from the note editor leaves the editor and can be undone',
+    (tester) async {
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: const Value('n1'),
+              title: const Value('Editing this'),
+            ),
+          );
+      await tester.pumpWidget(_appWithDb(db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editing this'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move to trash'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Notes'), findsWidgets); // back on the list
+      expect(await db.select(db.notes).get(), isEmpty);
+      // The editor's autosave must not have resurrected the note.
+      await tester.pump(const Duration(seconds: 1));
+      expect(await db.select(db.notes).get(), isEmpty);
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(await db.select(db.notes).get(), hasLength(1));
+      await _disposeTree(tester);
+    },
+  );
 }

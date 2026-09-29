@@ -85,10 +85,9 @@ the rest are the remaining v1 work, in priority order.
 7. **Capture from other apps (Android built; iOS not)** — Android
    share-sheet/Open-with import for PDFs, audio, DOIs/arXiv links, links and
    text. iOS needs an Xcode Share Extension target — see Status.
-8. **Data safety** — full export/backup (database + files as a zip), trash
-   with undo instead of immediate delete, and data-preserving schema
-   migrations (the destructive v3 migration must not be repeated once real
-   users exist).
+8. **Data safety (built)** — trash with undo (swipe a card, or ⋮ → Move
+   to trash), full backup/restore as a zip, and data-preserving
+   migrations (the destructive v3 migration must not be repeated).
 9. **Cross-device sync (built; verified on local and hosted Supabase)** —
    Supabase + drift, last-write-wins. Metadata and files (PDFs, images,
    audio) sync; see the Sync engine entry under Status. Needs a real
@@ -510,6 +509,38 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   fake clock, and each awaited step needs its own round trip — see
   `settle()` in `test/features/share/share_test.dart` (alternate `pump()`
   with `runAsync` delays), and fake `PathProviderPlatform.instance`.
+- **Trash** (`lib/data/trash.dart`, `lib/features/trash/`, schema v9):
+  before this, *nothing* could delete a note or paper. Swiping a card or
+  ⋮ → "Move to trash" snapshots the item — the row plus attachments, tag /
+  paper / project links, highlights and ink — as JSON in `TrashItems`, then
+  hard-deletes it (so the delete syncs normally). Undo (snackbar, 6 s) and
+  the Trash screen call `restoreFromTrash`, which re-inserts everything,
+  dropping links to things deleted meanwhile (a folder, tag, paper…) and
+  **stamping every row `updatedAt = now`** — otherwise the restored rows
+  would lose to the server's delete marker on last-write-wins and never
+  sync. `TrashItems` is local-only (not in `syncTables`): trash isn't
+  shared between devices. Files stay on disk until `purgeTrash` (30 days,
+  run at startup; Empty trash purges now), which deletes a file only if no
+  row or other trash entry still points at it. Editors leave *before*
+  trashing so a pending autosave can't resurrect the item.
+- **Backup & restore** (`lib/data/backup.dart`, `features/home/data_actions.dart`):
+  the account button opens one sheet (signed in or out) with Sync, Trash,
+  Back up to a file, Restore, Sign out. A backup zip holds `manifest.json`,
+  a `VACUUM INTO` snapshot (consistent while the app runs) and every file
+  under the documents folder that the data references. Stored file paths
+  are absolute and device-specific (an iOS container path even changes
+  between installs), so the snapshot rewrites them to `@docs/…` and
+  restore rewrites them back. The snapshot also drops the trash, the
+  search index, tombstones and the sync identity (`sync_meta`), so a
+  restored device doesn't think it belongs to the old device's account.
+  **Restore is staged, then applied at next launch**: `stageRestore`
+  extracts into `restore_staging/` (ignoring `../` entries) and
+  `applyPendingRestore` — called in `_openConnection` *before* the database
+  opens — swaps files, keeps the old database as `corplex.sqlite.before-restore`
+  (one level of undo), and fixes paths; the user is told to reopen the app.
+  Backups from a newer schema, or that aren't backups, are refused with a
+  message. Restoring into a signed-in library: the next sync merges by
+  last-write-wins, so newer cloud edits will win over restored older ones.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

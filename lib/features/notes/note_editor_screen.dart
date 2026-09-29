@@ -18,6 +18,7 @@ import '../audio/audio_player_bar.dart';
 import '../ink/sketch_embed.dart';
 import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
+import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
@@ -280,6 +281,18 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   void _openNote(String id) => Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: id)));
 
+  /// Leaves the editor first so a pending autosave can't recreate the
+  /// note the moment it's deleted, then trashes it with Undo.
+  Future<void> _moveToTrash() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final title = _titleController.text;
+    _debounce?.cancel();
+    await _save();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    await deleteNoteWithUndo(ref, messenger, widget.noteId, title);
+  }
+
   Future<void> _shareMarkdown() async {
     await _save();
     final markdown = noteToMarkdown(
@@ -357,6 +370,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ),
               'link' => _linkNote(context),
               'markdown' => _shareMarkdown(),
+              'trash' => _moveToTrash(),
               _ => null,
             },
             itemBuilder: (_) => const [
@@ -380,6 +394,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 child: ListTile(
                   leading: Icon(Icons.ios_share),
                   title: Text('Share as Markdown'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'trash',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Move to trash'),
                 ),
               ),
             ],

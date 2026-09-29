@@ -16,6 +16,7 @@ import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
 import 'highlights.dart';
 import '../projects/project_picker_sheet.dart';
+import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
 import 'metadata_lookup.dart';
 import '../../data/tables/papers_table.dart';
@@ -96,6 +97,16 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
         if (untouched) controller.text = entry.value;
       }
     }
+  }
+
+  Future<void> _moveToTrash() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final title = _titleController.text;
+    _debounce?.cancel();
+    await _save();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    await deletePaperWithUndo(ref, messenger, widget.paperId, title);
   }
 
   /// Fills empty details from the DOI or arXiv ID in the DOI field.
@@ -195,7 +206,25 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     final notesAsync = ref.watch(notesForPaperProvider(widget.paperId));
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            onSelected: (v) {
+              if (v == 'trash') _moveToTrash();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'trash',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Move to trash'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       bottomNavigationBar: const SafeArea(child: AudioPlayerBar()),
       body: !_loaded
           ? const SizedBox.shrink()

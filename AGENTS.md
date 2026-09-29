@@ -75,7 +75,9 @@ the rest are the remaining v1 work, in priority order.
    (Crossref/arXiv; strictly optional online, manual entry always works),
    title/DOI extraction from an imported PDF, duplicate-paper detection, and
    structured author names (needed for correct citation styles).
-4. **Paper attachments (built)** — podcast links, images, arbitrary files.
+4. **Paper & note attachments (built)** — audio (e.g. NotebookLM audio
+   overviews) with an in-app player and tap-to-seek timestamps in notes,
+   podcast links, images, arbitrary files.
 5. **Library tab (built)** — remaining: full-text search (SQLite FTS5) over
    notes, highlights, and paper metadata; reading status (to read /
    reading / done).
@@ -109,11 +111,10 @@ existing table). Local-only columns (file paths) stay out of the spec.
   objects orphaned when a paper/attachment is deleted (none today).
 - **Clock skew**: last-write-wins trusts each device's clock. A device with
   a badly wrong clock can lose (or win) edits it shouldn't.
-- **Pen input inside notes**: AGENTS.md's design principle promises text +
-  images + pen in one note, but `flutter_quill` has no ink support. Options:
-  an embedded drawing block (custom Quill embed), or a per-note ink layer.
-  Decide and record it; if it can't be done well, say so in the principles
-  rather than leaving the promise unmet.
+- **Handwriting to text**: sketches stay drawings. iPadOS Scribble works
+  in plain `TextField`s (note/paper titles) for free, but not inside the
+  Quill body; converting ink to text would need on-device recognition
+  (e.g. ML Kit Digital Ink) — undecided.
 
 ## Later releases
 
@@ -137,7 +138,8 @@ the default screens until the user opts in by using the feature.
 
 ### v1.3 — iPad & pen
 - Split view: PDF beside note, as a first-class layout.
-- Apple Pencil handwriting in notes (per the open decision above), Scribble.
+- Pen input in notes is built (sketch blocks, see Status). Still to do:
+  handwriting-to-text, Apple Pencil double-tap to switch tools, hover.
 - Multiple windows, drag and drop between apps, hardware keyboard
   shortcuts. Android stylus support.
 
@@ -377,6 +379,28 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
 - **Android manifest**: `INTERNET` is declared in the *main* manifest.
   Debug/profile manifests add it implicitly, so leaving it out breaks
   sync and streaming only in release builds.
+- **Pen input** (`lib/features/ink/`): a note can hold any number of
+  sketch blocks between its paragraphs — the "Draw" button (first in the
+  editor's bottom toolbar) inserts one at the cursor and opens
+  `SketchEditorScreen`; tap a sketch to draw on it again. A sketch is a
+  Quill `CustomBlockEmbed('sketch', json)` rendered by
+  `SketchEmbedBuilder`, so it lives in the note's `content` and syncs
+  with it (no new table). **Insert `CustomBlockEmbed` directly**, never
+  `BlockEmbed.custom(...)`, which wraps it as type `custom` that the
+  builder's key won't match. Strokes (`ink_model.dart`) are stored in
+  canvas-width units with per-point pressure, so they render identically
+  at any size; `Sketch.encode` rounds to 4 decimals to keep synced notes
+  small. Apple Pencil and Android pens both arrive as
+  `PointerDeviceKind.stylus` with pressure. **Palm rejection**
+  (`InkInputPolicy`): fingers draw until a stylus is seen, then fingers
+  scroll and never draw (toggle in the editor's app bar); a pen's
+  eraser end (`invertedStylus`) always erases. Eraser removes whole
+  strokes; one gesture = one undo step (`onGestureStart`). The canvas
+  keeps its own working copy while erasing, since pointer moves can
+  outrun parent rebuilds. Sketch paper is light in both themes so ink
+  colors read the same everywhere. Test with real stylus events:
+  `adb shell input stylus swipe …` on the emulator,
+  `startGesture(kind: PointerDeviceKind.stylus)` in widget tests.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

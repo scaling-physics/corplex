@@ -14,6 +14,7 @@ import '../../data/tables/attachments_table.dart';
 import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
+import '../ink/sketch_embed.dart';
 import '../library/add_attachment_sheet.dart';
 import '../library/paper_detail_screen.dart';
 import 'folder_picker_sheet.dart';
@@ -380,6 +381,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     padding: EdgeInsets.zero,
                     placeholder: 'Start writing…',
                     customLinkPrefixes: const [audioLinkScheme],
+                    embedBuilders: const [SketchEmbedBuilder()],
                     // Audio timestamps play on a plain tap; other links
                     // keep Quill's default long-press menu.
                     customRecognizerBuilder: (attribute, leaf) {
@@ -417,31 +419,50 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         horizontal: 8,
                         vertical: 4,
                       ),
-                      child: QuillSimpleToolbar(
-                        controller: _quillController,
-                        config: const QuillSimpleToolbarConfig(
-                          multiRowsDisplay: false,
-                          showFontFamily: false,
-                          showFontSize: false,
-                          showSmallButton: false,
-                          showLineHeightButton: false,
-                          showInlineCode: false,
-                          showColorButton: false,
-                          showBackgroundColorButton: false,
-                          showClearFormat: false,
-                          showAlignmentButtons: false,
-                          showListCheck: false,
-                          showCodeBlock: false,
-                          showIndent: false,
-                          showLink: false,
-                          showDirection: false,
-                          showSearchButton: false,
-                          showSubscript: false,
-                          showSuperscript: false,
-                          showUndo: false,
-                          showRedo: false,
-                          showDividers: false,
-                        ),
+                      child: Row(
+                        children: [
+                          // Pen input sits first and always visible, not at
+                          // the scrolled-off end of the formatting row.
+                          IconButton(
+                            icon: const Icon(Icons.draw_outlined),
+                            tooltip: 'Draw',
+                            onPressed: () =>
+                                insertSketch(context, _quillController),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 24,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          Expanded(
+                            child: QuillSimpleToolbar(
+                              controller: _quillController,
+                              config: const QuillSimpleToolbarConfig(
+                                multiRowsDisplay: false,
+                                showFontFamily: false,
+                                showFontSize: false,
+                                showSmallButton: false,
+                                showLineHeightButton: false,
+                                showInlineCode: false,
+                                showColorButton: false,
+                                showBackgroundColorButton: false,
+                                showClearFormat: false,
+                                showAlignmentButtons: false,
+                                showListCheck: false,
+                                showCodeBlock: false,
+                                showIndent: false,
+                                showLink: false,
+                                showDirection: false,
+                                showSearchButton: false,
+                                showSubscript: false,
+                                showSuperscript: false,
+                                showUndo: false,
+                                showRedo: false,
+                                showDividers: false,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

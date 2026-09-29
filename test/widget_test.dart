@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +11,9 @@ import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
 import 'package:corplex/features/audio/audio_playback.dart';
+import 'package:corplex/features/ink/ink_canvas.dart';
+import 'package:corplex/features/ink/ink_model.dart';
+import 'package:corplex/features/notes/note_content.dart';
 
 import 'support/fake_audio_engine.dart';
 
@@ -142,21 +148,25 @@ void main() {
     tester,
   ) async {
     final audio = FakeAudioEngine();
-    await db.into(db.notes).insert(
-      NotesCompanion.insert(
-        id: const Value('n1'),
-        title: const Value('Lecture notes'),
-      ),
-    );
-    await db.into(db.attachments).insert(
-      AttachmentsCompanion.insert(
-        id: const Value('rec1'),
-        noteId: const Value('n1'),
-        type: AttachmentType.podcast,
-        path: const Value('/device/overview.m4a'),
-        title: const Value('Audio overview'),
-      ),
-    );
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            title: const Value('Lecture notes'),
+          ),
+        );
+    await db
+        .into(db.attachments)
+        .insert(
+          AttachmentsCompanion.insert(
+            id: const Value('rec1'),
+            noteId: const Value('n1'),
+            type: AttachmentType.podcast,
+            path: const Value('/device/overview.m4a'),
+            title: const Value('Audio overview'),
+          ),
+        );
     await tester.pumpWidget(_appWithDb(db, audio: audio));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lecture notes'));
@@ -189,6 +199,81 @@ void main() {
     await tester.pumpAndSettle();
     expect(audio.seeks, [const Duration(minutes: 12, seconds: 34)]);
 
+    await _disposeTree(tester);
+  });
+
+  testWidgets('drawing a sketch in a note with a stylus', (tester) async {
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            title: const Value('Diagram'),
+            content: const Value('[{"insert":"Before\\n"}]'),
+          ),
+        );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Diagram'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Draw'));
+    await tester.pumpAndSettle();
+    expect(find.text('Done'), findsOneWidget);
+
+    final canvas = find.byType(InkCanvas);
+    final start = tester.getTopLeft(canvas) + const Offset(40, 40);
+    final g = await tester.startGesture(start, kind: PointerDeviceKind.stylus);
+    for (var i = 1; i <= 8; i++) {
+      await g.moveTo(start + Offset(i * 25.0, i * 5.0));
+    }
+    await g.up();
+    await tester.pump();
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    // Back in the note, the drawing shows and is saved in its content.
+    expect(find.textContaining('Before', findRichText: true), findsOneWidget);
+    expect(find.byType(CustomPaint), findsWidgets);
+    final saved = (await db.select(db.notes).getSingle()).content;
+    expect(saved, contains('"sketch"'));
+    final data =
+        (jsonDecode(saved) as List)
+                .map((op) => (op as Map)['insert'])
+                .whereType<Map>()
+                .single['sketch']
+            as String;
+    expect(Sketch.decode(data).strokes, hasLength(1));
+    expect(notePlainTextPreview(saved), 'Before');
+
+    await _disposeTree(tester);
+  });
+
+  testWidgets('tapping Draw and leaving without drawing adds nothing', (
+    tester,
+  ) async {
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('n1'),
+            title: const Value('Plain'),
+            content: const Value('[{"insert":"Text\\n"}]'),
+          ),
+        );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plain'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Draw'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    final saved = (await db.select(db.notes).getSingle()).content;
+    expect(saved, isNot(contains('sketch')));
     await _disposeTree(tester);
   });
 }

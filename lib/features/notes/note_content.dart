@@ -19,5 +19,11 @@ String encodeNoteContent(Document document) =>
 
 /// A single-line plain-text preview for list rows, without loading a full
 /// Quill controller just to render a subtitle.
+/// Embeds (sketches) have no text, so they're dropped rather than shown as
+/// the object-replacement character.
 String notePlainTextPreview(String content) =>
-    decodeNoteContent(content).toPlainText().replaceAll('\n', ' ').trim();
+    decodeNoteContent(content)
+        .toPlainText()
+        .replaceAll('\uFFFC', '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();

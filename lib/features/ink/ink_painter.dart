@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'ink_model.dart';
 
 /// Paints strokes at the given canvas width. Pen lines swell and thin with
-/// pressure; highlighter lines are flat, translucent and drawn beneath the
+/// pressure; highlighter lines are flat, translucent (50%) and drawn beneath the
 /// pen so they never mute the ink on top.
 class InkPainter extends CustomPainter {
   InkPainter({required this.strokes, super.repaint});
@@ -27,7 +27,7 @@ class InkPainter extends CustomPainter {
 
     if (stroke.tool == InkTool.highlighter) {
       final paint = Paint()
-        ..color = stroke.color.withValues(alpha: 0.35)
+        ..color = stroke.color.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
@@ -37,8 +37,11 @@ class InkPainter extends CustomPainter {
         path.lineTo(p.x * scale, p.y * scale);
       }
       if (points.length == 1) {
-        canvas.drawCircle(points[0].offset * scale, paint.strokeWidth / 2,
-            paint..style = PaintingStyle.fill);
+        canvas.drawCircle(
+          points[0].offset * scale,
+          paint.strokeWidth / 2,
+          paint..style = PaintingStyle.fill,
+        );
       } else {
         canvas.drawPath(path, paint);
       }

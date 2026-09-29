@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/database.dart';
@@ -15,6 +16,10 @@ import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import '../ink/sketch_embed.dart';
+import '../../theme/app_theme.dart';
+import 'note_link_sheet.dart';
+import 'note_links.dart';
+import 'note_markdown.dart';
 import '../library/add_attachment_sheet.dart';
 import '../library/highlights.dart';
 import '../library/paper_detail_screen.dart';
@@ -48,6 +53,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   // Captured up front: dispose() must be able to flush a pending save, and
   // `ref` can't be used there.
   late final AppDatabase _db = ref.read(databaseProvider);
+  StreamSubscription<DocChange>? _docChanges;
 
   /// What's in the database, so a save only happens for a real change.
   /// Merely opening a note, or moving the cursor, fires the listeners too;
@@ -79,6 +85,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     // Attached after the initial text is in place, so loading isn't an edit.
     _titleController.addListener(_scheduleSave);
     _quillController.addListener(_scheduleSave);
+    _docChanges = _quillController.document.changes.listen(_watchForWikilink);
     if (mounted) setState(() => _loaded = true);
   }
 
@@ -209,8 +216,85 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
+  /// Typing "[[" opens the note picker, like a wiki link.
+  void _watchForWikilink(DocChange change) {
+    if (change.source != ChangeSource.local) return;
+    // Where the change inserted a single "[", from the change itself
+    // rather than the cursor (which may not have moved yet).
+    var at = 0;
+    int? end;
+    for (final op in change.change.toList()) {
+      if (op.isRetain) {
+        at += op.length!;
+      } else if (op.isInsert) {
+        if (op.data == '[') end = at + 1;
+        break;
+      }
+    }
+    if (end == null || end < 2) return;
+    final text = _quillController.document.toPlainText();
+    if (end > text.length || text.substring(end - 2, end) != '[[') return;
+    final start = end - 2;
+    // After this change has finished applying.
+    Future.microtask(() async {
+      _quillController.replaceText(
+        start,
+        2,
+        '',
+        TextSelection.collapsed(offset: start),
+      );
+      if (mounted) await _linkNote(context);
+    });
+  }
+
+  Future<void> _linkNote(BuildContext context) async {
+    final picked = await showNoteLinkSheet(
+      context,
+      ref,
+      excludeNoteId: widget.noteId,
+    );
+    if (picked == null || !mounted) return;
+    final controller = _quillController;
+    final docEnd = controller.document.length - 1;
+    final cursor = controller.selection.baseOffset;
+    final index = cursor < 0 || cursor > docEnd ? docEnd : cursor;
+    controller.replaceText(index, 0, '${picked.title} ', null);
+    controller.formatText(
+      index,
+      picked.title.length + 1,
+      Attribute.clone(Attribute.link, null),
+    );
+    controller.formatText(
+      index,
+      picked.title.length,
+      LinkAttribute(noteLink(picked.id)),
+    );
+    controller.updateSelection(
+      TextSelection.collapsed(offset: index + picked.title.length + 1),
+      ChangeSource.local,
+    );
+  }
+
+  void _openNote(String id) => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: id)));
+
+  Future<void> _shareMarkdown() async {
+    await _save();
+    final markdown = noteToMarkdown(
+      title: _titleController.text,
+      content: encodeNoteContent(_quillController.document),
+    );
+    await SharePlus.instance.share(
+      ShareParams(
+        text: markdown,
+        subject: _titleController.text.isEmpty ? null : _titleController.text,
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _docChanges?.cancel();
     // Leaving right after typing must not drop the last edit.
     if (_debounce?.isActive ?? false) _save();
     _debounce?.cancel();
@@ -261,6 +345,31 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             icon: const Icon(Icons.attach_file),
             tooltip: 'Attach audio, image or file',
             onPressed: () => _attach(context),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            onSelected: (v) => switch (v) {
+              'link' => _linkNote(context),
+              'markdown' => _shareMarkdown(),
+              _ => null,
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'link',
+                child: ListTile(
+                  leading: Icon(Icons.add_link),
+                  title: Text('Link to a note'),
+                  subtitle: Text('Or type [[ while writing'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'markdown',
+                child: ListTile(
+                  leading: Icon(Icons.ios_share),
+                  title: Text('Share as Markdown'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -423,10 +532,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         return TapGestureRecognizer()
                           ..onTap = () => _openPaperAt(p.paperId, p.page);
                       }
+                      if (parseNoteLink(link) case final id?) {
+                        return TapGestureRecognizer()
+                          ..onTap = () => _openNote(id);
+                      }
                       return null;
                     },
                   ),
                 ),
+                _Backlinks(noteId: widget.noteId),
               ],
             ),
       bottomNavigationBar: !_loaded
@@ -541,6 +655,57 @@ class _AttachmentChip extends ConsumerWidget {
     return Chip(
       avatar: const Icon(Icons.attach_file, size: 16),
       label: Text(title, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+/// "Linked from": notes that link here. Hidden when there are none.
+class _Backlinks extends ConsumerWidget {
+  const _Backlinks({required this.noteId});
+
+  final String noteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notes = ref.watch(backlinksProvider(noteId)).value ?? const [];
+    return AnimatedSize(
+      duration: AppMotion.medium,
+      curve: AppMotion.standard,
+      alignment: Alignment.topCenter,
+      child: notes.isEmpty
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.only(top: 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Linked from',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final n in notes)
+                        ActionChip(
+                          avatar: const Icon(Icons.north_west, size: 16),
+                          label: Text(
+                            n.title.isEmpty ? 'Untitled' : n.title,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => NoteEditorScreen(noteId: n.id),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

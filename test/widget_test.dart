@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/gestures.dart';
+import 'package:flutter_quill/flutter_quill.dart' hide Text;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -274,6 +275,63 @@ void main() {
 
     final saved = (await db.select(db.notes).getSingle()).content;
     expect(saved, isNot(contains('sketch')));
+    await _disposeTree(tester);
+  });
+
+  testWidgets('typing [[ links another note, which then shows a backlink', (
+    tester,
+  ) async {
+    await db.into(db.notes).insert(
+      NotesCompanion.insert(
+        id: const Value('target'),
+        title: const Value('Transformers'),
+        updatedAt: Value(DateTime(2025)),
+      ),
+    );
+    await db.into(db.notes).insert(
+      NotesCompanion.insert(
+        id: const Value('source'),
+        title: const Value('Reading list'),
+        content: const Value('[{"insert":"See \\n"}]'),
+      ),
+    );
+    await tester.pumpWidget(_appWithDb(db));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reading list'));
+    await tester.pumpAndSettle();
+
+    // Type "[[" at the end of "See ".
+    final editor = find.byType(QuillEditor);
+    final controller = tester.widget<QuillEditor>(editor).controller;
+    controller.updateSelection(
+      const TextSelection.collapsed(offset: 4),
+      ChangeSource.local,
+    );
+    controller.replaceText(4, 0, '[', null);
+    controller.replaceText(5, 0, '[', null);
+    await tester.pumpAndSettle();
+
+    // The picker opened; pick the target.
+    await tester.enterText(find.byType(TextField).last, 'Trans');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transformers').last);
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    final saved = (await (db.select(db.notes)
+              ..where((n) => n.id.equals('source')))
+            .getSingle())
+        .content;
+    expect(saved, contains('corplex://note/target'));
+    expect(saved, isNot(contains('[[')));
+
+    // Open the target: it lists the source as linking to it.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transformers'));
+    await tester.pumpAndSettle();
+    expect(find.text('Linked from'), findsOneWidget);
+    expect(find.text('Reading list'), findsOneWidget);
+
     await _disposeTree(tester);
   });
 }

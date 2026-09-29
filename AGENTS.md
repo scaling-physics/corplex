@@ -62,8 +62,9 @@ v1 is the smallest release that completes the read → annotate → note → cit
 loop *and* cannot lose a user's data. Items marked **(built)** exist today;
 the rest are the remaining v1 work, in priority order.
 
-1. **Rich-text notes (built)** — folders/tags, Quill rich-text editor.
-   Remaining: `[[wikilinks]]` with a backlinks panel, and Markdown export.
+1. **Rich-text notes (built)** — folders/tags, Quill rich-text editor,
+   links between notes (`[[`) with "Linked from" backlinks, Markdown
+   export via the share sheet.
 2. **PDF import & annotation (built)** — text-selection highlights with
    comments, "Quote to note" (quote + tappable page link), a per-paper
    Highlights list, resume at last-read page; freeform ink as a second
@@ -424,6 +425,18 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   colors read the same everywhere. Test with real stylus events:
   `adb shell input stylus swipe …` on the emulator,
   `startGesture(kind: PointerDeviceKind.stylus)` in widget tests.
+- **Note links & export** (`note_links.dart`, `note_link_sheet.dart`,
+  `note_markdown.dart`): a link to another note is a plain Quill link
+  `corplex://note/<id>` whose text is the target's title when linked.
+  Typing `[[` (detected from the document change itself, not the
+  cursor) or ⋮ → "Link to a note" opens a searchable picker that can
+  also create the note. Backlinks are found by `LIKE` on the link text in
+  `content` — no index table to keep consistent — and render as "Linked
+  from" chips only when there are any. All `corplex://` links (note,
+  paper page, audio) open on a single tap through the editor's
+  `customRecognizerBuilder`. "Share as Markdown" converts the Delta
+  (`noteToMarkdown`): headings shift down one level under the title,
+  app-internal links become plain text, sketches become `[Sketch]`.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

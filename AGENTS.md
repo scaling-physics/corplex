@@ -103,10 +103,10 @@ existing table). Local-only columns (file paths) stay out of the spec.
 
 ### Open decisions (resolve before implementing)
 
-- **File storage limits**: files upload whole, unconditionally, and
-  download eagerly (fully in memory) on every device. Decide size limits,
-  Wi-Fi-only transfer, lazy download-on-open, and cleanup of storage
-  objects orphaned when a paper/attachment is deleted (none today).
+- **File storage transfer**: files download eagerly (fully in memory) on
+  every device and upload on any network. Decide Wi-Fi-only transfer and
+  lazy download-on-open. (Size limit and orphan cleanup are done, see the
+  Files entry under Sync engine.)
 - **Clock skew**: last-write-wins trusts each device's clock. A device with
   a badly wrong clock can lose (or win) edits it shouldn't.
 - **Handwriting to text**: sketches stay drawings. iPadOS Scribble works
@@ -391,6 +391,16 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     after a reinstall) is re-downloaded. Per-file failures don't block
     metadata; they surface as `SyncFilesIncomplete` and retry next sync.
     Needs `20260930000000_file_sync.sql` (Storage bucket + policies).
+    **Size limit**: files over `defaultMaxUploadBytes` (50 MB) stay on the
+    device — skipped, not failed, and not counted as pending changes.
+    **Orphan cleanup**: at the end of a fully successful sync (no skipped
+    tables, no file failures) `removeOrphans` deletes storage objects that
+    no live *server* row names (`SyncRemote.liveStorageKeys`, so a row this
+    device hasn't applied can't make its file look orphaned), that no local
+    row names (unpushed), and that are over a day old (`orphanGrace`:
+    another device may have uploaded a file and not pushed its row yet).
+    Restoring from trash clears `storage_key` when the file is still on
+    disk, so it uploads again if cleanup removed the object.
   * **Watchers**: pull applies rows with raw SQL, which drift can't see, so
     the engine calls `notifyUpdates` itself — only when something really
     changed (rows are compared by content first), otherwise the inclusive

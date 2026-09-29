@@ -77,6 +77,14 @@ class FakeSyncRemote implements SyncRemote {
   }
 
   @override
+  Future<Set<String>> liveStorageKeys() async => {
+    for (final t in const ['papers', 'attachments'])
+      for (final r in _table(t).values)
+        if (r['storage_key'] != null && r['deleted_at'] == null)
+          r['storage_key']! as String,
+  };
+
+  @override
   Future<List<Map<String, Object?>>> fetchChanges(
     String table, {
     String? sinceIso,
@@ -98,6 +106,7 @@ class FakeSyncRemote implements SyncRemote {
 /// In-memory stand-in for Supabase Storage.
 class FakeFileRemote implements FileRemote {
   final Map<String, Uint8List> objects = {};
+  final Map<String, DateTime> created = {};
   int uploads = 0;
   bool failing = false;
 
@@ -106,6 +115,21 @@ class FakeFileRemote implements FileRemote {
     if (failing) throw Exception('offline');
     uploads++;
     objects[key] = await file.readAsBytes();
+    created[key] = DateTime.now();
+  }
+
+  @override
+  Future<List<RemoteObject>> list(String prefix) async => [
+    for (final k in objects.keys)
+      if (k.startsWith('$prefix/')) RemoteObject(k, created[k]!),
+  ];
+
+  @override
+  Future<void> remove(List<String> keys) async {
+    for (final k in keys) {
+      objects.remove(k);
+      created.remove(k);
+    }
   }
 
   @override

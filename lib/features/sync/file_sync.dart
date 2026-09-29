@@ -11,6 +11,18 @@ abstract class FileRemote {
   Future<void> upload(String key, File file);
 
   Future<Uint8List> download(String key);
+
+  /// Objects directly under [prefix] (e.g. `<user>/papers`).
+  Future<List<RemoteObject>> list(String prefix);
+
+  Future<void> remove(List<String> keys);
+}
+
+class RemoteObject {
+  const RemoteObject(this.key, this.createdAt);
+
+  final String key;
+  final DateTime createdAt;
 }
 
 class SupabaseFileRemote implements FileRemote {
@@ -30,7 +42,42 @@ class SupabaseFileRemote implements FileRemote {
   @override
   Future<Uint8List> download(String key) =>
       _client.storage.from(bucket).download(key);
+
+  @override
+  Future<List<RemoteObject>> list(String prefix) async {
+    const page = 100;
+    final found = <RemoteObject>[];
+    for (var offset = 0; ; offset += page) {
+      final items = await _client.storage
+          .from(bucket)
+          .list(
+            path: prefix,
+            searchOptions: SearchOptions(limit: page, offset: offset),
+          );
+      for (final item in items) {
+        final created = DateTime.tryParse(item.createdAt ?? '');
+        // Folders have no timestamps; only real objects are of interest.
+        if (created != null) {
+          found.add(RemoteObject('$prefix/${item.name}', created));
+        }
+      }
+      if (items.length < page) return found;
+    }
+  }
+
+  @override
+  Future<void> remove(List<String> keys) async {
+    if (keys.isEmpty) return;
+    await _client.storage.from(bucket).remove(keys);
+  }
 }
+
+/// Files larger than this aren't uploaded (see [FileSync.maxUploadBytes]).
+const defaultMaxUploadBytes = 50 * 1024 * 1024;
+
+/// Cloud objects newer than this are never treated as orphans: another
+/// device may have uploaded one and not pushed the row that names it yet.
+const orphanGrace = Duration(days: 1);
 
 /// Picks a fresh local path for a downloaded file, e.g. inside the app's
 /// documents folder. Injected so tests can use a temp directory.
@@ -51,7 +98,16 @@ typedef LocalPathAllocator = Future<String> Function(
 /// A file that fails to transfer is left for the next sync; it never blocks
 /// metadata. [failures] counts what was skipped in the last pass.
 class FileSync {
-  FileSync(this._db, this._remote, this._allocate);
+  FileSync(
+    this._db,
+    this._remote,
+    this._allocate, {
+    this.maxUploadBytes = defaultMaxUploadBytes,
+  });
+
+  /// Bigger files stay on this device only: they are skipped, not retried
+  /// as failures, and don't count as pending changes.
+  final int maxUploadBytes;
 
   final AppDatabase _db;
   final FileRemote _remote;
@@ -59,9 +115,18 @@ class FileSync {
 
   int failures = 0;
 
+  /// Files over [maxUploadBytes] seen in the last upload pass.
+  int tooLarge = 0;
+
+  bool _uploadable(String path) {
+    final file = File(path);
+    return file.existsSync() && file.lengthSync() <= maxUploadBytes;
+  }
+
   /// Uploads local files that have no `storage_key` yet and records the key
   /// (an ordinary write, so it is pushed with the rest of the metadata).
   Future<void> upload(String userId) async {
+    tooLarge = 0;
     final papers = await (_db.select(
       _db.papers,
     )..where((t) => t.pdfPath.isNotNull() & t.storageKey.isNull())).get();
@@ -69,6 +134,10 @@ class FileSync {
       await _guard(() async {
         final file = File(paper.pdfPath!);
         if (!file.existsSync()) return;
+        if (!_uploadable(file.path)) {
+          tooLarge++;
+          return;
+        }
         final key = '$userId/papers/${paper.id}.pdf';
         await _remote.upload(key, file);
         await (_db.update(_db.papers)..where((t) => t.id.equals(paper.id)))
@@ -83,6 +152,10 @@ class FileSync {
       await _guard(() async {
         final file = File(attachment.path!);
         if (!file.existsSync()) return;
+        if (!_uploadable(file.path)) {
+          tooLarge++;
+          return;
+        }
         final key =
             '$userId/attachments/${attachment.id}${p.extension(file.path)}';
         await _remote.upload(key, file);
@@ -134,12 +207,52 @@ class FileSync {
     final papers = await (_db.select(
       _db.papers,
     )..where((t) => t.pdfPath.isNotNull() & t.storageKey.isNull())).get();
-    count += papers.where((t) => File(t.pdfPath!).existsSync()).length;
+    count += papers.where((t) => _uploadable(t.pdfPath!)).length;
     final attachments = await (_db.select(
       _db.attachments,
     )..where((t) => t.path.isNotNull() & t.storageKey.isNull())).get();
-    count += attachments.where((t) => File(t.path!).existsSync()).length;
+    count += attachments.where((t) => _uploadable(t.path!)).length;
     return count;
+  }
+
+  /// Deletes cloud objects that no row refers to any more (a paper or
+  /// attachment was deleted; nothing else removes its file). [liveKeys] must
+  /// come from the *server's* rows, not just this device's, so a row this
+  /// device hasn't applied can't make its file look orphaned. Local keys are
+  /// kept too (unpushed rows), and anything younger than [orphanGrace].
+  /// Returns how many objects were removed. Best effort: failures are
+  /// ignored and retried on a later sync.
+  Future<int> removeOrphans(
+    String userId,
+    Set<String> liveKeys, {
+    DateTime? now,
+  }) async {
+    try {
+      final local = {
+        for (final r
+            in await _db
+                .customSelect(
+                  'SELECT storage_key AS k FROM papers WHERE storage_key IS NOT NULL '
+                  'UNION SELECT storage_key FROM attachments '
+                  'WHERE storage_key IS NOT NULL',
+                )
+                .get())
+          r.read<String>('k'),
+      };
+      final cutoff = (now ?? DateTime.now()).subtract(orphanGrace);
+      final orphans = <String>[
+        for (final folder in const ['papers', 'attachments'])
+          for (final o in await _remote.list('$userId/$folder'))
+            if (o.createdAt.isBefore(cutoff) &&
+                !liveKeys.contains(o.key) &&
+                !local.contains(o.key))
+              o.key,
+      ];
+      await _remote.remove(orphans);
+      return orphans.length;
+    } catch (_) {
+      return 0;
+    }
   }
 
   bool _present(String? path) => path != null && File(path).existsSync();

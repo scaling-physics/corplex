@@ -6,13 +6,20 @@ import 'package:path/path.dart' as p;
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
+import 'package:corplex/data/trash.dart';
+import 'package:corplex/features/sync/sync_remote.dart';
 import 'package:corplex/features/sync/file_sync.dart';
 import 'package:corplex/features/sync/sync_engine.dart';
 
 import '../../support/fake_sync_remote.dart';
 
 class _Device {
-  _Device(this.name, FakeSyncRemote server, FakeFileRemote files) {
+  _Device(
+    this.name,
+    FakeSyncRemote server,
+    FakeFileRemote files, {
+    int? maxUploadBytes,
+  }) {
     dir = Directory.systemTemp.createTempSync('corplex_$name');
     db = AppDatabase.inMemoryForTesting();
     engine = SyncEngine(
@@ -22,7 +29,7 @@ class _Device {
         final d = Directory(p.join(dir.path, subfolder))
           ..createSync(recursive: true);
         return p.join(d.path, fileName);
-      }),
+      }, maxUploadBytes: maxUploadBytes ?? defaultMaxUploadBytes),
     );
   }
 
@@ -266,5 +273,120 @@ void main() {
     await (a.db.delete(a.db.notes)..where((n) => n.id.equals('n1'))).go();
 
     expect(await a.engine.pendingChanges(), 1);
+  });
+
+  group('cloud cleanup', () {
+    Future<void> addPaper(String id, File pdf) => a.db
+        .into(a.db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: Value(id),
+            title: id,
+            pdfPath: Value(pdf.path),
+          ),
+        );
+
+    // Row stamps have one-second resolution and the key write bumps
+    // `updated_at` a second ahead, so a delete in the same second would
+    // (correctly) lose to it. Real deletes are never that quick.
+    Future<void> later() =>
+        Future<void>.delayed(const Duration(milliseconds: 2100));
+
+    void age(String key) =>
+        files.created[key] = DateTime.now().subtract(const Duration(days: 3));
+
+    test('the file of a deleted paper is removed from storage', () async {
+      await addPaper('p1', a.writeFile('1.pdf', [1]));
+      await addPaper('p2', a.writeFile('2.pdf', [2]));
+      await a.sync();
+      expect(files.objects.keys, hasLength(2));
+      age('u1/papers/p1.pdf');
+      age('u1/papers/p2.pdf');
+
+      await later();
+      await (a.db.delete(a.db.papers)..where((t) => t.id.equals('p1'))).go();
+      await a.sync();
+
+      expect(files.objects.keys, ['u1/papers/p2.pdf']);
+    });
+
+    test(
+      'a fresh object is left alone (another device may be mid-upload)',
+      () async {
+        files.objects['u1/papers/other.pdf'] = Uint8List.fromList([1]);
+        files.created['u1/papers/other.pdf'] = DateTime.now();
+        await a.sync();
+        expect(files.objects.keys, contains('u1/papers/other.pdf'));
+      },
+    );
+
+    test('an object a server row still names is kept', () async {
+      await addPaper('p1', a.writeFile('1.pdf', [1]));
+      await a.sync();
+      age('u1/papers/p1.pdf');
+      // This device never applied the row (e.g. its parent is missing).
+      await b.sync();
+      expect(files.objects.keys, contains('u1/papers/p1.pdf'));
+    });
+
+    test('nothing is removed while the server is missing a table', () async {
+      files.objects['u1/papers/x.pdf'] = Uint8List.fromList([1]);
+      age('u1/papers/x.pdf');
+      server.missingTables.add('projects');
+      await expectLater(a.sync(), throwsA(isA<SyncServerOutdated>()));
+      expect(files.objects.keys, contains('u1/papers/x.pdf'));
+    });
+
+    test('restoring a trashed paper uploads its file again', () async {
+      await addPaper('p1', a.writeFile('1.pdf', [1]));
+      await a.sync();
+      age('u1/papers/p1.pdf');
+      await later();
+      final trashId = await trashPaper(a.db, 'p1');
+      await a.sync(); // deletes the row, then cleanup removes the object
+      expect(files.objects, isEmpty);
+
+      await restoreFromTrash(a.db, trashId);
+      await a.sync();
+      await b.sync();
+
+      expect(files.objects.keys, ['u1/papers/p1.pdf']);
+      final paper = await b.db.select(b.db.papers).getSingle();
+      expect(File(paper.pdfPath!).readAsBytesSync(), [1]);
+    });
+  });
+
+  group('size limit', () {
+    test(
+      'a file over the limit stays local without failing the sync',
+      () async {
+        final small = _Device('small', server, files, maxUploadBytes: 3);
+        addTearDown(small.dispose);
+        final big = small.writeFile('big.pdf', [1, 2, 3, 4]);
+        final ok = small.writeFile('ok.pdf', [1, 2]);
+        for (final (id, f) in [('big', big), ('ok', ok)]) {
+          await small.db
+              .into(small.db.papers)
+              .insert(
+                PapersCompanion.insert(
+                  id: Value(id),
+                  title: id,
+                  pdfPath: Value(f.path),
+                ),
+              );
+        }
+        // Two unpushed rows plus the one file that can go up.
+        expect(await small.engine.pendingChanges(), 3);
+
+        await small.sync(); // must not throw
+
+        expect(files.objects.keys, ['u1/papers/ok.pdf']);
+        final row = await (small.db.select(
+          small.db.papers,
+        )..where((t) => t.id.equals('big'))).getSingle();
+        expect(row.storageKey, isNull);
+        expect(await small.engine.pendingChanges(), 0);
+      },
+    );
   });
 }

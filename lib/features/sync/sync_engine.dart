@@ -63,6 +63,10 @@ class SyncEngine {
     await _push();
     await _pull(meta.cursors);
     await files?.download();
+    // Only with a complete picture of the server: nothing skipped.
+    if (files != null && _skipped.isEmpty && files.failures == 0) {
+      await files.removeOrphans(userId, await _remote.liveStorageKeys());
+    }
     // Tables the server doesn't have (yet) were skipped, not fatal: their
     // changes stay queued here and everything else synced. Say so.
     if (_skipped.isNotEmpty) throw const SyncServerOutdated();

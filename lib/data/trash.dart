@@ -84,6 +84,13 @@ Future<void> restoreFromTrash(AppDatabase db, String trashId) => db.transaction(
   List<Map<String, dynamic>> list(String key) =>
       [for (final r in (payload[key] as List? ?? const [])) (r as Map).cast<String, dynamic>()];
 
+  // Deleting the row let cloud cleanup remove its file. If the file is still
+  // on this device, forget the cloud copy so the restore uploads it again.
+  Map<String, dynamic> reupload(Map<String, dynamic> json, String pathKey) {
+    final path = json[pathKey] as String?;
+    return path != null && File(path).existsSync() ? {...json, 'storageKey': null} : json;
+  }
+
   Future<bool> exists(String table, String column, Object? value) async =>
       (await db.customSelect('SELECT 1 FROM $table WHERE $column = ?', variables: [Variable(value)]).get()).isNotEmpty;
 
@@ -98,7 +105,7 @@ Future<void> restoreFromTrash(AppDatabase db, String trashId) => db.transaction(
     await db.into(db.notes).insertOnConflictUpdate(note);
     for (final a in list('attachments')) {
       await db.into(db.attachments).insertOnConflictUpdate(
-        Attachment.fromJson({...a, 'updatedAt': now.millisecondsSinceEpoch}),
+        Attachment.fromJson({...reupload(a, 'path'), 'updatedAt': now.millisecondsSinceEpoch}),
       );
     }
     for (final r in list('tags')) {
@@ -124,13 +131,13 @@ Future<void> restoreFromTrash(AppDatabase db, String trashId) => db.transaction(
     }
   } else {
     final paper = Paper.fromJson({
-      ...(payload['paper'] as Map).cast<String, dynamic>(),
+      ...reupload((payload['paper'] as Map).cast<String, dynamic>(), 'pdfPath'),
       'updatedAt': now.millisecondsSinceEpoch,
     });
     await db.into(db.papers).insertOnConflictUpdate(paper);
     for (final a in list('attachments')) {
       await db.into(db.attachments).insertOnConflictUpdate(
-        Attachment.fromJson({...a, 'updatedAt': now.millisecondsSinceEpoch}),
+        Attachment.fromJson({...reupload(a, 'path'), 'updatedAt': now.millisecondsSinceEpoch}),
       );
     }
     for (final h in list('highlights')) {

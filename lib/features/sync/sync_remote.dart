@@ -36,6 +36,10 @@ abstract class SyncRemote {
     String table, {
     String? sinceIso,
   });
+
+  /// Every storage key referenced by a live (not deleted) paper or
+  /// attachment row on the server.
+  Future<Set<String>> liveStorageKeys();
 }
 
 class SupabaseSyncRemote implements SyncRemote {
@@ -103,5 +107,26 @@ class SupabaseSyncRemote implements SyncRemote {
       result.addAll(page.cast<Map<String, Object?>>());
       if (page.length < _pageSize) return result;
     }
+  }
+
+  @override
+  Future<Set<String>> liveStorageKeys() async {
+    final keys = <String>{};
+    for (final table in const ['papers', 'attachments']) {
+      for (var offset = 0; ; offset += _pageSize) {
+        final page = await _guard(
+          () => _client
+              .from(table)
+              .select('storage_key')
+              .not('storage_key', 'is', null)
+              .filter('deleted_at', 'is', null)
+              .order(syncTables.firstWhere((t) => t.name == table).keys.first)
+              .range(offset, offset + _pageSize - 1),
+        );
+        keys.addAll(page.map((r) => r['storage_key']! as String));
+        if (page.length < _pageSize) break;
+      }
+    }
+    return keys;
   }
 }

@@ -6,10 +6,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:corplex/app.dart';
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
+import 'package:corplex/data/tables/attachments_table.dart';
+import 'package:corplex/features/audio/audio_playback.dart';
 
-Widget _appWithDb(AppDatabase db) {
+import 'support/fake_audio_engine.dart';
+
+Widget _appWithDb(AppDatabase db, {FakeAudioEngine? audio}) {
   return ProviderScope(
-    overrides: [databaseProvider.overrideWithValue(db)],
+    overrides: [
+      databaseProvider.overrideWithValue(db),
+      audioEngineProvider.overrideWithValue(audio ?? FakeAudioEngine()),
+    ],
     child: const CorplexApp(),
   );
 }
@@ -129,5 +136,59 @@ void main() {
     );
 
     expect((await db.select(db.notes).getSingle()).title, 'Quick thought');
+  });
+
+  testWidgets('listening to audio and marking timestamps in a note', (
+    tester,
+  ) async {
+    final audio = FakeAudioEngine();
+    await db.into(db.notes).insert(
+      NotesCompanion.insert(
+        id: const Value('n1'),
+        title: const Value('Lecture notes'),
+      ),
+    );
+    await db.into(db.attachments).insert(
+      AttachmentsCompanion.insert(
+        id: const Value('rec1'),
+        noteId: const Value('n1'),
+        type: AttachmentType.podcast,
+        path: const Value('/device/overview.m4a'),
+        title: const Value('Audio overview'),
+      ),
+    );
+    await tester.pumpWidget(_appWithDb(db, audio: audio));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lecture notes'));
+    await tester.pumpAndSettle();
+
+    // No player until something is played.
+    expect(find.text('Mark'), findsNothing);
+    await tester.tap(find.text('Audio overview'));
+    await tester.pumpAndSettle();
+    expect(audio.loads.single.path, '/device/overview.m4a');
+    expect(find.text('Mark'), findsOneWidget);
+
+    // Playback reaches 12:34; mark it.
+    audio.emitPosition(const Duration(minutes: 12, seconds: 34));
+    await tester.pump();
+    await tester.tap(find.text('Mark'));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    final note = await db.select(db.notes).getSingle();
+    expect(note.content, contains('▸ 12:34'));
+    expect(note.content, contains('corplex://audio/rec1?t=754'));
+
+    // Jump elsewhere, then tap the timestamp to come back to it.
+    audio.emitPosition(const Duration(minutes: 20));
+    audio.seeks.clear();
+    await tester.pump();
+    // Tap on the timestamp's own characters (the paragraph is full width).
+    final stamp = find.textContaining('▸ 12:34', findRichText: true);
+    await tester.tapAt(tester.getTopLeft(stamp.first) + const Offset(12, 10));
+    await tester.pumpAndSettle();
+    expect(audio.seeks, [const Duration(minutes: 12, seconds: 34)]);
+
+    await _disposeTree(tester);
   });
 }

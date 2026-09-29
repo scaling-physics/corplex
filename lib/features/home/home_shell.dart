@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
 import '../auth/sign_in_screen.dart';
+import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../sync/sync_service.dart';
 import '../notes/notes_screen.dart';
@@ -73,20 +74,27 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       body: FadeThroughIndexedStack(index: _index, children: _screens),
       floatingActionButton: _PrimaryAction(index: _index),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        animationDuration: AppMotion.medium,
-        onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.edit_note_outlined),
-            selectedIcon: Icon(Icons.edit_note),
-            label: 'Notes',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.library_books_outlined),
-            selectedIcon: Icon(Icons.library_books),
-            label: 'Library',
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Keeps a podcast playing (and controllable) between screens.
+          const AudioPlayerBar(),
+          NavigationBar(
+            selectedIndex: _index,
+            animationDuration: AppMotion.medium,
+            onDestinationSelected: (value) => setState(() => _index = value),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.edit_note_outlined),
+                selectedIcon: Icon(Icons.edit_note),
+                label: 'Notes',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.library_books_outlined),
+                selectedIcon: Icon(Icons.library_books),
+                label: 'Library',
+              ),
+            ],
           ),
         ],
       ),

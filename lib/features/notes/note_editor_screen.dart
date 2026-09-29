@@ -1,14 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show OrderingTerm, Value;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
+import '../audio/audio_link.dart';
+import '../audio/audio_playback.dart';
+import '../audio/audio_player_bar.dart';
+import '../library/add_attachment_sheet.dart';
 import '../library/paper_detail_screen.dart';
 import 'folder_picker_sheet.dart';
 import 'folders_providers.dart';
@@ -96,6 +102,84 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
+  Future<void> _attach(BuildContext context) async {
+    final type = await showAddAttachmentSheet(
+      context,
+      ref,
+      noteId: widget.noteId,
+    );
+    if (type != AttachmentType.podcast || !mounted) return;
+    // Start what was just added, so "Mark" is usable straight away.
+    final latest =
+        await (_db.select(_db.attachments)
+              ..where((a) => a.noteId.equals(widget.noteId))
+              ..orderBy([(a) => OrderingTerm.desc(a.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
+    if (latest != null && audioSourceOf(latest) != null) {
+      await ref.read(audioPlaybackProvider).open(latest);
+    }
+  }
+
+  /// Plays the recording a timestamp points at, from that moment.
+  Future<void> _playFrom(String attachmentId, Duration at) async {
+    final attachment = await (_db.select(
+      _db.attachments,
+    )..where((a) => a.id.equals(attachmentId))).getSingleOrNull();
+    if (!mounted) return;
+    if (attachment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That recording was removed.')),
+      );
+      return;
+    }
+    await ref.read(audioPlaybackProvider).open(attachment, at: at);
+  }
+
+  /// Inserts a tappable "▸ 12:34" at the cursor (or the end of the note if
+  /// it has none), linked to [attachmentId] at [at]. It's plain, unstyled
+  /// text — not bold just because the cursor sat after a bold word — with
+  /// a space either side so it never fuses with neighbouring words.
+  void _insertTimestamp(String attachmentId, Duration at) {
+    final controller = _quillController;
+    final doc = controller.document;
+    final docEnd = doc.length - 1;
+    final cursor = controller.selection.baseOffset;
+    var index = cursor < 0 || cursor > docEnd ? docEnd : cursor;
+
+    // "▸" (not "▶", which Android draws as an emoji).
+    final label = '▸ ${formatTimestamp(at)}';
+    final before = index == 0 ? '\n' : doc.toPlainText()[index - 1];
+    if (before.trim().isNotEmpty) {
+      controller.replaceText(index, 0, ' ', null);
+      index++;
+    }
+    controller.replaceText(index, 0, '$label ', null);
+    for (final inline in <Attribute<Object?>>[
+      Attribute.bold,
+      Attribute.italic,
+      Attribute.underline,
+      Attribute.strikeThrough,
+      Attribute.link,
+    ]) {
+      controller.formatText(
+        index,
+        label.length + 1,
+        Attribute.clone(inline, null),
+      );
+    }
+    // Only the label is the link, so typing on after it doesn't extend it.
+    controller.formatText(
+      index,
+      label.length,
+      LinkAttribute(audioTimestampLink(attachmentId, at)),
+    );
+    controller.updateSelection(
+      TextSelection.collapsed(offset: index + label.length + 1),
+      ChangeSource.local,
+    );
+  }
+
   @override
   void dispose() {
     // Leaving right after typing must not drop the last edit.
@@ -143,6 +227,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             icon: const Icon(Icons.link),
             tooltip: 'Link a paper',
             onPressed: () => showLinkPaperSheet(context, ref, widget.noteId),
+          ),
+          IconButton(
+            icon: const Icon(Icons.attach_file),
+            tooltip: 'Attach audio, image or file',
+            onPressed: () => _attach(context),
           ),
         ],
       ),
@@ -278,13 +367,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             ),
                           );
                         }
-                        return Chip(
-                          avatar: const Icon(Icons.attach_file, size: 16),
-                          label: Text(
-                            a.title ?? a.url ?? 'Attachment',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
+                        return _AttachmentChip(attachment: a);
                       }).toList(),
                     ),
                     const SizedBox(height: 8),
@@ -292,60 +375,120 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 },
                 QuillEditor.basic(
                   controller: _quillController,
-                  config: const QuillEditorConfig(
+                  config: QuillEditorConfig(
                     scrollable: false,
                     padding: EdgeInsets.zero,
                     placeholder: 'Start writing…',
+                    customLinkPrefixes: const [audioLinkScheme],
+                    // Audio timestamps play on a plain tap; other links
+                    // keep Quill's default long-press menu.
+                    customRecognizerBuilder: (attribute, leaf) {
+                      if (attribute.key != Attribute.link.key) return null;
+                      final target = parseAudioTimestampLink(
+                        attribute.value?.toString() ?? '',
+                      );
+                      if (target == null) return null;
+                      return TapGestureRecognizer()
+                        ..onTap = () =>
+                            _playFrom(target.attachmentId, target.at);
+                    },
                   ),
                 ),
               ],
             ),
       bottomNavigationBar: !_loaded
           ? null
-          : Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                border: Border(
-                  top: BorderSide(
-                    color: Theme.of(context).colorScheme.outlineVariant,
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AudioPlayerBar(onMark: _insertTimestamp),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    border: Border(
+                      top: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: QuillSimpleToolbar(
-                    controller: _quillController,
-                    config: const QuillSimpleToolbarConfig(
-                      multiRowsDisplay: false,
-                      showFontFamily: false,
-                      showFontSize: false,
-                      showSmallButton: false,
-                      showLineHeightButton: false,
-                      showInlineCode: false,
-                      showColorButton: false,
-                      showBackgroundColorButton: false,
-                      showClearFormat: false,
-                      showAlignmentButtons: false,
-                      showListCheck: false,
-                      showCodeBlock: false,
-                      showIndent: false,
-                      showLink: false,
-                      showDirection: false,
-                      showSearchButton: false,
-                      showSubscript: false,
-                      showSuperscript: false,
-                      showUndo: false,
-                      showRedo: false,
-                      showDividers: false,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: QuillSimpleToolbar(
+                        controller: _quillController,
+                        config: const QuillSimpleToolbarConfig(
+                          multiRowsDisplay: false,
+                          showFontFamily: false,
+                          showFontSize: false,
+                          showSmallButton: false,
+                          showLineHeightButton: false,
+                          showInlineCode: false,
+                          showColorButton: false,
+                          showBackgroundColorButton: false,
+                          showClearFormat: false,
+                          showAlignmentButtons: false,
+                          showListCheck: false,
+                          showCodeBlock: false,
+                          showIndent: false,
+                          showLink: false,
+                          showDirection: false,
+                          showSearchButton: false,
+                          showSubscript: false,
+                          showSuperscript: false,
+                          showUndo: false,
+                          showRedo: false,
+                          showDividers: false,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
+    );
+  }
+}
+
+/// A note's non-image attachment: audio plays in the player bar, a
+/// podcast/web link opens in the browser, anything else just shows.
+class _AttachmentChip extends ConsumerWidget {
+  const _AttachmentChip({required this.attachment});
+
+  final Attachment attachment;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final a = attachment;
+    final title = a.title ?? a.url ?? 'Attachment';
+    if (isAudioAttachment(a)) {
+      final playback = ref.watch(audioPlaybackProvider);
+      final isCurrent = playback.current?.id == a.id;
+      return ActionChip(
+        avatar: Icon(
+          isCurrent && playback.playing ? Icons.graphic_eq : Icons.play_arrow,
+          size: 18,
+        ),
+        label: Text(title, overflow: TextOverflow.ellipsis),
+        onPressed: () => playback.open(a),
+      );
+    }
+    if (a.url case final url?) {
+      return ActionChip(
+        avatar: Icon(
+          a.type == AttachmentType.podcast ? Icons.podcasts : Icons.link,
+          size: 18,
+        ),
+        label: Text(title, overflow: TextOverflow.ellipsis),
+        onPressed: () =>
+            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      );
+    }
+    return Chip(
+      avatar: const Icon(Icons.attach_file, size: 16),
+      label: Text(title, overflow: TextOverflow.ellipsis),
     );
   }
 }

@@ -4,11 +4,15 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
 import '../notes/note_editor_screen.dart';
+import '../audio/audio_link.dart';
+import '../audio/audio_playback.dart';
+import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
 import 'citation_formatter.dart';
 import 'papers_providers.dart';
@@ -86,6 +90,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(),
+      bottomNavigationBar: const SafeArea(child: AudioPlayerBar()),
       body: !_loaded
           ? const SizedBox.shrink()
           : ListView(
@@ -125,8 +130,11 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                   trailing: TextButton.icon(
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Add'),
-                    onPressed: () =>
-                        showAddAttachmentSheet(context, ref, widget.paperId),
+                    onPressed: () => showAddAttachmentSheet(
+                      context,
+                      ref,
+                      paperId: widget.paperId,
+                    ),
                   ),
                   child: attachmentsAsync.when(
                     loading: () => const SizedBox(height: 56),
@@ -313,12 +321,13 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _AttachmentTile extends StatelessWidget {
+class _AttachmentTile extends ConsumerWidget {
   const _AttachmentTile({required this.attachment});
 
   final Attachment attachment;
 
   IconData get _icon {
+    if (isAudioAttachment(attachment)) return Icons.headphones_outlined;
     switch (attachment.type) {
       case AttachmentType.podcast:
         return Icons.podcasts;
@@ -334,14 +343,35 @@ class _AttachmentTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final a = attachment;
+    final audio = isAudioAttachment(a);
+    final url = a.url;
+    final playback = audio ? ref.watch(audioPlaybackProvider) : null;
+    final playingThis =
+        playback != null && playback.current?.id == a.id && playback.playing;
+
     return ListTile(
-      leading: Icon(_icon, color: Theme.of(context).colorScheme.primary),
+      leading: Icon(
+        playingThis ? Icons.graphic_eq : _icon,
+        color: Theme.of(context).colorScheme.primary,
+      ),
       title: Text(
-        attachment.title ?? attachment.url ?? attachment.path ?? 'Attachment',
+        a.title ?? a.url ?? a.path ?? 'Attachment',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
+      trailing: audio
+          ? const Icon(Icons.play_arrow)
+          : url != null
+          ? const Icon(Icons.open_in_new, size: 20)
+          : null,
+      onTap: audio
+          ? () => playback!.open(a)
+          : url != null
+          ? () =>
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)
+          : null,
     );
   }
 }

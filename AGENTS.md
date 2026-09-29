@@ -349,6 +349,34 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     `sync_*` tables/triggers. `test/data/v4_schema.dart` is the real v4
     schema, used to test the v4→v5 migration.
 
+- **Audio & NotebookLM**: there is no public NotebookLM API for consumer
+  accounts (only a Pre-GA Enterprise API on Google Cloud; unofficial
+  libraries drive a logged-in browser session and must not ship), so the
+  "connector" works with what NotebookLM allows: download the audio
+  overview, then attach it (`Audio` in the attach sheet, available on
+  notes *and* papers — `showAddAttachmentSheet(noteId:/paperId:)`,
+  UI-free `insertAttachment`). Audio is an `AttachmentType.podcast` row
+  with a local `path` (so it syncs via file sync); a podcast row with only
+  a `url` streams if it's a direct audio file, otherwise (e.g. a
+  NotebookLM share page) opens in the browser. `audio_link.dart` decides
+  playability (`audioSourceOf`). Playback is one app-wide
+  `AudioPlayback` (`audio_playback.dart`, behind an `AudioEngine`
+  interface so tests use `FakeAudioEngine` instead of just_audio's
+  plugin; widget tests must override `audioEngineProvider`).
+  `AudioPlayerBar` shows on home, paper and note screens; in a note its
+  **Mark** button inserts `▸ 12:34` linked to
+  `corplex://audio/<attachmentId>?t=<seconds>` — plain Quill links, so
+  they sync/copy/export untouched. The note editor's
+  `customRecognizerBuilder` makes those links play on a single tap (Quill
+  otherwise only opens links on long-press while editing). Gotchas: use
+  `▸` not `▶` (Android renders ▶ as an emoji); just_audio's `playing`
+  stays true after a track completes, so `JustAudioEngine` derives it
+  from `playerStateStream`; its `play()` future only completes when
+  playback stops, so don't await it. Not built yet: background/lock-screen
+  playback controls (`just_audio_background`), share-sheet import.
+- **Android manifest**: `INTERNET` is declared in the *main* manifest.
+  Debug/profile manifests add it implicitly, so leaving it out breaks
+  sync and streaming only in release builds.
 - **Rich text**: notes use `flutter_quill` instead of a plain `TextField`.
   `lib/features/notes/note_content.dart` is the single place that
   encodes/decodes a note's `content` column: it's Quill Delta JSON now,

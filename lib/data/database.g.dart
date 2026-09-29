@@ -816,6 +816,26 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   ).withConverter<ReadingStatus?>($PapersTable.$converterreadingStatusn);
+  static const VerificationMeta _citekeyMeta = const VerificationMeta(
+    'citekey',
+  );
+  @override
+  late final GeneratedColumn<String> citekey = GeneratedColumn<String>(
+    'citekey',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ratingMeta = const VerificationMeta('rating');
+  @override
+  late final GeneratedColumn<int> rating = GeneratedColumn<int>(
+    'rating',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -852,6 +872,8 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     storageKey,
     lastPage,
     readingStatus,
+    citekey,
+    rating,
     createdAt,
     updatedAt,
   ];
@@ -920,6 +942,18 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         lastPage.isAcceptableOrUnknown(data['last_page']!, _lastPageMeta),
       );
     }
+    if (data.containsKey('citekey')) {
+      context.handle(
+        _citekeyMeta,
+        citekey.isAcceptableOrUnknown(data['citekey']!, _citekeyMeta),
+      );
+    }
+    if (data.containsKey('rating')) {
+      context.handle(
+        _ratingMeta,
+        rating.isAcceptableOrUnknown(data['rating']!, _ratingMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -983,6 +1017,14 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
           data['${effectivePrefix}reading_status'],
         ),
       ),
+      citekey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}citekey'],
+      ),
+      rating: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rating'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1030,6 +1072,14 @@ class Paper extends DataClass implements Insertable<Paper> {
   /// Where the paper is in the reader's queue (see [ReadingStatus]); null
   /// means not yet triaged.
   final ReadingStatus? readingStatus;
+
+  /// Stable key for inline `[@citekey]` citations, assigned the first time
+  /// the paper is cited and never changed after (so old notes keep
+  /// resolving even if the metadata is later edited).
+  final String? citekey;
+
+  /// The reader's own rating/priority, 1–5 stars; null means unrated.
+  final int? rating;
   final DateTime createdAt;
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
@@ -1045,6 +1095,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     this.storageKey,
     this.lastPage,
     this.readingStatus,
+    this.citekey,
+    this.rating,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1077,6 +1129,12 @@ class Paper extends DataClass implements Insertable<Paper> {
         $PapersTable.$converterreadingStatusn.toSql(readingStatus),
       );
     }
+    if (!nullToAbsent || citekey != null) {
+      map['citekey'] = Variable<String>(citekey);
+    }
+    if (!nullToAbsent || rating != null) {
+      map['rating'] = Variable<int>(rating);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1104,6 +1162,12 @@ class Paper extends DataClass implements Insertable<Paper> {
       readingStatus: readingStatus == null && nullToAbsent
           ? const Value.absent()
           : Value(readingStatus),
+      citekey: citekey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(citekey),
+      rating: rating == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rating),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1127,6 +1191,8 @@ class Paper extends DataClass implements Insertable<Paper> {
       readingStatus: $PapersTable.$converterreadingStatusn.fromJson(
         serializer.fromJson<String?>(json['readingStatus']),
       ),
+      citekey: serializer.fromJson<String?>(json['citekey']),
+      rating: serializer.fromJson<int?>(json['rating']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1147,6 +1213,8 @@ class Paper extends DataClass implements Insertable<Paper> {
       'readingStatus': serializer.toJson<String?>(
         $PapersTable.$converterreadingStatusn.toJson(readingStatus),
       ),
+      'citekey': serializer.toJson<String?>(citekey),
+      'rating': serializer.toJson<int?>(rating),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1163,6 +1231,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     Value<String?> storageKey = const Value.absent(),
     Value<int?> lastPage = const Value.absent(),
     Value<ReadingStatus?> readingStatus = const Value.absent(),
+    Value<String?> citekey = const Value.absent(),
+    Value<int?> rating = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Paper(
@@ -1178,6 +1248,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     readingStatus: readingStatus.present
         ? readingStatus.value
         : this.readingStatus,
+    citekey: citekey.present ? citekey.value : this.citekey,
+    rating: rating.present ? rating.value : this.rating,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1197,6 +1269,8 @@ class Paper extends DataClass implements Insertable<Paper> {
       readingStatus: data.readingStatus.present
           ? data.readingStatus.value
           : this.readingStatus,
+      citekey: data.citekey.present ? data.citekey.value : this.citekey,
+      rating: data.rating.present ? data.rating.value : this.rating,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1215,6 +1289,8 @@ class Paper extends DataClass implements Insertable<Paper> {
           ..write('storageKey: $storageKey, ')
           ..write('lastPage: $lastPage, ')
           ..write('readingStatus: $readingStatus, ')
+          ..write('citekey: $citekey, ')
+          ..write('rating: $rating, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1233,6 +1309,8 @@ class Paper extends DataClass implements Insertable<Paper> {
     storageKey,
     lastPage,
     readingStatus,
+    citekey,
+    rating,
     createdAt,
     updatedAt,
   );
@@ -1250,6 +1328,8 @@ class Paper extends DataClass implements Insertable<Paper> {
           other.storageKey == this.storageKey &&
           other.lastPage == this.lastPage &&
           other.readingStatus == this.readingStatus &&
+          other.citekey == this.citekey &&
+          other.rating == this.rating &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1265,6 +1345,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<String?> storageKey;
   final Value<int?> lastPage;
   final Value<ReadingStatus?> readingStatus;
+  final Value<String?> citekey;
+  final Value<int?> rating;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1279,6 +1361,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.storageKey = const Value.absent(),
     this.lastPage = const Value.absent(),
     this.readingStatus = const Value.absent(),
+    this.citekey = const Value.absent(),
+    this.rating = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1294,6 +1378,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.storageKey = const Value.absent(),
     this.lastPage = const Value.absent(),
     this.readingStatus = const Value.absent(),
+    this.citekey = const Value.absent(),
+    this.rating = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1309,6 +1395,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? storageKey,
     Expression<int>? lastPage,
     Expression<String>? readingStatus,
+    Expression<String>? citekey,
+    Expression<int>? rating,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1324,6 +1412,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (storageKey != null) 'storage_key': storageKey,
       if (lastPage != null) 'last_page': lastPage,
       if (readingStatus != null) 'reading_status': readingStatus,
+      if (citekey != null) 'citekey': citekey,
+      if (rating != null) 'rating': rating,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1341,6 +1431,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<String?>? storageKey,
     Value<int?>? lastPage,
     Value<ReadingStatus?>? readingStatus,
+    Value<String?>? citekey,
+    Value<int?>? rating,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1356,6 +1448,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       storageKey: storageKey ?? this.storageKey,
       lastPage: lastPage ?? this.lastPage,
       readingStatus: readingStatus ?? this.readingStatus,
+      citekey: citekey ?? this.citekey,
+      rating: rating ?? this.rating,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1397,6 +1491,12 @@ class PapersCompanion extends UpdateCompanion<Paper> {
         $PapersTable.$converterreadingStatusn.toSql(readingStatus.value),
       );
     }
+    if (citekey.present) {
+      map['citekey'] = Variable<String>(citekey.value);
+    }
+    if (rating.present) {
+      map['rating'] = Variable<int>(rating.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1422,6 +1522,8 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('storageKey: $storageKey, ')
           ..write('lastPage: $lastPage, ')
           ..write('readingStatus: $readingStatus, ')
+          ..write('citekey: $citekey, ')
+          ..write('rating: $rating, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -4768,6 +4870,726 @@ class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
   }
 }
 
+class $MatrixColumnsTable extends MatrixColumns
+    with TableInfo<$MatrixColumnsTable, MatrixColumn> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MatrixColumnsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES projects (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    name,
+    position,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'matrix_columns';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MatrixColumn> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MatrixColumn map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MatrixColumn(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MatrixColumnsTable createAlias(String alias) {
+    return $MatrixColumnsTable(attachedDatabase, alias);
+  }
+}
+
+class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
+  final String id;
+  final String projectId;
+  final String name;
+
+  /// Left-to-right order.
+  final int position;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const MatrixColumn({
+    required this.id,
+    required this.projectId,
+    required this.name,
+    required this.position,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['project_id'] = Variable<String>(projectId);
+    map['name'] = Variable<String>(name);
+    map['position'] = Variable<int>(position);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MatrixColumnsCompanion toCompanion(bool nullToAbsent) {
+    return MatrixColumnsCompanion(
+      id: Value(id),
+      projectId: Value(projectId),
+      name: Value(name),
+      position: Value(position),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MatrixColumn.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MatrixColumn(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String>(json['projectId']),
+      name: serializer.fromJson<String>(json['name']),
+      position: serializer.fromJson<int>(json['position']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String>(projectId),
+      'name': serializer.toJson<String>(name),
+      'position': serializer.toJson<int>(position),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MatrixColumn copyWith({
+    String? id,
+    String? projectId,
+    String? name,
+    int? position,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => MatrixColumn(
+    id: id ?? this.id,
+    projectId: projectId ?? this.projectId,
+    name: name ?? this.name,
+    position: position ?? this.position,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MatrixColumn copyWithCompanion(MatrixColumnsCompanion data) {
+    return MatrixColumn(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      name: data.name.present ? data.name.value : this.name,
+      position: data.position.present ? data.position.value : this.position,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MatrixColumn(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('name: $name, ')
+          ..write('position: $position, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, projectId, name, position, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MatrixColumn &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.name == this.name &&
+          other.position == this.position &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
+  final Value<String> id;
+  final Value<String> projectId;
+  final Value<String> name;
+  final Value<int> position;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const MatrixColumnsCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.position = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MatrixColumnsCompanion.insert({
+    this.id = const Value.absent(),
+    required String projectId,
+    required String name,
+    this.position = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : projectId = Value(projectId),
+       name = Value(name);
+  static Insertable<MatrixColumn> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? name,
+    Expression<int>? position,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (name != null) 'name': name,
+      if (position != null) 'position': position,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MatrixColumnsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? projectId,
+    Value<String>? name,
+    Value<int>? position,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return MatrixColumnsCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      name: name ?? this.name,
+      position: position ?? this.position,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MatrixColumnsCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('name: $name, ')
+          ..write('position: $position, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MatrixCellsTable extends MatrixCells
+    with TableInfo<$MatrixCellsTable, MatrixCell> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MatrixCellsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _columnIdMeta = const VerificationMeta(
+    'columnId',
+  );
+  @override
+  late final GeneratedColumn<String> columnId = GeneratedColumn<String>(
+    'column_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES matrix_columns (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _paperIdMeta = const VerificationMeta(
+    'paperId',
+  );
+  @override
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
+    'paper_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES papers (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _text_Meta = const VerificationMeta('text_');
+  @override
+  late final GeneratedColumn<String> text_ = GeneratedColumn<String>(
+    'text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [columnId, paperId, text_, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'matrix_cells';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MatrixCell> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('column_id')) {
+      context.handle(
+        _columnIdMeta,
+        columnId.isAcceptableOrUnknown(data['column_id']!, _columnIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_columnIdMeta);
+    }
+    if (data.containsKey('paper_id')) {
+      context.handle(
+        _paperIdMeta,
+        paperId.isAcceptableOrUnknown(data['paper_id']!, _paperIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paperIdMeta);
+    }
+    if (data.containsKey('text')) {
+      context.handle(
+        _text_Meta,
+        text_.isAcceptableOrUnknown(data['text']!, _text_Meta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {columnId, paperId};
+  @override
+  MatrixCell map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MatrixCell(
+      columnId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}column_id'],
+      )!,
+      paperId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paper_id'],
+      )!,
+      text_: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}text'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MatrixCellsTable createAlias(String alias) {
+    return $MatrixCellsTable(attachedDatabase, alias);
+  }
+}
+
+class MatrixCell extends DataClass implements Insertable<MatrixCell> {
+  final String columnId;
+  final String paperId;
+  final String text_;
+  final DateTime updatedAt;
+  const MatrixCell({
+    required this.columnId,
+    required this.paperId,
+    required this.text_,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['column_id'] = Variable<String>(columnId);
+    map['paper_id'] = Variable<String>(paperId);
+    map['text'] = Variable<String>(text_);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MatrixCellsCompanion toCompanion(bool nullToAbsent) {
+    return MatrixCellsCompanion(
+      columnId: Value(columnId),
+      paperId: Value(paperId),
+      text_: Value(text_),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MatrixCell.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MatrixCell(
+      columnId: serializer.fromJson<String>(json['columnId']),
+      paperId: serializer.fromJson<String>(json['paperId']),
+      text_: serializer.fromJson<String>(json['text_']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'columnId': serializer.toJson<String>(columnId),
+      'paperId': serializer.toJson<String>(paperId),
+      'text_': serializer.toJson<String>(text_),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MatrixCell copyWith({
+    String? columnId,
+    String? paperId,
+    String? text_,
+    DateTime? updatedAt,
+  }) => MatrixCell(
+    columnId: columnId ?? this.columnId,
+    paperId: paperId ?? this.paperId,
+    text_: text_ ?? this.text_,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MatrixCell copyWithCompanion(MatrixCellsCompanion data) {
+    return MatrixCell(
+      columnId: data.columnId.present ? data.columnId.value : this.columnId,
+      paperId: data.paperId.present ? data.paperId.value : this.paperId,
+      text_: data.text_.present ? data.text_.value : this.text_,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MatrixCell(')
+          ..write('columnId: $columnId, ')
+          ..write('paperId: $paperId, ')
+          ..write('text_: $text_, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(columnId, paperId, text_, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MatrixCell &&
+          other.columnId == this.columnId &&
+          other.paperId == this.paperId &&
+          other.text_ == this.text_ &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MatrixCellsCompanion extends UpdateCompanion<MatrixCell> {
+  final Value<String> columnId;
+  final Value<String> paperId;
+  final Value<String> text_;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const MatrixCellsCompanion({
+    this.columnId = const Value.absent(),
+    this.paperId = const Value.absent(),
+    this.text_ = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MatrixCellsCompanion.insert({
+    required String columnId,
+    required String paperId,
+    this.text_ = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : columnId = Value(columnId),
+       paperId = Value(paperId);
+  static Insertable<MatrixCell> custom({
+    Expression<String>? columnId,
+    Expression<String>? paperId,
+    Expression<String>? text_,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (columnId != null) 'column_id': columnId,
+      if (paperId != null) 'paper_id': paperId,
+      if (text_ != null) 'text': text_,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MatrixCellsCompanion copyWith({
+    Value<String>? columnId,
+    Value<String>? paperId,
+    Value<String>? text_,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return MatrixCellsCompanion(
+      columnId: columnId ?? this.columnId,
+      paperId: paperId ?? this.paperId,
+      text_: text_ ?? this.text_,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (columnId.present) {
+      map['column_id'] = Variable<String>(columnId.value);
+    }
+    if (paperId.present) {
+      map['paper_id'] = Variable<String>(paperId.value);
+    }
+    if (text_.present) {
+      map['text'] = Variable<String>(text_.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MatrixCellsCompanion(')
+          ..write('columnId: $columnId, ')
+          ..write('paperId: $paperId, ')
+          ..write('text_: $text_, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TrashItemsTable extends TrashItems
     with TableInfo<$TrashItemsTable, TrashItem> {
   @override
@@ -5195,6 +6017,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ProjectsTable projects = $ProjectsTable(this);
   late final $ProjectPapersTable projectPapers = $ProjectPapersTable(this);
   late final $ProjectNotesTable projectNotes = $ProjectNotesTable(this);
+  late final $MatrixColumnsTable matrixColumns = $MatrixColumnsTable(this);
+  late final $MatrixCellsTable matrixCells = $MatrixCellsTable(this);
   late final $TrashItemsTable trashItems = $TrashItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -5213,6 +6037,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     projects,
     projectPapers,
     projectNotes,
+    matrixColumns,
+    matrixCells,
     trashItems,
   ];
   @override
@@ -5307,6 +6133,27 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('project_notes', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'projects',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('matrix_columns', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'matrix_columns',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('matrix_cells', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'papers',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('matrix_cells', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -6305,6 +7152,8 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<String?> storageKey,
   Value<int?> lastPage,
   Value<ReadingStatus?> readingStatus,
+  Value<String?> citekey,
+  Value<int?> rating,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -6320,6 +7169,8 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<String?> storageKey,
   Value<int?> lastPage,
   Value<ReadingStatus?> readingStatus,
+  Value<String?> citekey,
+  Value<int?> rating,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -6418,6 +7269,24 @@ final class $$PapersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$MatrixCellsTable, List<MatrixCell>>
+  _matrixCellsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.matrixCells,
+    aliasName: 'papers__id__matrix_cells__paper_id',
+  );
+
+  $$MatrixCellsTableProcessedTableManager get matrixCellsRefs {
+    final manager = $$MatrixCellsTableTableManager(
+      $_db,
+      $_db.matrixCells,
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_matrixCellsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PapersTableFilterComposer
@@ -6478,6 +7347,16 @@ class $$PapersTableFilterComposer
   get readingStatus => $composableBuilder(
     column: $table.readingStatus,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get citekey => $composableBuilder(
+    column: $table.citekey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
@@ -6614,6 +7493,31 @@ class $$PapersTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> matrixCellsRefs(
+    Expression<bool> Function($$MatrixCellsTableFilterComposer f) f,
+  ) {
+    final $$MatrixCellsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.matrixCells,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixCellsTableFilterComposer(
+            $db: $db,
+            $table: $db.matrixCells,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PapersTableOrderingComposer
@@ -6675,6 +7579,16 @@ class $$PapersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get citekey => $composableBuilder(
+    column: $table.citekey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -6729,6 +7643,12 @@ class $$PapersTableAnnotationComposer
         column: $table.readingStatus,
         builder: (column) => column,
       );
+
+  GeneratedColumn<String> get citekey =>
+      $composableBuilder(column: $table.citekey, builder: (column) => column);
+
+  GeneratedColumn<int> get rating =>
+      $composableBuilder(column: $table.rating, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -6860,6 +7780,31 @@ class $$PapersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> matrixCellsRefs<T extends Object>(
+    Expression<T> Function($$MatrixCellsTableAnnotationComposer a) f,
+  ) {
+    final $$MatrixCellsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.matrixCells,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixCellsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.matrixCells,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PapersTableTableManager
@@ -6881,6 +7826,7 @@ class $$PapersTableTableManager
             bool annotationsRefs,
             bool highlightsRefs,
             bool projectPapersRefs,
+            bool matrixCellsRefs,
           })
         > {
   $$PapersTableTableManager(_$AppDatabase db, $PapersTable table)
@@ -6906,6 +7852,8 @@ class $$PapersTableTableManager
                 Value<String?> storageKey = const Value.absent(),
                 Value<int?> lastPage = const Value.absent(),
                 Value<ReadingStatus?> readingStatus = const Value.absent(),
+                Value<String?> citekey = const Value.absent(),
+                Value<int?> rating = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -6920,6 +7868,8 @@ class $$PapersTableTableManager
                 storageKey: storageKey,
                 lastPage: lastPage,
                 readingStatus: readingStatus,
+                citekey: citekey,
+                rating: rating,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -6936,6 +7886,8 @@ class $$PapersTableTableManager
                 Value<String?> storageKey = const Value.absent(),
                 Value<int?> lastPage = const Value.absent(),
                 Value<ReadingStatus?> readingStatus = const Value.absent(),
+                Value<String?> citekey = const Value.absent(),
+                Value<int?> rating = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -6950,6 +7902,8 @@ class $$PapersTableTableManager
                 storageKey: storageKey,
                 lastPage: lastPage,
                 readingStatus: readingStatus,
+                citekey: citekey,
+                rating: rating,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -6969,6 +7923,7 @@ class $$PapersTableTableManager
                 annotationsRefs = false,
                 highlightsRefs = false,
                 projectPapersRefs = false,
+                matrixCellsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -6978,6 +7933,7 @@ class $$PapersTableTableManager
                     if (annotationsRefs) db.annotations,
                     if (highlightsRefs) db.highlights,
                     if (projectPapersRefs) db.projectPapers,
+                    if (matrixCellsRefs) db.matrixCells,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -7087,6 +8043,27 @@ class $$PapersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (matrixCellsRefs)
+                        await $_getPrefetchedData<
+                          Paper,
+                          $PapersTable,
+                          MatrixCell
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PapersTableReferences
+                              ._matrixCellsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PapersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).matrixCellsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.paperId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7113,6 +8090,7 @@ typedef $$PapersTableProcessedTableManager =
         bool annotationsRefs,
         bool highlightsRefs,
         bool projectPapersRefs,
+        bool matrixCellsRefs,
       })
     >;
 typedef $$AttachmentsTableCreateCompanionBuilder =
@@ -9412,6 +10390,24 @@ final class $$ProjectsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$MatrixColumnsTable, List<MatrixColumn>>
+  _matrixColumnsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.matrixColumns,
+    aliasName: 'projects__id__matrix_columns__project_id',
+  );
+
+  $$MatrixColumnsTableProcessedTableManager get matrixColumnsRefs {
+    final manager = $$MatrixColumnsTableTableManager(
+      $_db,
+      $_db.matrixColumns,
+    ).filter((f) => f.projectId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_matrixColumnsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ProjectsTableFilterComposer
@@ -9484,6 +10480,31 @@ class $$ProjectsTableFilterComposer
           }) => $$ProjectNotesTableFilterComposer(
             $db: $db,
             $table: $db.projectNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> matrixColumnsRefs(
+    Expression<bool> Function($$MatrixColumnsTableFilterComposer f) f,
+  ) {
+    final $$MatrixColumnsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.matrixColumns,
+      getReferencedColumn: (t) => t.projectId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixColumnsTableFilterComposer(
+            $db: $db,
+            $table: $db.matrixColumns,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9594,6 +10615,31 @@ class $$ProjectsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> matrixColumnsRefs<T extends Object>(
+    Expression<T> Function($$MatrixColumnsTableAnnotationComposer a) f,
+  ) {
+    final $$MatrixColumnsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.matrixColumns,
+      getReferencedColumn: (t) => t.projectId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixColumnsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.matrixColumns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ProjectsTableTableManager
@@ -9612,6 +10658,7 @@ class $$ProjectsTableTableManager
           PrefetchHooks Function({
             bool projectPapersRefs,
             bool projectNotesRefs,
+            bool matrixColumnsRefs,
           })
         > {
   $$ProjectsTableTableManager(_$AppDatabase db, $ProjectsTable table)
@@ -9662,12 +10709,17 @@ class $$ProjectsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({projectPapersRefs = false, projectNotesRefs = false}) {
+              ({
+                projectPapersRefs = false,
+                projectNotesRefs = false,
+                matrixColumnsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (projectPapersRefs) db.projectPapers,
                     if (projectNotesRefs) db.projectNotes,
+                    if (matrixColumnsRefs) db.matrixColumns,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -9714,6 +10766,27 @@ class $$ProjectsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (matrixColumnsRefs)
+                        await $_getPrefetchedData<
+                          Project,
+                          $ProjectsTable,
+                          MatrixColumn
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProjectsTableReferences
+                              ._matrixColumnsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProjectsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).matrixColumnsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.projectId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -9734,7 +10807,11 @@ typedef $$ProjectsTableProcessedTableManager =
       $$ProjectsTableUpdateCompanionBuilder,
       (Project, $$ProjectsTableReferences),
       Project,
-      PrefetchHooks Function({bool projectPapersRefs, bool projectNotesRefs})
+      PrefetchHooks Function({
+        bool projectPapersRefs,
+        bool projectNotesRefs,
+        bool matrixColumnsRefs,
+      })
     >;
 typedef $$ProjectPapersTableCreateCompanionBuilder =
     ProjectPapersCompanion Function({
@@ -10462,6 +11539,818 @@ typedef $$ProjectNotesTableProcessedTableManager =
       ProjectNote,
       PrefetchHooks Function({bool projectId, bool noteId})
     >;
+typedef $$MatrixColumnsTableCreateCompanionBuilder =
+    MatrixColumnsCompanion Function({
+      Value<String> id,
+      required String projectId,
+      required String name,
+      Value<int> position,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$MatrixColumnsTableUpdateCompanionBuilder =
+    MatrixColumnsCompanion Function({
+      Value<String> id,
+      Value<String> projectId,
+      Value<String> name,
+      Value<int> position,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$MatrixColumnsTableReferences
+    extends BaseReferences<_$AppDatabase, $MatrixColumnsTable, MatrixColumn> {
+  $$MatrixColumnsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ProjectsTable _projectIdTable(_$AppDatabase db) =>
+      db.projects.createAlias('matrix_columns__project_id__projects__id');
+
+  $$ProjectsTableProcessedTableManager get projectId {
+    final $_column = $_itemColumn<String>('project_id')!;
+
+    final manager = $$ProjectsTableTableManager(
+      $_db,
+      $_db.projects,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_projectIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$MatrixCellsTable, List<MatrixCell>>
+  _matrixCellsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.matrixCells,
+    aliasName: 'matrix_columns__id__matrix_cells__column_id',
+  );
+
+  $$MatrixCellsTableProcessedTableManager get matrixCellsRefs {
+    final manager = $$MatrixCellsTableTableManager(
+      $_db,
+      $_db.matrixCells,
+    ).filter((f) => f.columnId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_matrixCellsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$MatrixColumnsTableFilterComposer
+    extends Composer<_$AppDatabase, $MatrixColumnsTable> {
+  $$MatrixColumnsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ProjectsTableFilterComposer get projectId {
+    final $$ProjectsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableFilterComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> matrixCellsRefs(
+    Expression<bool> Function($$MatrixCellsTableFilterComposer f) f,
+  ) {
+    final $$MatrixCellsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.matrixCells,
+      getReferencedColumn: (t) => t.columnId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixCellsTableFilterComposer(
+            $db: $db,
+            $table: $db.matrixCells,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$MatrixColumnsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MatrixColumnsTable> {
+  $$MatrixColumnsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ProjectsTableOrderingComposer get projectId {
+    final $$ProjectsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableOrderingComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MatrixColumnsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MatrixColumnsTable> {
+  $$MatrixColumnsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$ProjectsTableAnnotationComposer get projectId {
+    final $$ProjectsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> matrixCellsRefs<T extends Object>(
+    Expression<T> Function($$MatrixCellsTableAnnotationComposer a) f,
+  ) {
+    final $$MatrixCellsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.matrixCells,
+      getReferencedColumn: (t) => t.columnId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixCellsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.matrixCells,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$MatrixColumnsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MatrixColumnsTable,
+          MatrixColumn,
+          $$MatrixColumnsTableFilterComposer,
+          $$MatrixColumnsTableOrderingComposer,
+          $$MatrixColumnsTableAnnotationComposer,
+          $$MatrixColumnsTableCreateCompanionBuilder,
+          $$MatrixColumnsTableUpdateCompanionBuilder,
+          (MatrixColumn, $$MatrixColumnsTableReferences),
+          MatrixColumn,
+          PrefetchHooks Function({bool projectId, bool matrixCellsRefs})
+        > {
+  $$MatrixColumnsTableTableManager(_$AppDatabase db, $MatrixColumnsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MatrixColumnsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MatrixColumnsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MatrixColumnsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> projectId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MatrixColumnsCompanion(
+                id: id,
+                projectId: projectId,
+                name: name,
+                position: position,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String projectId,
+                required String name,
+                Value<int> position = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MatrixColumnsCompanion.insert(
+                id: id,
+                projectId: projectId,
+                name: name,
+                position: position,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$MatrixColumnsTable, MatrixColumn>(table),
+                  $$MatrixColumnsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({projectId = false, matrixCellsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (matrixCellsRefs) db.matrixCells,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (projectId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.projectId,
+                            referencedTable: $$MatrixColumnsTableReferences
+                                ._projectIdTable(db),
+                            referencedColumn: $$MatrixColumnsTableReferences
+                                ._projectIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (matrixCellsRefs)
+                        await $_getPrefetchedData<
+                          MatrixColumn,
+                          $MatrixColumnsTable,
+                          MatrixCell
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MatrixColumnsTableReferences
+                              ._matrixCellsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MatrixColumnsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).matrixCellsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.columnId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$MatrixColumnsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MatrixColumnsTable,
+      MatrixColumn,
+      $$MatrixColumnsTableFilterComposer,
+      $$MatrixColumnsTableOrderingComposer,
+      $$MatrixColumnsTableAnnotationComposer,
+      $$MatrixColumnsTableCreateCompanionBuilder,
+      $$MatrixColumnsTableUpdateCompanionBuilder,
+      (MatrixColumn, $$MatrixColumnsTableReferences),
+      MatrixColumn,
+      PrefetchHooks Function({bool projectId, bool matrixCellsRefs})
+    >;
+typedef $$MatrixCellsTableCreateCompanionBuilder =
+    MatrixCellsCompanion Function({
+      required String columnId,
+      required String paperId,
+      Value<String> text_,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$MatrixCellsTableUpdateCompanionBuilder =
+    MatrixCellsCompanion Function({
+      Value<String> columnId,
+      Value<String> paperId,
+      Value<String> text_,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$MatrixCellsTableReferences
+    extends BaseReferences<_$AppDatabase, $MatrixCellsTable, MatrixCell> {
+  $$MatrixCellsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $MatrixColumnsTable _columnIdTable(_$AppDatabase db) => db
+      .matrixColumns
+      .createAlias('matrix_cells__column_id__matrix_columns__id');
+
+  $$MatrixColumnsTableProcessedTableManager get columnId {
+    final $_column = $_itemColumn<String>('column_id')!;
+
+    final manager = $$MatrixColumnsTableTableManager(
+      $_db,
+      $_db.matrixColumns,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_columnIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $PapersTable _paperIdTable(_$AppDatabase db) =>
+      db.papers.createAlias('matrix_cells__paper_id__papers__id');
+
+  $$PapersTableProcessedTableManager get paperId {
+    final $_column = $_itemColumn<String>('paper_id')!;
+
+    final manager = $$PapersTableTableManager(
+      $_db,
+      $_db.papers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_paperIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MatrixCellsTableFilterComposer
+    extends Composer<_$AppDatabase, $MatrixCellsTable> {
+  $$MatrixCellsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get text_ => $composableBuilder(
+    column: $table.text_,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MatrixColumnsTableFilterComposer get columnId {
+    final $$MatrixColumnsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.columnId,
+      referencedTable: $db.matrixColumns,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixColumnsTableFilterComposer(
+            $db: $db,
+            $table: $db.matrixColumns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PapersTableFilterComposer get paperId {
+    final $$PapersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableFilterComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MatrixCellsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MatrixCellsTable> {
+  $$MatrixCellsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get text_ => $composableBuilder(
+    column: $table.text_,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MatrixColumnsTableOrderingComposer get columnId {
+    final $$MatrixColumnsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.columnId,
+      referencedTable: $db.matrixColumns,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixColumnsTableOrderingComposer(
+            $db: $db,
+            $table: $db.matrixColumns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PapersTableOrderingComposer get paperId {
+    final $$PapersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableOrderingComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MatrixCellsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MatrixCellsTable> {
+  $$MatrixCellsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get text_ =>
+      $composableBuilder(column: $table.text_, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$MatrixColumnsTableAnnotationComposer get columnId {
+    final $$MatrixColumnsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.columnId,
+      referencedTable: $db.matrixColumns,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MatrixColumnsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.matrixColumns,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PapersTableAnnotationComposer get paperId {
+    final $$PapersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MatrixCellsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MatrixCellsTable,
+          MatrixCell,
+          $$MatrixCellsTableFilterComposer,
+          $$MatrixCellsTableOrderingComposer,
+          $$MatrixCellsTableAnnotationComposer,
+          $$MatrixCellsTableCreateCompanionBuilder,
+          $$MatrixCellsTableUpdateCompanionBuilder,
+          (MatrixCell, $$MatrixCellsTableReferences),
+          MatrixCell,
+          PrefetchHooks Function({bool columnId, bool paperId})
+        > {
+  $$MatrixCellsTableTableManager(_$AppDatabase db, $MatrixCellsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MatrixCellsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MatrixCellsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MatrixCellsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> columnId = const Value.absent(),
+                Value<String> paperId = const Value.absent(),
+                Value<String> text_ = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MatrixCellsCompanion(
+                columnId: columnId,
+                paperId: paperId,
+                text_: text_,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String columnId,
+                required String paperId,
+                Value<String> text_ = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MatrixCellsCompanion.insert(
+                columnId: columnId,
+                paperId: paperId,
+                text_: text_,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$MatrixCellsTable, MatrixCell>(table),
+                  $$MatrixCellsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({columnId = false, paperId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (columnId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.columnId,
+                        referencedTable: $$MatrixCellsTableReferences
+                            ._columnIdTable(db),
+                        referencedColumn: $$MatrixCellsTableReferences
+                            ._columnIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+                    if (paperId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.paperId,
+                        referencedTable: $$MatrixCellsTableReferences
+                            ._paperIdTable(db),
+                        referencedColumn: $$MatrixCellsTableReferences
+                            ._paperIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MatrixCellsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MatrixCellsTable,
+      MatrixCell,
+      $$MatrixCellsTableFilterComposer,
+      $$MatrixCellsTableOrderingComposer,
+      $$MatrixCellsTableAnnotationComposer,
+      $$MatrixCellsTableCreateCompanionBuilder,
+      $$MatrixCellsTableUpdateCompanionBuilder,
+      (MatrixCell, $$MatrixCellsTableReferences),
+      MatrixCell,
+      PrefetchHooks Function({bool columnId, bool paperId})
+    >;
 typedef $$TrashItemsTableCreateCompanionBuilder = TrashItemsCompanion Function({
   Value<String> id,
   required TrashKind kind,
@@ -10715,6 +12604,10 @@ class $AppDatabaseManager {
       $$ProjectPapersTableTableManager(_db, _db.projectPapers);
   $$ProjectNotesTableTableManager get projectNotes =>
       $$ProjectNotesTableTableManager(_db, _db.projectNotes);
+  $$MatrixColumnsTableTableManager get matrixColumns =>
+      $$MatrixColumnsTableTableManager(_db, _db.matrixColumns);
+  $$MatrixCellsTableTableManager get matrixCells =>
+      $$MatrixCellsTableTableManager(_db, _db.matrixCells);
   $$TrashItemsTableTableManager get trashItems =>
       $$TrashItemsTableTableManager(_db, _db.trashItems);
 }

@@ -28,6 +28,14 @@ class Papers extends Table {
   /// means not yet triaged.
   TextColumn get readingStatus => textEnum<ReadingStatus>().nullable()();
 
+  /// Stable key for inline `[@citekey]` citations, assigned the first time
+  /// the paper is cited and never changed after (so old notes keep
+  /// resolving even if the metadata is later edited).
+  TextColumn get citekey => text().nullable()();
+
+  /// The reader's own rating/priority, 1–5 stars; null means unrated.
+  IntColumn get rating => integer().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).

@@ -64,6 +64,8 @@ const syncTables = [
       'storage_key',
       'last_page',
       'reading_status',
+      'citekey',
+      'rating',
       'created_at',
       'updated_at',
     ],
@@ -97,6 +99,16 @@ const syncTables = [
     'project_notes',
     keys: ['project_id', 'note_id'],
     columns: ['updated_at'],
+  ),
+  SyncTableSpec(
+    'matrix_columns',
+    keys: ['id'],
+    columns: ['project_id', 'name', 'position', 'created_at', 'updated_at'],
+  ),
+  SyncTableSpec(
+    'matrix_cells',
+    keys: ['column_id', 'paper_id'],
+    columns: ['text', 'updated_at'],
   ),
   SyncTableSpec(
     'attachments',

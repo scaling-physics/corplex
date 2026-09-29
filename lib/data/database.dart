@@ -12,6 +12,7 @@ import 'tables/annotations_table.dart';
 import 'tables/attachments_table.dart';
 import 'tables/folders_table.dart';
 import 'tables/highlights_table.dart';
+import 'tables/matrix_table.dart';
 import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
 import 'tables/notes_table.dart';
@@ -36,6 +37,8 @@ part 'database.g.dart';
     Projects,
     ProjectPapers,
     ProjectNotes,
+    MatrixColumns,
+    MatrixCells,
     TrashItems,
   ],
 )
@@ -57,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -153,6 +156,21 @@ class AppDatabase extends _$AppDatabase {
       if (from < 9) {
         // v9: local-only trash (not part of sync).
         if (!await _hasTable('trash_items')) await m.createTable(trashItems);
+      }
+      if (from < 10) {
+        // v10: citekeys and ratings on papers; the synthesis matrix.
+        if (!await _hasColumn('papers', 'citekey')) {
+          await m.addColumn(papers, papers.citekey);
+        }
+        if (!await _hasColumn('papers', 'rating')) {
+          await m.addColumn(papers, papers.rating);
+        }
+        for (final table in <TableInfo>[matrixColumns, matrixCells]) {
+          if (!await _hasTable(table.actualTableName)) {
+            await m.createTable(table);
+          }
+        }
+        await _createSyncSchema();
       }
     },
   );

@@ -20,10 +20,14 @@ import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
+import 'cite_paper_sheet.dart';
+import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
 import 'note_markdown.dart';
 import '../library/add_attachment_sheet.dart';
+import '../library/citation_formatter.dart';
+import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../library/paper_detail_screen.dart';
 import '../library/pdf_viewer_screen.dart';
@@ -219,7 +223,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  /// Typing "[[" opens the note picker, like a wiki link.
+  /// Typing "[[" opens the note picker, like a wiki link; "[@" opens the
+  /// paper picker for a citation.
   void _watchForWikilink(DocChange change) {
     if (change.source != ChangeSource.local) return;
     // Where the change inserted a single "[", from the change itself
@@ -230,13 +235,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       if (op.isRetain) {
         at += op.length!;
       } else if (op.isInsert) {
-        if (op.data == '[') end = at + 1;
+        if (op.data == '[' || op.data == '@') end = at + 1;
         break;
       }
     }
     if (end == null || end < 2) return;
     final text = _quillController.document.toPlainText();
-    if (end > text.length || text.substring(end - 2, end) != '[[') return;
+    if (end > text.length) return;
+    final typed = text.substring(end - 2, end);
+    if (typed != '[[' && typed != '[@') return;
+    final cite = typed == '[@';
     final start = end - 2;
     // After this change has finished applying.
     Future.microtask(() async {
@@ -246,8 +254,66 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         '',
         TextSelection.collapsed(offset: start),
       );
-      if (mounted) await _linkNote(context);
+      if (!mounted) return;
+      if (cite) {
+        await _citePaper(context);
+      } else {
+        await _linkNote(context);
+      }
     });
+  }
+
+  /// Inserts `[@citekey]` for a chosen paper at the cursor (assigning the
+  /// paper its citekey the first time).
+  Future<void> _citePaper(BuildContext context) async {
+    final paperId = await showCitePaperSheet(context);
+    if (paperId == null || !mounted) return;
+    final key = await ensureCitekey(ref.read(databaseProvider), paperId);
+    if (!mounted) return;
+    final controller = _quillController;
+    final docEnd = controller.document.length - 1;
+    final cursor = controller.selection.baseOffset;
+    final index = cursor < 0 || cursor > docEnd ? docEnd : cursor;
+    final marker = citationMarker(key);
+    controller.replaceText(index, 0, '$marker ', null);
+    controller.updateSelection(
+      TextSelection.collapsed(offset: index + marker.length + 1),
+      ChangeSource.local,
+    );
+  }
+
+  Future<void> _addBibliography(BuildContext context) async {
+    final style = await showDialog<CitationStyle>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Reference style'),
+        children: [
+          for (final s in CitationStyle.values.where(
+            (s) => s != CitationStyle.bibtex,
+          ))
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, s),
+              child: Text(s.label),
+            ),
+        ],
+      ),
+    );
+    if (style == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final n = await insertBibliography(
+      _quillController,
+      ref.read(databaseProvider),
+      style,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          n == 0
+              ? 'No citations to list yet. Type [@ to cite a paper.'
+              : 'Added $n reference${n == 1 ? '' : 's'}',
+        ),
+      ),
+    );
   }
 
   Future<void> _linkNote(BuildContext context) async {
@@ -369,6 +435,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 noteId: widget.noteId,
               ),
               'link' => _linkNote(context),
+              'cite' => _citePaper(context),
+              'bibliography' => _addBibliography(context),
               'markdown' => _shareMarkdown(),
               'trash' => _moveToTrash(),
               _ => null,
@@ -387,6 +455,21 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   leading: Icon(Icons.add_link),
                   title: Text('Link to a note'),
                   subtitle: Text('Or type [[ while writing'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'cite',
+                child: ListTile(
+                  leading: Icon(Icons.format_quote),
+                  title: Text('Cite a paper'),
+                  subtitle: Text('Or type [@ while writing'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'bibliography',
+                child: ListTile(
+                  leading: Icon(Icons.list_alt),
+                  title: Text('Add bibliography'),
                 ),
               ),
               PopupMenuItem(

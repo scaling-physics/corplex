@@ -88,7 +88,7 @@ the rest are the remaining v1 work, in priority order.
    with undo instead of immediate delete, and data-preserving schema
    migrations (the destructive v3 migration must not be repeated once real
    users exist).
-9. **Cross-device sync (built; verified on a local Supabase stack)** —
+9. **Cross-device sync (built; verified on local and hosted Supabase)** —
    Supabase + drift, last-write-wins. Metadata and files (PDFs, images,
    audio) sync; see the Sync engine entry under Status. Needs a real
    Supabase project before it can run.
@@ -259,8 +259,10 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   isolation between users. Run it with:
   `flutter test test/integration --dart-define=SUPABASE_URL=http://127.0.0.1:54321 --dart-define=SUPABASE_PUBLISHABLE_KEY=<from supabase status>`
   (skipped without the defines, so plain `flutter test` stays offline).
-  *Not yet run against a hosted project*; email confirmation and
-  hosted-only settings are untested. The unit tests still use
+  The same test also passes against a hosted project (with "Confirm
+  email" off); with confirmation on, `SupabaseAuthService.signUp` reports
+  "check your email" but the app has no deep-link handling to finish the
+  flow. The unit tests still use
   `test/support/fake_sync_remote.dart`.
 - **Sync engine**: `SyncEngine` (`lib/features/sync/sync_engine.dart`)
   pushes then pulls through the narrow `SyncRemote` interface
@@ -350,8 +352,7 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   feature. The note editor exposes a folder picker and tag picker via
   AppBar icons (`folder_picker_sheet.dart`, `tag_picker_sheet.dart`).
 
-Not yet built: verification against a hosted Supabase project (needs the
-account owner; only a local stack has been tested), storage
+Not yet built: hand-testing sync through the app UI on two devices, storage
 cleanup for deleted files, and BibTeX *import*. Update the sections above as those decisions are made,
 so this file stays accurate for future agent sessions.
 

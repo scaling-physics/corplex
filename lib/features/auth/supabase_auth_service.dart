@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import 'auth_service.dart';
@@ -45,6 +49,9 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<void> signOut() => _run(_auth.signOut);
 
+  static const _offline =
+      'Could not reach the server. Check your connection and try again.';
+
   Future<void> _run(Future<void> Function() action) async {
     try {
       await action();
@@ -52,10 +59,15 @@ class SupabaseAuthService implements AuthService {
       throw AuthException(e.message);
     } on AuthException {
       rethrow;
-    } catch (_) {
-      throw const AuthException(
-        'Could not reach the server. Check your connection and try again.',
-      );
+    } on SocketException {
+      throw const AuthException(_offline);
+    } on TimeoutException {
+      throw const AuthException(_offline);
+    } on http.ClientException {
+      throw const AuthException(_offline);
+    } catch (e) {
+      // Not a connectivity problem: say so, rather than blaming the network.
+      throw AuthException('Something went wrong (${e.runtimeType}). Try again.');
     }
   }
 }

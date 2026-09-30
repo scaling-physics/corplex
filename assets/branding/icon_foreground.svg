@@ -1,13 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  
-  <g transform="translate(512 512) scale(0.74) translate(-512 -512) rotate(-6 512 512)">
-    <path d="M318,176 H586 L762,352 V792 A56,56 0 0 1 706,848 H318 A56,56 0 0 1 262,792 V232 A56,56 0 0 1 318,176 Z" fill="#435C48" transform="translate(10,18)"/>
-    <path d="M318,176 H586 L762,352 V792 A56,56 0 0 1 706,848 H318 A56,56 0 0 1 262,792 V232 A56,56 0 0 1 318,176 Z" fill="#FBFAF6"/>
-    <path d="M586,176 C590,270 612,322 662,340 C700,352 736,352 762,352 Z" fill="#C9D8C3"/>
-    <path d="M586,176 C590,270 612,322 662,340 C640,300 616,250 586,176 Z" fill="#A9BFA3"/>
-    <rect x="336" y="430" width="340" height="32" rx="16" fill="#9DB39A"/>
-    <rect x="336" y="514" width="300" height="32" rx="16" fill="#9DB39A"/>
-    <path d="M336,600 C420,582 520,588 604,576 C636,572 662,568 684,562" fill="none" stroke="#C77F5E" stroke-width="22" stroke-linecap="round"/>
-    <rect x="336" y="660" width="200" height="32" rx="16" fill="#9DB39A"/>
-  </g>
-</svg>
+<defs>
+ <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0F3329"/><stop offset="0.55" stop-color="#1F6A4E"/><stop offset="1" stop-color="#37A276"/></linearGradient>
+ <radialGradient id="glow" cx="0.78" cy="0.15" r="0.7"><stop offset="0" stop-color="#B8F2CF" stop-opacity="0.35"/><stop offset="1" stop-color="#B8F2CF" stop-opacity="0"/></radialGradient>
+ <linearGradient id="mk" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF4F5A"/><stop offset="0.6" stop-color="#FF8A3D"/><stop offset="1" stop-color="#FFC247"/></linearGradient>
+ <linearGradient id="hl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFB547" stop-opacity="0.85"/><stop offset="1" stop-color="#FF7A45" stop-opacity="0.95"/></linearGradient>
+ <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F4F0E6"/></linearGradient>
+ <filter id="sh" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#03130D" flood-opacity="0.5"/></filter>
+</defs>
+
+<g transform="translate(512 512) scale(0.74) translate(-512 -512)"><g filter="url(#sh)">
+ <g transform="rotate(9 512 512) translate(46,-6)"><path d="M318,176 H586 L762,352 V792 A56,56 0 0 1 706,848 H318 A56,56 0 0 1 262,792 V232 A56,56 0 0 1 318,176 Z" fill="#9EDCB9"/></g>
+ <g transform="rotate(-6 512 512)">
+  <path d="M318,176 H586 L762,352 V792 A56,56 0 0 1 706,848 H318 A56,56 0 0 1 262,792 V232 A56,56 0 0 1 318,176 Z" fill="url(#pg)"/>
+  <path d="M586,176 C590,270 612,322 662,340 C700,352 736,352 762,352 Z" fill="#D5EEDD"/><path d="M586,176 C590,270 612,322 662,340 C640,300 616,250 586,176 Z" fill="#A6DCBC"/>
+  <rect x="336" y="420" width="336" height="30" rx="15" fill="#1F6A4E" opacity="0.85"/>
+  <rect x="322" y="482" width="330" height="58" rx="18" fill="url(#hl)"/>
+  <rect x="336" y="496" width="286" height="30" rx="15" fill="#5A2414" opacity="0.8"/>
+  <rect x="336" y="578" width="300" height="30" rx="15" fill="#1F6A4E" opacity="0.4"/>
+  <rect x="336" y="656" width="210" height="30" rx="15" fill="#1F6A4E" opacity="0.4"/>
+ </g>
+ <g transform="rotate(-32 600 560)">
+  <rect x="640" y="514" width="330" height="92" rx="40" fill="url(#mk)"/>
+  <rect x="930" y="514" width="70" height="92" rx="26" fill="#FFE3A6"/>
+  <path d="M640,530 L596,560 L640,590 Z" fill="#FF4F5A"/>
+  <rect x="660" y="526" width="250" height="18" rx="9" fill="#FFFFFF" opacity="0.35"/>
+ </g>
+</g></g></svg>

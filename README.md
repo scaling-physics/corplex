@@ -123,8 +123,12 @@ Corplex is in active development and not yet in the app stores.
   [Releases](../../releases) page when available; open one on your device
   (you may need to allow installing apps from your browser). Or build it
   yourself (below).
-- **iPhone and iPad** — build it yourself for now (below). An App Store
-  release is planned.
+- **iPad and iPhone** — each release also has an unsigned `.ipa`. Install
+  it with a free sideloading tool such as [Sideloadly](https://sideloadly.io)
+  or AltStore, which signs it with your own Apple ID (the release notes
+  walk through it). On iPad, Corplex uses a proper tablet layout: a side
+  rail, and in landscape your list and the open note or paper side by
+  side. An App Store release is planned.
 
 ## Sync between devices (optional)
 

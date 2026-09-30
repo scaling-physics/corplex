@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../home/adaptive.dart' show readableWidth;
+
 import '../../theme/app_theme.dart';
 import 'audio_link.dart';
 import 'audio_playback.dart';
@@ -27,7 +29,13 @@ class AudioPlayerBar extends ConsumerWidget {
       alignment: Alignment.bottomCenter,
       child: current == null
           ? const SizedBox(width: double.infinity)
-          : _Bar(playback: playback, onMark: onMark),
+          // A floating card; on a tablet it keeps to the reading width.
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: readableWidth),
+                child: _Bar(playback: playback, onMark: onMark),
+              ),
+            ),
     );
   }
 }
@@ -105,56 +113,72 @@ class _Bar extends StatelessWidget {
                     : (v) => playback.seek(duration * v),
               ),
             ),
-            Row(
-              children: [
-                const SizedBox(width: 8),
-                Text(formatTimestamp(position), style: label),
-                const Spacer(),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(44, 36),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onPressed: playback.cycleSpeed,
-                  child: Text('${_speedLabel(playback.speed)}×'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.replay_10),
-                  tooltip: 'Back 10 seconds',
-                  onPressed: () => playback.skip(const Duration(seconds: -10)),
-                ),
-                IconButton.filled(
-                  icon: AnimatedSwitcher(
-                    duration: AppMotion.short,
-                    child: Icon(
-                      playback.playing ? Icons.pause : Icons.play_arrow,
-                      key: ValueKey(playback.playing),
+            LayoutBuilder(
+              builder: (context, box) {
+                final narrow = box.maxWidth < 420;
+                return Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    Text(formatTimestamp(position), style: label),
+                    const Spacer(),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(44, 36),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: playback.cycleSpeed,
+                      child: Text('${_speedLabel(playback.speed)}×'),
                     ),
-                  ),
-                  tooltip: playback.playing ? 'Pause' : 'Play',
-                  onPressed: playback.togglePlay,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.forward_30),
-                  tooltip: 'Forward 30 seconds',
-                  onPressed: () => playback.skip(const Duration(seconds: 30)),
-                ),
-                if (onMark case final onMark?)
-                  TextButton.icon(
-                    icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                    label: const Text('Mark'),
-                    // Live position at the moment of the tap, not the last redraw.
-                    onPressed: () => onMark(current.id, playback.position),
-                  )
-                else ...[
-                  const Spacer(),
-                  Text(
-                    duration == null ? '' : formatTimestamp(duration),
-                    style: label,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
+                    IconButton(
+                      visualDensity: narrow ? VisualDensity.compact : null,
+                      icon: const Icon(Icons.replay_10),
+                      tooltip: 'Back 10 seconds',
+                      onPressed: () =>
+                          playback.skip(const Duration(seconds: -10)),
+                    ),
+                    IconButton.filled(
+                      icon: AnimatedSwitcher(
+                        duration: AppMotion.short,
+                        child: Icon(
+                          playback.playing ? Icons.pause : Icons.play_arrow,
+                          key: ValueKey(playback.playing),
+                        ),
+                      ),
+                      tooltip: playback.playing ? 'Pause' : 'Play',
+                      onPressed: playback.togglePlay,
+                    ),
+                    IconButton(
+                      visualDensity: narrow ? VisualDensity.compact : null,
+                      icon: const Icon(Icons.forward_30),
+                      tooltip: 'Forward 30 seconds',
+                      onPressed: () =>
+                          playback.skip(const Duration(seconds: 30)),
+                    ),
+                    if (onMark case final onMark? when narrow)
+                      // No room for the label on a small phone.
+                      IconButton(
+                        icon: const Icon(Icons.bookmark_add_outlined),
+                        tooltip: 'Mark',
+                        onPressed: () => onMark(current.id, playback.position),
+                      )
+                    else if (onMark case final onMark?)
+                      TextButton.icon(
+                        icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                        label: const Text('Mark'),
+                        // Live position at the moment of the tap, not the last redraw.
+                        onPressed: () => onMark(current.id, playback.position),
+                      )
+                    else ...[
+                      const Spacer(),
+                      Text(
+                        duration == null ? '' : formatTimestamp(duration),
+                        style: label,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ],
+                );
+              },
             ),
           ],
         ],

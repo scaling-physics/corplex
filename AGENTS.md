@@ -234,6 +234,26 @@ the default screens until the user opts in by using the feature.
   (cross-fade between loading/empty/content) and `EmptyState`. Page
   routes use predictive-back on Android and Cupertino slides on iOS/macOS
   via `pageTransitionsTheme`, so plain `MaterialPageRoute`s get them.
+- **Tablet / iPad layout** (`lib/features/home/adaptive.dart`): the home
+  screen adapts to its window, so an iPad never gets a stretched phone.
+  Under 600 px wide: phone layout (bottom tabs, full-screen pages). 600–899
+  (iPad portrait, Split View): a `NavigationRail` (primary action on top)
+  instead of bottom tabs; lists centred at `readableWidth` (720); notes and
+  papers open as pages. 900+ (iPad landscape, 13" portrait): rail, list and
+  a detail pane side by side; `openNote`/`openPaper` fill the pane
+  (`selectedNoteProvider`/`selectedPaperProvider`) instead of pushing, the
+  open card is tinted, and the pane shows a placeholder when empty or when
+  its item is deleted. Screens shown in the pane take `embedded: true`
+  (no back arrow) and `onClose` (trash clears the pane instead of popping
+  home). The editor and paper screens pad their content to
+  `readablePadding` of the space they actually get (LayoutBuilder, not
+  screen width); Search, Trash and All highlights use `ReadableColumn`; the
+  audio bar and editor toolbar keep to the reading width. The tablet
+  audio bar lives in the body, not `bottomNavigationBar` (a Scaffold bottom
+  bar strips the bottom safe-area inset from nested scaffolds). Widget tests
+  default to an 800×600 screen, which is the *tablet* layout:
+  `test/widget_test.dart` pins a phone size; tablet behaviour is covered in
+  `test/features/home/tablet_layout_test.dart`.
 - **Primary actions**: each tab's main action is one labelled extended FAB
   owned by `HomeShell` (`New note` / `Import PDF`), morphing between tabs.
   The actions themselves are top-level functions (`createNote`,

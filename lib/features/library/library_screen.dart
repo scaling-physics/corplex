@@ -10,7 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
-import 'paper_detail_screen.dart';
+import '../home/adaptive.dart';
 import '../../data/tables/papers_table.dart';
 import '../projects/project_menu.dart';
 import '../projects/projects_providers.dart';
@@ -62,8 +62,7 @@ Future<String?> importPaperFile(BuildContext context, WidgetRef ref) async {
 Future<void> importPaper(BuildContext context, WidgetRef ref) async {
   final id = await importPaperFile(context, ref);
   if (id == null || !context.mounted) return;
-  Navigator.of(context)
-      .push(MaterialPageRoute(builder: (_) => PaperDetailScreen(paperId: id)));
+  openPaper(context, ref, id);
 }
 
 /// Searchable, auto-organized library of every paper referenced across
@@ -132,7 +131,9 @@ class LibraryScreen extends ConsumerWidget {
                     child: ListTile(
                       leading: Icon(Icons.file_download_outlined),
                       title: Text('Import references'),
-                      subtitle: Text('BibTeX, RIS or CSL JSON (Zotero, Mendeley)'),
+                      subtitle: Text(
+                        'BibTeX, RIS or CSL JSON (Zotero, Mendeley)',
+                      ),
                     ),
                   ),
                   PopupMenuItem(
@@ -263,13 +264,13 @@ class LibraryScreen extends ConsumerWidget {
   }
 }
 
-class _PaperCard extends StatelessWidget {
+class _PaperCard extends ConsumerWidget {
   const _PaperCard({required this.paper});
 
   final Paper paper;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final c = theme.colorScheme;
     final byline = [
@@ -277,13 +278,12 @@ class _PaperCard extends StatelessWidget {
       if (paper.year case final year?) '$year',
     ].join(' · ');
 
+    final selected =
+        hasDetailPane(context) && ref.watch(selectedPaperProvider) == paper.id;
     return Card(
+      color: selected ? c.secondaryContainer : null,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PaperDetailScreen(paperId: paper.id),
-          ),
-        ),
+        onTap: () => openPaper(context, ref, paper.id),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(

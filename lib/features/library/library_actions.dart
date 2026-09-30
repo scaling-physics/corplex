@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/database_provider.dart';
+import '../home/adaptive.dart';
 import 'bibtex.dart';
 import 'reference_import.dart';
 import 'metadata_lookup.dart';
@@ -19,8 +20,18 @@ void _say(BuildContext context, String message, {SnackBarAction? action}) {
     ..showSnackBar(SnackBar(content: Text(message), action: action));
 }
 
-void _openPaper(BuildContext context, String id) => Navigator.of(context)
-    .push(MaterialPageRoute(builder: (_) => PaperDetailScreen(paperId: id)));
+void _openPaper(BuildContext context, String id) {
+  // Beside the list on a tablet, as a page on a phone.
+  if (hasDetailPane(context)) {
+    ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(selectedPaperProvider.notifier).state = id;
+    return;
+  }
+  Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => PaperDetailScreen(paperId: id)));
+}
 
 /// "Add by DOI or arXiv ID": asks for one (or a link), looks up its
 /// details, and adds the paper unless it's already in the library.
@@ -77,11 +88,7 @@ Future<void> addPaperFromIdentifier(
       _say(context, 'No paper found for ${id.value}.');
       return;
     }
-    final result = await addPaperFromMetadata(
-      db,
-      meta,
-      id: const Uuid().v4(),
-    );
+    final result = await addPaperFromMetadata(db, meta, id: const Uuid().v4());
     if (!context.mounted) return;
     if (result.existing case final existing?) {
       _say(

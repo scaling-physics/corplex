@@ -59,12 +59,24 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
+    // These are phone-layout tests (bottom tabs, "New note" button); the
+    // default 800×600 test screen would get the tablet layout.
+    final view = TestWidgetsFlutterBinding.ensureInitialized()
+        .platformDispatcher
+        .implicitView!;
+    view.physicalSize = const Size(1080, 2400);
+    view.devicePixelRatio = 3;
     // TextField's cursor blink uses a periodic Timer; without this it's
     // still armed when a test ends and trips flutter_test's timer check.
     EditableText.debugDeterministicCursor = true;
     db = AppDatabase.inMemoryForTesting();
   });
   tearDown(() {
+    final view = TestWidgetsFlutterBinding.ensureInitialized()
+        .platformDispatcher
+        .implicitView!;
+    view.resetPhysicalSize();
+    view.resetDevicePixelRatio();
     EditableText.debugDeterministicCursor = false;
     db.close();
   });
@@ -190,16 +202,16 @@ void main() {
     await tester.pumpAndSettle();
 
     // No player until something is played.
-    expect(find.text('Mark'), findsNothing);
+    expect(find.byTooltip('Mark'), findsNothing);
     await tester.tap(find.text('Audio overview'));
     await tester.pumpAndSettle();
     expect(audio.loads.single.path, '/device/overview.m4a');
-    expect(find.text('Mark'), findsOneWidget);
+    expect(find.byTooltip('Mark'), findsOneWidget);
 
     // Playback reaches 12:34; mark it.
     audio.emitPosition(const Duration(minutes: 12, seconds: 34));
     await tester.pump();
-    await tester.tap(find.text('Mark'));
+    await tester.tap(find.byTooltip('Mark'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
     final note = await db.select(db.notes).getSingle();

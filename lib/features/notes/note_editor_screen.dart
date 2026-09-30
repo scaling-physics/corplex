@@ -21,6 +21,7 @@ import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
+import '../home/adaptive.dart' show readablePadding, readableWidth;
 import 'cite_paper_sheet.dart';
 import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
@@ -64,6 +65,7 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
     required this.noteId,
     this.handle,
     this.embedded = false,
+    this.onClose,
   });
 
   final String noteId;
@@ -71,8 +73,12 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
   /// Set when the editor sits beside a PDF; see [NoteEditorHandle].
   final NoteEditorHandle? handle;
 
-  /// One pane of a split view: no back button (the reader has it).
+  /// One pane of a split view or the tablet layout: no back button.
   final bool embedded;
+
+  /// How to leave when the note is moved to the trash; defaults to popping
+  /// this page.
+  final VoidCallback? onClose;
 
   @override
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -420,7 +426,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _debounce?.cancel();
     await _save();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    if (widget.onClose case final close?) {
+      close();
+    } else {
+      Navigator.of(context).pop();
+    }
     await deleteNoteWithUndo(ref, messenger, widget.noteId, title);
   }
 
@@ -569,209 +579,218 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           ),
         ],
       ),
-      body: !_loaded
-          ? const SizedBox.shrink()
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-              children: [
-                TextField(
-                  controller: _titleController,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Title',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                  ),
+      body: LayoutBuilder(
+        builder: (context, box) => !_loaded
+            ? const SizedBox.shrink()
+            : ListView(
+                // Centred at a readable width on a tablet.
+                padding: EdgeInsets.fromLTRB(
+                  readablePadding(box.maxWidth),
+                  0,
+                  readablePadding(box.maxWidth),
+                  32,
                 ),
-                if (folderName != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: GestureDetector(
-                      onTap: () => showFolderPickerSheet(
-                        context,
-                        ref,
-                        widget.noteId,
-                        folderId,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.folder_outlined,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            folderName,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                ),
-                          ),
-                        ],
-                      ),
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText: 'Title',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
-                ...switch (tagsAsync.value) {
-                  null || [] => const [],
-                  final tags => [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: -8,
-                      children: tags
-                          .map(
-                            (tag) => InputChip(
-                              avatar: const Icon(Icons.tag, size: 16),
-                              label: Text(tag.name),
-                              onPressed: () => showTagPickerSheet(
-                                context,
-                                ref,
-                                widget.noteId,
-                              ),
-                              onDeleted: () => removeTagFromNote(
-                                ref.read(databaseProvider),
-                                noteId: widget.noteId,
-                                tagId: tag.id,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                },
-                ...switch (ref
-                    .watch(projectsForNoteProvider(widget.noteId))
-                    .value) {
-                  null || [] => const [],
-                  final projects => [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: -8,
-                      children: [
-                        for (final project in projects)
-                          InputChip(
-                            avatar: const Icon(
-                              Icons.folder_special_outlined,
+                  if (folderName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: GestureDetector(
+                        onTap: () => showFolderPickerSheet(
+                          context,
+                          ref,
+                          widget.noteId,
+                          folderId,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.folder_outlined,
                               size: 16,
+                              color: Theme.of(context).colorScheme.secondary,
                             ),
-                            label: Text(project.name),
-                            onPressed: () => showProjectPickerSheet(
-                              context,
-                              noteId: widget.noteId,
+                            const SizedBox(width: 4),
+                            Text(
+                              folderName,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                  ),
                             ),
-                            onDeleted: () => removeNoteFromProject(
-                              ref.read(databaseProvider),
-                              projectId: project.id,
-                              noteId: widget.noteId,
-                            ),
-                          ),
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                },
-                ...switch (linkedPapersAsync.value) {
-                  null || [] => const [],
-                  final papers => [
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: -8,
-                      children: papers
-                          .map(
-                            (paper) => InputChip(
+                  ...switch (tagsAsync.value) {
+                    null || [] => const [],
+                    final tags => [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: -8,
+                        children: tags
+                            .map(
+                              (tag) => InputChip(
+                                avatar: const Icon(Icons.tag, size: 16),
+                                label: Text(tag.name),
+                                onPressed: () => showTagPickerSheet(
+                                  context,
+                                  ref,
+                                  widget.noteId,
+                                ),
+                                onDeleted: () => removeTagFromNote(
+                                  ref.read(databaseProvider),
+                                  noteId: widget.noteId,
+                                  tagId: tag.id,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  },
+                  ...switch (ref
+                      .watch(projectsForNoteProvider(widget.noteId))
+                      .value) {
+                    null || [] => const [],
+                    final projects => [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: -8,
+                        children: [
+                          for (final project in projects)
+                            InputChip(
                               avatar: const Icon(
-                                Icons.article_outlined,
+                                Icons.folder_special_outlined,
                                 size: 16,
                               ),
-                              label: Text(
-                                paper.title,
-                                overflow: TextOverflow.ellipsis,
+                              label: Text(project.name),
+                              onPressed: () => showProjectPickerSheet(
+                                context,
+                                noteId: widget.noteId,
                               ),
-                              onPressed: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      PaperDetailScreen(paperId: paper.id),
+                              onDeleted: () => removeNoteFromProject(
+                                ref.read(databaseProvider),
+                                projectId: project.id,
+                                noteId: widget.noteId,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  },
+                  ...switch (linkedPapersAsync.value) {
+                    null || [] => const [],
+                    final papers => [
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: -8,
+                        children: papers
+                            .map(
+                              (paper) => InputChip(
+                                avatar: const Icon(
+                                  Icons.article_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  paper.title,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        PaperDetailScreen(paperId: paper.id),
+                                  ),
+                                ),
+                                onDeleted: () => unlinkPaperFromNote(
+                                  ref.read(databaseProvider),
+                                  noteId: widget.noteId,
+                                  paperId: paper.id,
                                 ),
                               ),
-                              onDeleted: () => unlinkPaperFromNote(
-                                ref.read(databaseProvider),
-                                noteId: widget.noteId,
-                                paperId: paper.id,
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  },
+                  ...switch (attachmentsAsync.value) {
+                    null || [] => const [],
+                    final attachments => [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: attachments.map((a) {
+                          if (a.type == AttachmentType.image &&
+                              a.path != null) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                File(a.path!),
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
                               ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                },
-                ...switch (attachmentsAsync.value) {
-                  null || [] => const [],
-                  final attachments => [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: attachments.map((a) {
-                        if (a.type == AttachmentType.image && a.path != null) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              File(a.path!),
-                              width: 96,
-                              height: 96,
-                              fit: BoxFit.cover,
-                            ),
-                          );
+                            );
+                          }
+                          return _AttachmentChip(attachment: a);
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  },
+                  QuillEditor.basic(
+                    controller: _quillController,
+                    focusNode: _bodyFocus,
+                    scrollController: _bodyScroll,
+                    config: QuillEditorConfig(
+                      scrollable: false,
+                      padding: EdgeInsets.zero,
+                      placeholder: 'Start writing…',
+                      customLinkPrefixes: const [audioLinkScheme],
+                      embedBuilders: const [SketchEmbedBuilder()],
+                      // Audio timestamps play on a plain tap; other links
+                      // keep Quill's default long-press menu.
+                      customRecognizerBuilder: (attribute, leaf) {
+                        if (attribute.key != Attribute.link.key) return null;
+                        final link = attribute.value?.toString() ?? '';
+                        if (parseAudioTimestampLink(link) case final t?) {
+                          return TapGestureRecognizer()
+                            ..onTap = () => _playFrom(t.attachmentId, t.at);
                         }
-                        return _AttachmentChip(attachment: a);
-                      }).toList(),
+                        if (parsePaperPageLink(link) case final p?) {
+                          return TapGestureRecognizer()
+                            ..onTap = () => _openPaperAt(p.paperId, p.page);
+                        }
+                        if (parseNoteLink(link) case final id?) {
+                          return TapGestureRecognizer()
+                            ..onTap = () => _openNote(id);
+                        }
+                        return null;
+                      },
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                },
-                QuillEditor.basic(
-                  controller: _quillController,
-                  focusNode: _bodyFocus,
-                  scrollController: _bodyScroll,
-                  config: QuillEditorConfig(
-                    scrollable: false,
-                    padding: EdgeInsets.zero,
-                    placeholder: 'Start writing…',
-                    customLinkPrefixes: const [audioLinkScheme],
-                    embedBuilders: const [SketchEmbedBuilder()],
-                    // Audio timestamps play on a plain tap; other links
-                    // keep Quill's default long-press menu.
-                    customRecognizerBuilder: (attribute, leaf) {
-                      if (attribute.key != Attribute.link.key) return null;
-                      final link = attribute.value?.toString() ?? '';
-                      if (parseAudioTimestampLink(link) case final t?) {
-                        return TapGestureRecognizer()
-                          ..onTap = () => _playFrom(t.attachmentId, t.at);
-                      }
-                      if (parsePaperPageLink(link) case final p?) {
-                        return TapGestureRecognizer()
-                          ..onTap = () => _openPaperAt(p.paperId, p.page);
-                      }
-                      if (parseNoteLink(link) case final id?) {
-                        return TapGestureRecognizer()
-                          ..onTap = () => _openNote(id);
-                      }
-                      return null;
-                    },
                   ),
-                ),
-                _Backlinks(noteId: widget.noteId),
-              ],
-            ),
+                  _Backlinks(noteId: widget.noteId),
+                ],
+              ),
+      ),
       // A Scaffold leaves its bottom bar under the keyboard; pad it up by the
       // keyboard's height so formatting and Draw stay in reach while typing.
       bottomNavigationBar: !_loaded
@@ -801,52 +820,60 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           horizontal: 8,
                           vertical: 4,
                         ),
-                        child: Row(
-                          children: [
-                            // Pen input sits first and always visible, not at
-                            // the scrolled-off end of the formatting row.
-                            IconButton(
-                              icon: const Icon(Icons.draw_outlined),
-                              tooltip: 'Draw',
-                              onPressed: () =>
-                                  insertSketch(context, _quillController),
+                        child: Center(
+                          // Same width as the text above it on a tablet.
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: readableWidth,
                             ),
-                            Container(
-                              width: 1,
-                              height: 24,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outlineVariant,
-                            ),
-                            Expanded(
-                              child: QuillSimpleToolbar(
-                                controller: _quillController,
-                                config: const QuillSimpleToolbarConfig(
-                                  multiRowsDisplay: false,
-                                  showFontFamily: false,
-                                  showFontSize: false,
-                                  showSmallButton: false,
-                                  showLineHeightButton: false,
-                                  showInlineCode: false,
-                                  showColorButton: false,
-                                  showBackgroundColorButton: false,
-                                  showClearFormat: false,
-                                  showAlignmentButtons: false,
-                                  showListCheck: false,
-                                  showCodeBlock: false,
-                                  showIndent: false,
-                                  showLink: false,
-                                  showDirection: false,
-                                  showSearchButton: false,
-                                  showSubscript: false,
-                                  showSuperscript: false,
-                                  showUndo: false,
-                                  showRedo: false,
-                                  showDividers: false,
+                            child: Row(
+                              children: [
+                                // Pen input sits first and always visible, not at
+                                // the scrolled-off end of the formatting row.
+                                IconButton(
+                                  icon: const Icon(Icons.draw_outlined),
+                                  tooltip: 'Draw',
+                                  onPressed: () =>
+                                      insertSketch(context, _quillController),
                                 ),
-                              ),
+                                Container(
+                                  width: 1,
+                                  height: 24,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant,
+                                ),
+                                Expanded(
+                                  child: QuillSimpleToolbar(
+                                    controller: _quillController,
+                                    config: const QuillSimpleToolbarConfig(
+                                      multiRowsDisplay: false,
+                                      showFontFamily: false,
+                                      showFontSize: false,
+                                      showSmallButton: false,
+                                      showLineHeightButton: false,
+                                      showInlineCode: false,
+                                      showColorButton: false,
+                                      showBackgroundColorButton: false,
+                                      showClearFormat: false,
+                                      showAlignmentButtons: false,
+                                      showListCheck: false,
+                                      showCodeBlock: false,
+                                      showIndent: false,
+                                      showLink: false,
+                                      showDirection: false,
+                                      showSearchButton: false,
+                                      showSubscript: false,
+                                      showSuperscript: false,
+                                      showUndo: false,
+                                      showRedo: false,
+                                      showDividers: false,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),

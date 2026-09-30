@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../home/adaptive.dart' show ReadableColumn;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -111,27 +113,29 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           style: theme.textTheme.titleMedium,
         ),
       ),
-      body: _results == null
-          ? const EmptyState(
-              icon: Icons.search,
-              title: 'Search everything',
-              message: 'Find a note, a paper, or a passage you highlighted.',
-            )
-          : FutureBuilder<List<SearchHit>>(
-              future: _results,
-              builder: (context, snapshot) {
-                final hits = snapshot.data;
-                if (hits == null) return const SizedBox.shrink();
-                if (hits.isEmpty) {
-                  return const EmptyState(
-                    icon: Icons.search_off,
-                    title: 'No matches',
-                    message: 'Try fewer or different words.',
-                  );
-                }
-                return _ResultsList(hits: hits, onTap: _open);
-              },
-            ),
+      body: ReadableColumn(
+        child: _results == null
+            ? const EmptyState(
+                icon: Icons.search,
+                title: 'Search everything',
+                message: 'Find a note, a paper, or a passage you highlighted.',
+              )
+            : FutureBuilder<List<SearchHit>>(
+                future: _results,
+                builder: (context, snapshot) {
+                  final hits = snapshot.data;
+                  if (hits == null) return const SizedBox.shrink();
+                  if (hits.isEmpty) {
+                    return const EmptyState(
+                      icon: Icons.search_off,
+                      title: 'No matches',
+                      message: 'Try fewer or different words.',
+                    );
+                  }
+                  return _ResultsList(hits: hits, onTap: _open);
+                },
+              ),
+      ),
     );
   }
 }

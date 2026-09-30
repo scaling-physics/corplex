@@ -2,6 +2,8 @@ import 'package:drift/drift.dart' show OrderingTerm, innerJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../home/adaptive.dart' show ReadableColumn;
+
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
@@ -146,20 +148,22 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
           ),
         ),
       ),
-      body: all.isEmpty
-          ? const EmptyState(
-              icon: Icons.format_quote_outlined,
-              title: 'No highlights yet',
-              message:
-                  'Select text in a PDF and choose Highlight; it will '
-                  'collect here.',
-            )
-          : shown.isEmpty
-          ? const Center(child: Text('No matches.'))
-          : ListView(
-              padding: const EdgeInsets.only(bottom: 32),
-              children: children,
-            ),
+      body: ReadableColumn(
+        child: all.isEmpty
+            ? const EmptyState(
+                icon: Icons.format_quote_outlined,
+                title: 'No highlights yet',
+                message:
+                    'Select text in a PDF and choose Highlight; it will '
+                    'collect here.',
+              )
+            : shown.isEmpty
+            ? const Center(child: Text('No matches.'))
+            : ListView(
+                padding: const EdgeInsets.only(bottom: 32),
+                children: children,
+              ),
+      ),
     );
   }
 }

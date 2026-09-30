@@ -8,7 +8,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import 'folders_providers.dart';
 import 'note_content.dart';
-import 'note_editor_screen.dart';
+import '../home/adaptive.dart';
 import 'notes_providers.dart';
 import 'tags_providers.dart';
 import '../../theme/swipe_to_trash.dart';
@@ -34,8 +34,7 @@ Future<void> createNote(BuildContext context, WidgetRef ref) async {
         ),
       );
   if (!context.mounted) return;
-  Navigator.of(context)
-      .push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: id)));
+  openNote(context, ref, id);
   if (filter is TagFilter) {
     await addTagToNote(db, noteId: id, tagId: filter.tagId);
   }
@@ -125,11 +124,11 @@ class NotesScreen extends ConsumerWidget {
                           note.title,
                         ),
                         child: _NoteCard(
-                        note: note,
-                        // The folder is redundant while filtering by it.
-                        folderName: filter is FolderFilter
-                            ? null
-                            : folderNames[note.folderId],
+                          note: note,
+                          // The folder is redundant while filtering by it.
+                          folderName: filter is FolderFilter
+                              ? null
+                              : folderNames[note.folderId],
                         ),
                       ),
                     );
@@ -144,14 +143,14 @@ class NotesScreen extends ConsumerWidget {
   }
 }
 
-class _NoteCard extends StatelessWidget {
+class _NoteCard extends ConsumerWidget {
   const _NoteCard({required this.note, required this.folderName});
 
   final Note note;
   final String? folderName;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final c = theme.colorScheme;
     final preview = notePlainTextPreview(note.content);
@@ -159,11 +158,13 @@ class _NoteCard extends StatelessWidget {
       color: c.onSurfaceVariant,
     );
 
+    // In the tablet layout, the note open beside the list is marked.
+    final selected =
+        hasDetailPane(context) && ref.watch(selectedNoteProvider) == note.id;
     return Card(
+      color: selected ? c.secondaryContainer : null,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: note.id)),
-        ),
+        onTap: () => openNote(context, ref, note.id),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
           child: Column(

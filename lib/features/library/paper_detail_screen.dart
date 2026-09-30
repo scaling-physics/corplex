@@ -25,12 +25,25 @@ import 'citation_formatter.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
 import 'split_reader.dart';
+import '../home/adaptive.dart' show readablePadding;
 import '../../theme/app_theme.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
-  const PaperDetailScreen({super.key, required this.paperId});
+  const PaperDetailScreen({
+    super.key,
+    required this.paperId,
+    this.embedded = false,
+    this.onClose,
+  });
 
   final String paperId;
+
+  /// Shown in the tablet layout's detail pane: no back arrow.
+  final bool embedded;
+
+  /// How to leave when the paper is moved to the trash; defaults to
+  /// popping this page.
+  final VoidCallback? onClose;
 
   @override
   ConsumerState<PaperDetailScreen> createState() => _PaperDetailScreenState();
@@ -107,7 +120,11 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _debounce?.cancel();
     await _save();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    if (widget.onClose case final close?) {
+      close();
+    } else {
+      Navigator.of(context).pop();
+    }
     await deletePaperWithUndo(ref, messenger, widget.paperId, title);
   }
 
@@ -209,6 +226,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         actions: [
           PopupMenuButton<String>(
             tooltip: 'More',
@@ -228,203 +246,213 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
         ],
       ),
       bottomNavigationBar: const SafeArea(child: AudioPlayerBar()),
-      body: !_loaded
-          ? const SizedBox.shrink()
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-              children: [
-                TextField(
-                  controller: _titleController,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  maxLines: null,
-                  decoration: const InputDecoration(
-                    hintText: 'Title',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                  ),
+      body: LayoutBuilder(
+        builder: (context, box) => !_loaded
+            ? const SizedBox.shrink()
+            : ListView(
+                // Centred at a readable width on a tablet.
+                padding: EdgeInsets.fromLTRB(
+                  readablePadding(box.maxWidth, minimum: 20),
+                  0,
+                  readablePadding(box.maxWidth, minimum: 20),
+                  40,
                 ),
-                TextField(
-                  controller: _authorsController,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: 'Authors',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
-                _ReadingStatusRow(paper: paperAsync.value),
-                _ProjectChips(paperId: widget.paperId),
-                _HighlightsSection(paper: paperAsync.value),
-                _Section(
-                  title: 'Attachments',
-                  trailing: TextButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add'),
-                    onPressed: () => showAddAttachmentSheet(
-                      context,
-                      ref,
-                      paperId: widget.paperId,
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    maxLines: null,
+                    decoration: const InputDecoration(
+                      hintText: 'Title',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
-                  child: attachmentsAsync.when(
-                    loading: () => const SizedBox(height: 56),
-                    error: (error, _) =>
-                        Text('Could not load attachments: $error'),
-                    data: (attachments) {
-                      if (attachments.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'Podcasts, images, links or files for this paper.',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                          ),
-                        );
-                      }
-                      return Column(
-                        children: attachments
-                            .map((a) => _AttachmentTile(attachment: a))
-                            .toList(),
-                      );
-                    },
-                  ),
-                ),
-                _Section(
-                  title: 'Details',
-                  trailing: TextButton.icon(
-                    icon: _lookingUp
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.travel_explore, size: 18),
-                    label: const Text('Look up'),
-                    onPressed: _lookingUp ? null : _lookUp,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _doiController,
-                          keyboardType: TextInputType.url,
-                          decoration: const InputDecoration(
-                            labelText: 'DOI or arXiv ID',
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _venueController,
-                          textCapitalization: TextCapitalization.words,
-                          decoration: const InputDecoration(
-                            labelText: 'Journal or conference',
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _yearController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Year'),
-                        ),
-                      ],
+                  TextField(
+                    controller: _authorsController,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Authors',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
-                ),
-                if (paperAsync.value case final paper?)
+                  const SizedBox(height: 12),
+                  _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
+                  _ReadingStatusRow(paper: paperAsync.value),
+                  _ProjectChips(paperId: widget.paperId),
+                  _HighlightsSection(paper: paperAsync.value),
                   _Section(
-                    title: 'Citation',
-                    trailing: IconButton(
-                      icon: const Icon(Icons.copy_outlined, size: 20),
-                      tooltip: 'Copy citation',
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(
-                            text: formatCitation(paper, _citationStyle),
-                          ),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Citation copied')),
+                    title: 'Attachments',
+                    trailing: TextButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add'),
+                      onPressed: () => showAddAttachmentSheet(
+                        context,
+                        ref,
+                        paperId: widget.paperId,
+                      ),
+                    ),
+                    child: attachmentsAsync.when(
+                      loading: () => const SizedBox(height: 56),
+                      error: (error, _) =>
+                          Text('Could not load attachments: $error'),
+                      data: (attachments) {
+                        if (attachments.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Podcasts, images, links or files for this paper.',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          );
+                        }
+                        return Column(
+                          children: attachments
+                              .map((a) => _AttachmentTile(attachment: a))
+                              .toList(),
                         );
                       },
+                    ),
+                  ),
+                  _Section(
+                    title: 'Details',
+                    trailing: TextButton.icon(
+                      icon: _lookingUp
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.travel_explore, size: 18),
+                      label: const Text('Look up'),
+                      onPressed: _lookingUp ? null : _lookUp,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Chips wrap onto a second line on a phone; a
-                          // segmented bar squeezed six styles until their
-                          // names broke mid-word.
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              for (final style in CitationStyle.values)
-                                ChoiceChip(
-                                  label: Text(style.label),
-                                  selected: _citationStyle == style,
-                                  showCheckmark: false,
-                                  visualDensity: VisualDensity.compact,
-                                  onSelected: (_) =>
-                                      setState(() => _citationStyle = style),
-                                ),
-                            ],
+                          TextField(
+                            controller: _doiController,
+                            keyboardType: TextInputType.url,
+                            decoration: const InputDecoration(
+                              labelText: 'DOI or arXiv ID',
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          AnimatedSwitcher(
-                            duration: AppMotion.medium,
-                            child: SelectableText(
-                              formatCitation(paper, _citationStyle),
-                              key: ValueKey(_citationStyle),
-                              style: Theme.of(context).textTheme.bodyMedium,
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _venueController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              labelText: 'Journal or conference',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _yearController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Year',
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                if (notesAsync.value case final notes? when notes.isNotEmpty)
-                  _Section(
-                    title: 'Referenced in notes',
-                    child: Column(
-                      children: notes
-                          .map(
-                            (note) => ListTile(
-                              leading: const Icon(Icons.edit_note_outlined),
-                              title: Text(
-                                note.title.isEmpty ? 'Untitled' : note.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      NoteEditorScreen(noteId: note.id),
-                                ),
+                  if (paperAsync.value case final paper?)
+                    _Section(
+                      title: 'Citation',
+                      trailing: IconButton(
+                        icon: const Icon(Icons.copy_outlined, size: 20),
+                        tooltip: 'Copy citation',
+                        onPressed: () {
+                          Clipboard.setData(
+                            ClipboardData(
+                              text: formatCitation(paper, _citationStyle),
+                            ),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Citation copied')),
+                          );
+                        },
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Chips wrap onto a second line on a phone; a
+                            // segmented bar squeezed six styles until their
+                            // names broke mid-word.
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final style in CitationStyle.values)
+                                  ChoiceChip(
+                                    label: Text(style.label),
+                                    selected: _citationStyle == style,
+                                    showCheckmark: false,
+                                    visualDensity: VisualDensity.compact,
+                                    onSelected: (_) =>
+                                        setState(() => _citationStyle = style),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            AnimatedSwitcher(
+                              duration: AppMotion.medium,
+                              child: SelectableText(
+                                formatCitation(paper, _citationStyle),
+                                key: ValueKey(_citationStyle),
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
-                          )
-                          .toList(),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-              ],
-            ),
+                  if (notesAsync.value case final notes? when notes.isNotEmpty)
+                    _Section(
+                      title: 'Referenced in notes',
+                      child: Column(
+                        children: notes
+                            .map(
+                              (note) => ListTile(
+                                leading: const Icon(Icons.edit_note_outlined),
+                                title: Text(
+                                  note.title.isEmpty ? 'Untitled' : note.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        NoteEditorScreen(noteId: note.id),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                ],
+              ),
+      ),
     );
   }
 }

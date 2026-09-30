@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../home/adaptive.dart' show ReadableColumn;
+
 import '../../data/database_provider.dart';
 import '../../data/tables/trash_table.dart';
 import '../../data/trash.dart';
@@ -49,56 +51,58 @@ class TrashScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: items.isEmpty
-          ? EmptyState(
-              icon: Icons.delete_outline,
-              title: 'Trash is empty',
-              message:
-                  'Deleted notes and papers stay here for '
-                  '${trashRetention.inDays} days.',
-            )
-          : ListView(
-              padding: const EdgeInsets.only(bottom: 32),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                  child: Text(
-                    'Kept for ${trashRetention.inDays} days, then deleted for good.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+      body: ReadableColumn(
+        child: items.isEmpty
+            ? EmptyState(
+                icon: Icons.delete_outline,
+                title: 'Trash is empty',
+                message:
+                    'Deleted notes and papers stay here for '
+                    '${trashRetention.inDays} days.',
+              )
+            : ListView(
+                padding: const EdgeInsets.only(bottom: 32),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    child: Text(
+                      'Kept for ${trashRetention.inDays} days, then deleted for good.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                for (final item in items)
-                  ListTile(
-                    leading: Icon(
-                      item.kind == TrashKind.note
-                          ? Icons.edit_note_outlined
-                          : Icons.article_outlined,
+                  for (final item in items)
+                    ListTile(
+                      leading: Icon(
+                        item.kind == TrashKind.note
+                            ? Icons.edit_note_outlined
+                            : Icons.article_outlined,
+                      ),
+                      title: Text(
+                        item.title.isEmpty ? 'Untitled' : item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        '${item.kind == TrashKind.note ? 'Note' : 'Paper'} · '
+                        '${_daysLeft(item.deletedAt)}',
+                      ),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          await restoreFromTrash(db, item.id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Restored')),
+                            );
+                          }
+                        },
+                        child: const Text('Restore'),
+                      ),
                     ),
-                    title: Text(
-                      item.title.isEmpty ? 'Untitled' : item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      '${item.kind == TrashKind.note ? 'Note' : 'Paper'} · '
-                      '${_daysLeft(item.deletedAt)}',
-                    ),
-                    trailing: TextButton(
-                      onPressed: () async {
-                        await restoreFromTrash(db, item.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Restored')),
-                          );
-                        }
-                      },
-                      child: const Text('Restore'),
-                    ),
-                  ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 

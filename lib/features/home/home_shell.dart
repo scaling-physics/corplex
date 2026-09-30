@@ -9,6 +9,7 @@ import '../../data/trash.dart';
 import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../settings/appearance_settings.dart';
+import 'adaptive.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
 import '../notes/notes_screen.dart';
@@ -77,50 +78,116 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   Widget _buildScaffold(BuildContext context, AppUser? user, ThemeData theme) {
+    final layout = homeLayoutFor(MediaQuery.sizeOf(context).width);
+    if (layout == HomeLayout.compact) {
+      return _phoneScaffold(context, user, theme);
+    }
+
+    // Tablet: a rail instead of bottom tabs; the list (with its own header)
+    // and, when there's room, the open note or paper beside it.
+    final c = theme.colorScheme;
+    final lists = Scaffold(
+      appBar: _appBar(context, user, theme),
+      body: FadeThroughIndexedStack(index: _index, children: _screens),
+    );
+    final expanded = layout == HomeLayout.expanded;
+    final wideRail = MediaQuery.sizeOf(context).width >= 1280;
+    // The audio bar is part of the body, not a bottomNavigationBar: a
+    // Scaffold bottom bar strips the bottom safe-area inset from the body,
+    // and the note editor beside the list needs it for its toolbar.
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 72,
-        titleSpacing: 20,
-        title: AnimatedSwitcher(
-          duration: AppMotion.medium,
-          switchInCurve: AppMotion.enter,
-          switchOutCurve: Curves.easeOut,
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween(
-                begin: const Offset(0, 0.25),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
+      body: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  _Rail(
+                    index: _index,
+                    extended: wideRail,
+                    onSelected: (value) => setState(() => _index = value),
+                  ),
+                  VerticalDivider(width: 1, color: c.outlineVariant),
+                  if (expanded) ...[
+                    SizedBox(width: wideRail ? 400 : 360, child: lists),
+                    VerticalDivider(width: 1, color: c.outlineVariant),
+                    Expanded(child: DetailPane(tab: _index)),
+                  ] else
+                    // One column, centred at a readable width.
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: readableWidth,
+                          ),
+                          child: lists,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-          layoutBuilder: (current, previous) => Stack(
-            alignment: Alignment.centerLeft,
-            children: [...previous, ?current],
-          ),
-          child: Text(
-            _titles[_index],
-            key: ValueKey(_index),
-            style: theme.textTheme.headlineMedium,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: 'Search',
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const SearchScreen())),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _AccountButton(
-              email: user?.email,
-              onPressed: () => _showAccountMenu(context),
-            ),
-          ),
+          const AudioPlayerBar(),
         ],
       ),
+    );
+  }
+
+  PreferredSizeWidget _appBar(
+    BuildContext context,
+    AppUser? user,
+    ThemeData theme,
+  ) {
+    return AppBar(
+      toolbarHeight: 72,
+      titleSpacing: 20,
+      title: AnimatedSwitcher(
+        duration: AppMotion.medium,
+        switchInCurve: AppMotion.enter,
+        switchOutCurve: Curves.easeOut,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween(
+              begin: const Offset(0, 0.25),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        ),
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.centerLeft,
+          children: [...previous, ?current],
+        ),
+        child: Text(
+          _titles[_index],
+          key: ValueKey(_index),
+          style: theme.textTheme.headlineMedium,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          tooltip: 'Search',
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const SearchScreen())),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: _AccountButton(
+            email: user?.email,
+            onPressed: () => _showAccountMenu(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _phoneScaffold(BuildContext context, AppUser? user, ThemeData theme) {
+    return Scaffold(
+      appBar: _appBar(context, user, theme),
       body: FadeThroughIndexedStack(index: _index, children: _screens),
       floatingActionButton: _PrimaryAction(index: _index),
       bottomNavigationBar: Column(
@@ -450,6 +517,71 @@ class _AccountButton extends StatelessWidget {
                 ),
               ),
       ),
+    );
+  }
+}
+
+/// The tablet navigation: the primary action on top, then the two spaces.
+/// [extended] (wide windows) shows labels beside the icons.
+class _Rail extends ConsumerWidget {
+  const _Rail({
+    required this.index,
+    required this.extended,
+    required this.onSelected,
+  });
+
+  final int index;
+  final bool extended;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (icon, label, action) = switch (index) {
+      0 => (Icons.add, 'New note', createNote),
+      _ => (Icons.upload_file_outlined, 'Import PDF', importPaper),
+    };
+    return NavigationRail(
+      selectedIndex: index,
+      onDestinationSelected: onSelected,
+      extended: extended,
+      minExtendedWidth: 200,
+      labelType: extended
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      leading: Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 20),
+        child: extended
+            ? FloatingActionButton.extended(
+                heroTag: null,
+                elevation: 0,
+                onPressed: () => action(context, ref),
+                icon: Icon(icon),
+                label: Text(label),
+              )
+            : FloatingActionButton(
+                heroTag: null,
+                elevation: 0,
+                tooltip: label,
+                onPressed: () => action(context, ref),
+                child: AnimatedSwitcher(
+                  duration: AppMotion.short,
+                  child: Icon(icon, key: ValueKey(icon)),
+                ),
+              ),
+      ),
+      destinations: const [
+        NavigationRailDestination(
+          icon: Icon(Icons.edit_note_outlined),
+          selectedIcon: Icon(Icons.edit_note),
+          label: Text('Notes'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.library_books_outlined),
+          selectedIcon: Icon(Icons.library_books),
+          label: Text('Library'),
+        ),
+      ],
     );
   }
 }

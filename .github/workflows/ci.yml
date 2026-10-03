@@ -19,5 +19,41 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: git diff --exit-code lib/data/database.g.dart
       - run: flutter analyze
+      # Android release builds refuse cleartext http; an http:// request
+      # works in debug and tests and silently fails on phones (it broke
+      # arXiv lookups once). Only https URLs in app code.
+      - name: No plain-http requests
+        run: |
+          if grep -rnE "Uri\.http\(|['\"]http://" lib \
+              | grep -vE "www\.w3\.org|schemas\."; then
+            echo "Use https: Android release builds block http." && exit 1
+          fi
       # Integration tests skip themselves without Supabase credentials.
       - run: flutter test
+
+  # Some problems only exist in release builds: R8/resource shrinking,
+  # manifest merging, cleartext rules. Build one on every push.
+  android-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --release
+      # audio_service looks its notification icons up by name; if
+      # resource shrinking drops them, lock-screen controls fail to build.
+      - name: Notification icons survived shrinking
+        run: |
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          for name in ic_stat_corplex audio_service_play_arrow audio_service_pause; do
+            unzip -l "$apk" | grep -q "res/.*$name" \
+              || unzip -p "$apk" resources.arsc | grep -aq "$name" \
+              || { echo "missing drawable: $name"; exit 1; }
+          done

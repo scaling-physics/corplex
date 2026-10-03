@@ -217,7 +217,12 @@ the default screens until the user opts in by using the feature.
   opt-in, like sync. Not committed.
 
 ### Engineering (ongoing, start now)
-- CI running `flutter analyze` and `flutter test` on every push.
+- CI (`.github/workflows/ci.yml`, on every push and PR): `flutter
+  analyze`, a stale-`database.g.dart` check, `flutter test`, a guard
+  against plain-`http://` requests in `lib/` (Android release builds block
+  them), and an Android **release** build that checks the notification
+  drawables survived resource shrinking — release-only failures are
+  otherwise invisible to the tests.
 - Integration tests on real devices; a performance pass with 1,000+ papers
   and large PDFs.
 - App Store / Play Store release setup; privacy-respecting crash reporting.

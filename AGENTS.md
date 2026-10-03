@@ -692,12 +692,16 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   existed, or any malformed content) so nothing crashes on old data.
   `notePlainTextPreview` extracts a flattened one-line preview for the
   Notes list without spinning up a full `QuillController`. The toolbar
-  (`QuillSimpleToolbar` in `note_editor_screen.dart`, pinned to
+  (`_FormatBar` in `note_editor_screen.dart`, pinned to
   `bottomNavigationBar` rather than above the content, so it sits near
-  the keyboard) is deliberately pared down from Quill's defaults — no
-  font/size/color pickers, alignment, code block, or link button — to
-  match the "no distractions" principle; only bold/italic/underline/
-  strikethrough, headers, lists, and quote are exposed. **Important**:
+  the keyboard) is deliberately small — no font/size/color pickers,
+  alignment, code block, or link button — to match the "no distractions"
+  principle: Draw, bold, italic, underline, bullet and numbered lists
+  (Quill's `QuillToolbarToggleStyleButton`s), and **Aa**, a menu for
+  Title/Heading/Subheading/Body text, Quote and Strikethrough. It fits a
+  360 px phone on one row (`test/features/ui_polish_test.dart`). Titles
+  wrap (`maxLines: null` with a text keyboard, so Return moves to the body
+  instead of adding a newline). **Important**:
   `flutter_quill` requires `FlutterQuillLocalizations.delegate` (and the
   standard Flutter ones) registered in `MaterialApp.localizationsDelegates`
   (see `lib/app.dart`) — omitting it throws

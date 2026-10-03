@@ -180,148 +180,158 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.format_quote_outlined),
-            tooltip: 'Highlights',
-            onPressed: _showHighlightsList,
-          ),
-          IconButton(
-            isSelected: _inkMode,
-            icon: const Icon(Icons.draw_outlined),
-            selectedIcon: const Icon(Icons.draw),
-            tooltip: _inkMode ? 'Stop drawing' : 'Draw on the page',
-            onPressed: () => setState(() => _inkMode = !_inkMode),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            onSelected: (v) {
-              if (v == 'snapshot') setState(() => _snapping = true);
-              if (v == 'contents') _showContents();
-              if (v.startsWith('read:')) {
-                ref
-                    .read(appearanceSettingsProvider)
-                    .setReading(ReadingTheme.values.byName(v.substring(5)));
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'contents',
-                child: ListTile(
-                  leading: Icon(Icons.toc),
-                  title: Text('Contents'),
-                ),
-              ),
-              for (final theme in ReadingTheme.values)
-                CheckedPopupMenuItem(
-                  value: 'read:${theme.name}',
-                  checked:
-                      ref.read(appearanceSettingsProvider).reading == theme,
-                  child: Text('${theme.label} page'),
-                ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'snapshot',
-                enabled: !_extracting,
-                child: const ListTile(
-                  leading: Icon(Icons.crop_free),
-                  title: Text('Snapshot to a note'),
-                  subtitle: Text('For figures and tables'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // The reading theme sits outside the boundary, so a snapshot
-          // keeps the figure's real colors.
-          ColorFiltered(
-            colorFilter:
-                ref.watch(appearanceSettingsProvider).reading.filter ??
-                const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-            child: RepaintBoundary(
-              key: _repaintKey,
-              child: PdfViewer.file(
-                widget.pdfPath,
-                controller: _controller,
-                initialPageNumber: widget.initialPage ?? 1,
-                params: PdfViewerParams(
-                  backgroundColor: c.surfaceContainer,
-                  onPageChanged: _onPageChanged,
-                  textSelectionParams: PdfTextSelectionParams(
-                    enabled: !_inkMode,
-                    buildSelectionHandle: (context, anchor, state) =>
-                        SelectionHandle(
-                          // pdfrx places handle A above-left of the first
-                          // character and B below-right of the last; each
-                          // teardrop points at its corner of the selection.
-                          pointsTo:
-                              (anchor.type == PdfTextSelectionAnchorType.a) ==
-                                  (anchor.direction != PdfTextDirection.rtl &&
-                                      anchor.direction != PdfTextDirection.vrtl)
-                              ? Alignment.bottomRight
-                              : Alignment.topLeft,
-                          active:
-                              state !=
-                              PdfViewerTextSelectionAnchorHandleState.normal,
-                        ),
-                  ),
-                  customizeContextMenuItems: _customizeMenu,
-                  pageOverlaysBuilder: (context, pageRect, page) => [
-                    _PageOverlay(
-                      paperId: widget.paperId,
-                      pageNumber: page.pageNumber,
-                      pageRect: pageRect,
-                      inkMode: _inkMode,
-                      color: _color,
-                    ),
-                  ],
-                ),
-              ),
+    // While choosing a snapshot area, back (or a swipe in from the edge,
+    // easy to start by accident when dragging the box) cancels the
+    // snapshot instead of leaving the paper.
+    return PopScope(
+      canPop: !_snapping,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _snapping = false);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.format_quote_outlined),
+              tooltip: 'Highlights',
+              onPressed: _showHighlightsList,
             ),
-          ),
-          if (_snapping)
-            SnapshotOverlay(
-              onSelected: (area) {
-                setState(() => _snapping = false);
-                _extractToNote(area);
+            IconButton(
+              isSelected: _inkMode,
+              icon: const Icon(Icons.draw_outlined),
+              selectedIcon: const Icon(Icons.draw),
+              tooltip: _inkMode ? 'Stop drawing' : 'Draw on the page',
+              onPressed: () => setState(() => _inkMode = !_inkMode),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              onSelected: (v) {
+                if (v == 'snapshot') setState(() => _snapping = true);
+                if (v == 'contents') _showContents();
+                if (v.startsWith('read:')) {
+                  ref
+                      .read(appearanceSettingsProvider)
+                      .setReading(ReadingTheme.values.byName(v.substring(5)));
+                }
               },
-              onCancel: () => setState(() => _snapping = false),
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'contents',
+                  child: ListTile(
+                    leading: Icon(Icons.toc),
+                    title: Text('Contents'),
+                  ),
+                ),
+                for (final theme in ReadingTheme.values)
+                  CheckedPopupMenuItem(
+                    value: 'read:${theme.name}',
+                    checked:
+                        ref.read(appearanceSettingsProvider).reading == theme,
+                    child: Text('${theme.label} page'),
+                  ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'snapshot',
+                  enabled: !_extracting,
+                  child: const ListTile(
+                    leading: Icon(Icons.crop_free),
+                    title: Text('Snapshot to a note'),
+                    subtitle: Text('For figures and tables'),
+                  ),
+                ),
+              ],
             ),
-        ],
-      ),
-      // One palette for both kinds of marking: the ink for new strokes,
-      // and the color the next text highlight gets.
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (final ink in highlightInks)
-                GestureDetector(
-                  onTap: () => setState(() => _color = ink),
-                  child: AnimatedContainer(
-                    duration: AppMotion.short,
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: ink,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ink == _color ? c.primary : c.outlineVariant,
-                        width: ink == _color ? 3 : 1,
+          ],
+        ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // The reading theme sits outside the boundary, so a snapshot
+            // keeps the figure's real colors.
+            ColorFiltered(
+              colorFilter:
+                  ref.watch(appearanceSettingsProvider).reading.filter ??
+                  const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+              child: RepaintBoundary(
+                key: _repaintKey,
+                child: PdfViewer.file(
+                  widget.pdfPath,
+                  controller: _controller,
+                  initialPageNumber: widget.initialPage ?? 1,
+                  params: PdfViewerParams(
+                    backgroundColor: c.surfaceContainer,
+                    onPageChanged: _onPageChanged,
+                    textSelectionParams: PdfTextSelectionParams(
+                      enabled: !_inkMode,
+                      buildSelectionHandle: (context, anchor, state) =>
+                          SelectionHandle(
+                            // pdfrx places handle A above-left of the first
+                            // character and B below-right of the last; each
+                            // teardrop points at its corner of the selection.
+                            pointsTo:
+                                (anchor.type == PdfTextSelectionAnchorType.a) ==
+                                    (anchor.direction != PdfTextDirection.rtl &&
+                                        anchor.direction !=
+                                            PdfTextDirection.vrtl)
+                                ? Alignment.bottomRight
+                                : Alignment.topLeft,
+                            active:
+                                state !=
+                                PdfViewerTextSelectionAnchorHandleState.normal,
+                          ),
+                    ),
+                    customizeContextMenuItems: _customizeMenu,
+                    pageOverlaysBuilder: (context, pageRect, page) => [
+                      _PageOverlay(
+                        paperId: widget.paperId,
+                        pageNumber: page.pageNumber,
+                        pageRect: pageRect,
+                        inkMode: _inkMode,
+                        color: _color,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_snapping)
+              SnapshotOverlay(
+                onSelected: (area) {
+                  setState(() => _snapping = false);
+                  _extractToNote(area);
+                },
+                onCancel: () => setState(() => _snapping = false),
+              ),
+          ],
+        ),
+        // One palette for both kinds of marking: the ink for new strokes,
+        // and the color the next text highlight gets.
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final ink in highlightInks)
+                  GestureDetector(
+                    onTap: () => setState(() => _color = ink),
+                    child: AnimatedContainer(
+                      duration: AppMotion.short,
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: ink,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: ink == _color ? c.primary : c.outlineVariant,
+                          width: ink == _color ? 3 : 1,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

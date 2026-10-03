@@ -35,3 +35,15 @@ Future<String> saveBytesToAppStorage(
   await File(destPath).writeAsBytes(bytes);
   return destPath;
 }
+
+/// A readable title from a file name: `Audio_Overview_Attention.m4a` →
+/// "Audio Overview Attention", `attention-is-all-you-need.pdf` →
+/// "attention is all you need". Hyphens only count as spaces when the
+/// name has no spaces of its own (so "state-of-the-art review" keeps
+/// them).
+String titleFromFileName(String name) {
+  var title = p.basenameWithoutExtension(name).replaceAll('_', ' ');
+  if (!title.contains(' ')) title = title.replaceAll('-', ' ');
+  title = title.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return title.isEmpty ? name : title;
+}

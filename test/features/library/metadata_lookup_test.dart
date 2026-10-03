@@ -131,6 +131,11 @@ void main() {
       expect(meta.authors, 'Vaswani, Ashish; Shazeer, Noam');
       expect(meta.year, 2017);
       expect(meta.venue, 'arXiv:1706.03762');
+      expect(
+        meta.doi,
+        '10.48550/arXiv.1706.03762',
+        reason: 'arXiv\'s own DOI when the feed names no journal DOI',
+      );
     });
 
     test('arXiv: an unknown id is null', () async {

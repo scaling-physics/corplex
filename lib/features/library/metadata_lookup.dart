@@ -214,7 +214,10 @@ PaperMetadata? parseArxiv(String atom, String id) {
     venue:
         tag('arxiv:journal_ref')?.replaceAll(RegExp(r'\s+'), ' ') ??
         'arXiv:$id',
-    doi: tag('arxiv:doi'),
+    // The published version's DOI if arXiv knows it, else the DOI arXiv
+    // registers for every preprint — so the paper always has one to cite
+    // and the DOI field isn't left empty.
+    doi: tag('arxiv:doi') ?? '10.48550/arXiv.$id',
   );
 }
 

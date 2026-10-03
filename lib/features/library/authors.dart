@@ -176,3 +176,19 @@ String authorsToStored(AuthorList list) {
   final names = list.authors.map((a) => a.inverted).toList();
   return names.join('; ') + (list.etAl ? ' et al.' : '');
 }
+
+/// A short, readable line for [list]: "Ashish Vaswani, Noam Shazeer and
+/// Niki Parmar", or past [max] names "Ashish Vaswani, Noam Shazeer,
+/// Niki Parmar + 5 more".
+String authorsSummary(AuthorList list, {int max = 3}) {
+  final names = [for (final a in list.authors) a.natural];
+  if (names.isEmpty) return '';
+  if (names.length > max) {
+    final more = names.length - max;
+    return '${names.take(max).join(', ')} + $more more';
+  }
+  final shown = names.length == 1
+      ? names.single
+      : '${names.take(names.length - 1).join(', ')} and ${names.last}';
+  return list.etAl ? '$shown et al.' : shown;
+}

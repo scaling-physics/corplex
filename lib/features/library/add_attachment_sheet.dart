@@ -3,7 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
@@ -123,7 +122,7 @@ Future<AttachmentType?> _addAudio(_Insert insert) async {
   await insert(
     type: AttachmentType.podcast,
     path: localPath,
-    title: p.basenameWithoutExtension(picked.name),
+    title: titleFromFileName(picked.name),
   );
   return AttachmentType.podcast;
 }

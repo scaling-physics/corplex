@@ -1,6 +1,7 @@
 import 'package:path/path.dart' as p;
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
+import '../../data/local_files.dart';
 import '../library/metadata_lookup.dart';
 
 /// What another app shared with Corplex, sorted into the things it can do
@@ -13,14 +14,14 @@ class SharedPdf extends SharedItem {
   const SharedPdf(this.path);
 
   final String path;
-  String get name => p.basenameWithoutExtension(path);
+  String get name => titleFromFileName(path);
 }
 
 class SharedAudio extends SharedItem {
   const SharedAudio(this.path);
 
   final String path;
-  String get name => p.basenameWithoutExtension(path);
+  String get name => titleFromFileName(path);
 }
 
 /// A DOI or arXiv id, alone or inside a link.

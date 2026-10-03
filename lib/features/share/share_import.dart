@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:uuid/uuid.dart';
 
@@ -215,7 +214,7 @@ Future<void> _attachAudio(
     paperId: target.paperId,
     type: AttachmentType.podcast,
     path: localPath,
-    title: p.basenameWithoutExtension(item.path),
+    title: titleFromFileName(item.path),
   );
   if (!context.mounted) return;
   _saved(

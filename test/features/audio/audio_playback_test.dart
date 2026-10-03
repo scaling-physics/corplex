@@ -39,7 +39,7 @@ void main() {
       await playback.open(_audio('a1', title: 'Attention, explained'));
       expect(engine.loads.single.title, 'Attention, explained');
       await playback.open(_audio('a2', path: '/x/overview.m4a'));
-      expect(engine.loads.last.title, 'overview.m4a');
+      expect(engine.loads.last.title, 'overview');
     },
   );
 

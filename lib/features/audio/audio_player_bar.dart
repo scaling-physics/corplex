@@ -1,3 +1,5 @@
+import '../../data/attachment_label.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,7 +60,7 @@ class _Bar extends StatelessWidget {
     final position = duration != null && playback.position > duration
         ? duration
         : playback.position;
-    final title = current.title ?? current.url ?? 'Recording';
+    final title = current.label;
     final error = playback.error;
     final label = theme.textTheme.labelSmall?.copyWith(
       color: c.onSurfaceVariant,

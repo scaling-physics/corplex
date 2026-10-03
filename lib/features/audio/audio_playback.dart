@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
+import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import 'audio_link.dart';
 
@@ -152,7 +153,7 @@ class AudioPlayback extends ChangeNotifier {
         await _engine.load(
           path: source.path,
           url: source.url,
-          title: attachment.title ?? attachment.path?.split('/').last ?? '',
+          title: attachment.label,
         );
         await _engine.setSpeed(_speed);
       }

@@ -4,7 +4,6 @@ import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
@@ -35,7 +34,7 @@ Future<String?> importPaperFile(BuildContext context, WidgetRef ref) async {
   if (picked?.path == null) return null;
 
   final localPath = await copyIntoAppStorage(picked!.path!, 'papers');
-  final title = p.basenameWithoutExtension(picked.name);
+  final title = titleFromFileName(picked.name);
 
   final id = const Uuid().v4();
   final db = ref.read(databaseProvider);

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
@@ -14,6 +15,7 @@ import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
+import 'authors.dart';
 import 'highlights.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
@@ -55,6 +57,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   final _yearController = TextEditingController();
   final _venueController = TextEditingController();
   final _doiController = TextEditingController();
+  final _authorsFocus = FocusNode();
+
+  /// Long author lists show as a short summary until tapped.
+  bool _editingAuthors = false;
   bool _lookingUp = false;
   Timer? _debounce;
   bool _loaded = false;
@@ -69,6 +75,18 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _yearController.addListener(_scheduleSave);
     _venueController.addListener(_scheduleSave);
     _doiController.addListener(_scheduleSave);
+    _authorsFocus.addListener(() {
+      if (_authorsFocus.hasFocus != _editingAuthors) {
+        setState(() => _editingAuthors = _authorsFocus.hasFocus);
+      }
+    });
+  }
+
+  void _editAuthors() {
+    setState(() => _editingAuthors = true);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _authorsFocus.requestFocus(),
+    );
   }
 
   Future<void> _loadPaper() async {
@@ -130,7 +148,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
 
   /// Fills empty details from the DOI or arXiv ID in the DOI field.
   Future<void> _lookUp() async {
-    final id = parseIdentifier(_doiController.text);
+    // An arXiv paper's id often sits in the venue ("arXiv:1706.03762").
+    final id =
+        parseIdentifier(_doiController.text) ??
+        parseIdentifier(_venueController.text);
     final messenger = ScaffoldMessenger.of(context);
     if (id == null) {
       messenger.showSnackBar(
@@ -207,6 +228,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _debounce?.cancel();
     _titleController.dispose();
     _authorsController.dispose();
+    _authorsFocus.dispose();
     _yearController.dispose();
     _venueController.dispose();
     _doiController.dispose();
@@ -262,6 +284,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                     controller: _titleController,
                     style: Theme.of(context).textTheme.headlineSmall,
                     maxLines: null,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
                       hintText: 'Title',
                       border: InputBorder.none,
@@ -271,19 +295,56 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                       contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
-                  TextField(
-                    controller: _authorsController,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Authors',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    ),
+                  ValueListenableBuilder(
+                    valueListenable: _authorsController,
+                    builder: (context, value, _) {
+                      final style = Theme.of(context).textTheme.bodyLarge
+                          ?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          );
+                      final summary = authorsSummary(parseAuthors(value.text));
+                      if (!_editingAuthors &&
+                          !_authorsFocus.hasFocus &&
+                          summary.isNotEmpty) {
+                        // "Ashish Vaswani, Noam Shazeer, Niki Parmar + 5
+                        // more" reads better than the stored
+                        // "Vaswani, Ashish; Shazeer, Noam; …".
+                        return Semantics(
+                          button: true,
+                          hint: 'Edit authors',
+                          child: InkWell(
+                            onTap: _editAuthors,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: Text(summary, style: style),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return TextField(
+                        controller: _authorsController,
+                        focusNode: _authorsFocus,
+                        style: style,
+                        maxLines: null,
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.done,
+                        decoration: const InputDecoration(
+                          hintText: 'Authors',
+                          helperText: 'Separate authors with ;',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
@@ -843,11 +904,7 @@ class _AttachmentTile extends ConsumerWidget {
         playingThis ? Icons.graphic_eq : _icon,
         color: Theme.of(context).colorScheme.primary,
       ),
-      title: Text(
-        a.title ?? a.url ?? a.path ?? 'Attachment',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: audio
           ? Icon(
               _inCloudOnly ? Icons.cloud_download_outlined : Icons.play_arrow,

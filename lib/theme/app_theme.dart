@@ -231,17 +231,20 @@ class AppTheme {
           horizontal: 16,
           vertical: 14,
         ),
-        border: const OutlineInputBorder(
+        // Underline-style (Material's filled field), not outline: an
+        // outline border floats a field's label onto its top edge, half
+        // outside the box.
+        border: const UnderlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(14)),
           borderSide: BorderSide.none,
         ),
-        enabledBorder: const OutlineInputBorder(
+        enabledBorder: const UnderlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(14)),
           borderSide: BorderSide.none,
         ),
-        focusedBorder: OutlineInputBorder(
+        focusedBorder: UnderlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: c.primary, width: 1.5),
+          borderSide: BorderSide(color: c.primary, width: 2),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(

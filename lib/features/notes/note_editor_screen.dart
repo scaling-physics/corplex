@@ -8,6 +8,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
@@ -649,6 +650,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     controller: _titleController,
                     style: Theme.of(context).textTheme.headlineMedium,
                     textCapitalization: TextCapitalization.sentences,
+                    // A long title wraps rather than scrolling out of
+                    // sight; Return moves on to the body (a title is one
+                    // line of text, even when it wraps).
+                    maxLines: null,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _bodyFocus.requestFocus(),
                     decoration: const InputDecoration(
                       hintText: 'Title',
                       border: InputBorder.none,
@@ -889,32 +897,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                       .colorScheme
                                       .outlineVariant,
                                 ),
+                                // The everyday formats stay on the bar; the
+                                // rest sit behind "Aa", so the row fits a
+                                // phone without scrolling.
                                 Expanded(
-                                  child: QuillSimpleToolbar(
+                                  child: _FormatBar(
                                     controller: _quillController,
-                                    config: const QuillSimpleToolbarConfig(
-                                      multiRowsDisplay: false,
-                                      showFontFamily: false,
-                                      showFontSize: false,
-                                      showSmallButton: false,
-                                      showLineHeightButton: false,
-                                      showInlineCode: false,
-                                      showColorButton: false,
-                                      showBackgroundColorButton: false,
-                                      showClearFormat: false,
-                                      showAlignmentButtons: false,
-                                      showListCheck: false,
-                                      showCodeBlock: false,
-                                      showIndent: false,
-                                      showLink: false,
-                                      showDirection: false,
-                                      showSearchButton: false,
-                                      showSubscript: false,
-                                      showSuperscript: false,
-                                      showUndo: false,
-                                      showRedo: false,
-                                      showDividers: false,
-                                    ),
+                                    onDone: _bodyFocus.requestFocus,
                                   ),
                                 ),
                               ],
@@ -941,7 +930,7 @@ class _AttachmentChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final a = attachment;
-    final title = a.title ?? a.url ?? 'Attachment';
+    final title = a.label;
     if (isAudioAttachment(a)) {
       final playback = ref.watch(audioPlaybackProvider);
       final isCurrent = playback.current?.id == a.id;
@@ -1074,6 +1063,123 @@ class _ImageViewer extends StatelessWidget {
       body: InteractiveViewer(
         maxScale: 6,
         child: Center(child: Image.file(File(path))),
+      ),
+    );
+  }
+}
+
+/// The note's formatting row: bold, italic, underline, the two lists, and
+/// "Aa" for headings, quote and strikethrough.
+class _FormatBar extends StatelessWidget {
+  const _FormatBar({required this.controller, required this.onDone});
+
+  final QuillController controller;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget toggle(Attribute attribute) => QuillToolbarToggleStyleButton(
+      controller: controller,
+      attribute: attribute,
+    );
+    return SingleChildScrollView(
+      // Only scrolls on the very narrowest screens.
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          toggle(Attribute.bold),
+          toggle(Attribute.italic),
+          toggle(Attribute.underline),
+          toggle(Attribute.ul),
+          toggle(Attribute.ol),
+          _TextStyleButton(controller: controller, onDone: onDone),
+        ],
+      ),
+    );
+  }
+}
+
+enum _TextStyle {
+  title('Title', Icons.title),
+  heading('Heading', Icons.text_fields),
+  subheading('Subheading', Icons.short_text),
+  body('Body text', Icons.notes),
+  quote('Quote', Icons.format_quote),
+  strike('Strikethrough', Icons.format_strikethrough);
+
+  const _TextStyle(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+/// "Aa": the less frequent formats, as a menu that says which is on.
+class _TextStyleButton extends StatelessWidget {
+  const _TextStyleButton({required this.controller, required this.onDone});
+
+  final QuillController controller;
+  final VoidCallback onDone;
+
+  bool _isOn(_TextStyle style, Map<String, Attribute> attrs) {
+    final header = attrs[Attribute.header.key]?.value;
+    return switch (style) {
+      _TextStyle.title => header == 1,
+      _TextStyle.heading => header == 2,
+      _TextStyle.subheading => header == 3,
+      _TextStyle.body => header == null,
+      _TextStyle.quote => attrs.containsKey(Attribute.blockQuote.key),
+      _TextStyle.strike => attrs.containsKey(Attribute.strikeThrough.key),
+    };
+  }
+
+  void _apply(_TextStyle style) {
+    final attrs = controller.getSelectionStyle().attributes;
+    controller.formatSelection(switch (style) {
+      _TextStyle.title => Attribute.h1,
+      _TextStyle.heading => Attribute.h2,
+      _TextStyle.subheading => Attribute.h3,
+      _TextStyle.body => Attribute.header,
+      _TextStyle.quote =>
+        _isOn(style, attrs)
+            ? Attribute.clone(Attribute.blockQuote, null)
+            : Attribute.blockQuote,
+      _TextStyle.strike =>
+        _isOn(style, attrs)
+            ? Attribute.clone(Attribute.strikeThrough, null)
+            : Attribute.strikeThrough,
+    });
+    onDone();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_TextStyle>(
+      tooltip: 'Text style',
+      onSelected: _apply,
+      itemBuilder: (_) {
+        final attrs = controller.getSelectionStyle().attributes;
+        return [
+          for (final style in _TextStyle.values) ...[
+            if (style == _TextStyle.quote) const PopupMenuDivider(),
+            CheckedPopupMenuItem(
+              value: style,
+              checked: _isOn(style, attrs),
+              child: Text(style.label),
+            ),
+          ],
+        ];
+      },
+      child: SizedBox.square(
+        dimension: 40,
+        child: Center(
+          child: Text(
+            'Aa',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ),
     );
   }

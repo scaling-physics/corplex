@@ -4,6 +4,7 @@ import 'package:flutter_quill/quill_delta.dart';
 import '../../data/database.dart';
 import '../library/citation_formatter.dart';
 import '../library/citations.dart';
+import 'citation_embed.dart';
 
 /// The heading of the reference list Corplex writes at the end of a note.
 const referencesHeading = 'References';
@@ -51,8 +52,9 @@ Future<int> insertBibliography(
 ) async {
   final doc = controller.document;
   final start = bibliographyStart(doc.toDelta());
-  final text = doc.toPlainText();
-  final body = start == null ? text : text.substring(0, start);
+  // Citations show as chips in the editor; read their keys from the
+  // document itself.
+  final body = textWithCitations(doc.toDelta(), end: start);
   final papers = await papersForCitekeys(db, citedKeys(body));
   if (papers.isEmpty) return 0;
 
@@ -63,7 +65,11 @@ Future<int> insertBibliography(
   // paragraph (unless the note is empty there).
   if (at > 0) {
     final before = doc.toPlainText().substring(0, at);
-    final gap = before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+    final gap = before.endsWith('\n\n')
+        ? ''
+        : before.endsWith('\n')
+        ? '\n'
+        : '\n\n';
     controller.replaceText(at, 0, gap, null);
     at += gap.length;
   }

@@ -146,6 +146,52 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('typing / opens the note commands', (tester) async {
+    await db
+        .into(db.notes)
+        .insert(NotesCompanion.insert(id: const Value('n1')));
+    await show(tester, const NoteEditorScreen(noteId: 'n1'));
+    final controller = tester
+        .widget<QuillEditor>(find.byType(QuillEditor))
+        .controller;
+    void type(String text) {
+      final at = controller.selection.baseOffset.clamp(
+        0,
+        controller.document.length - 1,
+      );
+      controller.replaceText(
+        at,
+        0,
+        text,
+        TextSelection.collapsed(offset: at + text.length),
+      );
+    }
+
+    // In the middle of a word it's just a slash.
+    type('and/or ');
+    await tester.pumpAndSettle();
+    expect(find.text('Cite a paper'), findsNothing);
+
+    // After a space: the commands. Dismissing keeps the "/".
+    type('/');
+    await tester.pumpAndSettle();
+    expect(find.text('Cite a paper'), findsOneWidget);
+    expect(find.text('Literature note template'), findsOneWidget);
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+    expect(controller.document.toPlainText(), 'and/or /\n');
+
+    // Choosing one removes the "/" and does it.
+    type('Method ');
+    type('/');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Heading'));
+    await tester.pumpAndSettle();
+    expect(controller.document.toPlainText(), 'and/or /Method \n');
+    expect(controller.getSelectionStyle().attributes['header']?.value, 2);
+    await close(tester);
+  });
+
   testWidgets('a long author list reads as a summary until tapped', (
     tester,
   ) async {

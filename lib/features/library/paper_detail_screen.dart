@@ -334,9 +334,11 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                         maxLines: null,
                         keyboardType: TextInputType.text,
                         textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Authors',
-                          helperText: 'Separate authors with ;',
+                          helperText: _authorsFocus.hasFocus
+                              ? 'Separate authors with ;'
+                              : null,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,

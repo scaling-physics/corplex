@@ -87,18 +87,23 @@ void main() {
     await tester.pumpWidget(_appWithDb(db));
     await tester.pumpAndSettle();
 
-    expect(find.text('No notes yet'), findsOneWidget);
+    // A first launch: the welcome steps, not a blank page.
+    expect(find.text('Welcome to Corplex'), findsOneWidget);
+    expect(find.text('Import your first paper'), findsOneWidget);
 
     await tester.tap(find.text('Library'));
     await tester.pumpAndSettle();
-
-    expect(find.text('Your library is empty'), findsOneWidget);
-    expect(
-      find.text('No notes yet'),
-      findsNothing,
-      reason: 'Notes tab is offstage',
-    );
+    expect(find.text('Welcome to Corplex'), findsOneWidget);
     expect(find.text('Import PDF'), findsOneWidget);
+
+    // Once anything exists, the welcome goes and the usual empty states
+    // take over.
+    await db
+        .into(db.notes)
+        .insert(NotesCompanion.insert(title: const Value('First')));
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome to Corplex'), findsNothing);
+    expect(find.text('Your library is empty'), findsOneWidget);
 
     await _disposeTree(tester);
   });
@@ -747,7 +752,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Back on the library, which no longer lists it.
-      expect(find.text('Your library is empty'), findsOneWidget);
+      // Nothing left at all: back to the first-launch welcome.
+      expect(find.text('Welcome to Corplex'), findsOneWidget);
 
       // Account sheet -> Trash -> Restore.
       await tester.tap(find.byTooltip('Sign in'));

@@ -1,3 +1,5 @@
+import '../library/authors.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -91,7 +93,7 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
                           subtitle: paper.authors.isEmpty
                               ? null
                               : Text(
-                                  paper.authors,
+                                  displayAuthors(paper.authors),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),

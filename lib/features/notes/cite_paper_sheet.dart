@@ -1,3 +1,5 @@
+import '../library/authors.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -67,7 +69,8 @@ class _CitePaperSheetState extends ConsumerState<_CitePaperSheet> {
                               ),
                               subtitle: Text(
                                 [
-                                  if (paper.authors.isNotEmpty) paper.authors,
+                                  if (paper.authors.isNotEmpty)
+                                    displayAuthors(paper.authors),
                                   if (paper.year != null) '${paper.year}',
                                 ].join(' · '),
                                 maxLines: 1,

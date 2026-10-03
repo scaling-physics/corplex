@@ -116,9 +116,64 @@ class MetadataLookup {
     }
   }
 
+  /// For a PDF that prints no DOI or arXiv ID: searches Crossref with the
+  /// start of its first page and accepts a result only if that paper's
+  /// title is printed there too, so a loose search match can't attach
+  /// the wrong paper. Null when nothing matches.
+  Future<PaperMetadata?> searchByFirstPage(String pageText) async {
+    final page = _normalizeTitle(pageText);
+    // Titles, authors and the abstract's start: plenty for the search.
+    final query = pageText.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (page.split(' ').length < 8) return null;
+    final uri = Uri.https('api.crossref.org', '/works', {
+      'query.bibliographic': query.length > 300
+          ? query.substring(0, 300)
+          : query,
+      'rows': '5',
+      'select': 'DOI,title,author,issued,published,container-title,publisher',
+      ?(contactEmail == null ? null : 'mailto'): contactEmail,
+    });
+    final response = await _get(uri);
+    if (response.statusCode != 200) throw const LookupFailed();
+    final List<dynamic> items;
+    try {
+      final message =
+          (jsonDecode(response.body) as Map<String, dynamic>)['message']
+              as Map<String, dynamic>;
+      items = message['items'] as List<dynamic>? ?? const [];
+    } catch (_) {
+      throw const LookupFailed();
+    }
+    // Years printed on the page (conference, copyright, arXiv stamp).
+    final years = {
+      for (final m in RegExp(r'\b(19|20)\d\d\b').allMatches(pageText))
+        int.parse(m.group(0)!),
+    };
+    for (final item in items) {
+      if (item is! Map<String, dynamic>) continue;
+      final meta = parseCrossref({'message': item});
+      if (meta == null) continue;
+      final title = _normalizeTitle(meta.title);
+      final families = [
+        for (final a in parseAuthors(meta.authors).authors)
+          _normalizeTitle(a.family),
+      ];
+      // Crossref also holds re-posted copies of famous papers under other
+      // publishers; demand everything a real match would have:
+      if (title.split(' ').length < 4 || !page.contains(title)) continue;
+      if (!families.any((f) => f.isNotEmpty && page.contains(f))) continue;
+      if (_first(item['container-title']) == null) continue;
+      if (years.isNotEmpty && !years.contains(meta.year)) continue;
+      return meta;
+    }
+    return null;
+  }
+
   Future<PaperMetadata?> arxiv(String id) async {
     final response = await _get(
-      Uri.http('export.arxiv.org', '/api/query', {'id_list': id}),
+      // https: Android release builds refuse plain http, so an http
+      // lookup failed silently on phones (it worked in debug and tests).
+      Uri.https('export.arxiv.org', '/api/query', {'id_list': id}),
     );
     if (response.statusCode != 200) throw const LookupFailed();
     return parseArxiv(response.body, id);

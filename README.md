@@ -41,10 +41,11 @@ note.
 
 ### Bring in a paper
 
-In **Library**, tap **Import PDF** and pick the file. Type its DOI or
-arXiv ID and tap **Look up** — Corplex fills in the authors, venue and
-year, and every citation style (APA, MLA, Chicago, Harvard, IEEE,
-BibTeX) is ready to copy.
+In **Library**, tap **Import PDF** and pick the file. Corplex finds the
+paper's DOI or arXiv ID (or its title) and fills in the authors, venue
+and year by itself; if it can't, type the DOI and tap **Look up**. Every
+citation style (APA, MLA, Chicago, Harvard, IEEE, BibTeX) is then ready
+to copy.
 
 You can also share a PDF or a link *into* Corplex from other apps on
 Android, or import a whole reference library from Zotero, Mendeley or
@@ -75,9 +76,12 @@ side, and quotes drop straight into the open note.
 
 ### Cite as you write
 
-Type **[@** anywhere in a note to cite a paper from your library. When
+Type **[@** anywhere in a note to cite a paper from your library — it
+shows as *(Vaswani et al., 2017)*, and tapping it opens the paper. When
 you're done, choose **More → Add bibliography** and pick a style — the
 reference list is written for you, and updated if you run it again.
+Type **/** for everything else a note can do: draw, link a note, add a
+heading, attach a file, start a literature-note template.
 
 **More → Export** turns a note (or a whole project) into Markdown, Word
 or PDF with the citations and references resolved.

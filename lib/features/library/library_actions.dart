@@ -168,14 +168,22 @@ Future<void> enrichImportedPaper(
   String pdfPath, {
   required String importedTitle,
 }) async {
+  // Everything from the widget is taken now: the widget that started the
+  // import may be gone by the time the lookup answers (the first-launch
+  // welcome disappears as soon as the paper exists).
   final messenger = ScaffoldMessenger.maybeOf(context);
+  final lookup = ref.read(metadataLookupProvider);
+  final db = ref.read(databaseProvider);
   try {
-    final id = await identifierFromPdf(pdfPath);
-    if (id == null) return;
-    final meta = await ref.read(metadataLookupProvider).lookup(id);
+    final start = await readPdfStart(pdfPath);
+    final id = start.id;
+    // No DOI or arXiv ID printed (many conference papers): search by the
+    // title on the first page instead.
+    final meta = id != null
+        ? await lookup.lookup(id)
+        : await lookup.searchByFirstPage(start.firstPage);
     if (meta == null) return;
 
-    final db = ref.read(databaseProvider);
     final duplicate = await findDuplicate(db, meta, excludePaperId: paperId);
     // The imported title is just the file name; replace it — but not a
     // title the reader has already typed in the meantime.
@@ -183,21 +191,29 @@ Future<void> enrichImportedPaper(
       db.papers,
     )..where((p) => p.id.equals(paperId))).getSingleOrNull();
     if (current == null) return;
-    await fillMissingMetadata(
+    final filled = await fillMissingMetadata(
       db,
       paperId,
       meta,
       replaceTitle: current.title == importedTitle,
     );
-    if (duplicate != null && context.mounted) {
+    if (filled && duplicate == null) {
+      // Quietly say so: the title on screen just changed by itself.
       messenger
         ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Found the details for “${meta.title}”')),
+        );
+    }
+    if (duplicate != null && messenger != null) {
+      messenger
+        ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
             content: Text('Looks like “${duplicate.title}” is already here.'),
             action: SnackBarAction(
               label: 'Open',
-              onPressed: () => _openPaper(context, duplicate.id),
+              onPressed: () => _openPaper(messenger.context, duplicate.id),
             ),
           ),
         );
@@ -207,16 +223,21 @@ Future<void> enrichImportedPaper(
   }
 }
 
-/// Reads the first pages of a PDF looking for a printed DOI or arXiv ID.
-Future<PaperIdentifier?> identifierFromPdf(String path) async {
+/// Reads the first pages of a PDF: a printed DOI or arXiv ID, if any, and
+/// the first page's text (for a title search when there's no ID).
+Future<({PaperIdentifier? id, String firstPage})> readPdfStart(
+  String path,
+) async {
   final document = await PdfDocument.openFile(path);
   try {
-    for (final page in document.pages.take(2)) {
-      final text = await page.loadStructuredText();
-      final id = findIdentifierInText(text.fullText);
-      if (id != null) return id;
+    var firstPage = '';
+    for (final (i, page) in document.pages.take(2).indexed) {
+      final text = (await page.loadStructuredText()).fullText;
+      if (i == 0) firstPage = text;
+      final id = findIdentifierInText(text);
+      if (id != null) return (id: id, firstPage: firstPage);
     }
-    return null;
+    return (id: null, firstPage: firstPage);
   } finally {
     await document.dispose();
   }

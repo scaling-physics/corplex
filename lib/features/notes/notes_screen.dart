@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../home/getting_started.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import 'folders_providers.dart';
@@ -92,6 +93,9 @@ class NotesScreen extends ConsumerWidget {
                   Center(child: Text('Something went wrong: $error')),
               data: (notes) {
                 if (notes.isEmpty) {
+                  if (filter is AllNotes && ref.watch(isFreshStartProvider)) {
+                    return const GettingStarted();
+                  }
                   return filter is AllNotes
                       ? const EmptyState(
                           icon: Icons.edit_note_outlined,

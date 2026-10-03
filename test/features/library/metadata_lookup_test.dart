@@ -117,7 +117,10 @@ void main() {
 
     test('Crossref: unknown DOI is null; server trouble throws', () async {
       final id = const PaperIdentifier(IdentifierKind.doi, '10.1/none');
-      expect(await withResponse((_) => http.Response('', 404)).lookup(id), isNull);
+      expect(
+        await withResponse((_) => http.Response('', 404)).lookup(id),
+        isNull,
+      );
       await expectLater(
         withResponse((_) => http.Response('', 500)).lookup(id),
         throwsA(isA<LookupFailed>()),
@@ -125,8 +128,12 @@ void main() {
     });
 
     test('arXiv: title whitespace collapsed, authors and year', () async {
-      final meta = await withResponse((_) => http.Response(_arxivBody, 200))
-          .lookup(const PaperIdentifier(IdentifierKind.arxiv, '1706.03762'));
+      Uri? asked;
+      final meta = await withResponse((req) {
+        asked = req.url;
+        return http.Response(_arxivBody, 200);
+      }).lookup(const PaperIdentifier(IdentifierKind.arxiv, '1706.03762'));
+      expect(asked!.scheme, 'https', reason: 'Android blocks plain http');
       expect(meta!.title, 'Attention Is All You Need');
       expect(meta.authors, 'Vaswani, Ashish; Shazeer, Noam');
       expect(meta.year, 2017);
@@ -144,6 +151,90 @@ void main() {
       expect(meta, isNull);
     });
 
+    group('searching by a first page with no ID', () {
+      const page =
+          'Proceedings of NeurIPS 2017\nAttention Is All You Need\n'
+          'Ashish Vaswani Google Brain Noam Shazeer Google Brain\n'
+          'Abstract The dominant sequence transduction models are based on';
+      String results(List<String> titles) => jsonEncode({
+        'message': {
+          'items': [
+            for (final (i, t) in titles.indexed)
+              {
+                'DOI': '10.1/$i',
+                'title': [t],
+                'author': [
+                  {'family': 'Vaswani', 'given': 'Ashish'},
+                ],
+                'issued': {
+                  'date-parts': [
+                    [2017],
+                  ],
+                },
+                'container-title': ['NeurIPS'],
+              },
+          ],
+        },
+      });
+
+      test('takes the result whose title is printed on the page', () async {
+        Uri? asked;
+        final meta = await withResponse((req) {
+          asked = req.url;
+          return http.Response(
+            results([
+              'Attention Is Not Explanation',
+              'Attention is all you need',
+            ]),
+            200,
+          );
+        }).searchByFirstPage(page);
+        expect(
+          asked!.queryParameters['query.bibliographic'],
+          contains('Attention Is All You Need'),
+        );
+        expect(meta!.doi, '10.1/1');
+        expect(meta.year, 2017);
+      });
+
+      test('a copy re-posted elsewhere is not taken', () async {
+        final copy = jsonDecode(results(['Attention Is All You Need'])) as Map;
+        final item = (copy['message']['items'] as List).single as Map;
+        // No journal, and a year the page doesn't print.
+        item.remove('container-title');
+        final noVenue = await withResponse(
+          (_) => http.Response(jsonEncode(copy), 200),
+        ).searchByFirstPage(page);
+        expect(noVenue, isNull);
+        item['container-title'] = ['Some Journal'];
+        item['issued'] = {
+          'date-parts': [
+            [2025],
+          ],
+        };
+        final wrongYear = await withResponse(
+          (_) => http.Response(jsonEncode(copy), 200),
+        ).searchByFirstPage(page);
+        expect(wrongYear, isNull);
+      });
+
+      test('a near miss is not taken', () async {
+        final meta = await withResponse(
+          (_) => http.Response(results(['Attention Is Not Explanation']), 200),
+        ).searchByFirstPage(page);
+        expect(meta, isNull);
+      });
+
+      test('too little text to search is not searched', () async {
+        var asked = false;
+        final meta = await withResponse((_) {
+          asked = true;
+          return http.Response(results([]), 200);
+        }).searchByFirstPage('Scanned page');
+        expect((meta, asked), (null, false));
+      });
+    });
+
     test('a network error is a LookupFailed, not a crash', () async {
       final lookup = MetadataLookup(
         client: MockClient((_) async => throw Exception('offline')),
@@ -157,9 +248,8 @@ void main() {
     test('Crossref titles lose markup', () {
       final meta = parseCrossref(
         jsonDecode(
-              '{"message":{"title":["The <i>E. coli</i> genome"],"issued":{"date-parts":[[2020]]}}}',
-            )
-            as Map<String, dynamic>,
+          '{"message":{"title":["The <i>E. coli</i> genome"],"issued":{"date-parts":[[2020]]}}}',
+        ) as Map<String, dynamic>,
       );
       expect(meta!.title, 'The E. coli genome');
     });
@@ -170,14 +260,16 @@ void main() {
 
     setUp(() async {
       db = AppDatabase.inMemoryForTesting();
-      await db.into(db.papers).insert(
-        PapersCompanion.insert(
-          id: const Value('p1'),
-          title: 'Attention Is All You Need',
-          year: const Value(2017),
-          doi: const Value('10.5555/3295222.3295349'),
-        ),
-      );
+      await db
+          .into(db.papers)
+          .insert(
+            PapersCompanion.insert(
+              id: const Value('p1'),
+              title: 'Attention Is All You Need',
+              year: const Value(2017),
+              doi: const Value('10.5555/3295222.3295349'),
+            ),
+          );
     });
     tearDown(() => db.close());
 
@@ -228,7 +320,11 @@ void main() {
 
       final fresh = await addPaperFromMetadata(
         db,
-        const PaperMetadata(title: 'BERT', authors: 'Devlin, Jacob', year: 2018),
+        const PaperMetadata(
+          title: 'BERT',
+          authors: 'Devlin, Jacob',
+          year: 2018,
+        ),
         id: 'p3',
       );
       expect(fresh.id, 'p3');
@@ -236,13 +332,15 @@ void main() {
     });
 
     test('fillMissingMetadata only fills what is empty', () async {
-      await db.into(db.papers).insert(
-        PapersCompanion.insert(
-          id: const Value('p9'),
-          title: 'My own title',
-          authors: const Value('Typed, Myself'),
-        ),
-      );
+      await db
+          .into(db.papers)
+          .insert(
+            PapersCompanion.insert(
+              id: const Value('p9'),
+              title: 'My own title',
+              authors: const Value('Typed, Myself'),
+            ),
+          );
       final changed = await fillMissingMetadata(
         db,
         'p9',
@@ -255,7 +353,9 @@ void main() {
         ),
       );
       expect(changed, isTrue);
-      final paper = await (db.select(db.papers)..where((p) => p.id.equals('p9'))).getSingle();
+      final paper = await (db.select(
+        db.papers,
+      )..where((p) => p.id.equals('p9'))).getSingle();
       expect(paper.title, 'My own title');
       expect(paper.authors, 'Typed, Myself');
       expect(paper.year, 2015);
@@ -264,7 +364,11 @@ void main() {
 
       // Nothing left to fill.
       expect(
-        await fillMissingMetadata(db, 'p9', const PaperMetadata(title: 'x', year: 1999)),
+        await fillMissingMetadata(
+          db,
+          'p9',
+          const PaperMetadata(title: 'x', year: 1999),
+        ),
         isFalse,
       );
     });

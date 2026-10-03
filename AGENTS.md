@@ -126,8 +126,17 @@ the default screens until the user opts in by using the feature.
 - **Citations**: every paper can get a stable `citekey` (`Papers.citekey`,
   synced; `ensureCitekey` in `features/library/citations.dart` assigns
   `vaswani2017`, `…a` on collision, once, never changed). In a note, type
-  `[@` or ⋮ → "Cite a paper" to insert plain-text `[@key]` (also
-  `[@a; @b]`); ⋮ → "Add bibliography" writes/rewrites a "References" H2 at
+  `[@`, `/` → "Cite a paper", or ⋮ → "Cite a paper". Citations are
+  *stored* as plain-text `[@key]` (also `[@a; @b]`) but the editor shows
+  them as chips reading "(Vaswani et al., 2017)" (`citation_embed.dart`):
+  `citationsToEmbeds` turns markers into inline `cite` embeds on load and
+  `citationEmbedsToText` turns them back on save, so export, bibliography,
+  search, sync and merge only ever see text. The editor's `_stored()` /
+  `_editable()` are the only crossing points; anything reading the live
+  controller must use `textWithCitations` (as `insertBibliography`
+  does), since a chip is one `\uFFFC` in `toPlainText()`. Unknown keys
+  show as written, in the error tone; tap a chip to open its paper.
+  ⋮ → "Add bibliography" writes/rewrites a "References" H2 at
   the end in a chosen style (`note_bibliography.dart`). Styles: APA, MLA,
   Chicago (author-date), Harvard, IEEE (numbered), BibTeX
   (`citation_formatter.dart`, hand-written, not CSL).
@@ -258,6 +267,23 @@ the default screens until the user opts in by using the feature.
   owned by `HomeShell` (`New note` / `Import PDF`), morphing between tabs.
   The actions themselves are top-level functions (`createNote`,
   `importPaper`) next to their screens.
+- **Note commands**: typing `/` at the start of a line or after a space
+  opens a sheet of the note's less obvious actions (cite, link a note,
+  draw, heading, attach, literature template, bibliography); "and/or"
+  doesn't trigger it, and dismissing leaves the `/`.
+- **First launch**: while there are no notes and no papers
+  (`isFreshStartProvider`), both tabs show `GettingStarted` — three steps
+  and "Import your first paper" — instead of the plain empty states. It
+  goes away by itself once anything exists; nothing to dismiss or store.
+  Anything it starts must not rely on its own `WidgetRef` afterwards: it
+  disappears the moment a paper is inserted (`enrichImportedPaper` reads
+  its providers up front for this reason).
+- **Readable names**: stored authors (`Vaswani, Ashish; …`) display via
+  `displayAuthors` / `authorsSummary` ("Ashish Vaswani, Noam Shazeer,
+  Niki Parmar + 5 more"; the paper screen shows the raw field on tap).
+  Files become titles via `titleFromFileName`; attachments display through
+  `Attachment.label` (`data/attachment_label.dart`), which also feeds the
+  lock screen.
 
 ## Conventions
 
@@ -312,8 +338,18 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   the live services — and distinguishes "not found" (null) from "couldn't
   reach" (`LookupFailed`). Importing a PDF reads its first two pages for a
   printed DOI/arXiv id, looks it up, and `fillMissingMetadata` fills only
-  empty fields (the title is replaced only if it's still the file name);
-  all silent and optional. `findDuplicate` matches by DOI or normalized
+  empty fields (the title is replaced only if it's still the file name),
+  then says "Found the details for …". With no id printed,
+  `searchByFirstPage` queries Crossref with the first page's text and
+  accepts a result only if its title (4+ words) *and* an author's family
+  name are printed on the page, it has a journal/conference, and — when
+  the page prints years — its year is one of them: Crossref holds
+  re-posted copies of famous papers (same title and authors, another
+  publisher, no venue, a recent year). arXiv lookups must use **https**:
+  Android release builds block cleartext http, which made arXiv lookups
+  fail silently on phones while passing in debug and tests. arXiv papers
+  get arXiv's DOI (`10.48550/arXiv.<id>`) when the feed names no journal
+  DOI, and "Look up" falls back to an arXiv id in the venue field. `findDuplicate` matches by DOI or normalized
   title (+ compatible year) and is used by add-by-ID, BibTeX import and
   PDF enrichment. `parseBibtex` is a real tokenizer (nested braces,
   `"…"`, `@string`, LaTeX accents, DOI from `url`); `exportBibtex` makes

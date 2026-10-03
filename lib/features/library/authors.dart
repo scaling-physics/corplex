@@ -192,3 +192,10 @@ String authorsSummary(AuthorList list, {int max = 3}) {
       : '${names.take(names.length - 1).join(', ')} and ${names.last}';
   return list.etAl ? '$shown et al.' : shown;
 }
+
+/// [authorsSummary] for a stored authors string, or the string itself if
+/// it can't be read as names.
+String displayAuthors(String raw, {int max = 3}) {
+  final summary = authorsSummary(parseAuthors(raw), max: max);
+  return summary.isEmpty ? raw : summary;
+}

@@ -25,6 +25,7 @@ import '../projects/projects_providers.dart';
 import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
 import 'cite_paper_sheet.dart';
+import 'citation_embed.dart';
 import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
@@ -126,14 +127,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     )..where((n) => n.id.equals(widget.noteId))).getSingleOrNull();
 
     _quillController = QuillController(
-      document: note == null ? Document() : decodeNoteContent(note.content),
+      document: note == null ? Document() : _editable(note.content),
       selection: const TextSelection.collapsed(offset: 0),
     );
     if (note != null && mounted) {
       _titleController.text = note.title;
     }
     _savedTitle = _titleController.text;
-    _savedContent = encodeNoteContent(_quillController.document);
+    _savedContent = _stored();
     // Attached after the initial text is in place, so loading isn't an edit.
     _titleController.addListener(_scheduleSave);
     _quillController.addListener(_scheduleSave);
@@ -151,18 +152,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     String? comment,
   }) async {
     final content = appendQuote(
-      encodeNoteContent(_quillController.document),
+      _stored(),
       quote: quote,
       page: page,
       pageLink: pageLink,
       comment: comment,
     );
     await _docChanges?.cancel();
-    _quillController.document = decodeNoteContent(content);
+    _quillController.document = _editable(content);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
     await linkPaperToNote(_db, noteId: widget.noteId, paperId: paperId);
     _scheduleSave();
   }
+
+  /// The note as it is stored: citation chips written out as `[@key]`
+  /// (see `citation_embed.dart`).
+  String _stored() =>
+      citationEmbedsToText(encodeNoteContent(_quillController.document));
+
+  /// Stored content as the editor shows it, with citations as chips.
+  static Document _editable(String stored) =>
+      decodeNoteContent(citationsToEmbeds(stored));
 
   void _scheduleSave() {
     _debounce?.cancel();
@@ -172,7 +182,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _save() async {
     _debounce?.cancel();
     final title = _titleController.text;
-    final content = encodeNoteContent(_quillController.document);
+    final content = _stored();
     if (title == _savedTitle && content == _savedContent) return;
     _savedTitle = title;
     _savedContent = content;
@@ -210,7 +220,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     // in the database is the same note as its Delta form.
     final theirs = encodeNoteContent(decodeNoteContent(note.content));
     if (theirs == _savedContent || _ownContents.contains(theirs)) return;
-    final current = encodeNoteContent(_quillController.document);
+    final current = _stored();
     final merged = current == _savedContent
         ? theirs
         : mergeNoteContent(_savedContent, current, theirs) ?? current;
@@ -219,7 +229,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     final cursor = _quillController.selection;
     _docChanges?.cancel();
-    final document = decodeNoteContent(merged);
+    final document = _editable(merged);
     _quillController.document = document;
     _docChanges = document.changes.listen(_watchForWikilink);
     final max = document.length - 1;
@@ -348,6 +358,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       if (op.isRetain) {
         at += op.length!;
       } else if (op.isInsert) {
+        if (op.data == '/') {
+          _maybeShowCommands(at);
+          return;
+        }
         if (op.data == '[' || op.data == '@') end = at + 1;
         break;
       }
@@ -376,6 +390,67 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     });
   }
 
+  /// A "/" typed at the start of a line or after a space opens the
+  /// command list — the note's less obvious actions, without hunting
+  /// through menus. "and/or" or a URL doesn't trigger it; dismissing the
+  /// list leaves the "/" as typed.
+  void _maybeShowCommands(int slashAt) {
+    final text = _quillController.document.toPlainText();
+    if (slashAt >= text.length || text[slashAt] != '/') return;
+    if (slashAt > 0 && !RegExp(r'\s').hasMatch(text[slashAt - 1])) return;
+    Future.microtask(() async {
+      if (!mounted) return;
+      final command = await showModalBottomSheet<_Command>(
+        context: context,
+        showDragHandle: true,
+        // Sized to the list, so every command shows without scrolling.
+        isScrollControlled: true,
+        builder: (context) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final c in _Command.values)
+                ListTile(
+                  leading: Icon(c.icon),
+                  title: Text(c.label),
+                  subtitle: Text(c.hint),
+                  onTap: () => Navigator.pop(context, c),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (command == null || !mounted) return;
+      // Remove the "/" if it's still where it was typed.
+      final now = _quillController.document.toPlainText();
+      if (slashAt < now.length && now[slashAt] == '/') {
+        _quillController.replaceText(
+          slashAt,
+          1,
+          '',
+          TextSelection.collapsed(offset: slashAt),
+        );
+      }
+      if (!mounted) return;
+      switch (command) {
+        case _Command.cite:
+          await _citePaper(context);
+        case _Command.link:
+          await _linkNote(context);
+        case _Command.draw:
+          await insertSketch(context, _quillController);
+        case _Command.heading:
+          _quillController.formatSelection(Attribute.h2);
+        case _Command.template:
+          _insertTemplate();
+        case _Command.bibliography:
+          await _addBibliography(context);
+        case _Command.attach:
+          await _attach(context);
+      }
+    });
+  }
+
   /// Inserts `[@citekey]` for a chosen paper at the cursor (assigning the
   /// paper its citekey the first time).
   Future<void> _citePaper(BuildContext context) async {
@@ -387,12 +462,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final docEnd = controller.document.length - 1;
     final cursor = controller.selection.baseOffset;
     final index = cursor < 0 || cursor > docEnd ? docEnd : cursor;
-    final marker = citationMarker(key);
-    controller.replaceText(index, 0, '$marker ', null);
-    controller.updateSelection(
-      TextSelection.collapsed(offset: index + marker.length + 1),
-      ChangeSource.local,
-    );
+    insertCitation(controller, index, key);
   }
 
   void _insertTemplate() {
@@ -490,10 +560,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await _save();
     if (!context.mounted) return;
     await exportNotes(context, ref.read(databaseProvider), [
-      ExportNote(
-        _titleController.text,
-        encodeNoteContent(_quillController.document),
-      ),
+      ExportNote(_titleController.text, _stored()),
     ], title: _titleController.text);
   }
 
@@ -819,7 +886,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       padding: EdgeInsets.zero,
                       placeholder: 'Start writing…',
                       customLinkPrefixes: const [audioLinkScheme],
-                      embedBuilders: const [SketchEmbedBuilder()],
+                      embedBuilders: const [
+                        SketchEmbedBuilder(),
+                        CitationEmbedBuilder(),
+                      ],
                       // Audio timestamps play on a plain tap; other links
                       // keep Quill's default long-press menu.
                       customRecognizerBuilder: (attribute, leaf) {
@@ -1183,4 +1253,33 @@ class _TextStyleButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What "/" in a note offers.
+enum _Command {
+  cite(
+    'Cite a paper',
+    'Insert a citation from your library',
+    Icons.format_quote,
+  ),
+  link('Link to a note', 'Or type [[', Icons.link),
+  draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
+  heading('Heading', 'Make this line a heading', Icons.title),
+  attach('Attach', 'Audio, an image or a file', Icons.attach_file),
+  template(
+    'Literature note template',
+    'Summary, method, findings, critique',
+    Icons.article_outlined,
+  ),
+  bibliography(
+    'Add bibliography',
+    'A reference list of what this note cites',
+    Icons.list_alt,
+  );
+
+  const _Command(this.label, this.hint, this.icon);
+
+  final String label;
+  final String hint;
+  final IconData icon;
 }

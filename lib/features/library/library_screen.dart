@@ -1,3 +1,5 @@
+import 'authors.dart';
+
 import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
@@ -6,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../home/getting_started.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
@@ -223,6 +226,9 @@ class LibraryScreen extends ConsumerWidget {
                   Center(child: Text('Something went wrong: $error')),
               data: (papers) {
                 if (papers.isEmpty) {
+                  if (!searching && ref.watch(isFreshStartProvider)) {
+                    return const GettingStarted();
+                  }
                   return searching
                       ? const EmptyState(
                           icon: Icons.search_off,
@@ -273,7 +279,7 @@ class _PaperCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final c = theme.colorScheme;
     final byline = [
-      if (paper.authors.isNotEmpty) paper.authors,
+      if (paper.authors.isNotEmpty) displayAuthors(paper.authors),
       if (paper.year case final year?) '$year',
     ].join(' · ');
 

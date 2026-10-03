@@ -268,6 +268,15 @@ the default screens until the user opts in by using the feature.
   default to an 800×600 screen, which is the *tablet* layout:
   `test/widget_test.dart` pins a phone size; tablet behaviour is covered in
   `test/features/home/tablet_layout_test.dart`.
+- **App icon**: a watercolour painted in code by
+  `tool/branding/watercolor_icon.py` (numpy/scipy/Pillow: transparent
+  glazes, edge pooling, granulation, blooms; the page is left as unpainted
+  paper). It writes `assets/branding/icon.png` (full-bleed, iOS/README),
+  `icon_background.png` + `icon_foreground.png` (Android adaptive layers;
+  the foreground is painted to the safe zone, so
+  `adaptive_icon_foreground_inset: 0`) and `icon_monochrome.png` (themed
+  icon); then `dart run flutter_launcher_icons`. The iOS launch image is
+  the rounded icon.
 - **Primary actions**: each tab's main action is one labelled extended FAB
   owned by `HomeShell` (`New note` / `Import PDF`), morphing between tabs.
   The actions themselves are top-level functions (`createNote`,

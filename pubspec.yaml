@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.0+5
+version: 1.3.1+6
 
 environment:
   sdk: ^3.13.3
@@ -122,15 +122,18 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# App icon (sources in assets/branding/; regenerate with
-# `dart run flutter_launcher_icons`).
+# App icon: a watercolour painted by tool/branding/watercolor_icon.py into
+# assets/branding/ (`python3 tool/branding/watercolor_icon.py`), then
+# installed with `dart run flutter_launcher_icons`.
 flutter_launcher_icons:
   image_path: "assets/branding/icon.png"
   android: true
   ios: true
   remove_alpha_ios: true
   image_path_ios_dark_transparent: "assets/branding/icon_foreground.png"
-  adaptive_icon_background: "#1F6A4E"
+  adaptive_icon_background: "assets/branding/icon_background.png"
   adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  # Already painted to the adaptive safe zone; no extra shrinking.
+  adaptive_icon_foreground_inset: 0
   adaptive_icon_monochrome: "assets/branding/icon_monochrome.png"
   min_sdk_android: 21

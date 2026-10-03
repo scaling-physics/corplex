@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/icon.png" width="112" alt="Corplex icon: a folded, annotated page on sage green">
+  <img src="assets/branding/icon.png" width="112" alt="Corplex icon: a watercolour page with a highlighted line and a marker, on a green wash">
 </p>
 
 <h1 align="center">Corplex</h1>

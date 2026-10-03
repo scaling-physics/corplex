@@ -21,6 +21,7 @@ import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
+import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
 import 'cite_paper_sheet.dart';
 import 'note_bibliography.dart';
@@ -106,6 +107,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   String? _savedTitle;
   String? _savedContent;
 
+  /// Recent values this editor saved. The database echoes each save back,
+  /// sometimes after a newer one; an echo is not an outside change.
+  final _ownTitles = <String>{};
+  final _ownContents = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -169,6 +175,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (title == _savedTitle && content == _savedContent) return;
     _savedTitle = title;
     _savedContent = content;
+    _remember(_ownTitles, title);
+    _remember(_ownContents, content);
     await (_db.update(
       _db.notes,
     )..where((n) => n.id.equals(widget.noteId))).write(
@@ -177,6 +185,49 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         content: Value(content),
         updatedAt: Value(DateTime.now()),
       ),
+    );
+  }
+
+  static void _remember(Set<String> recent, String value) {
+    recent
+      ..remove(value)
+      ..add(value);
+    if (recent.length > 20) recent.remove(recent.first);
+  }
+
+  /// The note changed in the database, not through this editor: a sync
+  /// pulled or merged another device's edit. Take it in, merging with
+  /// anything typed here since the last save, so the next autosave doesn't
+  /// write the stale text back over it.
+  void _absorbOutsideChange(Note note) {
+    if (note.title != _savedTitle && !_ownTitles.contains(note.title)) {
+      final untouched = _titleController.text == _savedTitle;
+      _savedTitle = note.title;
+      if (untouched) _titleController.text = note.title;
+    }
+    // Compared as the editor would save it: an empty or plain-text body
+    // in the database is the same note as its Delta form.
+    final theirs = encodeNoteContent(decodeNoteContent(note.content));
+    if (theirs == _savedContent || _ownContents.contains(theirs)) return;
+    final current = encodeNoteContent(_quillController.document);
+    final merged = current == _savedContent
+        ? theirs
+        : mergeNoteContent(_savedContent, current, theirs) ?? current;
+    _savedContent = theirs;
+    if (merged == current) return;
+
+    final cursor = _quillController.selection;
+    _docChanges?.cancel();
+    final document = decodeNoteContent(merged);
+    _quillController.document = document;
+    _docChanges = document.changes.listen(_watchForWikilink);
+    final max = document.length - 1;
+    _quillController.updateSelection(
+      TextSelection(
+        baseOffset: cursor.baseOffset.clamp(0, max),
+        extentOffset: cursor.extentOffset.clamp(0, max),
+      ),
+      ChangeSource.silent,
     );
   }
 
@@ -468,6 +519,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       attachmentsForNoteProvider(widget.noteId),
     );
     final noteAsync = ref.watch(noteByIdProvider(widget.noteId));
+    ref.listen(noteByIdProvider(widget.noteId), (_, next) {
+      if (next.value case final note? when _loaded) _absorbOutsideChange(note);
+    });
     final tagsAsync = ref.watch(tagsForNoteProvider(widget.noteId));
     final foldersAsync = ref.watch(foldersListProvider);
     final folderId = noteAsync.value?.folderId;
@@ -740,15 +794,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         children: attachments.map((a) {
                           if (a.type == AttachmentType.image &&
                               a.path != null) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                File(a.path!),
-                                width: 96,
-                                height: 96,
-                                fit: BoxFit.cover,
-                              ),
-                            );
+                            return _ImagePreview(path: a.path!);
                           }
                           return _AttachmentChip(attachment: a);
                         }).toList(),
@@ -973,6 +1019,62 @@ class _Backlinks extends ConsumerWidget {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// An image attached to the note, in its own shape (a snapped figure is
+/// usually wide; a square crop would cut it off). Tap to see it full screen
+/// and zoom in.
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Image, tap to enlarge',
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => _ImageViewer(path: path),
+          ),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 220),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              File(path),
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const SizedBox.square(
+                dimension: 96,
+                child: Icon(Icons.broken_image_outlined),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageViewer extends StatelessWidget {
+  const _ImageViewer({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: InteractiveViewer(
+        maxScale: 6,
+        child: Center(child: Image.file(File(path))),
+      ),
     );
   }
 }

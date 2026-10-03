@@ -62,7 +62,8 @@ EndNote (BibTeX, RIS or CSL JSON).
 Open the PDF, press and hold to select a passage, then choose
 **Highlight** or **Quote to note**. The quote lands in your note with a
 **p. 1** link — tap it later to jump straight back to that page. The
-paper reopens where you stopped reading.
+paper reopens where you stopped reading. For a figure or table, choose
+**More → Snapshot to a note** and drag a box around it.
 
 On a big screen, **Read with a note** puts the PDF and your note side by
 side, and quotes drop straight into the open note.
@@ -107,6 +108,7 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
 - **Search everything** — notes, papers and highlights, as you type.
 - **Audio** — attach a NotebookLM audio overview or a lecture recording,
   play it while you read, and drop tappable timestamps into your notes.
+  It keeps playing with the screen off, with lock-screen controls.
 - **Reading comfort** — sepia and night pages, the PDF's table of
   contents, star ratings, reading status, dark mode.
 - **Your data is safe** — deleted items go to a trash you can undo from,
@@ -135,7 +137,8 @@ Corplex is in active development and not yet in the app stores.
 Everything works without an account. To keep your library in step
 across devices, Corplex can sync to your own free
 [Supabase](https://supabase.com) project — your notes, papers and files
-stay in a database you control. Sign in from the account button in the
+stay in a database you control. If you edit the same note on two devices
+before they sync, both edits are kept. Sign in from the account button in the
 top right; the setup for the server side is in
 [`AGENTS.md`](AGENTS.md#status) under *Supabase config*.
 

@@ -155,9 +155,9 @@ the default screens until the user opts in by using the feature.
   exports its notes as chapters under one bibliography.
 - DOCX is hand-written OOXML (headings, lists, quotes, bold/italic/strike;
   links as `text (url)`). PDF uses the `pdf` package with Roboto embedded
-  from `assets/fonts/` (curly quotes and accents render); Roboto ships no
-  italic here, so italics print regular in PDFs. Sketches export as
-  "[Sketch]".
+  from `assets/fonts/` (curly quotes and accents render), including the
+  Italic and BoldItalic faces, so italics print as italics. Sketches
+  export as "[Sketch]".
 - **Not done: real CSL/citeproc.** Styles are hand-written formatters;
   fine for common cases, not a full CSL engine.
 
@@ -352,14 +352,18 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   so they scale correctly at any zoom/render resolution. Drawing uses
   pdfrx's `pageOverlaysBuilder` hook, which hands back each page's
   on-screen `Rect` — this is what lets the overlay track zoom/pan for
-  free instead of us reimplementing a transform. "Extract to note"
-  screenshots the whole viewer (`RepaintBoundary` + `toImage`), saves it
-  as a note image attachment, and auto-links the note to the paper — it
-  captures whatever's currently visible on screen, not a precisely
-  cropped single page.
+  free instead of us reimplementing a transform. **Snapshot to a note**
+  (viewer ⋮, `snapshot.dart`): drag a box around a figure or table (or
+  "Whole view"); the viewer is captured (`RepaintBoundary` + `toImage` at
+  2–3×) and cropped to the box, saved as a note image attachment with a
+  "From p. N" link back to the page, and the note is linked to the paper.
+  The reading-theme filter sits *outside* the boundary, so a snapshot
+  keeps the figure's real colours. Drags starting at the screen edge are
+  Android's back gesture, not a box.
 - **Note attachments UI**: the note editor now renders its own
   attachments (`lib/features/notes/note_attachments_providers.dart`) as
-  image thumbnails or file chips below the linked-paper chips — added
+  image previews in their own aspect ratio (up to 220 px high; tap for a
+  full-screen, zoomable view) or file chips below the linked-paper chips — added
   specifically so extracted highlight screenshots are visible, since the
   `Attachments` table supported `noteId` from the start but nothing
   rendered it in the note editor until now.
@@ -451,9 +455,27 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     notes. **Every new migration file must be applied to the hosted
     project by its owner before the matching app version's data syncs.**
   * **Conflicts** are last-write-wins per row on client `updated_at`,
-    enforced on both ends (server `sync_guard` trigger; client `_apply`).
-    Two devices editing the same note offline: the later edit wins
-    wholesale — no merging. Device clocks are trusted for this.
+    enforced on both ends (server `sync_guard` trigger; client `_apply`),
+    *except* that concurrent edits to the same row are merged first
+    (schema v11). The first local edit of a row since it last synced saves
+    its old version in `sync_base` (update trigger, rows with an `id` key
+    only). Before pushing such a row, `_mergeConcurrentEdits` fetches the
+    server copy (`SyncRemote.fetchRows`); if it changed since the base,
+    `mergeRow` (`merge.dart`) merges field by field — a field only one side
+    changed takes that change; a note body both changed is merged by lines
+    (diff3 over Delta lines, formatting kept; where both rewrote the same
+    paragraph, both versions are kept, this device's first); any other
+    field both changed keeps the later edit. The merged row is stamped
+    newer than the server's and pushed; the base is dropped after the push
+    (or replaced by the pushed version if the row was edited mid-push).
+    A delete on one side vs an edit on the other is still plain LWW.
+    Device clocks are trusted for this. **An open note editor absorbs
+    outside changes** (`_absorbOutsideChange`): a pulled or merged body is
+    merged with whatever was typed since the last save, so the next
+    autosave can't write stale text back — this matters most on iPad,
+    where a note stays open in the detail pane. The editor ignores echoes
+    of its own recent saves (`_ownContents`) and compares bodies in
+    normalised Delta form.
   * **Accounts**: a database syncs for exactly one user. Data created
     signed-out uploads to whoever signs in first; a *different* account
     then gets `SyncAccountMismatch` rather than mixing libraries. Two
@@ -529,8 +551,21 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   `▸` not `▶` (Android renders ▶ as an emoji); just_audio's `playing`
   stays true after a track completes, so `JustAudioEngine` derives it
   from `playerStateStream`; its `play()` future only completes when
-  playback stops, so don't await it. Not built yet: background/lock-screen
-  playback controls (`just_audio_background`), share-sheet import.
+  playback stops, so don't await it. **Background playback**:
+  `just_audio_background` (`JustAudioEngine.initBackground()` in `main`)
+  keeps audio going with the screen off and shows lock-screen /
+  notification controls with the recording's title (`load(title:)`);
+  closing the player `stop()`s, which clears them. Android needs
+  `MainActivity : AudioServiceActivity`, the `AudioService` service and
+  `MediaButtonReceiver` in the manifest, the foreground-service
+  permissions, the monochrome `drawable/ic_stat_corplex` notification
+  icon, and `res/raw/keep.xml` — release resource shrinking otherwise
+  strips audio_service's button icons (looked up by name) and the
+  notification fails to build. iOS needs `UIBackgroundModes: audio`.
+  Verified on the Android emulator; untested on a real iPhone/iPad.
+  The player bar uses `Center(heightFactor: 1)`: as a Scaffold's
+  `bottomNavigationBar` it is offered the full screen height, and a plain
+  `Center` once took all of it and hid the page.
 - **Android manifest**: `INTERNET` is declared in the *main* manifest.
   Debug/profile manifests add it implicitly, so leaving it out breaks
   sync and streaming only in release builds.

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../data/database.dart';
 import 'audio_link.dart';
@@ -15,9 +16,14 @@ abstract class AudioEngine {
   Stream<Duration?> get durationStream;
   Stream<bool> get playingStream;
 
-  Future<void> load({String? path, String? url});
+  /// Loads a recording. [title] is what the lock screen and the
+  /// notification show while it plays.
+  Future<void> load({String? path, String? url, String title = ''});
   Future<void> play();
   Future<void> pause();
+
+  /// Stops and lets go of the recording (and its notification).
+  Future<void> stop();
   Future<void> seek(Duration position);
   Future<void> setSpeed(double speed);
   Future<void> dispose();
@@ -39,12 +45,27 @@ class JustAudioEngine implements AudioEngine {
       .map((s) => s.playing && s.processingState != ProcessingState.completed)
       .distinct();
 
+  /// Call once before the first player is made (from `main`): playback
+  /// then carries on in the background with lock-screen and notification
+  /// controls.
+  static Future<void> initBackground() => JustAudioBackground.init(
+    androidNotificationChannelId: 'com.corplex.corplex.audio',
+    androidNotificationChannelName: 'Audio playback',
+    androidNotificationIcon: 'drawable/ic_stat_corplex',
+    androidNotificationOngoing: true,
+  );
+
   @override
-  Future<void> load({String? path, String? url}) async {
+  Future<void> load({String? path, String? url, String title = ''}) async {
+    final tag = MediaItem(
+      id: path ?? url!,
+      title: title.isEmpty ? 'Recording' : title,
+      album: 'Corplex',
+    );
     if (path != null) {
-      await _player.setFilePath(path);
+      await _player.setFilePath(path, tag: tag);
     } else {
-      await _player.setUrl(url!);
+      await _player.setUrl(url!, tag: tag);
     }
   }
 
@@ -55,6 +76,9 @@ class JustAudioEngine implements AudioEngine {
 
   @override
   Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> stop() => _player.stop();
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
@@ -125,7 +149,11 @@ class AudioPlayback extends ChangeNotifier {
         _position = Duration.zero;
         _duration = null;
         notifyListeners();
-        await _engine.load(path: source.path, url: source.url);
+        await _engine.load(
+          path: source.path,
+          url: source.url,
+          title: attachment.title ?? attachment.path?.split('/').last ?? '',
+        );
         await _engine.setSpeed(_speed);
       }
       if (at != null) await _engine.seek(at);
@@ -165,7 +193,7 @@ class AudioPlayback extends ChangeNotifier {
 
   /// Stops and hides the player.
   Future<void> close() async {
-    await _engine.pause();
+    await _engine.stop();
     _current = null;
     _error = null;
     notifyListeners();

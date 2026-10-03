@@ -231,6 +231,47 @@ void main() {
     await _disposeTree(tester);
   });
 
+  testWidgets('the player sits at the bottom of a paper, under its content', (
+    tester,
+  ) async {
+    final audio = FakeAudioEngine();
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: const Value('p1'),
+            title: 'Attention Is All You Need',
+          ),
+        );
+    await db
+        .into(db.attachments)
+        .insert(
+          AttachmentsCompanion.insert(
+            paperId: const Value('p1'),
+            type: AttachmentType.podcast,
+            path: const Value('/device/overview.m4a'),
+            title: const Value('Audio overview'),
+          ),
+        );
+    await tester.pumpWidget(_appWithDb(db, audio: audio));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Attention Is All You Need'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Audio overview'));
+    await tester.pumpAndSettle();
+
+    // As a page's bottom bar the player once grew to the screen's height,
+    // hiding the whole page behind it.
+    expect(find.text('Attention Is All You Need'), findsOneWidget);
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    final bar = tester.getRect(find.byTooltip('Close player'));
+    expect(bar.top, greaterThan(screen.height * 0.75));
+
+    await _disposeTree(tester);
+  });
+
   testWidgets('drawing a sketch in a note with a stylus', (tester) async {
     await db
         .into(db.notes)

@@ -77,6 +77,7 @@ Future<File> createBackup(
       // or has synced.
       copy.execute('UPDATE sync_meta SET user_id = NULL, last_pull = NULL');
       copy.execute('DELETE FROM sync_tombstones');
+      copy.execute('DELETE FROM sync_base');
       // Derived; each device rebuilds its own (see SearchIndex).
       copy.execute('DROP TABLE IF EXISTS search_index');
     } finally {

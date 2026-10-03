@@ -60,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -146,7 +146,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 8) {
         // v8: projects (groups of papers and notes).
-        for (final table in <TableInfo>[projects, projectPapers, projectNotes]) {
+        for (final table in <TableInfo>[
+          projects,
+          projectPapers,
+          projectNotes,
+        ]) {
           if (!await _hasTable(table.actualTableName)) {
             await m.createTable(table);
           }
@@ -171,6 +175,13 @@ class AppDatabase extends _$AppDatabase {
           }
         }
         await _createSyncSchema();
+      }
+      if (from < 11) {
+        // v11: edits made on two devices are merged, which needs the
+        // last-synced version of each locally edited row (`sync_base`,
+        // saved by the update triggers). No new synced data, so nothing is
+        // queued for upload again.
+        await _createSyncSchema(markExisting: false);
       }
     },
   );
@@ -200,12 +211,15 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  Future<void> _createSyncSchema() async {
+  Future<void> _createSyncSchema({bool markExisting = true}) async {
     final tables = await customSelect(
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     ).get();
     final existing = {for (final t in tables) t.read<String>('name')};
-    for (final statement in syncSchemaStatements(existingTables: existing)) {
+    for (final statement in syncSchemaStatements(
+      existingTables: existing,
+      markExisting: markExisting,
+    )) {
       await customStatement(statement);
     }
   }

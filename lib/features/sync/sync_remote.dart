@@ -37,6 +37,10 @@ abstract class SyncRemote {
     String? sinceIso,
   });
 
+  /// The server's current rows with these `id`s (soft-deleted ones
+  /// included); ids it doesn't have are simply absent.
+  Future<List<Map<String, Object?>>> fetchRows(String table, List<String> ids);
+
   /// Every storage key referenced by a live (not deleted) paper or
   /// attachment row on the server.
   Future<Set<String>> liveStorageKeys();
@@ -107,6 +111,25 @@ class SupabaseSyncRemote implements SyncRemote {
       result.addAll(page.cast<Map<String, Object?>>());
       if (page.length < _pageSize) return result;
     }
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> fetchRows(
+    String table,
+    List<String> ids,
+  ) async {
+    final result = <Map<String, Object?>>[];
+    // Ids go in the URL; keep each request comfortably short.
+    for (var i = 0; i < ids.length; i += 100) {
+      final page = await _guard(
+        () => _client
+            .from(table)
+            .select()
+            .inFilter('id', ids.skip(i).take(100).toList()),
+      );
+      result.addAll(page.cast<Map<String, Object?>>());
+    }
+    return result;
   }
 
   @override

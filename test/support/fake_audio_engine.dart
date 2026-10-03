@@ -9,7 +9,7 @@ class FakeAudioEngine implements AudioEngine {
   final _duration = StreamController<Duration?>.broadcast();
   final _playing = StreamController<bool>.broadcast();
 
-  final loads = <({String? path, String? url})>[];
+  final loads = <({String? path, String? url, String title})>[];
   final seeks = <Duration>[];
   double speed = 1;
   bool isPlaying = false;
@@ -29,9 +29,9 @@ class FakeAudioEngine implements AudioEngine {
   void emitPosition(Duration p) => _position.add(p);
 
   @override
-  Future<void> load({String? path, String? url}) async {
+  Future<void> load({String? path, String? url, String title = ''}) async {
     if (failLoads) throw Exception('unsupported');
-    loads.add((path: path, url: url));
+    loads.add((path: path, url: url, title: title));
     _duration.add(fakeDuration);
   }
 
@@ -43,6 +43,15 @@ class FakeAudioEngine implements AudioEngine {
 
   @override
   Future<void> pause() async {
+    isPlaying = false;
+    _playing.add(false);
+  }
+
+  bool stopped = false;
+
+  @override
+  Future<void> stop() async {
+    stopped = true;
     isPlaying = false;
     _playing.add(false);
   }

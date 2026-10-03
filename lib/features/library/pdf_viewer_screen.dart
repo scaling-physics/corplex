@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -7,18 +6,16 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
-import '../../data/local_files.dart';
-import '../../data/tables/attachments_table.dart';
 import '../../theme/app_theme.dart';
 import '../notes/note_editor_screen.dart';
 import 'annotations_providers.dart';
 import 'highlights.dart';
 import '../settings/appearance_settings.dart';
 import 'quote_to_note.dart';
+import 'snapshot.dart';
 
 /// Reads a paper's PDF. Two ways to mark it up:
 ///
@@ -56,6 +53,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   bool _inkMode = false;
   Color _color = highlightInks.first;
   bool _extracting = false;
+
+  /// Choosing the area for "Snapshot to a note".
+  bool _snapping = false;
   Timer? _pageSave;
   int? _pendingPage;
 
@@ -198,7 +198,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
           PopupMenuButton<String>(
             tooltip: 'More',
             onSelected: (v) {
-              if (v == 'snapshot') _extractToNote();
+              if (v == 'snapshot') setState(() => _snapping = true);
               if (v == 'contents') _showContents();
               if (v.startsWith('read:')) {
                 ref
@@ -227,7 +227,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
                 enabled: !_extracting,
                 child: const ListTile(
                   leading: Icon(Icons.crop_free),
-                  title: Text('Snapshot view to a note'),
+                  title: Text('Snapshot to a note'),
                   subtitle: Text('For figures and tables'),
                 ),
               ),
@@ -235,50 +235,65 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
           ),
         ],
       ),
-      body: RepaintBoundary(
-        key: _repaintKey,
-        child: ColorFiltered(
-          colorFilter:
-              ref.watch(appearanceSettingsProvider).reading.filter ??
-              const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-          child: PdfViewer.file(
-            widget.pdfPath,
-            controller: _controller,
-            initialPageNumber: widget.initialPage ?? 1,
-            params: PdfViewerParams(
-              backgroundColor: c.surfaceContainer,
-              onPageChanged: _onPageChanged,
-              textSelectionParams: PdfTextSelectionParams(
-                enabled: !_inkMode,
-                buildSelectionHandle: (context, anchor, state) =>
-                    SelectionHandle(
-                      // pdfrx places handle A above-left of the first
-                      // character and B below-right of the last; each
-                      // teardrop points at its corner of the selection.
-                      pointsTo:
-                          (anchor.type == PdfTextSelectionAnchorType.a) ==
-                              (anchor.direction != PdfTextDirection.rtl &&
-                                  anchor.direction != PdfTextDirection.vrtl)
-                          ? Alignment.bottomRight
-                          : Alignment.topLeft,
-                      active:
-                          state !=
-                          PdfViewerTextSelectionAnchorHandleState.normal,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // The reading theme sits outside the boundary, so a snapshot
+          // keeps the figure's real colors.
+          ColorFiltered(
+            colorFilter:
+                ref.watch(appearanceSettingsProvider).reading.filter ??
+                const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+            child: RepaintBoundary(
+              key: _repaintKey,
+              child: PdfViewer.file(
+                widget.pdfPath,
+                controller: _controller,
+                initialPageNumber: widget.initialPage ?? 1,
+                params: PdfViewerParams(
+                  backgroundColor: c.surfaceContainer,
+                  onPageChanged: _onPageChanged,
+                  textSelectionParams: PdfTextSelectionParams(
+                    enabled: !_inkMode,
+                    buildSelectionHandle: (context, anchor, state) =>
+                        SelectionHandle(
+                          // pdfrx places handle A above-left of the first
+                          // character and B below-right of the last; each
+                          // teardrop points at its corner of the selection.
+                          pointsTo:
+                              (anchor.type == PdfTextSelectionAnchorType.a) ==
+                                  (anchor.direction != PdfTextDirection.rtl &&
+                                      anchor.direction != PdfTextDirection.vrtl)
+                              ? Alignment.bottomRight
+                              : Alignment.topLeft,
+                          active:
+                              state !=
+                              PdfViewerTextSelectionAnchorHandleState.normal,
+                        ),
+                  ),
+                  customizeContextMenuItems: _customizeMenu,
+                  pageOverlaysBuilder: (context, pageRect, page) => [
+                    _PageOverlay(
+                      paperId: widget.paperId,
+                      pageNumber: page.pageNumber,
+                      pageRect: pageRect,
+                      inkMode: _inkMode,
+                      color: _color,
                     ),
-              ),
-              customizeContextMenuItems: _customizeMenu,
-              pageOverlaysBuilder: (context, pageRect, page) => [
-                _PageOverlay(
-                  paperId: widget.paperId,
-                  pageNumber: page.pageNumber,
-                  pageRect: pageRect,
-                  inkMode: _inkMode,
-                  color: _color,
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          if (_snapping)
+            SnapshotOverlay(
+              onSelected: (area) {
+                setState(() => _snapping = false);
+                _extractToNote(area);
+              },
+              onCancel: () => setState(() => _snapping = false),
+            ),
+        ],
       ),
       // One palette for both kinds of marking: the ink for new strokes,
       // and the color the next text highlight gets.
@@ -313,53 +328,33 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
     );
   }
 
-  Future<void> _extractToNote() async {
+  /// Saves [area] of the reader (or all of it, when null) as an image in
+  /// a new note linked to this paper and page, and opens the note.
+  Future<void> _extractToNote(Rect? area) async {
     setState(() => _extracting = true);
     try {
       final boundary =
           _repaintKey.currentContext!.findRenderObject()
               as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 2);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = byteData!.buffer.asUint8List();
-
-      final path = await saveBytesToAppStorage(
-        bytes,
-        'attachments',
-        'highlight.png',
+      // Sharp enough to read a table's small print once zoomed in.
+      final ratio = MediaQuery.devicePixelRatioOf(context).clamp(2.0, 3.0);
+      final image = await boundary.toImage(pixelRatio: ratio);
+      final Uint8List png;
+      try {
+        png = await cropToPng(
+          image,
+          area ?? Offset.zero & boundary.size,
+          ratio,
+        );
+      } finally {
+        image.dispose();
+      }
+      final noteId = await createSnapshotNote(
+        _db,
+        paperId: widget.paperId,
+        page: _controller.pageNumber ?? 1,
+        png: png,
       );
-
-      final paper = await (_db.select(
-        _db.papers,
-      )..where((p) => p.id.equals(widget.paperId))).getSingle();
-
-      final noteId = const Uuid().v4();
-      await _db
-          .into(_db.notes)
-          .insert(
-            NotesCompanion.insert(
-              id: Value(noteId),
-              title: Value('Highlight from ${paper.title}'),
-            ),
-          );
-      await _db
-          .into(_db.attachments)
-          .insert(
-            AttachmentsCompanion.insert(
-              noteId: Value(noteId),
-              type: AttachmentType.image,
-              path: Value(path),
-            ),
-          );
-      await _db
-          .into(_db.notePaperRefs)
-          .insert(
-            NotePaperRefsCompanion.insert(
-              noteId: noteId,
-              paperId: widget.paperId,
-            ),
-          );
-
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: noteId)),

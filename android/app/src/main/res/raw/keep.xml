@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drawables looked up by name at runtime, which release resource
+     shrinking can't see: the audio notification's icon (named from Dart)
+     and audio_service's play/pause/skip buttons. Without these the
+     lock-screen and notification controls fail to build. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_corplex,@drawable/audio_service_*" />

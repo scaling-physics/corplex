@@ -6,13 +6,15 @@ import 'package:corplex/features/audio/audio_playback.dart';
 
 import '../../support/fake_audio_engine.dart';
 
-Attachment _audio(String id, {String? path = '/x/a.m4a'}) => Attachment(
-  id: id,
-  type: AttachmentType.podcast,
-  path: path,
-  createdAt: DateTime(2026),
-  updatedAt: DateTime(2026),
-);
+Attachment _audio(String id, {String? path = '/x/a.m4a', String? title}) =>
+    Attachment(
+      id: id,
+      type: AttachmentType.podcast,
+      path: path,
+      title: title,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+    );
 
 void main() {
   late FakeAudioEngine engine;
@@ -30,6 +32,16 @@ void main() {
     expect(engine.isPlaying, isTrue);
     expect(playback.current!.id, 'a1');
   });
+
+  test(
+    'the lock screen shows the recording\'s title, or its file name',
+    () async {
+      await playback.open(_audio('a1', title: 'Attention, explained'));
+      expect(engine.loads.single.title, 'Attention, explained');
+      await playback.open(_audio('a2', path: '/x/overview.m4a'));
+      expect(engine.loads.last.title, 'overview.m4a');
+    },
+  );
 
   test('re-opening the same recording seeks instead of reloading', () async {
     await playback.open(_audio('a1'));
@@ -80,6 +92,11 @@ void main() {
     await playback.open(_audio('a1'));
     await playback.close();
     expect(engine.isPlaying, isFalse);
+    expect(
+      engine.stopped,
+      isTrue,
+      reason: 'releases it, clearing the lock screen',
+    );
     expect(playback.current, isNull);
   });
 

@@ -1,5 +1,7 @@
 package com.corplex.corplex
 
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterActivity()
+// AudioServiceActivity (a FlutterActivity) shares the Flutter engine with
+// the background audio service, so playback survives the app going away.
+class MainActivity : AudioServiceActivity()

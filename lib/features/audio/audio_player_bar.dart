@@ -30,7 +30,10 @@ class AudioPlayerBar extends ConsumerWidget {
       child: current == null
           ? const SizedBox(width: double.infinity)
           // A floating card; on a tablet it keeps to the reading width.
+          // heightFactor 1: as a Scaffold's bottom bar it is offered the
+          // whole screen's height, and a plain Center would take it all.
           : Center(
+              heightFactor: 1,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: readableWidth),
                 child: _Bar(playback: playback, onMark: onMark),

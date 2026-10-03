@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../data/database.dart';
 import '../../data/sync_schema.dart';
 import 'file_sync.dart';
+import 'merge.dart';
 import 'sync_remote.dart';
 
 /// Thrown when the local database already belongs to a different account.
@@ -145,6 +146,7 @@ class SyncEngine {
       }
       await _db.customStatement('DELETE FROM sync_dirty');
       await _db.customStatement('DELETE FROM sync_tombstones');
+      await _db.customStatement('DELETE FROM sync_base');
       await _db.customStatement(
         'UPDATE sync_meta SET user_id = NULL, last_pull = NULL',
       );
@@ -163,6 +165,9 @@ class SyncEngine {
 
   Future<void> _push() async {
     for (final table in syncTables) {
+      if (table.mergeable) {
+        await _unlessOutdated(table.name, () => _mergeConcurrentEdits(table));
+      }
       final keyMatch = table.keys.map((k) => "'$k', t.$k").join(', ');
       final rows = await _db
           .customSelect(
@@ -185,6 +190,7 @@ class SyncEngine {
             await _db.customStatement('DELETE FROM sync_dirty WHERE id = ?', [
               row.read<int>('_seq'),
             ]);
+            if (table.mergeable) await _settleBase(table, row.data);
           }
         }
       });
@@ -225,6 +231,120 @@ class SyncEngine {
         );
       });
     }
+  }
+
+  /// Before pushing: for each locally edited row whose server copy also
+  /// changed since this device last synced it, merge the two edits
+  /// ([mergeRow]) into the local row, so the push carries both rather than
+  /// one replacing the other. The merged row is stamped newer than the
+  /// server's, so it wins the push.
+  Future<void> _mergeConcurrentEdits(SyncTableSpec table) async {
+    final pending = await _db
+        .customSelect(
+          'SELECT b.data FROM sync_base b JOIN sync_dirty d '
+          'ON d.table_name = b.table_name AND d.row_key = b.row_key '
+          'WHERE b.table_name = ?',
+          variables: [Variable.withString(table.name)],
+        )
+        .get();
+    if (pending.isEmpty) return;
+    final bases = <String, Map<String, Object?>>{};
+    for (final r in pending) {
+      final base = (jsonDecode(r.read<String>('data')) as Map)
+          .cast<String, Object?>();
+      bases[base['id']! as String] = base;
+    }
+
+    var merged = false;
+    for (final server in await _remote.fetchRows(
+      table.name,
+      bases.keys.toList(),
+    )) {
+      // A delete there vs an edit here stays last-write-wins.
+      if (server['deleted_at'] != null) continue;
+      final id = server['id']! as String;
+      final base = bases[id];
+      if (base == null) continue;
+      final theirs = {
+        for (final c in table.allColumns)
+          c: syncDateTimeColumns.contains(c)
+              ? _fromIso(server[c]! as String)
+              : server[c],
+      };
+      final changedThere = table.columns.any(
+        (c) => c != 'updated_at' && theirs[c] != base[c],
+      );
+      if (!changedThere) continue;
+
+      final local = await _db
+          .customSelect(
+            'SELECT ${table.allColumns.join(', ')} FROM ${table.name} '
+            'WHERE id = ?',
+            variables: [Variable.withString(id)],
+          )
+          .getSingleOrNull();
+      if (local == null) continue;
+      final mine = local.data;
+      final result = mergeRow(
+        table: table.name,
+        columns: table.allColumns,
+        base: base,
+        local: mine,
+        remote: theirs,
+      );
+      final mineAt = mine['updated_at']! as int;
+      final theirsAt = theirs['updated_at']! as int;
+      result['updated_at'] = mineAt > theirsAt ? mineAt : theirsAt + 1;
+
+      await _db.transaction(() async {
+        await _db.customStatement('UPDATE sync_meta SET applying = 1');
+        try {
+          await _db.customStatement(
+            'UPDATE ${table.name} SET '
+            '${table.columns.map((c) => '$c = ?').join(', ')} WHERE id = ?',
+            [for (final c in table.columns) result[c], id],
+          );
+        } finally {
+          await _db.customStatement('UPDATE sync_meta SET applying = 0');
+        }
+        // The server's version is what this device has now seen: if the
+        // push fails, the next attempt merges against it, not the old base.
+        await _db.customStatement(
+          'UPDATE sync_base SET data = ? '
+          "WHERE table_name = ? AND row_key = json_object('id', ?)",
+          [jsonEncode(theirs), table.name, id],
+        );
+      });
+      merged = true;
+    }
+    if (merged) _db.notifyUpdates({TableUpdate(table.name)});
+  }
+
+  /// After pushing [row]: the server now has it, so it's the base for any
+  /// later merge. Usually nothing is left to merge and the base goes; if
+  /// the row was edited again mid-push, the pushed version becomes its
+  /// base.
+  Future<void> _settleBase(
+    SyncTableSpec table,
+    Map<String, Object?> row,
+  ) async {
+    final id = row['id'];
+    await _db.customStatement(
+      'DELETE FROM sync_base '
+      "WHERE table_name = ?1 AND row_key = json_object('id', ?2) "
+      'AND NOT EXISTS (SELECT 1 FROM sync_dirty '
+      "WHERE table_name = ?1 AND row_key = json_object('id', ?2))",
+      [table.name, id],
+    );
+    await _db.customStatement(
+      'UPDATE sync_base SET data = ? '
+      "WHERE table_name = ? AND row_key = json_object('id', ?)",
+      [
+        jsonEncode({for (final c in table.allColumns) c: row[c]}),
+        table.name,
+        id,
+      ],
+    );
   }
 
   Map<String, Object?> _toRemote(Map<String, Object?> row) {

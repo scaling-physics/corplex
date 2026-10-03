@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
 import 'package:corplex/data/tables/papers_table.dart';
+import 'package:corplex/features/notes/note_content.dart';
 import 'package:corplex/features/sync/sync_engine.dart';
 import 'package:corplex/features/sync/sync_remote.dart';
 
@@ -318,6 +321,133 @@ void main() {
       expect((await b.select(b.notes).getSingle()).title, 'from B');
     },
   );
+
+  group('the same row edited on two devices between syncs', () {
+    String body(List<String> paragraphs) => jsonEncode([
+      for (final p in paragraphs) {'insert': '$p\n'},
+    ]);
+    List<String> paragraphs(Note n) {
+      final text = decodeNoteContent(n.content).toPlainText();
+      return text.substring(0, text.length - 1).split('\n');
+    }
+
+    Future<void> edit(AppDatabase db, NotesCompanion change) =>
+        (db.update(db.notes)..where((n) => n.id.equals('n1'))).write(change);
+
+    Future<int> bases(AppDatabase db) async =>
+        (await db
+                .customSelect('SELECT COUNT(*) AS c FROM sync_base')
+                .getSingle())
+            .read<int>('c');
+
+    setUp(() async {
+      await a
+          .into(a.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: const Value('n1'),
+              title: const Value('Review'),
+              content: Value(body(['Intro', 'Method', 'Findings'])),
+            ),
+          );
+      await both();
+    });
+
+    test('edits to different paragraphs are both kept', () async {
+      await edit(
+        a,
+        NotesCompanion(
+          content: Value(body(['Intro, sharpened', 'Method', 'Findings'])),
+        ),
+      );
+      await edit(
+        b,
+        NotesCompanion(
+          content: Value(body(['Intro', 'Method', 'Findings', 'Critique'])),
+        ),
+      );
+      await syncA.sync(userId: 'u1');
+      await syncB.sync(userId: 'u1');
+      await syncA.sync(userId: 'u1');
+
+      const expected = ['Intro, sharpened', 'Method', 'Findings', 'Critique'];
+      expect(paragraphs(await b.select(b.notes).getSingle()), expected);
+      expect(paragraphs(await a.select(a.notes).getSingle()), expected);
+      expect(await bases(a), 0, reason: 'bases go once pushed');
+      expect(await bases(b), 0);
+    });
+
+    test('a title changed here and a body changed there', () async {
+      await edit(a, const NotesCompanion(title: Value('Literature review')));
+      await edit(
+        b,
+        NotesCompanion(
+          content: Value(body(['Intro', 'Method', 'Findings', 'Gaps'])),
+        ),
+      );
+      await syncB.sync(userId: 'u1');
+      await syncA.sync(userId: 'u1');
+      await syncB.sync(userId: 'u1');
+
+      for (final db in [a, b]) {
+        final note = await db.select(db.notes).getSingle();
+        expect(note.title, 'Literature review');
+        expect(paragraphs(note), ['Intro', 'Method', 'Findings', 'Gaps']);
+      }
+    });
+
+    test('the same paragraph rewritten on both keeps both wordings', () async {
+      await edit(
+        a,
+        NotesCompanion(content: Value(body(['Intro', 'Method A', 'Findings']))),
+      );
+      await edit(
+        b,
+        NotesCompanion(content: Value(body(['Intro', 'Method B', 'Findings']))),
+      );
+      await syncA.sync(userId: 'u1');
+      await syncB.sync(userId: 'u1');
+      await syncA.sync(userId: 'u1');
+
+      expect(paragraphs(await a.select(a.notes).getSingle()), [
+        'Intro',
+        'Method B',
+        'Method A',
+        'Findings',
+      ]);
+    });
+
+    test('a later edit after syncing is not merged again', () async {
+      await edit(a, NotesCompanion(content: Value(body(['Only A']))));
+      await both();
+      await edit(b, NotesCompanion(content: Value(body(['Then B']))));
+      await both();
+      await syncA.sync(userId: 'u1');
+      for (final db in [a, b]) {
+        expect(paragraphs(await db.select(db.notes).getSingle()), ['Then B']);
+      }
+    });
+
+    test('paper fields edited on each device both land', () async {
+      await a
+          .into(a.papers)
+          .insert(PapersCompanion.insert(id: const Value('p1'), title: 'T'));
+      await both();
+      await (a.update(a.papers)..where((p) => p.id.equals('p1'))).write(
+        const PapersCompanion(rating: Value(5)),
+      );
+      await (b.update(b.papers)..where((p) => p.id.equals('p1'))).write(
+        const PapersCompanion(venue: Value('NeurIPS')),
+      );
+      await syncA.sync(userId: 'u1');
+      await syncB.sync(userId: 'u1');
+      await syncA.sync(userId: 'u1');
+      for (final db in [a, b]) {
+        final paper = await db.select(db.papers).getSingle();
+        expect((paper.rating, paper.venue), (5, 'NeurIPS'));
+      }
+    });
+  });
 
   test('a newer local edit survives a pull of an older remote delete', () async {
     await a.into(a.notes).insert(NotesCompanion.insert(id: const Value('n1')));

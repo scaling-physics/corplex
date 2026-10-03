@@ -11,20 +11,28 @@ import 'export_model.dart';
 typedef FontLoader = Future<ByteData> Function(String asset);
 
 /// A paginated A4 PDF of [doc]. Roboto is embedded so curly quotes, dashes
-/// and accented letters render; the PDF base fonts can't. (Roboto has no
-/// italic here, so italic text is set in the regular weight.)
+/// and accented letters render; the PDF base fonts can't.
 Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
   final load = loadFont ?? rootBundle.load;
   final regular = pw.Font.ttf(await load('assets/fonts/Roboto-Regular.ttf'));
   final bold = pw.Font.ttf(await load('assets/fonts/Roboto-Bold.ttf'));
+  final italic = pw.Font.ttf(await load('assets/fonts/Roboto-Italic.ttf'));
+  final boldItalic = pw.Font.ttf(
+    await load('assets/fonts/Roboto-BoldItalic.ttf'),
+  );
 
-  pw.TextStyle style(double size, {bool isBold = false}) => pw.TextStyle(
+  pw.TextStyle style(
+    double size, {
+    bool isBold = false,
+    bool isItalic = false,
+  }) => pw.TextStyle(
     font: regular,
     fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+    fontStyle: isItalic ? pw.FontStyle.italic : pw.FontStyle.normal,
     fontBold: bold,
     fontNormal: regular,
-    fontItalic: regular,
-    fontBoldItalic: bold,
+    fontItalic: italic,
+    fontBoldItalic: boldItalic,
     fontSize: size,
     lineSpacing: 3,
   );
@@ -35,6 +43,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
       style: style(
         size,
         isBold: forceBold || r.bold,
+        isItalic: r.italic,
       ).copyWith(decoration: r.strike ? pw.TextDecoration.lineThrough : null),
     );
   }

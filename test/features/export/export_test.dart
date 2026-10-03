@@ -231,9 +231,46 @@ void main() {
           ByteData.sublistView(File(asset).readAsBytesSync());
       final pdf = await exportToPdf(doc, loadFont: fromDisk);
       expect(String.fromCharCodes(pdf.sublist(0, 5)), '%PDF-');
-      expect(pdf.length, greaterThan(1500), reason: 'a real, font-bearing document');
+      expect(
+        pdf.length,
+        greaterThan(1500),
+        reason: 'a real, font-bearing document',
+      );
     },
   );
+
+  test('PDF sets italic and bold italic in the real italic faces', () async {
+    Future<ByteData> fromDisk(String asset) async =>
+        ByteData.sublistView(File(asset).readAsBytesSync());
+    Future<Set<String>> render(List<Map<String, Object?>> ops) async {
+      final doc = await buildExportDoc(db, [
+        ExportNote('T', _delta(ops)),
+      ], title: 'T');
+      final pdf = latin1.decode(await exportToPdf(doc, loadFont: fromDisk));
+      return {
+        for (final m in RegExp(r'/BaseFont */([A-Za-z-]+)').allMatches(pdf))
+          m[1]!,
+      };
+    }
+
+    final plain = await render([
+      {'insert': 'Plain words\n'},
+    ]);
+    expect(plain, {'Roboto-Regular', 'Roboto-Bold'});
+
+    final italic = await render([
+      {
+        'insert': 'Leaning',
+        'attributes': {'italic': true},
+      },
+      {
+        'insert': ' and strong',
+        'attributes': {'italic': true, 'bold': true},
+      },
+      {'insert': '\n'},
+    ]);
+    expect(italic, containsAll(['Roboto-Italic', 'Roboto-BoldItalic']));
+  });
 
   test('files are written with safe names', () async {
     expect(

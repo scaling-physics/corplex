@@ -77,6 +77,18 @@ class FakeSyncRemote implements SyncRemote {
   }
 
   @override
+  Future<List<Map<String, Object?>>> fetchRows(
+    String table,
+    List<String> ids,
+  ) async {
+    _requireTable(table);
+    return [
+      for (final id in ids)
+        if (_table(table)[id] case final row?) {...row},
+    ];
+  }
+
+  @override
   Future<Set<String>> liveStorageKeys() async => {
     for (final t in const ['papers', 'attachments'])
       for (final r in _table(t).values)

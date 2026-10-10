@@ -5,6 +5,7 @@ import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations;
 
 import 'features/home/home_shell.dart';
+import 'features/platform/platform_coordinator.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
 import 'features/sync/sync_coordinator.dart';
@@ -29,7 +30,9 @@ class CorplexApp extends ConsumerWidget {
       themeMode: ref.watch(appearanceSettingsProvider).themeMode,
       themeAnimationDuration: AppMotion.long,
       themeAnimationCurve: AppMotion.standard,
-      home: const SyncCoordinator(child: ShareCoordinator(child: HomeShell())),
+      home: const SyncCoordinator(
+        child: ShareCoordinator(child: PlatformCoordinator(child: HomeShell())),
+      ),
     );
   }
 }

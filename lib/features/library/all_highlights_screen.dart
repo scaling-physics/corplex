@@ -9,6 +9,7 @@ import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
 import 'paper_detail_screen.dart';
 import 'pdf_viewer_screen.dart';
+import '../review/review_screen.dart';
 
 /// A highlight together with the paper it came from.
 typedef HighlightWithPaper = ({Highlight highlight, Paper paper});
@@ -147,6 +148,15 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
             prefixIcon: Icon(Icons.search),
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.replay),
+            tooltip: 'Revisit highlights',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ReviewScreen()),
+            ),
+          ),
+        ],
       ),
       body: ReadableColumn(
         child: all.isEmpty

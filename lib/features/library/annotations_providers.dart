@@ -48,12 +48,14 @@ Future<void> saveHighlightStroke(
   required Color color,
 }) {
   if (normalizedPoints.length < 2) return Future.value();
-  return db.into(db.annotations).insert(
-    AnnotationsCompanion.insert(
-      paperId: paperId,
-      pageNumber: pageNumber,
-      pointsJson: _encodeStrokePoints(normalizedPoints),
-      colorHex: Value(colorToHex(color)),
-    ),
-  );
+  return db
+      .into(db.annotations)
+      .insert(
+        AnnotationsCompanion.insert(
+          paperId: paperId,
+          pageNumber: pageNumber,
+          pointsJson: _encodeStrokePoints(normalizedPoints),
+          colorHex: Value(colorToHex(color)),
+        ),
+      );
 }

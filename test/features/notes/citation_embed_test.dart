@@ -186,5 +186,73 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 1));
     });
+
+    testWidgets('only a newly inserted chip pops in', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            audioEngineProvider.overrideWithValue(FakeAudioEngine()),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              FlutterQuillLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: NoteEditorScreen(noteId: 'n1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The entrance scale of every citation chip (resolved or not).
+      List<double> scales() => [
+        for (final e in find.byType(ScaleTransition).evaluate())
+          if (find
+              .descendant(
+                of: find.byWidget(e.widget),
+                matching: find.byWidgetPredicate(
+                  (w) =>
+                      w is Text &&
+                      RegExp(r'^\[@|^\(Vaswani').hasMatch(w.data ?? ''),
+                ),
+              )
+              .evaluate()
+              .isNotEmpty)
+            (e.widget as ScaleTransition).scale.value,
+      ];
+
+      // Present when the note opened: at rest, never animated.
+      expect(scales(), [1.0, 1.0]); // Both chips in the note.
+
+      final controller = tester
+          .widget<QuillEditor>(find.byType(QuillEditor))
+          .controller;
+      insertCitation(controller, 0, 'vaswani2017');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      final mid = scales()..sort();
+      expect(mid, hasLength(3));
+      expect(mid.first, lessThan(1), reason: 'the new chip is mid-pop');
+      expect(mid[1], 1.0, reason: 'the old chips stay put');
+      expect(mid.last, 1.0);
+
+      await tester.pumpAndSettle();
+      expect(scales(), [1.0, 1.0, 1.0]);
+
+      // The stored text is just the marker.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      final note = await db.select(db.notes).getSingle();
+      expect(
+        decodeNoteContent(note.content).toPlainText(),
+        startsWith('[@vaswani2017] Self-attention [@vaswani2017]'),
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
   });
 }

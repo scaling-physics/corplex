@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'features/audio/audio_playback.dart';
+import 'features/platform/quick_action_source.dart';
+import 'features/platform/widget_data.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/sync/supabase_setup.dart';
 import 'features/sync/transfer_settings.dart';
@@ -18,6 +20,8 @@ Future<void> main() async {
       overrides: [
         transferSettingsProvider.overrideWith((ref) => transfer),
         appearanceSettingsProvider.overrideWith((ref) => appearance),
+        quickActionSourceProvider.overrideWithValue(PluginQuickActionSource()),
+        homeWidgetBridgeProvider.overrideWithValue(PluginHomeWidgetBridge()),
         ...overrides,
       ],
       child: const CorplexApp(),

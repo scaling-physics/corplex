@@ -60,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -181,6 +181,16 @@ class AppDatabase extends _$AppDatabase {
         // last-synced version of each locally edited row (`sync_base`,
         // saved by the update triggers). No new synced data, so nothing is
         // queued for upload again.
+        await _createSyncSchema(markExisting: false);
+      }
+      if (from < 12) {
+        // v12: page counts, for reading progress. Re-running the sync
+        // schema rebuilds the update triggers so they compare the new
+        // column. Nothing is queued: counts are filled in lazily and the
+        // next edit of a row uploads them.
+        if (!await _hasColumn('papers', 'page_count')) {
+          await m.addColumn(papers, papers.pageCount);
+        }
         await _createSyncSchema(markExisting: false);
       }
     },

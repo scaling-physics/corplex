@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../home/adaptive.dart';
 import 'bibtex.dart';
@@ -176,6 +178,12 @@ Future<void> enrichImportedPaper(
   final db = ref.read(databaseProvider);
   try {
     final start = await readPdfStart(pdfPath);
+    if (start.pageCount > 0) {
+      // Known from the document we just opened; reading progress needs it.
+      await (db.update(db.papers)..where((p) => p.id.equals(paperId))).write(
+        PapersCompanion(pageCount: Value(start.pageCount)),
+      );
+    }
     final id = start.id;
     // No DOI or arXiv ID printed (many conference papers): search by the
     // title on the first page instead.
@@ -224,20 +232,24 @@ Future<void> enrichImportedPaper(
 }
 
 /// Reads the first pages of a PDF: a printed DOI or arXiv ID, if any, and
-/// the first page's text (for a title search when there's no ID).
-Future<({PaperIdentifier? id, String firstPage})> readPdfStart(
+/// the first page's text (for a title search when there's no ID), and the
+/// page count.
+Future<({PaperIdentifier? id, String firstPage, int pageCount})> readPdfStart(
   String path,
 ) async {
   final document = await PdfDocument.openFile(path);
   try {
+    final pageCount = document.pages.length;
     var firstPage = '';
     for (final (i, page) in document.pages.take(2).indexed) {
       final text = (await page.loadStructuredText()).fullText;
       if (i == 0) firstPage = text;
       final id = findIdentifierInText(text);
-      if (id != null) return (id: id, firstPage: firstPage);
+      if (id != null) {
+        return (id: id, firstPage: firstPage, pageCount: pageCount);
+      }
     }
-    return (id: null, firstPage: firstPage);
+    return (id: null, firstPage: firstPage, pageCount: pageCount);
   } finally {
     await document.dispose();
   }

@@ -10,9 +10,11 @@ import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../settings/appearance_settings.dart';
 import 'adaptive.dart';
+import '../sync/sync_ring.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
 import '../notes/notes_screen.dart';
+import '../review/review_prompt.dart';
 import '../search/search_screen.dart';
 import '../trash/trash_screen.dart';
 import 'data_actions.dart';
@@ -88,7 +90,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final c = theme.colorScheme;
     final lists = Scaffold(
       appBar: _appBar(context, user, theme),
-      body: FadeThroughIndexedStack(index: _index, children: _screens),
+      body: _tabs(),
     );
     final expanded = layout == HomeLayout.expanded;
     final wideRail = MediaQuery.sizeOf(context).width >= 1280;
@@ -134,6 +136,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
     );
   }
+
+  /// The tab content, under the opt-in "highlights to revisit" line (which
+  /// takes no space unless the reader turned it on and something is due).
+  Widget _tabs() => Column(
+    children: [
+      const ReviewPrompt(),
+      Expanded(
+        child: FadeThroughIndexedStack(index: _index, children: _screens),
+      ),
+    ],
+  );
 
   PreferredSizeWidget _appBar(
     BuildContext context,
@@ -188,7 +201,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget _phoneScaffold(BuildContext context, AppUser? user, ThemeData theme) {
     return Scaffold(
       appBar: _appBar(context, user, theme),
-      body: FadeThroughIndexedStack(index: _index, children: _screens),
+      body: _tabs(),
       floatingActionButton: _PrimaryAction(index: _index),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -501,21 +514,23 @@ class _AccountButton extends StatelessWidget {
     return IconButton(
       tooltip: email ?? 'Sign in',
       onPressed: onPressed,
-      icon: AnimatedSwitcher(
-        duration: AppMotion.medium,
-        child: email == null
-            ? const Icon(Icons.account_circle_outlined, key: ValueKey('out'))
-            : CircleAvatar(
-                key: const ValueKey('in'),
-                radius: 15,
-                backgroundColor: c.primaryContainer,
-                foregroundColor: c.onPrimaryContainer,
-                child: Text(
-                  email.isEmpty ? '?' : email[0].toUpperCase(),
-                  style: Theme.of(context).textTheme.labelLarge
-                      ?.copyWith(color: c.onPrimaryContainer),
+      icon: SyncRing(
+        child: AnimatedSwitcher(
+          duration: AppMotion.medium,
+          child: email == null
+              ? const Icon(Icons.account_circle_outlined, key: ValueKey('out'))
+              : CircleAvatar(
+                  key: const ValueKey('in'),
+                  radius: 15,
+                  backgroundColor: c.primaryContainer,
+                  foregroundColor: c.onPrimaryContainer,
+                  child: Text(
+                    email.isEmpty ? '?' : email[0].toUpperCase(),
+                    style: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(color: c.onPrimaryContainer),
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

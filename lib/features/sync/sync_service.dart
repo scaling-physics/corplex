@@ -219,3 +219,11 @@ final syncStatusProvider = StreamProvider<SyncStatus>((ref) {
   final service = ref.watch(syncServiceProvider);
   return service.statusChanges;
 });
+
+/// Whether a sync is running right now. Always false with no backend
+/// configured, since [NoOpSyncService] never reports one.
+final syncingProvider = StreamProvider<bool>((ref) async* {
+  final service = ref.watch(syncServiceProvider);
+  yield service.currentStatus == SyncStatus.syncing;
+  yield* service.statusChanges.map((s) => s == SyncStatus.syncing).distinct();
+});

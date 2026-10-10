@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import 'ink_canvas.dart';
 import 'ink_model.dart';
+import '../../theme/haptics.dart';
 import 'pencil_taps.dart';
 
 /// Drawn on light "paper" in both themes, like a real sheet, so ink colors
@@ -78,7 +79,12 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
   }
 
   /// Double-tap on the Pencil, as configured in iPadOS Settings.
-  void _onPencilTap(PencilAction action) => setState(() {
+  void _onPencilTap(PencilAction action) {
+    if (action != PencilAction.ignore) AppHaptics.selection();
+    setState(() => _applyPencilTap(action));
+  }
+
+  void _applyPencilTap(PencilAction action) {
     switch (action) {
       case PencilAction.switchEraser:
         _setTool(_tool == _Tool.eraser ? _previousTool : _Tool.eraser);
@@ -94,7 +100,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
       case PencilAction.ignore:
         break;
     }
-  });
+  }
 
   void _beginChange() {
     _undo.add(_sketch);

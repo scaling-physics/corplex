@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:animations/animations.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +30,8 @@ import 'pdf_viewer_screen.dart';
 import 'split_reader.dart';
 import '../home/adaptive.dart' show readablePadding;
 import '../../theme/app_theme.dart';
+import '../../theme/haptics.dart';
+import 'paper_cover.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
   const PaperDetailScreen({
@@ -66,9 +69,19 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   bool _loaded = false;
   CitationStyle _citationStyle = CitationStyle.apa;
 
+  final _scroll = ScrollController();
+  final _scrollKey = GlobalKey();
+  final _titleKey = GlobalKey();
+
+  /// 0 while the large title is on screen, 1 once it has scrolled under
+  /// the app bar (and the compact title has fully faded in).
+  final _collapse = ValueNotifier<double>(0);
+  bool _collapseScheduled = false;
+
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_scheduleCollapse);
     _loadPaper();
     _titleController.addListener(_scheduleSave);
     _authorsController.addListener(_scheduleSave);
@@ -89,6 +102,29 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     );
   }
 
+  // Measured after layout, so it reflects this frame's scroll position.
+  void _scheduleCollapse() {
+    if (_collapseScheduled) return;
+    _collapseScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _collapseScheduled = false;
+      if (mounted) _updateCollapse();
+    });
+  }
+
+  void _updateCollapse() {
+    final title = _titleKey.currentContext?.findRenderObject();
+    final viewport = _scrollKey.currentContext?.findRenderObject();
+    if (title is! RenderBox || viewport is! RenderBox) return;
+    if (!title.attached || !title.hasSize || !viewport.attached) return;
+    final bottom = title.localToGlobal(Offset(0, title.size.height)).dy;
+    final barBottom =
+        viewport.localToGlobal(Offset.zero).dy +
+        MediaQuery.paddingOf(context).top +
+        kToolbarHeight;
+    _collapse.value = ((barBottom + 40 - bottom) / 40).clamp(0.0, 1.0);
+  }
+
   Future<void> _loadPaper() async {
     final db = ref.read(databaseProvider);
     final paper = await (db.select(
@@ -98,6 +134,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       _showPaper(paper);
     }
     setState(() => _loaded = true);
+    _scheduleCollapse();
   }
 
   /// What each field last held according to the database, so an outside
@@ -226,6 +263,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _scroll.dispose();
+    _collapse.dispose();
     _titleController.dispose();
     _authorsController.dispose();
     _authorsFocus.dispose();
@@ -246,275 +285,339 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     });
     final notesAsync = ref.watch(notesForPaperProvider(widget.paperId));
 
+    final paper = paperAsync.value;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: !widget.embedded,
-        actions: [
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            onSelected: (v) {
-              if (v == 'trash') _moveToTrash();
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'trash',
-                child: ListTile(
-                  leading: Icon(Icons.delete_outline),
-                  title: Text('Move to trash'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
       bottomNavigationBar: const SafeArea(child: AudioPlayerBar()),
       body: LayoutBuilder(
-        builder: (context, box) => !_loaded
-            ? const SizedBox.shrink()
-            : ListView(
-                // Centred at a readable width on a tablet.
-                padding: EdgeInsets.fromLTRB(
-                  readablePadding(box.maxWidth, minimum: 20),
-                  0,
-                  readablePadding(box.maxWidth, minimum: 20),
-                  40,
+        builder: (context, box) {
+          final side = readablePadding(box.maxWidth, minimum: 20);
+          return CustomScrollView(
+            key: _scrollKey,
+            controller: _scroll,
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                automaticallyImplyLeading: !widget.embedded,
+                title: _CompactTitle(
+                  controller: _titleController,
+                  collapse: _collapse,
                 ),
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    maxLines: null,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      hintText: 'Title',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                  ValueListenableBuilder(
-                    valueListenable: _authorsController,
-                    builder: (context, value, _) {
-                      final style = Theme.of(context).textTheme.bodyLarge
-                          ?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          );
-                      final summary = authorsSummary(parseAuthors(value.text));
-                      if (!_editingAuthors &&
-                          !_authorsFocus.hasFocus &&
-                          summary.isNotEmpty) {
-                        // "Ashish Vaswani, Noam Shazeer, Niki Parmar + 5
-                        // more" reads better than the stored
-                        // "Vaswani, Ashish; Shazeer, Noam; …".
-                        return Semantics(
-                          button: true,
-                          hint: 'Edit authors',
-                          child: InkWell(
-                            onTap: _editAuthors,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: Text(summary, style: style),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return TextField(
-                        controller: _authorsController,
-                        focusNode: _authorsFocus,
-                        style: style,
-                        maxLines: null,
-                        keyboardType: TextInputType.text,
-                        textInputAction: TextInputAction.done,
-                        decoration: InputDecoration(
-                          hintText: 'Authors',
-                          helperText: _authorsFocus.hasFocus
-                              ? 'Separate authors with ;'
-                              : null,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                          contentPadding: EdgeInsets.symmetric(vertical: 8),
-                        ),
-                      );
+                actions: [
+                  PopupMenuButton<String>(
+                    tooltip: 'More',
+                    onSelected: (v) {
+                      if (v == 'trash') _moveToTrash();
                     },
-                  ),
-                  const SizedBox(height: 12),
-                  _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
-                  _ReadingStatusRow(paper: paperAsync.value),
-                  _ProjectChips(paperId: widget.paperId),
-                  _HighlightsSection(paper: paperAsync.value),
-                  _Section(
-                    title: 'Attachments',
-                    trailing: TextButton.icon(
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add'),
-                      onPressed: () => showAddAttachmentSheet(
-                        context,
-                        ref,
-                        paperId: widget.paperId,
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'trash',
+                        child: ListTile(
+                          leading: Icon(Icons.delete_outline),
+                          title: Text('Move to trash'),
+                        ),
                       ),
-                    ),
-                    child: attachmentsAsync.when(
-                      loading: () => const SizedBox(height: 56),
-                      error: (error, _) =>
-                          Text('Could not load attachments: $error'),
-                      data: (attachments) {
-                        if (attachments.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'Podcasts, images, links or files for this paper.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          );
-                        }
-                        return Column(
-                          children: attachments
-                              .map((a) => _AttachmentTile(attachment: a))
-                              .toList(),
-                        );
-                      },
-                    ),
+                    ],
                   ),
-                  _Section(
-                    title: 'Details',
-                    trailing: TextButton.icon(
-                      icon: _lookingUp
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.travel_explore, size: 18),
-                      label: const Text('Look up'),
-                      onPressed: _lookingUp ? null : _lookUp,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
+                ],
+              ),
+              if (_loaded)
+                SliverPadding(
+                  // Centred at a readable width on a tablet.
+                  padding: EdgeInsets.fromLTRB(side, 0, side, 40),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextField(
-                            controller: _doiController,
-                            keyboardType: TextInputType.url,
-                            decoration: const InputDecoration(
-                              labelText: 'DOI or arXiv ID',
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, right: 16),
+                            child: _CoverButton(
+                              paperId: widget.paperId,
+                              paper: paper,
+                              width: box.maxWidth >= 600 ? 112 : 96,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _venueController,
-                            textCapitalization: TextCapitalization.words,
-                            decoration: const InputDecoration(
-                              labelText: 'Journal or conference',
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _yearController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Year',
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  key: _titleKey,
+                                  controller: _titleController,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall,
+                                  maxLines: null,
+                                  keyboardType: TextInputType.text,
+                                  textInputAction: TextInputAction.done,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Title',
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    filled: false,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                ),
+                                ValueListenableBuilder(
+                                  valueListenable: _authorsController,
+                                  builder: (context, value, _) {
+                                    final style = Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        );
+                                    final summary = authorsSummary(
+                                      parseAuthors(value.text),
+                                    );
+                                    if (!_editingAuthors &&
+                                        !_authorsFocus.hasFocus &&
+                                        summary.isNotEmpty) {
+                                      // "Ashish Vaswani, Noam Shazeer, Niki Parmar + 5
+                                      // more" reads better than the stored
+                                      // "Vaswani, Ashish; Shazeer, Noam; …".
+                                      return Semantics(
+                                        button: true,
+                                        hint: 'Edit authors',
+                                        child: InkWell(
+                                          onTap: _editAuthors,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                            ),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: Text(
+                                                summary,
+                                                style: style,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return TextField(
+                                      controller: _authorsController,
+                                      focusNode: _authorsFocus,
+                                      style: style,
+                                      maxLines: null,
+                                      keyboardType: TextInputType.text,
+                                      textInputAction: TextInputAction.done,
+                                      decoration: InputDecoration(
+                                        hintText: 'Authors',
+                                        helperText: _authorsFocus.hasFocus
+                                            ? 'Separate authors with ;'
+                                            : null,
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        filled: false,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  if (paperAsync.value case final paper?)
-                    _Section(
-                      title: 'Citation',
-                      trailing: IconButton(
-                        icon: const Icon(Icons.copy_outlined, size: 20),
-                        tooltip: 'Copy citation',
-                        onPressed: () {
-                          Clipboard.setData(
-                            ClipboardData(
-                              text: formatCitation(paper, _citationStyle),
-                            ),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Citation copied')),
-                          );
-                        },
+                      const SizedBox(height: 12),
+                      _PdfButton(
+                        paperId: widget.paperId,
+                        paper: paperAsync.value,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Chips wrap onto a second line on a phone; a
-                            // segmented bar squeezed six styles until their
-                            // names broke mid-word.
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [
-                                for (final style in CitationStyle.values)
-                                  ChoiceChip(
-                                    label: Text(style.label),
-                                    selected: _citationStyle == style,
-                                    showCheckmark: false,
-                                    visualDensity: VisualDensity.compact,
-                                    onSelected: (_) =>
-                                        setState(() => _citationStyle = style),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            AnimatedSwitcher(
-                              duration: AppMotion.medium,
-                              child: SelectableText(
-                                formatCitation(paper, _citationStyle),
-                                key: ValueKey(_citationStyle),
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ),
-                          ],
+                      _ReadingStatusRow(paper: paperAsync.value),
+                      _ProjectChips(paperId: widget.paperId),
+                      _HighlightsSection(paper: paperAsync.value),
+                      _Section(
+                        title: 'Attachments',
+                        trailing: TextButton.icon(
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add'),
+                          onPressed: () => showAddAttachmentSheet(
+                            context,
+                            ref,
+                            paperId: widget.paperId,
+                          ),
+                        ),
+                        child: attachmentsAsync.when(
+                          loading: () => const SizedBox(height: 56),
+                          error: (error, _) =>
+                              Text('Could not load attachments: $error'),
+                          data: (attachments) {
+                            if (attachments.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(
+                                  'Podcasts, images, links or files for this paper.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              );
+                            }
+                            return Column(
+                              children: attachments
+                                  .map((a) => _AttachmentTile(attachment: a))
+                                  .toList(),
+                            );
+                          },
                         ),
                       ),
-                    ),
-                  if (notesAsync.value case final notes? when notes.isNotEmpty)
-                    _Section(
-                      title: 'Referenced in notes',
-                      child: Column(
-                        children: notes
-                            .map(
-                              (note) => ListTile(
-                                leading: const Icon(Icons.edit_note_outlined),
-                                title: Text(
-                                  note.title.isEmpty ? 'Untitled' : note.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        NoteEditorScreen(noteId: note.id),
+                      _Section(
+                        title: 'Details',
+                        trailing: TextButton.icon(
+                          icon: _lookingUp
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
+                                )
+                              : const Icon(Icons.travel_explore, size: 18),
+                          label: const Text('Look up'),
+                          onPressed: _lookingUp ? null : _lookUp,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _doiController,
+                                keyboardType: TextInputType.url,
+                                decoration: const InputDecoration(
+                                  labelText: 'DOI or arXiv ID',
                                 ),
                               ),
-                            )
-                            .toList(),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _venueController,
+                                textCapitalization: TextCapitalization.words,
+                                decoration: const InputDecoration(
+                                  labelText: 'Journal or conference',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _yearController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Year',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                ],
-              ),
+                      if (paperAsync.value case final paper?)
+                        _Section(
+                          title: 'Citation',
+                          trailing: IconButton(
+                            icon: const Icon(Icons.copy_outlined, size: 20),
+                            tooltip: 'Copy citation',
+                            onPressed: () {
+                              Clipboard.setData(
+                                ClipboardData(
+                                  text: formatCitation(paper, _citationStyle),
+                                ),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Citation copied'),
+                                ),
+                              );
+                            },
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Chips wrap onto a second line on a phone; a
+                                // segmented bar squeezed six styles until their
+                                // names broke mid-word.
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: [
+                                    for (final style in CitationStyle.values)
+                                      ChoiceChip(
+                                        label: Text(style.label),
+                                        selected: _citationStyle == style,
+                                        showCheckmark: false,
+                                        visualDensity: VisualDensity.compact,
+                                        onSelected: (_) => setState(
+                                          () => _citationStyle = style,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                AnimatedSwitcher(
+                                  duration: AppMotion.medium,
+                                  child: SelectableText(
+                                    formatCitation(paper, _citationStyle),
+                                    key: ValueKey(_citationStyle),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (notesAsync.value case final notes?
+                          when notes.isNotEmpty)
+                        _Section(
+                          title: 'Referenced in notes',
+                          child: Column(
+                            children: notes
+                                .map(
+                                  (note) => ListTile(
+                                    leading: const Icon(
+                                      Icons.edit_note_outlined,
+                                    ),
+                                    title: Text(
+                                      note.title.isEmpty
+                                          ? 'Untitled'
+                                          : note.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            NoteEditorScreen(noteId: note.id),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                    ]),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -672,11 +775,23 @@ class _ReadingStatusRow extends ConsumerWidget {
             ChoiceChip(
               label: Text(_labels[status]!),
               selected: paper.readingStatus == status,
-              onSelected: (selected) => setReadingStatus(
-                ref.read(databaseProvider),
-                paper.id,
-                selected ? status : null,
+              // The fill eases between chips instead of jumping.
+              chipAnimationStyle: ChipAnimationStyle(
+                selectAnimation: AppMotion.reduced(context)
+                    ? AnimationStyle.noAnimation
+                    : AnimationStyle(
+                        duration: AppMotion.medium,
+                        curve: AppMotion.standard,
+                      ),
               ),
+              onSelected: (selected) {
+                AppHaptics.selection();
+                setReadingStatus(
+                  ref.read(databaseProvider),
+                  paper.id,
+                  selected ? status : null,
+                );
+              },
             ),
           _StarRating(paper: paper),
         ],
@@ -695,7 +810,6 @@ class _StarRating extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rating = paper.rating ?? 0;
-    final color = Theme.of(context).colorScheme.primary;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -703,21 +817,107 @@ class _StarRating extends ConsumerWidget {
           InkResponse(
             key: ValueKey('star-$i'),
             radius: 18,
-            onTap: () => setRating(
-              ref.read(databaseProvider),
-              paper.id,
-              rating == i ? null : i,
-            ),
+            onTap: () {
+              AppHaptics.confirm();
+              setRating(
+                ref.read(databaseProvider),
+                paper.id,
+                rating == i ? null : i,
+              );
+            },
             child: Padding(
               padding: const EdgeInsets.all(3),
-              child: Icon(
-                i <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                size: 22,
-                color: i <= rating ? color : color.withValues(alpha: 0.4),
-              ),
+              child: _Star(index: i, rating: rating),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// One star. The outline is always there; the filled star scales in
+/// (0.6 to 1, decelerating, no overshoot) with a short stagger across
+/// newly filled stars, and fades out when cleared.
+class _Star extends StatefulWidget {
+  const _Star({required this.index, required this.rating});
+
+  final int index;
+  final int rating;
+
+  @override
+  State<_Star> createState() => _StarState();
+}
+
+class _StarState extends State<_Star> with SingleTickerProviderStateMixin {
+  static const _stagger = Duration(milliseconds: 40);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    value: _filled ? 1 : 0,
+    reverseDuration: AppMotion.short,
+  );
+  bool get _filled => widget.index <= widget.rating;
+
+  @override
+  void didUpdateWidget(_Star old) {
+    super.didUpdateWidget(old);
+    final wasFilled = widget.index <= old.rating;
+    if (_filled == wasFilled) return;
+    if (AppMotion.reduced(context)) {
+      _controller.value = _filled ? 1 : 0;
+    } else if (_filled) {
+      // Stars already filled before this change don't count in the stagger.
+      final order = (widget.index - old.rating - 1).clamp(0, 4);
+      final delay = _stagger * order;
+      final total = AppMotion.short + delay;
+      _controller.duration = total;
+      // The first part of the run is the stagger delay (value stays 0).
+      final begin = delay.inMicroseconds / total.inMicroseconds;
+      _curveFor(begin);
+      _controller.forward(from: 0);
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  late Curve _forwardCurve = AppMotion.enter;
+
+  void _curveFor(double begin) {
+    _forwardCurve = Interval(begin, 1, curve: AppMotion.enter);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.status == AnimationStatus.reverse
+            ? Curves.easeOut.transform(_controller.value)
+            : _forwardCurve.transform(_controller.value);
+        return Stack(
+          children: [
+            Icon(
+              Icons.star_outline_rounded,
+              size: 22,
+              color: color.withValues(alpha: 0.4),
+            ),
+            Opacity(
+              opacity: t.clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: 0.6 + 0.4 * t,
+                child: Icon(Icons.star_rounded, size: 22, color: color),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -924,6 +1124,93 @@ class _AttachmentTile extends ConsumerWidget {
           ? () =>
                 launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)
           : null,
+    );
+  }
+}
+
+/// The compact title in the app bar: invisible while the large title is
+/// on screen, fading and sliding in as it scrolls away.
+class _CompactTitle extends StatelessWidget {
+  const _CompactTitle({required this.controller, required this.collapse});
+
+  final TextEditingController controller;
+  final ValueNotifier<double> collapse;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = AppMotion.reduced(context);
+    return ValueListenableBuilder<double>(
+      valueListenable: collapse,
+      builder: (context, t, _) {
+        if (t <= 0) return const SizedBox.shrink();
+        final shown = reduced ? (t >= 0.5 ? 1.0 : 0.0) : t;
+        return ValueListenableBuilder(
+          valueListenable: controller,
+          builder: (context, value, _) => Opacity(
+            opacity: shown,
+            child: Transform.translate(
+              offset: Offset(0, reduced ? 0 : (1 - shown) * 8),
+              child: Text(
+                value.text.trim().isEmpty ? 'Untitled' : value.text.trim(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The paper's cover. With a PDF on the device, tapping it opens the
+/// reader (what "Open PDF" opens, resuming at the last page) with a
+/// container transform growing out of the cover.
+class _CoverButton extends StatelessWidget {
+  const _CoverButton({
+    required this.paperId,
+    required this.paper,
+    required this.width,
+  });
+
+  final String paperId;
+  final Paper? paper;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final pdfPath = paper?.pdfPath;
+    final cover = PaperCover(paperId: paperId, pdfPath: pdfPath, width: width);
+    // No PDF here (none, or still in the cloud): the "Download PDF" button
+    // is the way in, so the cover is just a picture.
+    if (pdfPath == null) return cover;
+    final scheme = Theme.of(context).colorScheme;
+    const shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(6)),
+    );
+    return Semantics(
+      button: true,
+      label: 'Open PDF',
+      child: ExcludeSemantics(
+        child: OpenContainer(
+          transitionDuration: AppMotion.of(context, AppMotion.long),
+          transitionType: ContainerTransitionType.fade,
+          closedElevation: 0,
+          openElevation: 0,
+          closedColor: scheme.surface,
+          openColor: scheme.surface,
+          middleColor: scheme.surface,
+          closedShape: shape,
+          openShape: const RoundedRectangleBorder(),
+          closedBuilder: (context, open) => cover,
+          openBuilder: (context, close) => PdfViewerScreen(
+            paperId: paperId,
+            pdfPath: pdfPath,
+            initialPage: paper?.lastPage,
+          ),
+        ),
+      ),
     );
   }
 }

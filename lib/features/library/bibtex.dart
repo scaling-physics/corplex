@@ -29,9 +29,18 @@ class PaperMetadata {
 /// skipped rather than failing the whole file.
 List<PaperMetadata> parseBibtex(String source) {
   final strings = <String, String>{
-    'jan': 'January', 'feb': 'February', 'mar': 'March', 'apr': 'April',
-    'may': 'May', 'jun': 'June', 'jul': 'July', 'aug': 'August',
-    'sep': 'September', 'oct': 'October', 'nov': 'November', 'dec': 'December',
+    'jan': 'January',
+    'feb': 'February',
+    'mar': 'March',
+    'apr': 'April',
+    'may': 'May',
+    'jun': 'June',
+    'jul': 'July',
+    'aug': 'August',
+    'sep': 'September',
+    'oct': 'October',
+    'nov': 'November',
+    'dec': 'December',
   };
   final results = <PaperMetadata>[];
   var i = 0;
@@ -178,10 +187,31 @@ Map<String, String> _fields(String body, Map<String, String> strings) {
 }
 
 const _accents = {
-  '"a': 'ä', '"o': 'ö', '"u': 'ü', '"A': 'Ä', '"O': 'Ö', '"U': 'Ü',
-  "'a": 'á', "'e": 'é', "'i": 'í', "'o": 'ó', "'u": 'ú', "'E": 'É',
-  '`a': 'à', '`e': 'è', '`o': 'ò', '^e': 'ê', '^o': 'ô', '^a': 'â',
-  '~n': 'ñ', '~a': 'ã', '~o': 'õ', 'cc': 'ç', 'vs': 'š', 'vc': 'č', 'vz': 'ž',
+  '"a': 'ä',
+  '"o': 'ö',
+  '"u': 'ü',
+  '"A': 'Ä',
+  '"O': 'Ö',
+  '"U': 'Ü',
+  "'a": 'á',
+  "'e": 'é',
+  "'i": 'í',
+  "'o": 'ó',
+  "'u": 'ú',
+  "'E": 'É',
+  '`a': 'à',
+  '`e': 'è',
+  '`o': 'ò',
+  '^e': 'ê',
+  '^o': 'ô',
+  '^a': 'â',
+  '~n': 'ñ',
+  '~a': 'ã',
+  '~o': 'õ',
+  'cc': 'ç',
+  'vs': 'š',
+  'vc': 'č',
+  'vz': 'ž',
 };
 
 /// Plain text from a BibTeX value: braces and common LaTeX escapes gone.

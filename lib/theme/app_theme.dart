@@ -357,4 +357,13 @@ class AppMotion {
   static const enter = Easing.emphasizedDecelerate;
   static const exit = Easing.emphasizedAccelerate;
   static const standard = Easing.standard;
+
+  /// Whether the system asks for reduced motion. Animations then jump to
+  /// their end state; see [of].
+  static bool reduced(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  /// [duration], or zero when the system asks for reduced motion.
+  static Duration of(BuildContext context, Duration duration) =>
+      reduced(context) ? Duration.zero : duration;
 }

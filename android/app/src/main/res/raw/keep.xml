@@ -4,4 +4,4 @@
      and audio_service's play/pause/skip buttons. Without these the
      lock-screen and notification controls fail to build. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_corplex,@drawable/audio_service_*" />
+    tools:keep="@drawable/ic_stat_corplex,@drawable/audio_service_*,@layout/corplex_widget,@xml/corplex_widget_info,@drawable/widget_*,@color/widget_*" />

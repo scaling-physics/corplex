@@ -21,6 +21,11 @@ import '../ink/sketch_embed.dart';
 import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
+import '../settings/appearance_settings.dart';
+import '../library/metadata_lookup.dart';
+import 'note_stats.dart';
+import 'paste_citation.dart';
+import '../../theme/haptics.dart';
 import '../projects/projects_providers.dart';
 import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
@@ -103,6 +108,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   final _bodyFocus = FocusNode();
   final _bodyScroll = ScrollController();
 
+  // The page scrolls (the editor inside it doesn't), so typewriter mode
+  // moves this controller, measuring against the editor's caret.
+  final _pageScroll = ScrollController();
+  final _viewportKey = GlobalKey();
+  final _editorKey = GlobalKey<EditorState>();
+
   /// What's in the database, so a save only happens for a real change.
   /// Merely opening a note, or moving the cursor, fires the listeners too;
   /// saving then would bump updatedAt, reorder the list and re-sync.
@@ -138,9 +149,49 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     // Attached after the initial text is in place, so loading isn't an edit.
     _titleController.addListener(_scheduleSave);
     _quillController.addListener(_scheduleSave);
+    _quillController.addListener(_followCursor);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
     widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
+  }
+
+  /// Typewriter mode: after the caret moves (typing, arrow keys, a tap),
+  /// ease the page so its line sits at ~40% of the visible height. Only
+  /// reacts to the editor's own changes, never to scrolling, so reading by
+  /// hand is left alone; skipped while a range is selected (dragging
+  /// handles) or the body isn't focused.
+  void _followCursor() {
+    if (!ref.read(appearanceSettingsProvider).typewriter) return;
+    if (!_bodyFocus.hasFocus) return;
+    final selection = _quillController.selection;
+    if (!selection.isValid || !selection.isCollapsed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pageScroll.hasClients) return;
+      final render = _editorKey.currentState?.renderEditor;
+      final viewport = _viewportKey.currentContext?.findRenderObject();
+      if (render == null || !render.attached || viewport is! RenderBox) return;
+      if (!viewport.hasSize) return;
+      final sel = _quillController.selection;
+      if (!sel.isValid || !sel.isCollapsed) return;
+      final caret = render.getLocalRectForCaret(
+        TextPosition(offset: sel.baseOffset),
+      );
+      final caretY = render.localToGlobal(caret.center).dy;
+      final top = viewport.localToGlobal(Offset.zero).dy;
+      final target = top + viewport.size.height * 0.4;
+      final position = _pageScroll.position;
+      final to = (position.pixels + caretY - target).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if ((to - position.pixels).abs() < 2) return;
+      final duration = AppMotion.of(context, AppMotion.short);
+      if (duration == Duration.zero) {
+        _pageScroll.jumpTo(to);
+      } else {
+        _pageScroll.animateTo(to, duration: duration, curve: AppMotion.enter);
+      }
+    });
   }
 
   /// Adds a quote to the end of the open note (see [NoteEditorHandle]).
@@ -362,6 +413,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           _maybeShowCommands(at);
           return;
         }
+        if (op.data case final String pasted) {
+          if (pastedIdentifier(pasted) case final id?) {
+            _offerPastedCitation(at, pasted, id);
+            return;
+          }
+        }
         if (op.data == '[' || op.data == '@') end = at + 1;
         break;
       }
@@ -388,6 +445,72 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         await _linkNote(context);
       }
     });
+  }
+
+  /// A DOI or arXiv link was just pasted on its own: offer to turn it into
+  /// a citation (and add the paper). Declining, or ignoring the snackbar,
+  /// leaves the text as pasted.
+  void _offerPastedCitation(int at, String pasted, PaperIdentifier id) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    final db = _db;
+    final lookup = ref.read(metadataLookupProvider);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Add this paper and cite it?'),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: 'Add',
+            onPressed: () => _citePasted(messenger, db, lookup, at, pasted, id),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _citePasted(
+    ScaffoldMessengerState messenger,
+    AppDatabase db,
+    MetadataLookup lookup,
+    int at,
+    String pasted,
+    PaperIdentifier id,
+  ) async {
+    void say(String text) => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+    final String? paperId;
+    try {
+      paperId = await paperIdForIdentifier(db, lookup, id);
+    } on LookupFailed {
+      say('Couldn\'t reach the lookup service. The link is unchanged.');
+      return;
+    }
+    if (paperId == null) {
+      say('No paper found for ${id.value}.');
+      return;
+    }
+    final key = await ensureCitekey(db, paperId);
+    if (!mounted) return;
+    final controller = _quillController;
+    // The pasted text may have moved while the lookup ran.
+    final text = controller.document.toPlainText();
+    var index = text.startsWith(pasted, at) ? at : text.indexOf(pasted);
+    if (index < 0) {
+      final cursor = controller.selection.baseOffset;
+      final end = controller.document.length - 1;
+      index = cursor < 0 || cursor > end ? end : cursor;
+    } else {
+      controller.replaceText(
+        index,
+        pasted.length,
+        '',
+        TextSelection.collapsed(offset: index),
+      );
+    }
+    insertCitation(controller, index, key);
+    AppHaptics.confirm();
   }
 
   /// A "/" typed at the start of a line or after a space opens the
@@ -556,6 +679,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await deleteNoteWithUndo(ref, messenger, widget.noteId, title);
   }
 
+  Future<void> _showWordCount(BuildContext context) async {
+    final stats = noteStats(_quillController.document);
+    final linked = await ref.read(
+      linkedPapersForNoteProvider(widget.noteId).future,
+    );
+    if (!context.mounted) return;
+    await showNoteStatsSheet(context, stats, linkedPapers: linked.length);
+  }
+
   Future<void> _export(BuildContext context) async {
     await _save();
     if (!context.mounted) return;
@@ -574,6 +706,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _titleController.dispose();
     _bodyFocus.dispose();
     _bodyScroll.dispose();
+    _pageScroll.dispose();
     if (_loaded) _quillController.dispose();
     super.dispose();
   }
@@ -640,18 +773,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               'template' => _insertTemplate(),
               'bibliography' => _addBibliography(context),
               'export' => _export(context),
+              'words' => _showWordCount(context),
+              'typewriter' =>
+                ref
+                    .read(appearanceSettingsProvider)
+                    .setTypewriter(
+                      !ref.read(appearanceSettingsProvider).typewriter,
+                    ),
               'trash' => _moveToTrash(),
               _ => null,
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
+            itemBuilder: (_) => [
+              const PopupMenuItem(
                 value: 'project',
                 child: ListTile(
                   leading: Icon(Icons.folder_special_outlined),
                   title: Text('Add to project'),
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'link',
                 child: ListTile(
                   leading: Icon(Icons.add_link),
@@ -659,7 +799,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   subtitle: Text('Or type [[ while writing'),
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'cite',
                 child: ListTile(
                   leading: Icon(Icons.format_quote),
@@ -667,7 +807,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   subtitle: Text('Or type [@ while writing'),
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'template',
                 child: ListTile(
                   leading: Icon(Icons.article_outlined),
@@ -675,14 +815,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   subtitle: Text('Summary, method, findings, critique'),
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'bibliography',
                 child: ListTile(
                   leading: Icon(Icons.list_alt),
                   title: Text('Add bibliography'),
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'export',
                 child: ListTile(
                   leading: Icon(Icons.ios_share),
@@ -690,7 +830,26 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   subtitle: Text('Markdown, Word or PDF, with references'),
                 ),
               ),
+              const PopupMenuItem(
+                value: 'words',
+                child: ListTile(
+                  leading: Icon(Icons.format_list_numbered),
+                  title: Text('Word count'),
+                  subtitle: Text('And reading time'),
+                ),
+              ),
               PopupMenuItem(
+                value: 'typewriter',
+                child: ListTile(
+                  leading: const Icon(Icons.vertical_align_center),
+                  title: const Text('Typewriter scrolling'),
+                  subtitle: const Text('Keep the line you type centred'),
+                  trailing: ref.read(appearanceSettingsProvider).typewriter
+                      ? const Icon(Icons.check)
+                      : null,
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'trash',
                 child: ListTile(
                   leading: Icon(Icons.delete_outline),
@@ -705,12 +864,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         builder: (context, box) => !_loaded
             ? const SizedBox.shrink()
             : ListView(
-                // Centred at a readable width on a tablet.
+                key: _viewportKey,
+                controller: _pageScroll,
+                // Centred at a readable width on a tablet. In typewriter
+                // mode the end of the note can rise to the caret line.
                 padding: EdgeInsets.fromLTRB(
                   readablePadding(box.maxWidth),
                   0,
                   readablePadding(box.maxWidth),
-                  32,
+                  ref.watch(appearanceSettingsProvider).typewriter
+                      ? box.maxHeight * 0.6
+                      : 32,
                 ),
                 children: [
                   TextField(
@@ -882,6 +1046,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     focusNode: _bodyFocus,
                     scrollController: _bodyScroll,
                     config: QuillEditorConfig(
+                      editorKey: _editorKey,
                       scrollable: false,
                       padding: EdgeInsets.zero,
                       placeholder: 'Start writing…',

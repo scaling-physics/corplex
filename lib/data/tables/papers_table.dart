@@ -24,6 +24,10 @@ class Papers extends Table {
   /// The page the reader was last on, so the paper reopens there.
   IntColumn get lastPage => integer().nullable()();
 
+  /// How many pages the PDF has (set on import and when the viewer opens
+  /// it), so the Library can show reading progress from [lastPage].
+  IntColumn get pageCount => integer().nullable()();
+
   /// Where the paper is in the reader's queue (see [ReadingStatus]); null
   /// means not yet triaged.
   TextColumn get readingStatus => textEnum<ReadingStatus>().nullable()();

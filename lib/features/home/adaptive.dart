@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../../data/database_provider.dart';
+import '../../theme/app_theme.dart';
 import '../library/paper_detail_screen.dart';
 import '../notes/note_editor_screen.dart';
 
@@ -134,9 +135,11 @@ class DetailPane extends ConsumerWidget {
               text: 'Pick a paper to read, annotate and cite.',
             );
     }
+    // Cross-fade when the selection changes (or empties).
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
-      switchInCurve: Curves.easeOutCubic,
+      duration: AppMotion.of(context, AppMotion.medium),
+      switchInCurve: AppMotion.enter,
+      switchOutCurve: Curves.easeOut,
       child: child,
     );
   }

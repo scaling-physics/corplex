@@ -211,6 +211,76 @@ the default screens until the user opts in by using the feature.
   it means moving them to ARB files (`flutter gen-l10n`) and is a
   cross-cutting change best done as its own pass.
 
+### v1.5 — Reading flow, overview & platform (built, except as noted)
+- **Reading progress** (`reading_progress.dart`, schema v12):
+  `Papers.pageCount` (synced; server file `20261004000000_page_count.sql`,
+  **apply it before schema-v12 data syncs**) is set on import
+  (`readPdfStart` opens the PDF once) and when the viewer is ready
+  (`savePageCountIfChanged` writes only on change, so reopening a paper
+  isn't a synced edit). A Library card shows a thin bar only for a
+  started, unfinished paper with a known count.
+- **Viewer navigation** (`viewer_navigation.dart`): a "3 / 24" pill or
+  ⋮ → Page strip slides up a lazy thumbnail row (dots = highlight inks);
+  ticks on the right edge mark highlights at (page−1+y)/pageCount
+  (assumes equal page heights) and only the ticks take touches. **Focus
+  mode** (tap bare page, or ⋮ → Focus) collapses the bars and, on phones
+  only, goes `immersiveSticky`, restoring `edgeToEdge` on exit and
+  dispose. `PdfViewerScreen.viewerBuilder` lets tests drive
+  `onGeneralTap` without the PDF engine. Reflowed text: not possible with
+  pdfrx; not done.
+- **Note editor extras** (`note_stats.dart`, `paste_citation.dart`):
+  ⋮ → "Typewriter scrolling" (per-device `AppearanceSettings.typewriter`;
+  the page `ListView` scrolls, not Quill, so `_followCursor` measures the
+  caret via `editorKey` and eases it to ~40% height, only on controller
+  changes with a collapsed selection and focus). Long-press a citation
+  chip, or hover a pointer 500 ms, for a card with the paper and its top
+  highlights. ⋮ → "Word count" counts via `textWithCitations` (chips are
+  citations, not words; sketches ignored). Pasting a whole DOI/arXiv id
+  or link (one insert, `wholeIdentifier`) offers "Add this paper and cite
+  it?" → `paperIdForIdentifier` (lookup + duplicate detection, no UI or
+  navigation) → `ensureCitekey` → `insertCitation` at the pasted text.
+- **Project page** (`projects/project_page.dart`): project chip
+  long-press → "Open project" (first item): progress (papers done /
+  total), papers with covers, notes, and Matrix / Bibliography / Export /
+  Map actions; empty sections and pointless actions hidden. Pages pushed
+  over home open items via `openNoteFromPage`/`openPaperFromPage`, which
+  pop to home first when a detail pane exists.
+- **Map** (`features/graph/`): Search → Map, or a project's Map.
+  `buildGraph` joins note→note links (regex on stored content),
+  `NotePaperRefs` and `[@key]` citations (by citekey); `layoutGraph` is a
+  bounded, deterministic Fruchterman-Reingold over connected nodes only
+  (runs on the main isolate after a frame — isolates don't run under the
+  test clock; all-pairs repulsion, fine to ~500 nodes). Unconnected
+  nodes are hidden until toggled. Nothing ticks after layout.
+- **Revisit highlights** (`features/review/`): All highlights → Revisit.
+  One at a time; Keep walks 1, 3, 7, 14, 30, 90 days, Skip asks again
+  tomorrow, never-reviewed highlights are due a day after creation.
+  Schedule is per-device in shared_preferences, never the DB. The
+  `ReviewPrompt` line above the home tabs is invisible unless the user
+  turned on "Remind me on the home screen" and something is due; × hides
+  it for the day.
+- **Shortcuts & home-screen widget** (`features/platform/`):
+  `PlatformCoordinator` (inside `ShareCoordinator` in `app.dart`) handles
+  app-icon shortcuts (New note, Import PDF) and widget taps, which reuse
+  `corplex://` links (`new-note`, `paper/<id>?page=N`) through
+  `openWidgetLink`. The default seams (`quickActionSourceProvider`,
+  `homeWidgetBridgeProvider`) are inert no-ops because the plugins throw
+  `MissingPluginException` under `flutter test`; `main()` installs the
+  real ones — don't make the defaults real. The widget shows "Continue
+  reading" (newest `reading` paper, else newest with a `lastPage`),
+  republished on a 2 s debounce only when it changes. Android widget
+  resources must be listed in `res/raw/keep.xml`. **iOS widget not
+  done**: needs a WidgetKit extension target named `CorplexWidget` plus
+  App Group `group.com.corplex.corplex` (`widgetAppGroupId`) on Runner
+  and the extension, created in Xcode; the Swift widget reads `title`,
+  `detail`, `uri` from that group's `UserDefaults`, uses `.widgetURL` for
+  the paper line and a `Link` to `corplex://new-note`. The Dart side is
+  ready.
+- **Pointer hover**: a mouse/trackpad lifts an `OpenCard` slightly
+  (`OpenCard.hoverLift`); touch and pen don't.
+- Untested on devices: the widget, shortcuts, thumbnails and the
+  page-count hook (pdfium doesn't run under `flutter test`).
+
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This
   conflicts with offline-first, so it would be strictly additive and
@@ -248,6 +318,55 @@ the default screens until the user opts in by using the feature.
   (cross-fade between loading/empty/content) and `EmptyState`. Page
   routes use predictive-back on Android and Cupertino slides on iOS/macOS
   via `pageTransitionsTheme`, so plain `MaterialPageRoute`s get them.
+  Every animation honours the system's reduce-motion setting through
+  `AppMotion.of(context, d)` / `AppMotion.reduced(context)` (jump to the
+  end state; loops don't run). Haptics go through `AppHaptics`
+  (`theme/haptics.dart`: `confirm`, `threshold`, `selection`) and stay
+  sparse: highlight/snapshot created, rating set, swipe-to-trash
+  threshold, Pencil tool switch, audio Mark.
+- **Motion details** (what each piece does and its traps):
+  * **Cards → pages** (`home/open_card.dart`): below 900 px on Android a
+    Notes/Library card is an `OpenContainer` that grows into its page;
+    its route is a plain `ModalRoute` (no predictive-back animation;
+    system back still pops). On iOS/macOS it pushes a normal page instead,
+    because the container route has no edge swipe-back. At 900+ it fills
+    the detail pane, which cross-fades. The closed card sits in a
+    transparent `Card`: the transform re-hosts it outside any `Material`.
+  * **Lists**: `NewItemScope(ids:)` + `ListItemMotion` make an id that
+    joins an already-shown list (Undo, a new note) unfold in place; items
+    present at first build keep `EntranceTransition`. `SwipeToTrash`
+    grows its icon with drag progress and ticks once per crossing into
+    "will trash".
+  * **Covers** (`library/paper_cover.dart`): first page rendered at 360 px,
+    one at a time, cached as PNG in the OS cache folder (derived — not in
+    backups or sync), keyed by path + size + mtime. `coverRendererProvider`
+    is the test seam; in widget tests the real renderer never finishes and
+    the placeholder shows.
+  * **Paper screen**: a `CustomScrollView` with a pinned `SliverAppBar`;
+    a compact title fades into the bar once the large title field scrolls
+    under it (measured post-frame; not built while hidden, so tests never
+    see two titles). The cover is an `OpenContainer` into the same
+    `PdfViewerScreen` as "Open PDF" (plain picture without a local PDF).
+    Status chips stay `ChoiceChip`s (tests find them by type).
+  * **PDF marks**: only highlights made this session sweep in — they
+    register in `FreshHighlights` (`highlight_sweep.dart`) and the owning
+    `PageOverlay` claims them; each animates on its own `RepaintBoundary`
+    while the static painter skips it, so zoom cost is unchanged.
+    `ReadingFilter` tweens the 4×5 colour matrix between reading themes,
+    outside the snapshot boundary. Quote/snapshot flights (`flight.dart`,
+    `flyAcross`) use the root overlay and land on the note pane in split
+    view (`pairedPaneKeyProvider`), else the bottom of the screen.
+  * **Citation chips** pop in only when `insertCitation` marked the Quill
+    node (`FreshCitations`, an `Expando`). Don't key this on marker text or
+    `initState`: Flutter reuses chip state across different chips, so
+    loaded/synced chips would animate.
+  * **Audio bar** rises in and slides out (it keeps the last attachment
+    until the exit ends). Its level bars glide once per position update,
+    never `repeat()`, so `pumpAndSettle` settles. `AnimatedSize` must not
+    get a zero duration (assertion), so reduced motion uses 1 ms.
+  * **Sync ring** (`sync/sync_ring.dart`): a thin arc around the account
+    icon only while `syncingProvider` is true; static under reduced
+    motion, never shown without a backend.
 - **Tablet / iPad layout** (`lib/features/home/adaptive.dart`): the home
   screen adapts to its window, so an iPad never gets a stretched phone.
   Under 600 px wide: phone layout (bottom tabs, full-screen pages). 600–899

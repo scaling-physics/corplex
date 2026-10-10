@@ -71,6 +71,7 @@ const syncTables = [
       'doi',
       'storage_key',
       'last_page',
+      'page_count',
       'reading_status',
       'citekey',
       'rating',

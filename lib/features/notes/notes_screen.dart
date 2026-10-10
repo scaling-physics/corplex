@@ -10,6 +10,8 @@ import '../../data/database_provider.dart';
 import 'folders_providers.dart';
 import 'note_content.dart';
 import '../home/adaptive.dart';
+import '../home/open_card.dart';
+import 'note_editor_screen.dart';
 import 'notes_providers.dart';
 import 'tags_providers.dart';
 import '../../theme/swipe_to_trash.dart';
@@ -109,34 +111,38 @@ class NotesScreen extends ConsumerWidget {
                           message: 'Notes you add while this filter is on land here.',
                         );
                 }
-                return ListView.separated(
-                  // Clear of the floating "New note" button.
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  itemCount: notes.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final note = notes[index];
-                    return EntranceTransition(
-                      key: ValueKey(note.id),
-                      index: index,
-                      child: SwipeToTrash(
-                        dismissKey: ValueKey('swipe-${note.id}'),
-                        onTrash: () => deleteNoteWithUndo(
-                          ref,
-                          ScaffoldMessenger.of(context),
-                          note.id,
-                          note.title,
+                return NewItemScope(
+                  ids: [for (final n in notes) n.id],
+                  child: ListView.separated(
+                    // Clear of the floating "New note" button.
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    itemCount: notes.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return ListItemMotion(
+                        key: ValueKey(note.id),
+                        id: note.id,
+                        index: index,
+                        child: SwipeToTrash(
+                          dismissKey: ValueKey('swipe-${note.id}'),
+                          onTrash: () => deleteNoteWithUndo(
+                            ref,
+                            ScaffoldMessenger.of(context),
+                            note.id,
+                            note.title,
+                          ),
+                          child: _NoteCard(
+                            note: note,
+                            // The folder is redundant while filtering by it.
+                            folderName: filter is FolderFilter
+                                ? null
+                                : folderNames[note.folderId],
+                          ),
                         ),
-                        child: _NoteCard(
-                          note: note,
-                          // The folder is redundant while filtering by it.
-                          folderName: filter is FolderFilter
-                              ? null
-                              : folderNames[note.folderId],
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -165,55 +171,54 @@ class _NoteCard extends ConsumerWidget {
     // In the tablet layout, the note open beside the list is marked.
     final selected =
         hasDetailPane(context) && ref.watch(selectedNoteProvider) == note.id;
-    return Card(
-      color: selected ? c.secondaryContainer : null,
-      child: InkWell(
-        onTap: () => openNote(context, ref, note.id),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                note.title.isEmpty ? 'Untitled' : note.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: note.title.isEmpty ? c.onSurfaceVariant : null,
-                ),
+    return OpenCard(
+      selected: selected,
+      onOpenInPane: () => openNote(context, ref, note.id),
+      pageBuilder: (_) => NoteEditorScreen(noteId: note.id),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              note.title.isEmpty ? 'Untitled' : note.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: note.title.isEmpty ? c.onSurfaceVariant : null,
               ),
-              if (preview.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  preview,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: c.onSurfaceVariant,
-                  ),
+            ),
+            if (preview.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                preview,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: c.onSurfaceVariant,
                 ),
-              ],
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Text(_friendlyDate(note.updatedAt), style: meta),
-                  if (folderName case final name?) ...[
-                    const SizedBox(width: 12),
-                    Icon(Icons.folder_outlined, size: 14, color: c.primary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: meta?.copyWith(color: c.primary),
-                      ),
-                    ),
-                  ],
-                ],
               ),
             ],
-          ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(_friendlyDate(note.updatedAt), style: meta),
+                if (folderName case final name?) ...[
+                  const SizedBox(width: 12),
+                  Icon(Icons.folder_outlined, size: 14, color: c.primary),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: meta?.copyWith(color: c.primary),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
       ),
     );

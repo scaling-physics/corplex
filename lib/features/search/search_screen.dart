@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
+import '../graph/graph_screen.dart';
 import '../library/paper_detail_screen.dart';
 import '../library/pdf_viewer_screen.dart';
 import '../notes/note_editor_screen.dart';
@@ -112,6 +113,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
           style: theme.textTheme.titleMedium,
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.hub_outlined),
+            tooltip: 'Map',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const GraphScreen()),
+            ),
+          ),
+        ],
       ),
       body: ReadableColumn(
         child: _results == null

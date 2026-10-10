@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,7 +9,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/citation_formatter.dart';
+import '../library/authors.dart';
 import '../library/citations.dart';
+import '../library/highlights.dart';
+import '../../theme/haptics.dart';
+import '../../theme/app_theme.dart';
 import '../library/paper_detail_screen.dart';
 import 'note_content.dart';
 
@@ -97,6 +102,29 @@ String textWithCitations(Delta delta, {int? end}) {
   return b.toString();
 }
 
+/// Chips the user has just inserted, waiting to play their entrance.
+///
+/// Quill rebuilds embeds constantly, a note's chips all appear at once when
+/// it opens, and Flutter may hand an old chip's state to a different chip,
+/// so "is this chip new?" can't come from the build or `initState`. Instead
+/// [insertCitation] marks the document *node* it created, and a chip that
+/// is shown for a marked node takes the mark, exactly once. Chips in a
+/// loaded or merged document are other nodes and are never marked.
+class FreshCitations {
+  FreshCitations._();
+
+  static final _marked = Expando<bool>('fresh citation');
+
+  static void mark(Node node) => _marked[node] = true;
+
+  /// True once per [mark]ed node.
+  static bool take(Node node) {
+    if (_marked[node] != true) return false;
+    _marked[node] = null;
+    return true;
+  }
+}
+
 /// Inserts a citation chip for [citekey] at [index], followed by a space,
 /// and puts the cursor after it.
 void insertCitation(QuillController controller, int index, String citekey) {
@@ -106,6 +134,12 @@ void insertCitation(QuillController controller, int index, String citekey) {
     Embeddable(citationEmbedType, citationMarker(citekey)),
     null,
   );
+  final at = controller.document.queryChild(index);
+  final line = at.node;
+  if (line is Line) {
+    final leaf = line.queryChild(at.offset, false).node;
+    if (leaf != null) FreshCitations.mark(leaf);
+  }
   controller.replaceText(
     index + 1,
     0,
@@ -151,18 +185,138 @@ class CitationEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final marker = embedContext.node.value.data as String;
-    return _CitationChip(marker: marker, textStyle: embedContext.textStyle);
+    return _CitationChip(
+      node: embedContext.node,
+      marker: marker,
+      textStyle: embedContext.textStyle,
+    );
   }
 }
 
-class _CitationChip extends ConsumerWidget {
-  const _CitationChip({required this.marker, required this.textStyle});
+class _CitationChip extends ConsumerStatefulWidget {
+  const _CitationChip({
+    required this.node,
+    required this.marker,
+    required this.textStyle,
+  });
 
+  final Node node;
   final String marker;
   final TextStyle textStyle;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CitationChip> createState() => _CitationChipState();
+}
+
+class _CitationChipState extends ConsumerState<_CitationChip>
+    with SingleTickerProviderStateMixin {
+  static const _popDuration = Duration(milliseconds: 600);
+
+  // At 1 a chip is at rest. A freshly inserted one runs 0 → 1: it scales
+  // and fades in over the first part while the tint fades over all of it.
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: _popDuration,
+    value: 1,
+  );
+
+  bool _pending = false;
+
+  final _link = LayerLink();
+  OverlayEntry? _card;
+  Timer? _hoverIn;
+  Timer? _hoverOut;
+  bool _overChip = false;
+  bool _overCard = false;
+
+  void _openPaper(String paperId) {
+    _closeCard();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PaperDetailScreen(paperId: paperId)),
+    );
+  }
+
+  /// Shows the paper(s) this chip cites in a small popover under (or over)
+  /// the chip. Long-press, or resting a pointer on it.
+  void _showCard() {
+    if (_card != null || !mounted) return;
+    final overlay = Overlay.maybeOf(context);
+    final box = context.findRenderObject();
+    if (overlay == null || box is! RenderBox || !box.hasSize) return;
+    final anchor = box.localToGlobal(Offset.zero) & box.size;
+    final marker = widget.marker;
+    final entry = OverlayEntry(
+      builder: (_) => _CitationCardOverlay(
+        anchor: anchor,
+        marker: marker,
+        onOpen: _openPaper,
+        onDismiss: _closeCard,
+        onHover: (over) {
+          _overCard = over;
+          _maybeCloseAfterHover();
+        },
+      ),
+    );
+    _card = entry;
+    overlay.insert(entry);
+  }
+
+  void _closeCard() {
+    _hoverIn?.cancel();
+    _hoverOut?.cancel();
+    _card?.remove();
+    _card?.dispose();
+    _card = null;
+    _overCard = false;
+  }
+
+  void _maybeCloseAfterHover() {
+    _hoverOut?.cancel();
+    if (_overChip || _overCard) return;
+    _hoverOut = Timer(const Duration(milliseconds: 250), () {
+      if (!_overChip && !_overCard) _closeCard();
+    });
+  }
+
+  /// Plays the entrance once a freshly inserted chip has a context to ask
+  /// about reduced motion (not available in `initState`).
+  void _start() {
+    if (!_pending) return;
+    _pending = false;
+    if (!AppMotion.reduced(context)) _pop.forward(from: 0);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pending = FreshCitations.take(widget.node);
+  }
+
+  @override
+  void didUpdateWidget(_CitationChip old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.node, widget.node) && FreshCitations.take(widget.node)) {
+      _pending = true;
+      _start();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _start();
+  }
+
+  @override
+  void dispose() {
+    _closeCard();
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final marker = widget.marker;
     final c = Theme.of(context).colorScheme;
     final byKey = ref.watch(_citedPapersProvider(marker)).value;
     final keys = citedKeys(marker);
@@ -174,34 +328,239 @@ class _CitationChip extends ConsumerWidget {
         : marker;
     final first = known ? byKey[keys.first] : null;
 
+    final rest = known
+        ? c.primaryContainer.withValues(alpha: 0.6)
+        : c.errorContainer.withValues(alpha: 0.6);
+    final flash = known
+        ? Color.alphaBlend(c.primary.withValues(alpha: 0.3), c.primaryContainer)
+        : Color.alphaBlend(c.error.withValues(alpha: 0.3), c.errorContainer);
+    final entrance = CurvedAnimation(
+      parent: _pop,
+      curve: const Interval(0, 0.35, curve: AppMotion.enter),
+    );
+
     return Semantics(
       button: first != null,
       label: known ? 'Citation $label' : 'Citation $marker, paper not found',
-      child: GestureDetector(
-        onTap: first == null
-            ? null
-            : () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PaperDetailScreen(paperId: first.id),
+      onLongPress: _showCard,
+      child: MouseRegion(
+        onEnter: (_) {
+          _overChip = true;
+          _hoverOut?.cancel();
+          _hoverIn?.cancel();
+          _hoverIn = Timer(const Duration(milliseconds: 500), _showCard);
+        },
+        onExit: (_) {
+          _overChip = false;
+          _hoverIn?.cancel();
+          _maybeCloseAfterHover();
+        },
+        child: CompositedTransformTarget(
+          link: _link,
+          child: GestureDetector(
+            onLongPress: () {
+              AppHaptics.selection();
+              _showCard();
+            },
+            onTap: first == null
+                ? null
+                : () {
+                    _closeCard();
+                    _openPaper(first.id);
+                  },
+            child: FadeTransition(
+              opacity: entrance,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.9, end: 1).animate(entrance),
+                child: AnimatedBuilder(
+                  animation: _pop,
+                  builder: (context, child) => Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Color.lerp(flash, rest, _pop.value),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: child,
+                  ),
+                  child: Text(
+                    label,
+                    style: widget.textStyle.copyWith(
+                      color: known ? c.onPrimaryContainer : c.onErrorContainer,
+                    ),
+                  ),
                 ),
               ),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(
-            color: known
-                ? c.primaryContainer.withValues(alpha: 0.6)
-                : c.errorContainer.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            label,
-            style: textStyle.copyWith(
-              color: known ? c.onPrimaryContainer : c.onErrorContainer,
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The popover: for each cited key, the paper's title, authors, year and
+/// venue, up to three of its highlights, and "Open paper"; or a line saying
+/// the key isn't in the library.
+class _CitationCardOverlay extends ConsumerWidget {
+  const _CitationCardOverlay({
+    required this.anchor,
+    required this.marker,
+    required this.onOpen,
+    required this.onDismiss,
+    required this.onHover,
+  });
+
+  final Rect anchor;
+  final String marker;
+  final void Function(String paperId) onOpen;
+  final VoidCallback onDismiss;
+  final void Function(bool over) onHover;
+
+  static const _width = 320.0;
+  static const _maxHeight = 360.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final screen = MediaQuery.sizeOf(context);
+    final c = Theme.of(context).colorScheme;
+    final byKey = ref.watch(_citedPapersProvider(marker)).value ?? const {};
+    final width = _width.clamp(0.0, screen.width - 24);
+    final left = (anchor.left).clamp(12.0, screen.width - width - 12);
+    final below =
+        anchor.bottom + 8 + _maxHeight < screen.height ||
+        anchor.top < _maxHeight / 2;
+
+    final card = MouseRegion(
+      onEnter: (_) => onHover(true),
+      onExit: (_) => onHover(false),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: AppMotion.of(context, AppMotion.short),
+        curve: AppMotion.enter,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, (below ? -6 : 6) * (1 - t)),
+            child: child,
+          ),
+        ),
+        child: Material(
+          color: c.surfaceContainerHigh,
+          elevation: 3,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: width, maxHeight: _maxHeight),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (i, key) in citedKeys(marker).indexed) ...[
+                    if (i > 0) const Divider(height: 20),
+                    if (byKey[key] case final paper?)
+                      _CitedPaperSection(paper: paper, onOpen: onOpen)
+                    else
+                      Text(
+                        '@$key isn\'t in your library.',
+                        style: TextStyle(color: c.error),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Stack(
+      children: [
+        // Anything outside the card dismisses it (a scroll is a pointer
+        // down or a wheel event), without swallowing the gesture.
+        Positioned.fill(
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (_) => onDismiss(),
+            onPointerSignal: (_) => onDismiss(),
+          ),
+        ),
+        Positioned(
+          left: left,
+          top: below ? anchor.bottom + 6 : null,
+          bottom: below ? null : screen.height - anchor.top + 6,
+          child: card,
+        ),
+      ],
+    );
+  }
+}
+
+class _CitedPaperSection extends ConsumerWidget {
+  const _CitedPaperSection({required this.paper, required this.onOpen});
+
+  final Paper paper;
+  final void Function(String paperId) onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = Theme.of(context).textTheme;
+    final c = Theme.of(context).colorScheme;
+    final highlights =
+        (ref.watch(highlightsForPaperProvider(paper.id)).value ?? const [])
+            .take(3);
+    final authors = paper.authors.isEmpty ? '' : displayAuthors(paper.authors);
+    final meta = [
+      if (paper.year != null) '${paper.year}',
+      if ((paper.venue ?? '').isNotEmpty) paper.venue!,
+    ].join(' · ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(paper.title, style: text.titleSmall),
+        if (authors.isNotEmpty)
+          Text(authors, style: text.bodySmall?.copyWith(color: c.secondary)),
+        if (meta.isNotEmpty)
+          Text(meta, style: text.bodySmall?.copyWith(color: c.secondary)),
+        for (final h in highlights)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.only(left: 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: c.outlineVariant, width: 2),
+                ),
+              ),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: h.quote),
+                    TextSpan(
+                      text: '  p. ${h.pageNumber}',
+                      style: text.bodySmall?.copyWith(color: c.secondary),
+                    ),
+                  ],
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: text.bodySmall,
+              ),
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => onOpen(paper.id),
+            child: const Text('Open paper'),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../notes/note_content.dart';
 import '../notes/note_editor_screen.dart';
+import 'flight.dart';
 import 'highlights.dart';
 
 /// Appends [highlight] (quote, page link, comment) to a note and links the
@@ -63,12 +64,15 @@ Future<String> quoteHighlightIntoNote(
 final pairedNoteProvider = StateProvider<NoteEditorHandle?>((ref) => null);
 
 /// Asks which note the quote goes into — a new one, notes already about
-/// this paper, or recent notes — then adds it and opens that note.
+/// this paper, or recent notes — then adds it and opens that note. [from]
+/// is the selection's rect on screen (global), where the split-view quote
+/// flight starts.
 Future<void> showQuoteToNoteSheet(
   BuildContext context,
   WidgetRef ref,
-  Highlight highlight,
-) async {
+  Highlight highlight, {
+  Rect? from,
+}) async {
   final db = ref.read(databaseProvider);
   final paper = await (db.select(
     db.papers,
@@ -82,6 +86,17 @@ Future<void> showQuoteToNoteSheet(
       comment: highlight.comment,
     );
     if (context.mounted) {
+      // The quote lifts off the selection and lands in the note pane.
+      final landing = paneLanding(ref.read(pairedPaneKeyProvider));
+      if (from != null && landing != null) {
+        flyAcross(
+          context,
+          from: from.center,
+          to: landing,
+          size: QuoteCard.size,
+          child: QuoteCard(quote: highlight.quote),
+        );
+      }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(

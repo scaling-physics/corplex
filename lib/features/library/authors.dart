@@ -52,8 +52,25 @@ class AuthorList {
 }
 
 const _particles = {
-  'van', 'von', 'de', 'der', 'den', 'del', 'della', 'di', 'da', 'dos', 'du',
-  'la', 'le', 'ten', 'ter', 'bin', 'ibn', 'al', 'el',
+  'van',
+  'von',
+  'de',
+  'der',
+  'den',
+  'del',
+  'della',
+  'di',
+  'da',
+  'dos',
+  'du',
+  'la',
+  'le',
+  'ten',
+  'ter',
+  'bin',
+  'ibn',
+  'al',
+  'el',
 };
 
 /// Understands the shapes people actually write:
@@ -151,7 +168,9 @@ String authorsMla(AuthorList list) {
   final a = list.authors;
   if (a.isEmpty) return '';
   String finish(String s) => s.endsWith('.') ? s : '$s.';
-  if (list.etAl && !list.hasGivenNames) return finish('${a.first.family} et al.');
+  if (list.etAl && !list.hasGivenNames) {
+    return finish('${a.first.family} et al.');
+  }
   if (a.length >= 3 || list.etAl) return finish('${a.first.inverted}, et al.');
   if (a.length == 2) {
     return finish('${a[0].inverted}, and ${a[1].natural}');

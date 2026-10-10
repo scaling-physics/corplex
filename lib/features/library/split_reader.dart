@@ -7,6 +7,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../notes/note_editor_screen.dart';
 import '../notes/note_papers_providers.dart';
+import 'flight.dart';
 import 'pdf_viewer_screen.dart';
 import 'quote_to_note.dart';
 
@@ -40,12 +41,17 @@ class SplitReaderScreen extends ConsumerStatefulWidget {
 class _SplitReaderScreenState extends ConsumerState<SplitReaderScreen> {
   final _handle = NoteEditorHandle();
   late final _paired = ref.read(pairedNoteProvider.notifier);
+  late final _pane = ref.read(pairedPaneKeyProvider.notifier);
+  final _paneKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     // After the first frame: providers can't change while building.
-    Future.microtask(() => _paired.state = _handle);
+    Future.microtask(() {
+      _paired.state = _handle;
+      _pane.state = _paneKey;
+    });
   }
 
   @override
@@ -53,8 +59,11 @@ class _SplitReaderScreenState extends ConsumerState<SplitReaderScreen> {
     // Deferred for the same reason; only clear our own handle.
     final paired = _paired;
     final handle = _handle;
+    final pane = _pane;
+    final paneKey = _paneKey;
     Future.microtask(() {
       if (paired.state == handle) paired.state = null;
+      if (pane.state == paneKey) pane.state = null;
     });
     super.dispose();
   }
@@ -78,10 +87,13 @@ class _SplitReaderScreenState extends ConsumerState<SplitReaderScreen> {
             ),
             Expanded(
               flex: 9,
-              child: NoteEditorScreen(
-                noteId: widget.noteId,
-                handle: _handle,
-                embedded: true,
+              child: KeyedSubtree(
+                key: _paneKey,
+                child: NoteEditorScreen(
+                  noteId: widget.noteId,
+                  handle: _handle,
+                  embedded: true,
+                ),
               ),
             ),
           ],

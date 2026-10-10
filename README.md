@@ -107,14 +107,26 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
 ## And quietly, when you need them
 
 - **Projects** — group the papers and notes for one review or chapter.
-  Each project has a **synthesis matrix** (papers × themes like method,
+  Each project has its own page (how much you've read, its papers and
+  notes) and a **synthesis matrix** (papers × themes like method,
   sample, findings) that you can fill from your highlights.
 - **Search everything** — notes, papers and highlights, as you type.
+- **Map** — see how your notes and papers link and cite each other, for
+  the whole library or one project.
+- **Revisit highlights** — old highlights come back one at a time, less
+  often each time you keep them, so what you read stays with you.
 - **Audio** — attach a NotebookLM audio overview or a lecture recording,
   play it while you read, and drop tappable timestamps into your notes.
   It keeps playing with the screen off, with lock-screen controls.
-- **Reading comfort** — sepia and night pages, the PDF's table of
-  contents, star ratings, reading status, dark mode.
+- **Reading comfort** — sepia and night pages, a focus mode with nothing
+  but the page, a strip of page thumbnails, marks down the edge showing
+  where your highlights are, reading progress in the Library, the PDF's
+  table of contents, star ratings, reading status, dark mode.
+- **Writing comfort** — typewriter scrolling, word count and reading
+  time, a preview card when you long-press a citation, and paste a DOI or
+  arXiv link to add the paper and cite it in one go.
+- **Shortcuts** — long-press the app icon for a new note or a PDF import;
+  on Android, a home-screen widget to continue reading or start a note.
 - **Your data is safe** — deleted items go to a trash you can undo from,
   and you can back up everything to a single file and restore it.
 

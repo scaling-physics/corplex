@@ -141,6 +141,7 @@ class _EntranceTransitionState extends State<EntranceTransition>
 
   @override
   Widget build(BuildContext context) {
+    if (AppMotion.reduced(context)) return widget.child;
     return FadeTransition(
       opacity: _curve,
       child: SlideTransition(
@@ -224,6 +225,127 @@ class StateSwitcher extends StatelessWidget {
       switchInCurve: AppMotion.enter,
       switchOutCurve: Curves.easeOut,
       child: KeyedSubtree(key: ValueKey(stateKey), child: child),
+    );
+  }
+}
+
+/// Remembers which list items have been shown, so [ListItemMotion] can tell
+/// an item that is new to the list (an Undo restore, a freshly made note)
+/// from one that was there all along. Put it around the list, passing the
+/// ids currently in it.
+class NewItemScope extends StatefulWidget {
+  const NewItemScope({super.key, required this.ids, required this.child});
+
+  final Iterable<Object> ids;
+  final Widget child;
+
+  @override
+  State<NewItemScope> createState() => _NewItemScopeState();
+}
+
+class _NewItemScopeState extends State<NewItemScope> {
+  late final Set<Object> _known;
+  Set<Object> _fresh = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _known = widget.ids.toSet();
+  }
+
+  @override
+  void didUpdateWidget(NewItemScope old) {
+    super.didUpdateWidget(old);
+    final ids = widget.ids.toSet();
+    _fresh = ids.difference(_known);
+    _known.addAll(ids);
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _NewItems(isFresh: _fresh.contains, child: widget.child);
+}
+
+class _NewItems extends InheritedWidget {
+  const _NewItems({required this.isFresh, required super.child});
+
+  final bool Function(Object id) isFresh;
+
+  // Read once, when an item is built; never needs to notify.
+  @override
+  bool updateShouldNotify(_NewItems old) => false;
+}
+
+/// A list item's motion. Items present when the list first built, or
+/// scrolled into view later, fade and slide up (staggered by [index]);
+/// an item that joins an already-shown list (see [NewItemScope]) unfolds
+/// in place: its height opens while it fades in.
+class ListItemMotion extends StatefulWidget {
+  const ListItemMotion({
+    super.key,
+    required this.id,
+    required this.index,
+    required this.child,
+  });
+
+  final Object id;
+  final int index;
+  final Widget child;
+
+  @override
+  State<ListItemMotion> createState() => _ListItemMotionState();
+}
+
+class _ListItemMotionState extends State<ListItemMotion>
+    with SingleTickerProviderStateMixin {
+  late final bool _unfold =
+      context.getInheritedWidgetOfExactType<_NewItems>()?.isFresh(widget.id) ??
+      false;
+  AnimationController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_unfold) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: AppMotion.medium,
+      );
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = _controller;
+    if (controller != null &&
+        !controller.isCompleted &&
+        !controller.isAnimating) {
+      if (AppMotion.reduced(context)) {
+        controller.value = 1;
+      } else {
+        controller.forward();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null) {
+      return EntranceTransition(index: widget.index, child: widget.child);
+    }
+    final curve = CurvedAnimation(parent: controller, curve: AppMotion.enter);
+    return SizeTransition(
+      sizeFactor: curve,
+      alignment: Alignment.topCenter,
+      child: FadeTransition(opacity: curve, child: widget.child),
     );
   }
 }

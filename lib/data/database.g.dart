@@ -807,6 +807,17 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _pageCountMeta = const VerificationMeta(
+    'pageCount',
+  );
+  @override
+  late final GeneratedColumn<int> pageCount = GeneratedColumn<int>(
+    'page_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   late final GeneratedColumnWithTypeConverter<ReadingStatus?, String>
   readingStatus = GeneratedColumn<String>(
@@ -871,6 +882,7 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     pdfPath,
     storageKey,
     lastPage,
+    pageCount,
     readingStatus,
     citekey,
     rating,
@@ -942,6 +954,12 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         lastPage.isAcceptableOrUnknown(data['last_page']!, _lastPageMeta),
       );
     }
+    if (data.containsKey('page_count')) {
+      context.handle(
+        _pageCountMeta,
+        pageCount.isAcceptableOrUnknown(data['page_count']!, _pageCountMeta),
+      );
+    }
     if (data.containsKey('citekey')) {
       context.handle(
         _citekeyMeta,
@@ -1011,6 +1029,10 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         DriftSqlType.int,
         data['${effectivePrefix}last_page'],
       ),
+      pageCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_count'],
+      ),
       readingStatus: $PapersTable.$converterreadingStatusn.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -1069,6 +1091,10 @@ class Paper extends DataClass implements Insertable<Paper> {
   /// The page the reader was last on, so the paper reopens there.
   final int? lastPage;
 
+  /// How many pages the PDF has (set on import and when the viewer opens
+  /// it), so the Library can show reading progress from [lastPage].
+  final int? pageCount;
+
   /// Where the paper is in the reader's queue (see [ReadingStatus]); null
   /// means not yet triaged.
   final ReadingStatus? readingStatus;
@@ -1094,6 +1120,7 @@ class Paper extends DataClass implements Insertable<Paper> {
     this.pdfPath,
     this.storageKey,
     this.lastPage,
+    this.pageCount,
     this.readingStatus,
     this.citekey,
     this.rating,
@@ -1123,6 +1150,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     }
     if (!nullToAbsent || lastPage != null) {
       map['last_page'] = Variable<int>(lastPage);
+    }
+    if (!nullToAbsent || pageCount != null) {
+      map['page_count'] = Variable<int>(pageCount);
     }
     if (!nullToAbsent || readingStatus != null) {
       map['reading_status'] = Variable<String>(
@@ -1159,6 +1189,9 @@ class Paper extends DataClass implements Insertable<Paper> {
       lastPage: lastPage == null && nullToAbsent
           ? const Value.absent()
           : Value(lastPage),
+      pageCount: pageCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pageCount),
       readingStatus: readingStatus == null && nullToAbsent
           ? const Value.absent()
           : Value(readingStatus),
@@ -1188,6 +1221,7 @@ class Paper extends DataClass implements Insertable<Paper> {
       pdfPath: serializer.fromJson<String?>(json['pdfPath']),
       storageKey: serializer.fromJson<String?>(json['storageKey']),
       lastPage: serializer.fromJson<int?>(json['lastPage']),
+      pageCount: serializer.fromJson<int?>(json['pageCount']),
       readingStatus: $PapersTable.$converterreadingStatusn.fromJson(
         serializer.fromJson<String?>(json['readingStatus']),
       ),
@@ -1210,6 +1244,7 @@ class Paper extends DataClass implements Insertable<Paper> {
       'pdfPath': serializer.toJson<String?>(pdfPath),
       'storageKey': serializer.toJson<String?>(storageKey),
       'lastPage': serializer.toJson<int?>(lastPage),
+      'pageCount': serializer.toJson<int?>(pageCount),
       'readingStatus': serializer.toJson<String?>(
         $PapersTable.$converterreadingStatusn.toJson(readingStatus),
       ),
@@ -1230,6 +1265,7 @@ class Paper extends DataClass implements Insertable<Paper> {
     Value<String?> pdfPath = const Value.absent(),
     Value<String?> storageKey = const Value.absent(),
     Value<int?> lastPage = const Value.absent(),
+    Value<int?> pageCount = const Value.absent(),
     Value<ReadingStatus?> readingStatus = const Value.absent(),
     Value<String?> citekey = const Value.absent(),
     Value<int?> rating = const Value.absent(),
@@ -1245,6 +1281,7 @@ class Paper extends DataClass implements Insertable<Paper> {
     pdfPath: pdfPath.present ? pdfPath.value : this.pdfPath,
     storageKey: storageKey.present ? storageKey.value : this.storageKey,
     lastPage: lastPage.present ? lastPage.value : this.lastPage,
+    pageCount: pageCount.present ? pageCount.value : this.pageCount,
     readingStatus: readingStatus.present
         ? readingStatus.value
         : this.readingStatus,
@@ -1266,6 +1303,7 @@ class Paper extends DataClass implements Insertable<Paper> {
           ? data.storageKey.value
           : this.storageKey,
       lastPage: data.lastPage.present ? data.lastPage.value : this.lastPage,
+      pageCount: data.pageCount.present ? data.pageCount.value : this.pageCount,
       readingStatus: data.readingStatus.present
           ? data.readingStatus.value
           : this.readingStatus,
@@ -1288,6 +1326,7 @@ class Paper extends DataClass implements Insertable<Paper> {
           ..write('pdfPath: $pdfPath, ')
           ..write('storageKey: $storageKey, ')
           ..write('lastPage: $lastPage, ')
+          ..write('pageCount: $pageCount, ')
           ..write('readingStatus: $readingStatus, ')
           ..write('citekey: $citekey, ')
           ..write('rating: $rating, ')
@@ -1308,6 +1347,7 @@ class Paper extends DataClass implements Insertable<Paper> {
     pdfPath,
     storageKey,
     lastPage,
+    pageCount,
     readingStatus,
     citekey,
     rating,
@@ -1327,6 +1367,7 @@ class Paper extends DataClass implements Insertable<Paper> {
           other.pdfPath == this.pdfPath &&
           other.storageKey == this.storageKey &&
           other.lastPage == this.lastPage &&
+          other.pageCount == this.pageCount &&
           other.readingStatus == this.readingStatus &&
           other.citekey == this.citekey &&
           other.rating == this.rating &&
@@ -1344,6 +1385,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<String?> pdfPath;
   final Value<String?> storageKey;
   final Value<int?> lastPage;
+  final Value<int?> pageCount;
   final Value<ReadingStatus?> readingStatus;
   final Value<String?> citekey;
   final Value<int?> rating;
@@ -1360,6 +1402,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.pdfPath = const Value.absent(),
     this.storageKey = const Value.absent(),
     this.lastPage = const Value.absent(),
+    this.pageCount = const Value.absent(),
     this.readingStatus = const Value.absent(),
     this.citekey = const Value.absent(),
     this.rating = const Value.absent(),
@@ -1377,6 +1420,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.pdfPath = const Value.absent(),
     this.storageKey = const Value.absent(),
     this.lastPage = const Value.absent(),
+    this.pageCount = const Value.absent(),
     this.readingStatus = const Value.absent(),
     this.citekey = const Value.absent(),
     this.rating = const Value.absent(),
@@ -1394,6 +1438,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? pdfPath,
     Expression<String>? storageKey,
     Expression<int>? lastPage,
+    Expression<int>? pageCount,
     Expression<String>? readingStatus,
     Expression<String>? citekey,
     Expression<int>? rating,
@@ -1411,6 +1456,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (pdfPath != null) 'pdf_path': pdfPath,
       if (storageKey != null) 'storage_key': storageKey,
       if (lastPage != null) 'last_page': lastPage,
+      if (pageCount != null) 'page_count': pageCount,
       if (readingStatus != null) 'reading_status': readingStatus,
       if (citekey != null) 'citekey': citekey,
       if (rating != null) 'rating': rating,
@@ -1430,6 +1476,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<String?>? pdfPath,
     Value<String?>? storageKey,
     Value<int?>? lastPage,
+    Value<int?>? pageCount,
     Value<ReadingStatus?>? readingStatus,
     Value<String?>? citekey,
     Value<int?>? rating,
@@ -1447,6 +1494,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       pdfPath: pdfPath ?? this.pdfPath,
       storageKey: storageKey ?? this.storageKey,
       lastPage: lastPage ?? this.lastPage,
+      pageCount: pageCount ?? this.pageCount,
       readingStatus: readingStatus ?? this.readingStatus,
       citekey: citekey ?? this.citekey,
       rating: rating ?? this.rating,
@@ -1486,6 +1534,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     if (lastPage.present) {
       map['last_page'] = Variable<int>(lastPage.value);
     }
+    if (pageCount.present) {
+      map['page_count'] = Variable<int>(pageCount.value);
+    }
     if (readingStatus.present) {
       map['reading_status'] = Variable<String>(
         $PapersTable.$converterreadingStatusn.toSql(readingStatus.value),
@@ -1521,6 +1572,7 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('pdfPath: $pdfPath, ')
           ..write('storageKey: $storageKey, ')
           ..write('lastPage: $lastPage, ')
+          ..write('pageCount: $pageCount, ')
           ..write('readingStatus: $readingStatus, ')
           ..write('citekey: $citekey, ')
           ..write('rating: $rating, ')
@@ -7151,6 +7203,7 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<String?> pdfPath,
   Value<String?> storageKey,
   Value<int?> lastPage,
+  Value<int?> pageCount,
   Value<ReadingStatus?> readingStatus,
   Value<String?> citekey,
   Value<int?> rating,
@@ -7168,6 +7221,7 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<String?> pdfPath,
   Value<String?> storageKey,
   Value<int?> lastPage,
+  Value<int?> pageCount,
   Value<ReadingStatus?> readingStatus,
   Value<String?> citekey,
   Value<int?> rating,
@@ -7340,6 +7394,11 @@ class $$PapersTableFilterComposer
 
   ColumnFilters<int> get lastPage => $composableBuilder(
     column: $table.lastPage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7574,6 +7633,11 @@ class $$PapersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get readingStatus => $composableBuilder(
     column: $table.readingStatus,
     builder: (column) => ColumnOrderings(column),
@@ -7637,6 +7701,9 @@ class $$PapersTableAnnotationComposer
 
   GeneratedColumn<int> get lastPage =>
       $composableBuilder(column: $table.lastPage, builder: (column) => column);
+
+  GeneratedColumn<int> get pageCount =>
+      $composableBuilder(column: $table.pageCount, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<ReadingStatus?, String> get readingStatus =>
       $composableBuilder(
@@ -7851,6 +7918,7 @@ class $$PapersTableTableManager
                 Value<String?> pdfPath = const Value.absent(),
                 Value<String?> storageKey = const Value.absent(),
                 Value<int?> lastPage = const Value.absent(),
+                Value<int?> pageCount = const Value.absent(),
                 Value<ReadingStatus?> readingStatus = const Value.absent(),
                 Value<String?> citekey = const Value.absent(),
                 Value<int?> rating = const Value.absent(),
@@ -7867,6 +7935,7 @@ class $$PapersTableTableManager
                 pdfPath: pdfPath,
                 storageKey: storageKey,
                 lastPage: lastPage,
+                pageCount: pageCount,
                 readingStatus: readingStatus,
                 citekey: citekey,
                 rating: rating,
@@ -7885,6 +7954,7 @@ class $$PapersTableTableManager
                 Value<String?> pdfPath = const Value.absent(),
                 Value<String?> storageKey = const Value.absent(),
                 Value<int?> lastPage = const Value.absent(),
+                Value<int?> pageCount = const Value.absent(),
                 Value<ReadingStatus?> readingStatus = const Value.absent(),
                 Value<String?> citekey = const Value.absent(),
                 Value<int?> rating = const Value.absent(),
@@ -7901,6 +7971,7 @@ class $$PapersTableTableManager
                 pdfPath: pdfPath,
                 storageKey: storageKey,
                 lastPage: lastPage,
+                pageCount: pageCount,
                 readingStatus: readingStatus,
                 citekey: citekey,
                 rating: rating,

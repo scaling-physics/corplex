@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +11,17 @@ import 'package:pdfrx/pdfrx.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/haptics.dart';
 import '../notes/note_editor_screen.dart';
 import 'annotations_providers.dart';
+import 'flight.dart';
+import 'highlight_sweep.dart';
 import 'highlights.dart';
 import '../settings/appearance_settings.dart';
 import 'quote_to_note.dart';
+import 'reading_progress.dart';
 import 'snapshot.dart';
+import 'viewer_navigation.dart';
 
 /// Reads a paper's PDF. Two ways to mark it up:
 ///
@@ -33,6 +39,7 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
     required this.paperId,
     required this.pdfPath,
     this.initialPage,
+    this.viewerBuilder,
   });
 
   final String paperId;
@@ -41,11 +48,21 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
   /// Page to open at; defaults to 1.
   final int? initialPage;
 
+  /// Replaces the PDF viewer itself (tests have no PDF engine).
+  @visibleForTesting
+  final Widget Function(
+    BuildContext context,
+    PdfViewerController controller,
+    PdfViewerParams params,
+  )?
+  viewerBuilder;
+
   @override
   ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
-class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
+class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
+    with SingleTickerProviderStateMixin {
   final _repaintKey = GlobalKey();
   final _controller = PdfViewerController();
   late final AppDatabase _db = ref.read(databaseProvider);
@@ -59,16 +76,94 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   Timer? _pageSave;
   int? _pendingPage;
 
+  late final ValueNotifier<int> _page = ValueNotifier(widget.initialPage ?? 1);
+  PdfDocument? _document;
+  int? _pageCount;
+
+  /// 1 = chrome shown, 0 = focus mode (everything but the page hidden).
+  late final AnimationController _chrome = AnimationController(
+    vsync: this,
+    value: 1,
+  );
+  bool _focus = false;
+  bool _immersive = false;
+  bool _stripOpen = false;
+
   @override
   void dispose() {
+    if (_immersive) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    _chrome.dispose();
+    _page.dispose();
     // Flush the reading position on the way out.
     _pageSave?.cancel();
     if (_pendingPage case final page?) saveLastPage(_db, widget.paperId, page);
     super.dispose();
   }
 
+  void _onViewerReady(PdfDocument document, PdfViewerController controller) {
+    final count = document.pages.length;
+    setState(() {
+      _document = document;
+      _pageCount = count;
+    });
+    savePageCountIfChanged(_db, widget.paperId, count);
+  }
+
+  /// Hides (or brings back) everything but the page. On a phone the
+  /// system bars go too; a tablet keeps them, there is room.
+  void _setFocus(bool focus) {
+    if (_focus == focus) return;
+    setState(() {
+      _focus = focus;
+      if (focus) _stripOpen = false;
+    });
+    _chrome.animateTo(
+      focus ? 0 : 1,
+      duration: AppMotion.of(context, AppMotion.short),
+      curve: focus ? AppMotion.exit : AppMotion.enter,
+    );
+    final phone = MediaQuery.sizeOf(context).shortestSide < 600;
+    if (focus && phone) {
+      _immersive = true;
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else if (!focus && _immersive) {
+      _immersive = false;
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  /// A tap on bare page toggles focus mode. Taps that mean something else
+  /// (a selection to dismiss, ink, choosing a snapshot box) are left alone.
+  bool _onGeneralTap(
+    BuildContext context,
+    PdfViewerController controller,
+    PdfViewerGeneralTapHandlerDetails details,
+  ) {
+    if (details.type != PdfViewerGeneralTapType.tap) return false;
+    if (_inkMode || _snapping) return false;
+    if (details.tapOn == PdfViewerPart.selectedText) return false;
+    try {
+      if (controller.textSelectionDelegate.hasSelectedText) return false;
+    } catch (_) {}
+    if (_stripOpen) {
+      setState(() => _stripOpen = false);
+      return false;
+    }
+    _setFocus(!_focus);
+    return false;
+  }
+
+  Future<void> _jumpTo(int page) async {
+    try {
+      await _controller.goToPage(pageNumber: page);
+    } catch (_) {}
+  }
+
   void _onPageChanged(int? page) {
     if (page == null) return;
+    _page.value = page;
     _pendingPage = page;
     _pageSave?.cancel();
     _pageSave = Timer(const Duration(seconds: 2), () {
@@ -109,6 +204,11 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
       );
     }
     await selection.clearTextSelection();
+    if (ids.isNotEmpty && mounted) {
+      AppHaptics.confirm();
+      final fresh = ref.read(freshHighlightsProvider);
+      ids.forEach(fresh.add);
+    }
     return (_db.select(_db.highlights)..where((h) => h.id.isIn(ids))).get();
   }
 
@@ -118,6 +218,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   ) {
     final selection = params.textSelectionDelegate;
     if (!selection.hasSelectedText) return;
+    // Where the selection is on screen, for the quote's flight into a
+    // paired note.
+    final from = _globalRect(params.anchorA, params.anchorB);
     items.insertAll(0, [
       ContextMenuButtonItem(
         label: 'Highlight',
@@ -132,11 +235,20 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
           params.dismissContextMenu();
           final made = await _highlightSelection(selection);
           if (made.isNotEmpty && mounted) {
-            await showQuoteToNoteSheet(context, ref, _merge(made));
+            await showQuoteToNoteSheet(context, ref, _merge(made), from: from);
           }
         },
       ),
     ]);
+  }
+
+  /// [a] and [b], given in the reader's coordinates, as a global rect.
+  Rect? _globalRect(Offset a, Offset? b) {
+    final box = _repaintKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached) return null;
+    final p = box.localToGlobal(a);
+    final q = b == null ? p : box.localToGlobal(b);
+    return Rect.fromPoints(p, q);
   }
 
   /// A selection across a page break becomes one highlight per page, but
@@ -180,160 +292,311 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
+    final params = PdfViewerParams(
+      backgroundColor: c.surfaceContainer,
+      onPageChanged: _onPageChanged,
+      onViewerReady: _onViewerReady,
+      onGeneralTap: _onGeneralTap,
+      textSelectionParams: PdfTextSelectionParams(
+        enabled: !_inkMode,
+        buildSelectionHandle: (context, anchor, state) => SelectionHandle(
+          // pdfrx places handle A above-left of the first
+          // character and B below-right of the last; each
+          // teardrop points at its corner of the selection.
+          pointsTo:
+              (anchor.type == PdfTextSelectionAnchorType.a) ==
+                  (anchor.direction != PdfTextDirection.rtl &&
+                      anchor.direction != PdfTextDirection.vrtl)
+              ? Alignment.bottomRight
+              : Alignment.topLeft,
+          active: state != PdfViewerTextSelectionAnchorHandleState.normal,
+        ),
+      ),
+      customizeContextMenuItems: _customizeMenu,
+      pageOverlaysBuilder: (context, pageRect, page) => [
+        PageOverlay(
+          paperId: widget.paperId,
+          pageNumber: page.pageNumber,
+          pageRect: pageRect,
+          inkMode: _inkMode,
+          color: _color,
+        ),
+      ],
+    );
+    final marks =
+        ref.watch(paperMarksProvider(widget.paperId)).value ?? const [];
+    final pageCount = _pageCount;
+    final document = _document;
+
+    final body = Stack(
+      fit: StackFit.expand,
+      children: [
+        // The reading theme sits outside the boundary, so a snapshot
+        // keeps the figure's real colors.
+        ReadingFilter(
+          theme: ref.watch(appearanceSettingsProvider).reading,
+          child: RepaintBoundary(
+            key: _repaintKey,
+            child: widget.viewerBuilder != null
+                ? widget.viewerBuilder!(context, _controller, params)
+                : PdfViewer.file(
+                    widget.pdfPath,
+                    controller: _controller,
+                    initialPageNumber: widget.initialPage ?? 1,
+                    params: params,
+                  ),
+          ),
+        ),
+        if (_snapping)
+          SnapshotOverlay(
+            onSelected: (area) {
+              setState(() => _snapping = false);
+              _extractToNote(area);
+            },
+            onCancel: () => setState(() => _snapping = false),
+          ),
+        // Everything below is chrome: it goes with focus mode.
+        if (pageCount != null && marks.isNotEmpty)
+          Positioned.fill(
+            child: _Chrome(
+              animation: _chrome,
+              child: HighlightMinimap(
+                pageCount: pageCount,
+                marks: marks,
+                onJump: _jumpTo,
+              ),
+            ),
+          ),
+        if (pageCount != null && pageCount > 1)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 8,
+            child: _Chrome(
+              animation: _chrome,
+              child: Center(
+                child: AnimatedOpacity(
+                  duration: AppMotion.of(context, AppMotion.short),
+                  opacity: _stripOpen ? 0 : 1,
+                  child: IgnorePointer(
+                    ignoring: _stripOpen,
+                    child: PageIndicator(
+                      page: _page,
+                      pageCount: pageCount,
+                      onTap: () => setState(() => _stripOpen = true),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (pageCount != null && document != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: AnimatedSlide(
+              duration: AppMotion.of(context, AppMotion.medium),
+              curve: _stripOpen ? AppMotion.enter : AppMotion.exit,
+              offset: _stripOpen ? Offset.zero : const Offset(0, 1),
+              child: Offstage(
+                offstage: !_stripOpen,
+                child: PageStrip(
+                  pageCount: pageCount,
+                  current: _page,
+                  marks: marks,
+                  onJump: _jumpTo,
+                  thumbnail: (context, page) => PdfPageView(
+                    document: document,
+                    pageNumber: page,
+                    maximumDpi: 96,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
     // While choosing a snapshot area, back (or a swipe in from the edge,
     // easy to start by accident when dragging the box) cancels the
-    // snapshot instead of leaving the paper.
+    // snapshot instead of leaving the paper. In focus mode back brings the
+    // chrome back first.
     return PopScope(
-      canPop: !_snapping,
+      canPop: !_snapping && !_focus && !_stripOpen,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) setState(() => _snapping = false);
+        if (didPop) return;
+        if (_snapping) {
+          setState(() => _snapping = false);
+        } else if (_stripOpen) {
+          setState(() => _stripOpen = false);
+        } else {
+          _setFocus(false);
+        }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.format_quote_outlined),
-              tooltip: 'Highlights',
-              onPressed: _showHighlightsList,
-            ),
-            IconButton(
-              isSelected: _inkMode,
-              icon: const Icon(Icons.draw_outlined),
-              selectedIcon: const Icon(Icons.draw),
-              tooltip: _inkMode ? 'Stop drawing' : 'Draw on the page',
-              onPressed: () => setState(() => _inkMode = !_inkMode),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'More',
-              onSelected: (v) {
-                if (v == 'snapshot') setState(() => _snapping = true);
-                if (v == 'contents') _showContents();
-                if (v.startsWith('read:')) {
-                  ref
-                      .read(appearanceSettingsProvider)
-                      .setReading(ReadingTheme.values.byName(v.substring(5)));
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'contents',
-                  child: ListTile(
-                    leading: Icon(Icons.toc),
-                    title: Text('Contents'),
-                  ),
-                ),
-                for (final theme in ReadingTheme.values)
-                  CheckedPopupMenuItem(
-                    value: 'read:${theme.name}',
-                    checked:
-                        ref.read(appearanceSettingsProvider).reading == theme,
-                    child: Text('${theme.label} page'),
-                  ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: 'snapshot',
-                  enabled: !_extracting,
-                  child: const ListTile(
-                    leading: Icon(Icons.crop_free),
-                    title: Text('Snapshot to a note'),
-                    subtitle: Text('For figures and tables'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            // The reading theme sits outside the boundary, so a snapshot
-            // keeps the figure's real colors.
-            ColorFiltered(
-              colorFilter:
-                  ref.watch(appearanceSettingsProvider).reading.filter ??
-                  const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-              child: RepaintBoundary(
-                key: _repaintKey,
-                child: PdfViewer.file(
-                  widget.pdfPath,
-                  controller: _controller,
-                  initialPageNumber: widget.initialPage ?? 1,
-                  params: PdfViewerParams(
-                    backgroundColor: c.surfaceContainer,
-                    onPageChanged: _onPageChanged,
-                    textSelectionParams: PdfTextSelectionParams(
-                      enabled: !_inkMode,
-                      buildSelectionHandle: (context, anchor, state) =>
-                          SelectionHandle(
-                            // pdfrx places handle A above-left of the first
-                            // character and B below-right of the last; each
-                            // teardrop points at its corner of the selection.
-                            pointsTo:
-                                (anchor.type == PdfTextSelectionAnchorType.a) ==
-                                    (anchor.direction != PdfTextDirection.rtl &&
-                                        anchor.direction !=
-                                            PdfTextDirection.vrtl)
-                                ? Alignment.bottomRight
-                                : Alignment.topLeft,
-                            active:
-                                state !=
-                                PdfViewerTextSelectionAnchorHandleState.normal,
+      // Only the bars follow the animation; the body is built once.
+      child: AnimatedBuilder(
+        animation: _chrome,
+        child: body,
+        builder: (context, body) {
+          final t = _chrome.value;
+          final inset = MediaQuery.paddingOf(context).top;
+          return Scaffold(
+            appBar: t <= 0
+                ? null
+                : PreferredSize(
+                    preferredSize: Size.fromHeight(kToolbarHeight * t),
+                    child: ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.bottomCenter,
+                        minHeight: 0,
+                        maxHeight: kToolbarHeight + inset,
+                        child: Opacity(
+                          opacity: t,
+                          child: AppBar(
+                            actions: [
+                              IconButton(
+                                icon: const Icon(Icons.format_quote_outlined),
+                                tooltip: 'Highlights',
+                                onPressed: _showHighlightsList,
+                              ),
+                              IconButton(
+                                isSelected: _inkMode,
+                                icon: const Icon(Icons.draw_outlined),
+                                selectedIcon: const Icon(Icons.draw),
+                                tooltip: _inkMode
+                                    ? 'Stop drawing'
+                                    : 'Draw on the page',
+                                onPressed: () {
+                                  AppHaptics.selection();
+                                  setState(() => _inkMode = !_inkMode);
+                                },
+                              ),
+                              PopupMenuButton<String>(
+                                tooltip: 'More',
+                                onSelected: (v) {
+                                  if (v == 'snapshot') {
+                                    setState(() => _snapping = true);
+                                  }
+                                  if (v == 'focus') _setFocus(true);
+                                  if (v == 'pages') {
+                                    setState(() => _stripOpen = true);
+                                  }
+                                  if (v == 'contents') _showContents();
+                                  if (v.startsWith('read:')) {
+                                    ref
+                                        .read(appearanceSettingsProvider)
+                                        .setReading(
+                                          ReadingTheme.values.byName(
+                                            v.substring(5),
+                                          ),
+                                        );
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  if (_pageCount != null && _pageCount! > 1)
+                                    const PopupMenuItem(
+                                      value: 'pages',
+                                      child: ListTile(
+                                        leading: Icon(
+                                          Icons.view_carousel_outlined,
+                                        ),
+                                        title: Text('Page strip'),
+                                      ),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'focus',
+                                    child: ListTile(
+                                      leading: Icon(Icons.fullscreen),
+                                      title: Text('Focus'),
+                                      subtitle: Text(
+                                        'Tap the page to bring back',
+                                      ),
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'contents',
+                                    child: ListTile(
+                                      leading: Icon(Icons.toc),
+                                      title: Text('Contents'),
+                                    ),
+                                  ),
+                                  for (final theme in ReadingTheme.values)
+                                    CheckedPopupMenuItem(
+                                      value: 'read:${theme.name}',
+                                      checked:
+                                          ref
+                                              .read(appearanceSettingsProvider)
+                                              .reading ==
+                                          theme,
+                                      child: Text('${theme.label} page'),
+                                    ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value: 'snapshot',
+                                    enabled: !_extracting,
+                                    child: const ListTile(
+                                      leading: Icon(Icons.crop_free),
+                                      title: Text('Snapshot to a note'),
+                                      subtitle: Text('For figures and tables'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                    ),
-                    customizeContextMenuItems: _customizeMenu,
-                    pageOverlaysBuilder: (context, pageRect, page) => [
-                      _PageOverlay(
-                        paperId: widget.paperId,
-                        pageNumber: page.pageNumber,
-                        pageRect: pageRect,
-                        inkMode: _inkMode,
-                        color: _color,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (_snapping)
-              SnapshotOverlay(
-                onSelected: (area) {
-                  setState(() => _snapping = false);
-                  _extractToNote(area);
-                },
-                onCancel: () => setState(() => _snapping = false),
-              ),
-          ],
-        ),
-        // One palette for both kinds of marking: the ink for new strokes,
-        // and the color the next text highlight gets.
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (final ink in highlightInks)
-                  GestureDetector(
-                    onTap: () => setState(() => _color = ink),
-                    child: AnimatedContainer(
-                      duration: AppMotion.short,
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: ink,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: ink == _color ? c.primary : c.outlineVariant,
-                          width: ink == _color ? 3 : 1,
                         ),
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-        ),
+            body: body,
+            // One palette for both kinds of marking: the ink for new
+            // strokes, and the color the next text highlight gets.
+            bottomNavigationBar: t <= 0
+                ? null
+                : ClipRect(
+                    child: Align(
+                      heightFactor: t,
+                      alignment: Alignment.topCenter,
+                      child: Opacity(
+                        opacity: t,
+                        child: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (final ink in highlightInks)
+                                  GestureDetector(
+                                    onTap: () => setState(() => _color = ink),
+                                    child: AnimatedContainer(
+                                      duration: AppMotion.short,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: ink,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: ink == _color
+                                              ? c.primary
+                                              : c.outlineVariant,
+                                          width: ink == _color ? 3 : 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+          );
+        },
       ),
     );
   }
@@ -341,6 +604,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   /// Saves [area] of the reader (or all of it, when null) as an image in
   /// a new note linked to this paper and page, and opens the note.
   Future<void> _extractToNote(Rect? area) async {
+    final c = Theme.of(context).colorScheme;
     setState(() => _extracting = true);
     try {
       final boundary =
@@ -358,6 +622,35 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
         );
       } finally {
         image.dispose();
+      }
+      AppHaptics.confirm();
+      if (mounted) {
+        // The crop lifts off the page and heads for the note (the paired
+        // pane in split view, else the bottom, where the snackbar sits).
+        final box = area ?? Offset.zero & boundary.size;
+        final from = boundary.localToGlobal(box.topLeft) & box.size;
+        flyAcross(
+          context,
+          from: from.center,
+          to:
+              paneLanding(
+                ref.read(pairedPaneKeyProvider),
+                size: const Size(96, 72),
+              ) ??
+              bottomLanding(context, size: const Size(96, 72)),
+          size: from.size,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: c.shadow.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: Image.memory(png, fit: BoxFit.fill, gaplessPlayback: true),
+          ),
+        );
       }
       final noteId = await createSnapshotNote(
         _db,
@@ -386,8 +679,14 @@ final _highlightsForPageProvider = StreamProvider.autoDispose
 
 /// Everything drawn on one page: text highlights (tappable), ink strokes,
 /// and — in ink mode — the surface that captures new strokes.
-class _PageOverlay extends ConsumerStatefulWidget {
-  const _PageOverlay({
+///
+/// Built for every visible page on every frame of a zoom, so marks are
+/// decoded once when they change (not in `paint`), and a stroke being
+/// drawn repaints only its own layer instead of rebuilding the page.
+@visibleForTesting
+class PageOverlay extends ConsumerStatefulWidget {
+  const PageOverlay({
+    super.key,
     required this.paperId,
     required this.pageNumber,
     required this.pageRect,
@@ -402,24 +701,147 @@ class _PageOverlay extends ConsumerStatefulWidget {
   final Color color;
 
   @override
-  ConsumerState<_PageOverlay> createState() => _PageOverlayState();
+  ConsumerState<PageOverlay> createState() => _PageOverlayState();
 }
 
-class _PageOverlayState extends ConsumerState<_PageOverlay> {
-  List<Offset>? _liveStroke;
+typedef _DecodedStroke = ({List<Offset> points, Color color});
+typedef _DecodedHighlight = ({Highlight highlight, List<Rect> rects});
+
+/// A mark being animated: a new highlight sweeping in (`from == null`) or
+/// a recolored one cross-fading from its old color.
+class _MarkAnim {
+  _MarkAnim(this.mark, this.controller, this.from);
+
+  final _DecodedHighlight mark;
+  final AnimationController controller;
+  final Color? from;
+}
+
+class _PageOverlayState extends ConsumerState<PageOverlay>
+    with TickerProviderStateMixin {
+  final _live = _LiveStroke();
+  late final FreshHighlights _fresh = ref.read(freshHighlightsProvider);
+  final _anims = <String, _MarkAnim>{};
+
+  /// What the static painter draws: every highlight not being animated.
+  /// Rebuilt only when the marks or the animations change, so the painter
+  /// stays cheap to compare while the page is zoomed.
+  List<_DecodedHighlight> _still = const [];
+  List<_MarkAnim> _active = const [];
+
+  List<Annotation>? _strokesFrom;
+  List<_DecodedStroke> _strokes = const [];
+  List<Highlight>? _highlightsFrom;
+  List<_DecodedHighlight> _highlights = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fresh.addListener(_onFresh);
+  }
+
+  @override
+  void dispose() {
+    _fresh.removeListener(_onFresh);
+    for (final a in _anims.values) {
+      a.controller.dispose();
+    }
+    _live.dispose();
+    super.dispose();
+  }
+
+  void _onFresh() {
+    if (_startAnimations(const {}) && mounted) setState(() {});
+  }
+
+  void _refreshLayers() {
+    _still = [
+      for (final h in _highlights)
+        if (!_anims.containsKey(h.highlight.id)) h,
+    ];
+    _active = _anims.values.toList();
+  }
+
+  /// Starts the sweep for highlights made this session and the cross-fade
+  /// for recolored ones ([before] maps id -> previous color). Returns
+  /// whether anything started.
+  bool _startAnimations(Map<String, String> before) {
+    final reduced = AppMotion.reduced(context);
+    var started = false;
+    for (final h in _highlights) {
+      final id = h.highlight.id;
+      if (_anims.containsKey(id)) continue;
+      final Color? from;
+      final Duration duration;
+      if (_fresh.claim(id)) {
+        from = null;
+        duration = sweepDuration(h.rects.length);
+      } else if (before[id] case final old? when old != h.highlight.colorHex) {
+        from = colorFromHex(old);
+        duration = AppMotion.medium;
+      } else {
+        continue;
+      }
+      if (reduced) continue;
+      final controller = AnimationController(vsync: this, duration: duration);
+      final anim = _MarkAnim(h, controller, from);
+      _anims[id] = anim;
+      controller.forward().whenComplete(() {
+        if (!mounted || _anims[id] != anim) return;
+        _anims.remove(id);
+        controller.dispose();
+        setState(_refreshLayers);
+      });
+      started = true;
+    }
+    if (started) _refreshLayers();
+    return started;
+  }
 
   Offset _normalize(Offset local) => Offset(
     local.dx / widget.pageRect.width,
     local.dy / widget.pageRect.height,
   );
 
+  /// Decodes the stored JSON only when the query returns new rows.
+  void _decode(List<Annotation> strokes, List<Highlight> highlights) {
+    if (!identical(strokes, _strokesFrom)) {
+      _strokesFrom = strokes;
+      _strokes = [
+        for (final a in strokes)
+          (
+            points: decodeStrokePoints(a.pointsJson),
+            color: colorFromHex(a.colorHex),
+          ),
+      ];
+    }
+    if (!identical(highlights, _highlightsFrom)) {
+      final before = {
+        for (final h in _highlights) h.highlight.id: h.highlight.colorHex,
+      };
+      _highlightsFrom = highlights;
+      _highlights = [
+        for (final h in highlights)
+          (highlight: h, rects: decodeRects(h.rectsJson)),
+      ];
+      // An animation in flight keeps the mark it started with.
+      for (final id in _anims.keys.toList()) {
+        if (!highlights.any((h) => h.id == id)) {
+          _anims.remove(id)!.controller.dispose();
+        }
+      }
+      _refreshLayers();
+      _startAnimations(before);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final key = (paperId: widget.paperId, pageNumber: widget.pageNumber);
-    final strokes =
-        ref.watch(annotationsForPageProvider(key)).value ?? const [];
-    final highlights =
-        ref.watch(_highlightsForPageProvider(key)).value ?? const [];
+    _decode(
+      ref.watch(annotationsForPageProvider(key)).value ?? const [],
+      ref.watch(_highlightsForPageProvider(key)).value ?? const [],
+    );
     final size = widget.pageRect.size;
 
     return SizedBox.fromSize(
@@ -430,12 +852,18 @@ class _PageOverlayState extends ConsumerState<_PageOverlay> {
           IgnorePointer(
             child: CustomPaint(
               size: size,
-              painter: _TextHighlightPainter(highlights),
+              painter: _TextHighlightPainter(_still),
             ),
           ),
+          if (_active.isNotEmpty)
+            IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(size: size, painter: _SweepPainter(_active)),
+              ),
+            ),
           if (!widget.inkMode)
-            for (final h in highlights)
-              for (final r in decodeRects(h.rectsJson))
+            for (final (:highlight, :rects) in _highlights)
+              for (final r in rects)
                 Positioned(
                   left: r.left * size.width,
                   top: r.top * size.height,
@@ -446,7 +874,7 @@ class _PageOverlayState extends ConsumerState<_PageOverlay> {
                     onTap: () => showModalBottomSheet<void>(
                       context: context,
                       isScrollControlled: true,
-                      builder: (_) => HighlightSheet(highlightId: h.id),
+                      builder: (_) => HighlightSheet(highlightId: highlight.id),
                     ),
                   ),
                 ),
@@ -454,18 +882,23 @@ class _PageOverlayState extends ConsumerState<_PageOverlay> {
             ignoring: !widget.inkMode,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onPanStart: (d) =>
-                  setState(() => _liveStroke = [_normalize(d.localPosition)]),
-              onPanUpdate: (d) =>
-                  setState(() => _liveStroke!.add(_normalize(d.localPosition))),
+              // Start the stroke where the pen touched down, not where the
+              // drag was recognised a few pixels later.
+              dragStartBehavior: DragStartBehavior.down,
+              onPanStart: (d) => _live.start(_normalize(d.localPosition)),
+              onPanUpdate: (d) => _live.add(_normalize(d.localPosition)),
               onPanEnd: (_) => _commitStroke(),
-              child: CustomPaint(
-                size: size,
-                painter: _InkPainter(
-                  saved: strokes,
-                  live: _liveStroke,
-                  liveColor: widget.color,
-                ),
+              onPanCancel: _live.clear,
+              child: Stack(
+                children: [
+                  CustomPaint(size: size, painter: _InkPainter(_strokes)),
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      size: size,
+                      painter: _LiveInkPainter(_live, widget.color),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -475,8 +908,7 @@ class _PageOverlayState extends ConsumerState<_PageOverlay> {
   }
 
   Future<void> _commitStroke() async {
-    final stroke = _liveStroke;
-    setState(() => _liveStroke = null);
+    final stroke = _live.points;
     if (stroke == null) return;
     await saveHighlightStroke(
       ref.read(databaseProvider),
@@ -485,33 +917,69 @@ class _PageOverlayState extends ConsumerState<_PageOverlay> {
       normalizedPoints: stroke,
       color: widget.color,
     );
+    // Cleared after the save, so the stroke never blinks out before the
+    // saved copy arrives.
+    if (identical(_live.points, stroke)) _live.clear();
   }
 }
+
+/// The stroke under the pen, in normalized page coordinates. Repaints its
+/// painter directly; nothing rebuilds while drawing.
+class _LiveStroke extends ChangeNotifier {
+  List<Offset>? points;
+
+  void start(Offset p) {
+    points = [p];
+    notifyListeners();
+  }
+
+  void add(Offset p) {
+    final current = points;
+    if (current == null) return;
+    current.add(p);
+    notifyListeners();
+  }
+
+  void clear() {
+    if (points == null) return;
+    points = null;
+    notifyListeners();
+  }
+}
+
+/// One line's marker box, [fraction] of the way across.
+void _paintLine(Canvas canvas, Size size, Rect r, Paint paint, [double f = 1]) {
+  final left = r.left * size.width - 1;
+  final right = r.right * size.width + 1;
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(
+      Rect.fromLTRB(
+        left,
+        r.top * size.height,
+        left + (right - left) * f,
+        r.bottom * size.height,
+      ),
+      const Radius.circular(2),
+    ),
+    paint,
+  );
+}
+
+Paint _markerPaint(Color color, [double opacity = 1]) => Paint()
+  ..color = color.withValues(alpha: 0.45 * opacity)
+  ..blendMode = BlendMode.multiply;
 
 class _TextHighlightPainter extends CustomPainter {
   _TextHighlightPainter(this.highlights);
 
-  final List<Highlight> highlights;
+  final List<_DecodedHighlight> highlights;
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final h in highlights) {
-      final paint = Paint()
-        ..color = colorFromHex(h.colorHex).withValues(alpha: 0.45)
-        ..blendMode = BlendMode.multiply;
-      for (final r in decodeRects(h.rectsJson)) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTRB(
-              r.left * size.width - 1,
-              r.top * size.height,
-              r.right * size.width + 1,
-              r.bottom * size.height,
-            ),
-            const Radius.circular(2),
-          ),
-          paint,
-        );
+    for (final (:highlight, :rects) in highlights) {
+      final paint = _markerPaint(colorFromHex(highlight.colorHex));
+      for (final r in rects) {
+        _paintLine(canvas, size, r, paint);
       }
     }
   }
@@ -520,52 +988,95 @@ class _TextHighlightPainter extends CustomPainter {
   bool shouldRepaint(_TextHighlightPainter old) => old.highlights != highlights;
 }
 
-class _InkPainter extends CustomPainter {
-  _InkPainter({required this.saved, this.live, required this.liveColor});
+/// Highlights being animated, on a layer of their own that repaints from
+/// the animation controllers alone: nothing else rebuilds or repaints.
+class _SweepPainter extends CustomPainter {
+  _SweepPainter(this.anims)
+    : super(repaint: Listenable.merge([for (final a in anims) a.controller]));
 
-  final List<Annotation> saved;
-  final List<Offset>? live;
-  final Color liveColor;
-
-  void _paintStroke(
-    Canvas canvas,
-    Size size,
-    List<Offset> normalized,
-    Color color,
-  ) {
-    if (normalized.length < 2) return;
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.4)
-      ..strokeWidth = size.width * 0.025
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final path = Path()
-      ..moveTo(
-        normalized.first.dx * size.width,
-        normalized.first.dy * size.height,
-      );
-    for (final point in normalized.skip(1)) {
-      path.lineTo(point.dx * size.width, point.dy * size.height);
-    }
-    canvas.drawPath(path, paint);
-  }
+  final List<_MarkAnim> anims;
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final annotation in saved) {
-      _paintStroke(
-        canvas,
-        size,
-        decodeStrokePoints(annotation.pointsJson),
-        colorFromHex(annotation.colorHex),
-      );
+    for (final a in anims) {
+      final color = colorFromHex(a.mark.highlight.colorHex);
+      final t = a.controller.value;
+      final rects = a.mark.rects;
+      if (a.from case final old?) {
+        final eased = AppMotion.standard.transform(t);
+        for (final r in rects) {
+          _paintLine(canvas, size, r, _markerPaint(old, 1 - eased));
+          _paintLine(canvas, size, r, _markerPaint(color, eased));
+        }
+        continue;
+      }
+      final paint = _markerPaint(color);
+      for (var i = 0; i < rects.length; i++) {
+        final f = sweepLineProgress(t, i, rects.length);
+        if (f > 0) _paintLine(canvas, size, rects[i], paint, f);
+      }
     }
-    if (live != null) _paintStroke(canvas, size, live!, liveColor);
   }
 
   @override
-  bool shouldRepaint(covariant _InkPainter oldDelegate) =>
-      oldDelegate.saved != saved || oldDelegate.live != live;
+  bool shouldRepaint(_SweepPainter old) => old.anims != anims;
+}
+
+void _paintStroke(
+  Canvas canvas,
+  Size size,
+  List<Offset> normalized,
+  Color color,
+) {
+  if (normalized.length < 2) return;
+  final paint = Paint()
+    ..color = color.withValues(alpha: 0.4)
+    ..strokeWidth = size.width * 0.025
+    ..strokeCap = StrokeCap.round
+    ..style = PaintingStyle.stroke;
+  final path = Path()
+    ..moveTo(
+      normalized.first.dx * size.width,
+      normalized.first.dy * size.height,
+    );
+  for (final point in normalized.skip(1)) {
+    path.lineTo(point.dx * size.width, point.dy * size.height);
+  }
+  canvas.drawPath(path, paint);
+}
+
+class _InkPainter extends CustomPainter {
+  _InkPainter(this.strokes);
+
+  final List<_DecodedStroke> strokes;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final (:points, :color) in strokes) {
+      _paintStroke(canvas, size, points, color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_InkPainter old) => old.strokes != strokes;
+}
+
+class _LiveInkPainter extends CustomPainter {
+  _LiveInkPainter(this.live, this.color) : super(repaint: live);
+
+  final _LiveStroke live;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (live.points case final points?) {
+      _paintStroke(canvas, size, points, color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LiveInkPainter old) =>
+      old.live != live || old.color != color;
 }
 
 /// Details for one highlight: the quote, recolor, a comment, and actions.
@@ -873,4 +1384,22 @@ class SelectionHandle extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Wraps overlay chrome so focus mode fades it out and stops it taking
+/// touches once it is gone.
+class _Chrome extends StatelessWidget {
+  const _Chrome({required this.animation, required this.child});
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: animation,
+    child: child,
+    builder: (context, child) => animation.value <= 0
+        ? const SizedBox.shrink()
+        : Opacity(opacity: animation.value, child: child),
+  );
 }

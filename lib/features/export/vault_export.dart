@@ -10,6 +10,7 @@ import '../../data/tables/attachments_table.dart';
 import '../library/authors.dart';
 import '../library/citation_formatter.dart';
 import '../library/highlights.dart';
+import '../library/study_details.dart';
 import '../notes/note_content.dart';
 import '../notes/note_links.dart';
 import '../notes/note_markdown.dart';
@@ -231,6 +232,11 @@ Future<VaultExportResult> buildVaultArchive(
       'citekey': key,
       'status': pa.readingStatus?.name,
       'rating': pa.rating,
+      'species': _studyList(pa.species),
+      'brain_regions': _studyList(pa.brainRegions),
+      'techniques': _studyList(pa.techniques),
+      'sample_size': pa.sampleSize,
+      'paradigm': pa.paradigm,
       'projects': myProjects,
     });
     final b = StringBuffer('$fm\n# ${pa.title}\n');
@@ -455,6 +461,12 @@ Map<String, String> _uniqueCitekeys(List<Paper> papers) {
     out[pa.id] = unique;
   }
   return out;
+}
+
+/// A study-detail list for frontmatter; null (omitted) when unset.
+List<String>? _studyList(String? stored) {
+  final v = parseStudyList(stored);
+  return v.isEmpty ? null : v;
 }
 
 // ---- Frontmatter -------------------------------------------------------------

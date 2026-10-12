@@ -6,6 +6,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/papers_table.dart';
 import '../projects/projects_providers.dart';
+import 'study_filter.dart';
 
 final papersListProvider = StreamProvider.autoDispose<List<Paper>>((ref) {
   final db = ref.watch(databaseProvider);
@@ -37,14 +38,18 @@ final filteredPapersProvider = Provider.autoDispose<AsyncValue<List<Paper>>>((
   final inProject = projectId == null
       ? null
       : ref.watch(projectPaperIdsProvider(projectId)).value ?? const <String>{};
+  final study = ref.watch(studyFilterProvider);
   final papersAsync = ref.watch(papersListProvider);
-  if (query.isEmpty && status == null && inProject == null) return papersAsync;
+  if (query.isEmpty && status == null && inProject == null && !study.isActive) {
+    return papersAsync;
+  }
   return papersAsync.whenData(
     (papers) => papers
         .where(
           (p) =>
               (status == null || p.readingStatus == status) &&
               (inProject == null || inProject.contains(p.id)) &&
+              study.matches(p) &&
               (query.isEmpty ||
                   p.title.toLowerCase().contains(query) ||
                   p.authors.toLowerCase().contains(query) ||

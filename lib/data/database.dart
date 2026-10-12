@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -213,6 +213,25 @@ class AppDatabase extends _$AppDatabase {
           ('project_notes', 'status', 'TEXT'),
           ('project_notes', 'word_target', 'INTEGER'),
           ('projects', 'due_date', 'INTEGER'),
+        ]) {
+          if (!await _hasColumn(table, column)) {
+            await customStatement(
+              'ALTER TABLE $table ADD COLUMN $column $type',
+            );
+          }
+        }
+        await _createSyncSchema(markExisting: false);
+      }
+      if (from < 15) {
+        // v15: study details on papers, and matrix columns bound to them.
+        // All synced; nothing to backfill.
+        for (final (table, column, type) in [
+          ('papers', 'species', 'TEXT'),
+          ('papers', 'brain_regions', 'TEXT'),
+          ('papers', 'techniques', 'TEXT'),
+          ('papers', 'sample_size', 'INTEGER'),
+          ('papers', 'paradigm', 'TEXT'),
+          ('matrix_columns', 'paper_field', 'TEXT'),
         ]) {
           if (!await _hasColumn(table, column)) {
             await customStatement(

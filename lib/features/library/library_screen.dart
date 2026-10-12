@@ -25,6 +25,7 @@ import 'all_highlights_screen.dart';
 import 'library_actions.dart';
 import 'papers_providers.dart';
 import 'reading_progress.dart';
+import 'study_filter.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
@@ -88,6 +89,9 @@ class LibraryScreen extends ConsumerWidget {
     final anyStatus = (ref.watch(papersListProvider).value ?? const []).any(
       (p) => p.readingStatus != null,
     );
+
+    final anyStudy = ref.watch(anyStudyDetailsProvider);
+    final studyActive = ref.watch(studyFilterProvider).isActive;
 
     return Column(
       children: [
@@ -158,7 +162,7 @@ class LibraryScreen extends ConsumerWidget {
           duration: AppMotion.medium,
           curve: AppMotion.standard,
           alignment: Alignment.topCenter,
-          child: (anyStatus || projects.isNotEmpty)
+          child: (anyStatus || projects.isNotEmpty || anyStudy || studyActive)
               ? SizedBox(
                   height: 44,
                   child: ListView(
@@ -211,6 +215,11 @@ class LibraryScreen extends ConsumerWidget {
                                       status,
                             ),
                           ),
+                      if (anyStudy || studyActive)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: StudyFilterChip(),
+                        ),
                     ],
                   ),
                 )

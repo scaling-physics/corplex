@@ -7,6 +7,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
 import '../library/highlights.dart';
+import '../library/study_details.dart';
 import 'matrix.dart';
 
 /// A project's synthesis matrix: papers × themes. Tap a cell to write in
@@ -57,9 +58,7 @@ class MatrixScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add a theme',
-            onPressed: () => _askName(context, 'New theme').then((name) {
-              if (name != null) addMatrixColumn(db, project.id, name);
-            }),
+            onPressed: () => _addColumn(context, db, columns),
           ),
         ],
       ),
@@ -76,9 +75,18 @@ class MatrixScreen extends ConsumerWidget {
               message:
                   'Add the themes you are comparing — method, sample, '
                   'findings — and fill in what each paper says.',
-              action: FilledButton(
-                onPressed: () => addDefaultMatrixColumns(db, project.id),
-                child: const Text('Add method, sample, findings'),
+              action: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FilledButton(
+                    onPressed: () => addDefaultMatrixColumns(db, project.id),
+                    child: const Text('Add method, sample, findings'),
+                  ),
+                  TextButton(
+                    onPressed: () => addStudyColumns(db, project.id),
+                    child: const Text('Add study columns'),
+                  ),
+                ],
               ),
             )
           : SingleChildScrollView(
@@ -128,12 +136,12 @@ class MatrixScreen extends ConsumerWidget {
                                 db,
                                 column: c,
                                 paper: paper,
-                                current: cells['${c.id}|${paper.id}'] ?? '',
+                                current: _editable(c, paper, cells),
                               ),
                               child: _Pad(
                                 minHeight: 64,
                                 child: Text(
-                                  cells['${c.id}|${paper.id}'] ?? '',
+                                  matrixCellText(c, paper, cells),
                                   style: theme.textTheme.bodySmall,
                                 ),
                               ),
@@ -145,6 +153,71 @@ class MatrixScreen extends ConsumerWidget {
               ),
             ),
     );
+  }
+
+  /// The text a bound cell is edited as (`a; b` for lists).
+  String _editable(MatrixColumn c, Paper paper, Map<String, String> cells) {
+    final field = StudyField.byKey(c.paperField);
+    return field == null
+        ? cells['${c.id}|${paper.id}'] ?? ''
+        : studyValue(paper, field);
+  }
+
+  Future<void> _addColumn(
+    BuildContext context,
+    AppDatabase db,
+    List<MatrixColumn> columns,
+  ) async {
+    final have = {for (final c in columns) c.paperField};
+    final choice = await showModalBottomSheet<Object>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.add),
+                title: const Text('New theme'),
+                onTap: () => Navigator.pop(context, 'new'),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text('From study details'),
+              ),
+              if (StudyField.values.any((f) => !have.contains(f.key)))
+                ListTile(
+                  leading: const Icon(Icons.table_rows_outlined),
+                  title: const Text('Add study columns'),
+                  subtitle: const Text('All the ones not here yet'),
+                  onTap: () => Navigator.pop(context, 'all'),
+                ),
+              for (final f in StudyField.values)
+                ListTile(
+                  leading: const Icon(Icons.science_outlined),
+                  title: Text(f.label),
+                  enabled: !have.contains(f.key),
+                  subtitle: have.contains(f.key)
+                      ? const Text('Already a column')
+                      : null,
+                  onTap: () => Navigator.pop(context, f),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    if (choice == 'new') {
+      final name = await _askName(context, 'New theme');
+      if (name != null) await addMatrixColumn(db, project.id, name);
+    } else if (choice == 'all') {
+      await addStudyColumns(db, project.id);
+    } else if (choice is StudyField) {
+      await addMatrixColumn(db, project.id, choice.label, field: choice);
+    }
   }
 
   Future<String?> _askName(
@@ -199,7 +272,14 @@ class MatrixScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Delete theme and its notes'),
+              title: Text(
+                column.paperField == null
+                    ? 'Delete theme and its notes'
+                    : 'Delete column',
+              ),
+              subtitle: column.paperField == null
+                  ? null
+                  : const Text('Papers keep their study details'),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -270,13 +350,19 @@ class _CellSheetState extends ConsumerState<_CellSheet> {
 
   @override
   void dispose() {
-    // Saved on the way out, however the sheet is dismissed.
-    setMatrixCell(
-      widget.db,
-      widget.column.id,
-      widget.paper.id,
-      _controller.text,
-    );
+    // Saved on the way out, however the sheet is dismissed. A column bound
+    // to study details writes the paper itself (only if it changed).
+    final field = StudyField.byKey(widget.column.paperField);
+    if (field == null) {
+      setMatrixCell(
+        widget.db,
+        widget.column.id,
+        widget.paper.id,
+        _controller.text,
+      );
+    } else if (_controller.text.trim() != widget.initial.trim()) {
+      setStudyValue(widget.db, widget.paper.id, field, _controller.text);
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -317,8 +403,13 @@ class _CellSheetState extends ConsumerState<_CellSheet> {
                 minLines: 3,
                 maxLines: 8,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  hintText: 'What does this paper say?',
+                decoration: InputDecoration(
+                  hintText: widget.column.paperField == null
+                      ? 'What does this paper say?'
+                      : (StudyField.byKey(widget.column.paperField)?.isList ??
+                            false)
+                      ? 'Separate with ;'
+                      : null,
                 ),
               ),
               if (highlights.isNotEmpty) ...[

@@ -80,6 +80,8 @@ class SearchIndex {
         SearchKind.paper,
         'SELECT id, updated_at, title, '
         "authors || ' ' || COALESCE(venue, '') || ' ' || COALESCE(doi, '') "
+        "|| ' ' || COALESCE(species, '') || ' ' || COALESCE(brain_regions, '') "
+        "|| ' ' || COALESCE(techniques, '') || ' ' || COALESCE(paradigm, '') "
         'AS body, NULL AS aux FROM papers',
         (row) =>
             (title: row.read<String>('title'), body: row.read<String>('body')),
@@ -212,7 +214,10 @@ class SearchIndex {
       }
     }
     for (final p in await _db.select(_db.papers).get()) {
-      final body = '${p.authors} ${p.venue ?? ''} ${p.doi ?? ''}';
+      final body =
+          '${p.authors} ${p.venue ?? ''} ${p.doi ?? ''} '
+          '${p.species ?? ''} ${p.brainRegions ?? ''} ${p.techniques ?? ''} '
+          '${p.paradigm ?? ''}';
       if (matches('${p.title} $body')) {
         hits.add(
           SearchHit(

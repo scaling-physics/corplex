@@ -847,6 +847,61 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _speciesMeta = const VerificationMeta(
+    'species',
+  );
+  @override
+  late final GeneratedColumn<String> species = GeneratedColumn<String>(
+    'species',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _brainRegionsMeta = const VerificationMeta(
+    'brainRegions',
+  );
+  @override
+  late final GeneratedColumn<String> brainRegions = GeneratedColumn<String>(
+    'brain_regions',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _techniquesMeta = const VerificationMeta(
+    'techniques',
+  );
+  @override
+  late final GeneratedColumn<String> techniques = GeneratedColumn<String>(
+    'techniques',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sampleSizeMeta = const VerificationMeta(
+    'sampleSize',
+  );
+  @override
+  late final GeneratedColumn<int> sampleSize = GeneratedColumn<int>(
+    'sample_size',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _paradigmMeta = const VerificationMeta(
+    'paradigm',
+  );
+  @override
+  late final GeneratedColumn<String> paradigm = GeneratedColumn<String>(
+    'paradigm',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -886,6 +941,11 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     readingStatus,
     citekey,
     rating,
+    species,
+    brainRegions,
+    techniques,
+    sampleSize,
+    paradigm,
     createdAt,
     updatedAt,
   ];
@@ -972,6 +1032,39 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         rating.isAcceptableOrUnknown(data['rating']!, _ratingMeta),
       );
     }
+    if (data.containsKey('species')) {
+      context.handle(
+        _speciesMeta,
+        species.isAcceptableOrUnknown(data['species']!, _speciesMeta),
+      );
+    }
+    if (data.containsKey('brain_regions')) {
+      context.handle(
+        _brainRegionsMeta,
+        brainRegions.isAcceptableOrUnknown(
+          data['brain_regions']!,
+          _brainRegionsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('techniques')) {
+      context.handle(
+        _techniquesMeta,
+        techniques.isAcceptableOrUnknown(data['techniques']!, _techniquesMeta),
+      );
+    }
+    if (data.containsKey('sample_size')) {
+      context.handle(
+        _sampleSizeMeta,
+        sampleSize.isAcceptableOrUnknown(data['sample_size']!, _sampleSizeMeta),
+      );
+    }
+    if (data.containsKey('paradigm')) {
+      context.handle(
+        _paradigmMeta,
+        paradigm.isAcceptableOrUnknown(data['paradigm']!, _paradigmMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1047,6 +1140,26 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         DriftSqlType.int,
         data['${effectivePrefix}rating'],
       ),
+      species: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}species'],
+      ),
+      brainRegions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brain_regions'],
+      ),
+      techniques: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}techniques'],
+      ),
+      sampleSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sample_size'],
+      ),
+      paradigm: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paradigm'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1106,6 +1219,21 @@ class Paper extends DataClass implements Insertable<Paper> {
 
   /// The reader's own rating/priority, 1–5 stars; null means unrated.
   final int? rating;
+
+  /// Species or model system, e.g. `mouse; human`.
+  final String? species;
+
+  /// Brain regions, e.g. `CA1; mPFC`.
+  final String? brainRegions;
+
+  /// Techniques, e.g. `2-photon imaging; optogenetics`.
+  final String? techniques;
+
+  /// Sample size (n), as the reader recorded it.
+  final int? sampleSize;
+
+  /// Task or paradigm, free text, e.g. `fear conditioning`.
+  final String? paradigm;
   final DateTime createdAt;
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
@@ -1124,6 +1252,11 @@ class Paper extends DataClass implements Insertable<Paper> {
     this.readingStatus,
     this.citekey,
     this.rating,
+    this.species,
+    this.brainRegions,
+    this.techniques,
+    this.sampleSize,
+    this.paradigm,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1165,6 +1298,21 @@ class Paper extends DataClass implements Insertable<Paper> {
     if (!nullToAbsent || rating != null) {
       map['rating'] = Variable<int>(rating);
     }
+    if (!nullToAbsent || species != null) {
+      map['species'] = Variable<String>(species);
+    }
+    if (!nullToAbsent || brainRegions != null) {
+      map['brain_regions'] = Variable<String>(brainRegions);
+    }
+    if (!nullToAbsent || techniques != null) {
+      map['techniques'] = Variable<String>(techniques);
+    }
+    if (!nullToAbsent || sampleSize != null) {
+      map['sample_size'] = Variable<int>(sampleSize);
+    }
+    if (!nullToAbsent || paradigm != null) {
+      map['paradigm'] = Variable<String>(paradigm);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1201,6 +1349,21 @@ class Paper extends DataClass implements Insertable<Paper> {
       rating: rating == null && nullToAbsent
           ? const Value.absent()
           : Value(rating),
+      species: species == null && nullToAbsent
+          ? const Value.absent()
+          : Value(species),
+      brainRegions: brainRegions == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brainRegions),
+      techniques: techniques == null && nullToAbsent
+          ? const Value.absent()
+          : Value(techniques),
+      sampleSize: sampleSize == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sampleSize),
+      paradigm: paradigm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paradigm),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1227,6 +1390,11 @@ class Paper extends DataClass implements Insertable<Paper> {
       ),
       citekey: serializer.fromJson<String?>(json['citekey']),
       rating: serializer.fromJson<int?>(json['rating']),
+      species: serializer.fromJson<String?>(json['species']),
+      brainRegions: serializer.fromJson<String?>(json['brainRegions']),
+      techniques: serializer.fromJson<String?>(json['techniques']),
+      sampleSize: serializer.fromJson<int?>(json['sampleSize']),
+      paradigm: serializer.fromJson<String?>(json['paradigm']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1250,6 +1418,11 @@ class Paper extends DataClass implements Insertable<Paper> {
       ),
       'citekey': serializer.toJson<String?>(citekey),
       'rating': serializer.toJson<int?>(rating),
+      'species': serializer.toJson<String?>(species),
+      'brainRegions': serializer.toJson<String?>(brainRegions),
+      'techniques': serializer.toJson<String?>(techniques),
+      'sampleSize': serializer.toJson<int?>(sampleSize),
+      'paradigm': serializer.toJson<String?>(paradigm),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1269,6 +1442,11 @@ class Paper extends DataClass implements Insertable<Paper> {
     Value<ReadingStatus?> readingStatus = const Value.absent(),
     Value<String?> citekey = const Value.absent(),
     Value<int?> rating = const Value.absent(),
+    Value<String?> species = const Value.absent(),
+    Value<String?> brainRegions = const Value.absent(),
+    Value<String?> techniques = const Value.absent(),
+    Value<int?> sampleSize = const Value.absent(),
+    Value<String?> paradigm = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Paper(
@@ -1287,6 +1465,11 @@ class Paper extends DataClass implements Insertable<Paper> {
         : this.readingStatus,
     citekey: citekey.present ? citekey.value : this.citekey,
     rating: rating.present ? rating.value : this.rating,
+    species: species.present ? species.value : this.species,
+    brainRegions: brainRegions.present ? brainRegions.value : this.brainRegions,
+    techniques: techniques.present ? techniques.value : this.techniques,
+    sampleSize: sampleSize.present ? sampleSize.value : this.sampleSize,
+    paradigm: paradigm.present ? paradigm.value : this.paradigm,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1309,6 +1492,17 @@ class Paper extends DataClass implements Insertable<Paper> {
           : this.readingStatus,
       citekey: data.citekey.present ? data.citekey.value : this.citekey,
       rating: data.rating.present ? data.rating.value : this.rating,
+      species: data.species.present ? data.species.value : this.species,
+      brainRegions: data.brainRegions.present
+          ? data.brainRegions.value
+          : this.brainRegions,
+      techniques: data.techniques.present
+          ? data.techniques.value
+          : this.techniques,
+      sampleSize: data.sampleSize.present
+          ? data.sampleSize.value
+          : this.sampleSize,
+      paradigm: data.paradigm.present ? data.paradigm.value : this.paradigm,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1330,6 +1524,11 @@ class Paper extends DataClass implements Insertable<Paper> {
           ..write('readingStatus: $readingStatus, ')
           ..write('citekey: $citekey, ')
           ..write('rating: $rating, ')
+          ..write('species: $species, ')
+          ..write('brainRegions: $brainRegions, ')
+          ..write('techniques: $techniques, ')
+          ..write('sampleSize: $sampleSize, ')
+          ..write('paradigm: $paradigm, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1351,6 +1550,11 @@ class Paper extends DataClass implements Insertable<Paper> {
     readingStatus,
     citekey,
     rating,
+    species,
+    brainRegions,
+    techniques,
+    sampleSize,
+    paradigm,
     createdAt,
     updatedAt,
   );
@@ -1371,6 +1575,11 @@ class Paper extends DataClass implements Insertable<Paper> {
           other.readingStatus == this.readingStatus &&
           other.citekey == this.citekey &&
           other.rating == this.rating &&
+          other.species == this.species &&
+          other.brainRegions == this.brainRegions &&
+          other.techniques == this.techniques &&
+          other.sampleSize == this.sampleSize &&
+          other.paradigm == this.paradigm &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1389,6 +1598,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<ReadingStatus?> readingStatus;
   final Value<String?> citekey;
   final Value<int?> rating;
+  final Value<String?> species;
+  final Value<String?> brainRegions;
+  final Value<String?> techniques;
+  final Value<int?> sampleSize;
+  final Value<String?> paradigm;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1406,6 +1620,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.readingStatus = const Value.absent(),
     this.citekey = const Value.absent(),
     this.rating = const Value.absent(),
+    this.species = const Value.absent(),
+    this.brainRegions = const Value.absent(),
+    this.techniques = const Value.absent(),
+    this.sampleSize = const Value.absent(),
+    this.paradigm = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1424,6 +1643,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.readingStatus = const Value.absent(),
     this.citekey = const Value.absent(),
     this.rating = const Value.absent(),
+    this.species = const Value.absent(),
+    this.brainRegions = const Value.absent(),
+    this.techniques = const Value.absent(),
+    this.sampleSize = const Value.absent(),
+    this.paradigm = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1442,6 +1666,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? readingStatus,
     Expression<String>? citekey,
     Expression<int>? rating,
+    Expression<String>? species,
+    Expression<String>? brainRegions,
+    Expression<String>? techniques,
+    Expression<int>? sampleSize,
+    Expression<String>? paradigm,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1460,6 +1689,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (readingStatus != null) 'reading_status': readingStatus,
       if (citekey != null) 'citekey': citekey,
       if (rating != null) 'rating': rating,
+      if (species != null) 'species': species,
+      if (brainRegions != null) 'brain_regions': brainRegions,
+      if (techniques != null) 'techniques': techniques,
+      if (sampleSize != null) 'sample_size': sampleSize,
+      if (paradigm != null) 'paradigm': paradigm,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1480,6 +1714,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<ReadingStatus?>? readingStatus,
     Value<String?>? citekey,
     Value<int?>? rating,
+    Value<String?>? species,
+    Value<String?>? brainRegions,
+    Value<String?>? techniques,
+    Value<int?>? sampleSize,
+    Value<String?>? paradigm,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1498,6 +1737,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       readingStatus: readingStatus ?? this.readingStatus,
       citekey: citekey ?? this.citekey,
       rating: rating ?? this.rating,
+      species: species ?? this.species,
+      brainRegions: brainRegions ?? this.brainRegions,
+      techniques: techniques ?? this.techniques,
+      sampleSize: sampleSize ?? this.sampleSize,
+      paradigm: paradigm ?? this.paradigm,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1548,6 +1792,21 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     if (rating.present) {
       map['rating'] = Variable<int>(rating.value);
     }
+    if (species.present) {
+      map['species'] = Variable<String>(species.value);
+    }
+    if (brainRegions.present) {
+      map['brain_regions'] = Variable<String>(brainRegions.value);
+    }
+    if (techniques.present) {
+      map['techniques'] = Variable<String>(techniques.value);
+    }
+    if (sampleSize.present) {
+      map['sample_size'] = Variable<int>(sampleSize.value);
+    }
+    if (paradigm.present) {
+      map['paradigm'] = Variable<String>(paradigm.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1576,6 +1835,11 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('readingStatus: $readingStatus, ')
           ..write('citekey: $citekey, ')
           ..write('rating: $rating, ')
+          ..write('species: $species, ')
+          ..write('brainRegions: $brainRegions, ')
+          ..write('techniques: $techniques, ')
+          ..write('sampleSize: $sampleSize, ')
+          ..write('paradigm: $paradigm, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -5193,6 +5457,17 @@ class $MatrixColumnsTable extends MatrixColumns
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _paperFieldMeta = const VerificationMeta(
+    'paperField',
+  );
+  @override
+  late final GeneratedColumn<String> paperField = GeneratedColumn<String>(
+    'paper_field',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -5223,6 +5498,7 @@ class $MatrixColumnsTable extends MatrixColumns
     projectId,
     name,
     position,
+    paperField,
     createdAt,
     updatedAt,
   ];
@@ -5263,6 +5539,12 @@ class $MatrixColumnsTable extends MatrixColumns
         position.isAcceptableOrUnknown(data['position']!, _positionMeta),
       );
     }
+    if (data.containsKey('paper_field')) {
+      context.handle(
+        _paperFieldMeta,
+        paperField.isAcceptableOrUnknown(data['paper_field']!, _paperFieldMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5300,6 +5582,10 @@ class $MatrixColumnsTable extends MatrixColumns
         DriftSqlType.int,
         data['${effectivePrefix}position'],
       )!,
+      paperField: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paper_field'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5324,6 +5610,11 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
 
   /// Left-to-right order.
   final int position;
+
+  /// When set, the column shows a paper's study detail (`species`,
+  /// `brain_regions`, `techniques`, `sample_size`, `paradigm`) instead of
+  /// its own cells, and editing a cell edits the paper (schema v15).
+  final String? paperField;
   final DateTime createdAt;
   final DateTime updatedAt;
   const MatrixColumn({
@@ -5331,6 +5622,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
     required this.projectId,
     required this.name,
     required this.position,
+    this.paperField,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -5341,6 +5633,9 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
     map['project_id'] = Variable<String>(projectId);
     map['name'] = Variable<String>(name);
     map['position'] = Variable<int>(position);
+    if (!nullToAbsent || paperField != null) {
+      map['paper_field'] = Variable<String>(paperField);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -5352,6 +5647,9 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
       projectId: Value(projectId),
       name: Value(name),
       position: Value(position),
+      paperField: paperField == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paperField),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -5367,6 +5665,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
       projectId: serializer.fromJson<String>(json['projectId']),
       name: serializer.fromJson<String>(json['name']),
       position: serializer.fromJson<int>(json['position']),
+      paperField: serializer.fromJson<String?>(json['paperField']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -5379,6 +5678,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
       'projectId': serializer.toJson<String>(projectId),
       'name': serializer.toJson<String>(name),
       'position': serializer.toJson<int>(position),
+      'paperField': serializer.toJson<String?>(paperField),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -5389,6 +5689,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
     String? projectId,
     String? name,
     int? position,
+    Value<String?> paperField = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => MatrixColumn(
@@ -5396,6 +5697,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
     projectId: projectId ?? this.projectId,
     name: name ?? this.name,
     position: position ?? this.position,
+    paperField: paperField.present ? paperField.value : this.paperField,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -5405,6 +5707,9 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       name: data.name.present ? data.name.value : this.name,
       position: data.position.present ? data.position.value : this.position,
+      paperField: data.paperField.present
+          ? data.paperField.value
+          : this.paperField,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -5417,6 +5722,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
           ..write('projectId: $projectId, ')
           ..write('name: $name, ')
           ..write('position: $position, ')
+          ..write('paperField: $paperField, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -5424,8 +5730,15 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, projectId, name, position, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    name,
+    position,
+    paperField,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5434,6 +5747,7 @@ class MatrixColumn extends DataClass implements Insertable<MatrixColumn> {
           other.projectId == this.projectId &&
           other.name == this.name &&
           other.position == this.position &&
+          other.paperField == this.paperField &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -5443,6 +5757,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
   final Value<String> projectId;
   final Value<String> name;
   final Value<int> position;
+  final Value<String?> paperField;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -5451,6 +5766,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
     this.projectId = const Value.absent(),
     this.name = const Value.absent(),
     this.position = const Value.absent(),
+    this.paperField = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5460,6 +5776,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
     required String projectId,
     required String name,
     this.position = const Value.absent(),
+    this.paperField = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5470,6 +5787,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
     Expression<String>? projectId,
     Expression<String>? name,
     Expression<int>? position,
+    Expression<String>? paperField,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -5479,6 +5797,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
       if (projectId != null) 'project_id': projectId,
       if (name != null) 'name': name,
       if (position != null) 'position': position,
+      if (paperField != null) 'paper_field': paperField,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -5490,6 +5809,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
     Value<String>? projectId,
     Value<String>? name,
     Value<int>? position,
+    Value<String?>? paperField,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -5499,6 +5819,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
       projectId: projectId ?? this.projectId,
       name: name ?? this.name,
       position: position ?? this.position,
+      paperField: paperField ?? this.paperField,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -5520,6 +5841,9 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
     if (position.present) {
       map['position'] = Variable<int>(position.value);
     }
+    if (paperField.present) {
+      map['paper_field'] = Variable<String>(paperField.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -5539,6 +5863,7 @@ class MatrixColumnsCompanion extends UpdateCompanion<MatrixColumn> {
           ..write('projectId: $projectId, ')
           ..write('name: $name, ')
           ..write('position: $position, ')
+          ..write('paperField: $paperField, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8089,6 +8414,11 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<ReadingStatus?> readingStatus,
   Value<String?> citekey,
   Value<int?> rating,
+  Value<String?> species,
+  Value<String?> brainRegions,
+  Value<String?> techniques,
+  Value<int?> sampleSize,
+  Value<String?> paradigm,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -8107,6 +8437,11 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<ReadingStatus?> readingStatus,
   Value<String?> citekey,
   Value<int?> rating,
+  Value<String?> species,
+  Value<String?> brainRegions,
+  Value<String?> techniques,
+  Value<int?> sampleSize,
+  Value<String?> paradigm,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -8334,6 +8669,31 @@ class $$PapersTableFilterComposer
 
   ColumnFilters<int> get rating => $composableBuilder(
     column: $table.rating,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get species => $composableBuilder(
+    column: $table.species,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brainRegions => $composableBuilder(
+    column: $table.brainRegions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get techniques => $composableBuilder(
+    column: $table.techniques,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sampleSize => $composableBuilder(
+    column: $table.sampleSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paradigm => $composableBuilder(
+    column: $table.paradigm,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8622,6 +8982,31 @@ class $$PapersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get species => $composableBuilder(
+    column: $table.species,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get brainRegions => $composableBuilder(
+    column: $table.brainRegions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get techniques => $composableBuilder(
+    column: $table.techniques,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sampleSize => $composableBuilder(
+    column: $table.sampleSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paradigm => $composableBuilder(
+    column: $table.paradigm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8685,6 +9070,27 @@ class $$PapersTableAnnotationComposer
 
   GeneratedColumn<int> get rating =>
       $composableBuilder(column: $table.rating, builder: (column) => column);
+
+  GeneratedColumn<String> get species =>
+      $composableBuilder(column: $table.species, builder: (column) => column);
+
+  GeneratedColumn<String> get brainRegions => $composableBuilder(
+    column: $table.brainRegions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get techniques => $composableBuilder(
+    column: $table.techniques,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sampleSize => $composableBuilder(
+    column: $table.sampleSize,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paradigm =>
+      $composableBuilder(column: $table.paradigm, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -8943,6 +9349,11 @@ class $$PapersTableTableManager
                 Value<ReadingStatus?> readingStatus = const Value.absent(),
                 Value<String?> citekey = const Value.absent(),
                 Value<int?> rating = const Value.absent(),
+                Value<String?> species = const Value.absent(),
+                Value<String?> brainRegions = const Value.absent(),
+                Value<String?> techniques = const Value.absent(),
+                Value<int?> sampleSize = const Value.absent(),
+                Value<String?> paradigm = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8960,6 +9371,11 @@ class $$PapersTableTableManager
                 readingStatus: readingStatus,
                 citekey: citekey,
                 rating: rating,
+                species: species,
+                brainRegions: brainRegions,
+                techniques: techniques,
+                sampleSize: sampleSize,
+                paradigm: paradigm,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -8979,6 +9395,11 @@ class $$PapersTableTableManager
                 Value<ReadingStatus?> readingStatus = const Value.absent(),
                 Value<String?> citekey = const Value.absent(),
                 Value<int?> rating = const Value.absent(),
+                Value<String?> species = const Value.absent(),
+                Value<String?> brainRegions = const Value.absent(),
+                Value<String?> techniques = const Value.absent(),
+                Value<int?> sampleSize = const Value.absent(),
+                Value<String?> paradigm = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8996,6 +9417,11 @@ class $$PapersTableTableManager
                 readingStatus: readingStatus,
                 citekey: citekey,
                 rating: rating,
+                species: species,
+                brainRegions: brainRegions,
+                techniques: techniques,
+                sampleSize: sampleSize,
+                paradigm: paradigm,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -12760,6 +13186,7 @@ typedef $$MatrixColumnsTableCreateCompanionBuilder =
       required String projectId,
       required String name,
       Value<int> position,
+      Value<String?> paperField,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -12770,6 +13197,7 @@ typedef $$MatrixColumnsTableUpdateCompanionBuilder =
       Value<String> projectId,
       Value<String> name,
       Value<int> position,
+      Value<String?> paperField,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -12840,6 +13268,11 @@ class $$MatrixColumnsTableFilterComposer
 
   ColumnFilters<int> get position => $composableBuilder(
     column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paperField => $composableBuilder(
+    column: $table.paperField,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12926,6 +13359,11 @@ class $$MatrixColumnsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get paperField => $composableBuilder(
+    column: $table.paperField,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -12977,6 +13415,11 @@ class $$MatrixColumnsTableAnnotationComposer
 
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get paperField => $composableBuilder(
+    column: $table.paperField,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -13065,6 +13508,7 @@ class $$MatrixColumnsTableTableManager
                 Value<String> projectId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int> position = const Value.absent(),
+                Value<String?> paperField = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -13073,6 +13517,7 @@ class $$MatrixColumnsTableTableManager
                 projectId: projectId,
                 name: name,
                 position: position,
+                paperField: paperField,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -13083,6 +13528,7 @@ class $$MatrixColumnsTableTableManager
                 required String projectId,
                 required String name,
                 Value<int> position = const Value.absent(),
+                Value<String?> paperField = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -13091,6 +13537,7 @@ class $$MatrixColumnsTableTableManager
                 projectId: projectId,
                 name: name,
                 position: position,
+                paperField: paperField,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

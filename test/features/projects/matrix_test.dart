@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
+import 'package:corplex/features/library/study_details.dart';
 import 'package:corplex/features/projects/matrix.dart';
 import 'package:corplex/features/projects/matrix_screen.dart';
 
@@ -167,4 +168,85 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
     },
   );
+
+  group('columns bound to study details', () {
+    setUp(() async {
+      await (db.update(db.papers)..where((p) => p.id.equals('p1'))).write(
+        const PapersCompanion(
+          species: Value('mouse; rat'),
+          sampleSize: Value(12),
+        ),
+      );
+    });
+
+    test('add study columns skips existing, Markdown includes values, delete leaves papers', () async {
+      await addMatrixColumn(db, 'pr', 'Mine', field: StudyField.species);
+      expect(await addStudyColumns(db, 'pr'), 4);
+      expect(await addStudyColumns(db, 'pr'), 0);
+      final cols = await (db.select(
+        db.matrixColumns,
+      )..orderBy([(c) => OrderingTerm.asc(c.position)])).get();
+      expect(cols.map((c) => c.paperField), [
+        'species',
+        'brain_regions',
+        'techniques',
+        'sample_size',
+        'paradigm',
+      ]);
+      final papers = await (db.select(
+        db.papers,
+      )..orderBy([(p) => OrderingTerm.asc(p.title)])).get();
+      final md = matrixToMarkdown(
+        cols.sublist(0, 1) + cols.sublist(3, 4),
+        papers,
+        {},
+      );
+      expect(md.trim().split('\n').last, '| Devlin et al. 2019 |  |  |');
+      expect(md, contains('| Vaswani 2017 | mouse, rat | 12 |'));
+
+      await deleteMatrixColumn(db, cols.first.id);
+      final p1 = await (db.select(
+        db.papers,
+      )..where((p) => p.id.equals('p1'))).getSingle();
+      expect(p1.species, 'mouse; rat');
+    });
+
+    testWidgets('shows paper values; editing a bound cell writes the paper', (
+      tester,
+    ) async {
+      await addStudyColumns(db, 'pr');
+      final project = await (db.select(
+        db.projects,
+      )..where((p) => p.id.equals('pr'))).getSingle();
+      tester.view.physicalSize = const Size(1600, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: MaterialApp(home: MatrixScreen(project: project)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Species / model'), findsOneWidget);
+      expect(find.text('mouse, rat'), findsOneWidget);
+      expect(find.text('12'), findsOneWidget);
+
+      await tester.tap(find.text('mouse, rat'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'human; macaque');
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+
+      final p1 = await (db.select(
+        db.papers,
+      )..where((p) => p.id.equals('p1'))).getSingle();
+      expect(p1.species, 'human; macaque');
+      expect(find.text('human, macaque'), findsOneWidget);
+      expect(await db.select(db.matrixCells).get(), isEmpty);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  });
 }

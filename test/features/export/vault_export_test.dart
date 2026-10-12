@@ -273,4 +273,51 @@ void main() {
     // Same result whatever the input order.
     expect(assignFileNames(items.reversed.toList()), a);
   });
+
+  test('paper frontmatter carries study details only when set', () async {
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: const Value('s1'),
+            title: 'Place cells',
+            citekey: const Value('place1'),
+            species: const Value('mouse; rat'),
+            brainRegions: const Value('CA1'),
+            techniques: const Value('optogenetics'),
+            sampleSize: const Value(12),
+            paradigm: const Value('spatial navigation'),
+          ),
+        );
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: const Value('s2'),
+            title: 'Plain paper',
+            citekey: const Value('plain1'),
+          ),
+        );
+    final t = texts((await buildVaultArchive(db)).archive);
+    final set = t.entries
+        .firstWhere((e) => e.key.contains('Place cells'))
+        .value;
+    expect(set, contains('species:\n  - "mouse"\n  - "rat"\n'));
+    expect(set, contains('brain_regions:\n  - "CA1"\n'));
+    expect(set, contains('techniques:\n  - "optogenetics"\n'));
+    expect(set, contains('sample_size: 12\n'));
+    expect(set, contains('paradigm: "spatial navigation"\n'));
+    final plain = t.entries
+        .firstWhere((e) => e.key.contains('Plain paper'))
+        .value;
+    for (final k in [
+      'species',
+      'brain_regions',
+      'techniques',
+      'sample_size',
+      'paradigm',
+    ]) {
+      expect(plain, isNot(contains('$k:')));
+    }
+  });
 }

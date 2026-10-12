@@ -75,6 +75,11 @@ const syncTables = [
       'reading_status',
       'citekey',
       'rating',
+      'species',
+      'brain_regions',
+      'techniques',
+      'sample_size',
+      'paradigm',
       'created_at',
       'updated_at',
     ],
@@ -112,7 +117,14 @@ const syncTables = [
   SyncTableSpec(
     'matrix_columns',
     keys: ['id'],
-    columns: ['project_id', 'name', 'position', 'created_at', 'updated_at'],
+    columns: [
+      'project_id',
+      'name',
+      'position',
+      'paper_field',
+      'created_at',
+      'updated_at',
+    ],
   ),
   SyncTableSpec(
     'matrix_cells',

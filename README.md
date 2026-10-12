@@ -114,6 +114,10 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
   status (outline → final), word targets and a due date; see which papers
   you read but never cited, and every `TODO`, `[@?]` (needs a citation)
   and `[fig: …]` you left in the text.
+- **Study details** — record species, brain regions, techniques, sample
+  size and paradigm for each paper, filter the Library by them ("mouse
+  2-photon studies with n ≥ 10"), and pull them into the synthesis matrix
+  as ready-filled columns.
 - **Search everything** — notes, papers and highlights, as you type, and
   find any phrase inside an open PDF.
 - **Scanned papers too** — old or library-scanned PDFs are read on your

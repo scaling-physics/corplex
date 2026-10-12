@@ -14,6 +14,11 @@ class MatrixColumns extends Table {
 
   /// Left-to-right order.
   IntColumn get position => integer().withDefault(const Constant(0))();
+
+  /// When set, the column shows a paper's study detail (`species`,
+  /// `brain_regions`, `techniques`, `sample_size`, `paradigm`) instead of
+  /// its own cells, and editing a cell edits the paper (schema v15).
+  TextColumn get paperField => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now())();

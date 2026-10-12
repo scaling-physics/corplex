@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/authors.dart';
+import '../library/study_details.dart';
 
 /// The synthesis matrix of a project: its papers down the side, the themes
 /// the reader is comparing across the top, and what each paper says about
@@ -14,8 +15,9 @@ const defaultMatrixColumns = ['Method', 'Sample', 'Findings'];
 Future<String> addMatrixColumn(
   AppDatabase db,
   String projectId,
-  String name,
-) async {
+  String name, {
+  StudyField? field,
+}) async {
   final last =
       await (db.select(db.matrixColumns)
             ..where((c) => c.projectId.equals(projectId))
@@ -30,6 +32,7 @@ Future<String> addMatrixColumn(
           id: Value(id),
           projectId: projectId,
           name: name.trim(),
+          paperField: Value(field?.key),
           position: Value((last?.position ?? -1) + 1),
         ),
       );
@@ -42,12 +45,43 @@ Future<void> addDefaultMatrixColumns(AppDatabase db, String projectId) async {
   }
 }
 
+/// Adds the study-detail columns the project doesn't have yet, in order.
+/// Returns how many were added.
+Future<int> addStudyColumns(AppDatabase db, String projectId) async {
+  final existing =
+      (await (db.select(
+            db.matrixColumns,
+          )..where((c) => c.projectId.equals(projectId))).get())
+          .map((c) => c.paperField)
+          .toSet();
+  var added = 0;
+  for (final f in StudyField.values) {
+    if (existing.contains(f.key)) continue;
+    await addMatrixColumn(db, projectId, f.label, field: f);
+    added++;
+  }
+  return added;
+}
+
+/// What a cell shows: a bound column reads the paper's study detail (lists
+/// joined with ", "), any other column its `matrix_cells` text.
+String matrixCellText(
+  MatrixColumn column,
+  Paper paper,
+  Map<String, String> cells,
+) {
+  final field = StudyField.byKey(column.paperField);
+  if (field == null) return cells['${column.id}|${paper.id}'] ?? '';
+  return studyValues(paper, field).join(', ');
+}
+
 Future<void> renameMatrixColumn(AppDatabase db, String columnId, String name) =>
     (db.update(db.matrixColumns)..where((c) => c.id.equals(columnId))).write(
       MatrixColumnsCompanion(name: Value(name.trim())),
     );
 
-/// Removes the column and (by cascade) everything written under it.
+/// Removes the column and (by cascade) everything written under it. A
+/// column bound to study details has no cells; papers are never touched.
 Future<void> deleteMatrixColumn(AppDatabase db, String columnId) =>
     (db.delete(db.matrixColumns)..where((c) => c.id.equals(columnId))).go();
 
@@ -150,7 +184,7 @@ String matrixToMarkdown(
     '| ${header.join(' | ')} |',
     '| ${header.map((_) => '---').join(' | ')} |',
     for (final p in papers)
-      '| ${[cell(paperShortLabel(p)), for (final c in columns) cell(cells['${c.id}|${p.id}'] ?? '')].join(' | ')} |',
+      '| ${[cell(paperShortLabel(p)), for (final c in columns) cell(matrixCellText(c, p, cells))].join(' | ')} |',
   ];
   return '${lines.join('\n')}\n';
 }

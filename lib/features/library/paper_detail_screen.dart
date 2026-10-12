@@ -32,6 +32,7 @@ import 'annotated_pdf_export.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
 import 'split_reader.dart';
+import 'study_details_section.dart';
 import '../home/adaptive.dart' show readablePadding;
 import '../../theme/app_theme.dart';
 import '../../theme/haptics.dart';
@@ -561,6 +562,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                           ),
                         ),
                       ),
+                      if (paperAsync.value case final paper?)
+                        StudyDetailsSection(paper: paper),
                       if (paperAsync.value?.doi case final doi?
                           when normalizeCitationDoi(doi) != null)
                         CitationNetworkSection(doi: doi),

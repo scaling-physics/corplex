@@ -396,6 +396,30 @@ the default screens until the user opts in by using the feature.
   `NoteEditorScreen.initialSelection`, or, in the ≥ 900 px pane, via
   `pendingNoteSelectionProvider`, which the editor takes and clears.
 
+### v1.8 — Study details (built; emulator-checked)
+- **Study details** (`library/study_details.dart` — the shared
+  `StudyField` enum and helpers — and `study_details_section.dart`;
+  schema v15, server file `20261006000000_study_details.sql`, **apply it
+  before schema-v15 data syncs**): optional species, brain regions,
+  techniques (lists stored `a; b`), sample size and paradigm on a paper,
+  synced. The paper screen shows only "Add study details" until a paper
+  has any; then a compact card with chip inputs. Suggestions:
+  `studyLibraryValuesProvider` (values used in the library, most used
+  first), then `studySuggestions` (neuroscience-leaning). Fields absorb
+  outside changes only when the reader hasn't edited them. Search
+  indexes the values; the Markdown vault writes them to paper
+  frontmatter when set.
+- **Study filter** (`library/study_filter.dart`): a "Study" chip in the
+  Library filter row, only once some paper has details
+  (`anyStudyDetailsProvider`). OR within a field, AND across fields, a
+  minimum n drops papers without one; combined with search, status and
+  project in `filteredPapersProvider`. Per session, never synced.
+- **Bound matrix columns**: `MatrixColumns.paperField` (a
+  `StudyField.key`) makes a column read the paper (`matrixCellText`) and
+  write it through `setStudyValue`, never `matrix_cells`. Added from the
+  matrix "+" sheet ("Add study columns" skips fields already present);
+  deleting one leaves papers untouched; Markdown copy includes it.
+
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This
   conflicts with offline-first, so it would be strictly additive and
@@ -868,7 +892,7 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   export, maths, CSL assets, recorder, Markdown export through the real
   plugins; `adb shell pm grant com.corplex.corplex
   android.permission.RECORD_AUDIO` first, then `flutter test
-  integration_test/smoke_test.dart -d <device>`; a fresh debug install resets the grant, so the run can stop on the microphone dialog — tap Allow, or re-grant while it starts). To install and launch: (`adb install -r …; adb shell am start -W -n
+  integration_test/smoke_test.dart -d <device>`; a fresh debug install resets the grant, so re-grant in a loop while it runs: `(for i in $(seq 60); do adb shell pm grant com.corplex.corplex android.permission.RECORD_AUDIO; sleep 3; done) &`). To install and launch: (`adb install -r …; adb shell am start -W -n
   com.corplex.corplex/.MainActivity; adb logcat -b crash`); retrace
   obfuscated traces with `cmdline-tools/latest/bin/retrace` and
   `build/app/outputs/mapping/release/mapping.txt` (needs

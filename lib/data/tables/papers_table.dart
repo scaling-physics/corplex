@@ -40,6 +40,24 @@ class Papers extends Table {
   /// The reader's own rating/priority, 1–5 stars; null means unrated.
   IntColumn get rating => integer().nullable()();
 
+  // Study details (schema v15), all optional. Lists are stored like
+  // authors, `a; b; c` (see `study_details.dart`).
+
+  /// Species or model system, e.g. `mouse; human`.
+  TextColumn get species => text().nullable()();
+
+  /// Brain regions, e.g. `CA1; mPFC`.
+  TextColumn get brainRegions => text().nullable()();
+
+  /// Techniques, e.g. `2-photon imaging; optogenetics`.
+  TextColumn get techniques => text().nullable()();
+
+  /// Sample size (n), as the reader recorded it.
+  IntColumn get sampleSize => integer().nullable()();
+
+  /// Task or paradigm, free text, e.g. `fear conditioning`.
+  TextColumn get paradigm => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).

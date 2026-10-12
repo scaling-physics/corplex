@@ -1459,7 +1459,7 @@ enum _Command {
   draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
   heading('Heading', 'Make this line a heading', Icons.title),
   attach('Attach', 'Audio, an image or a file', Icons.attach_file),
-  voice('Voice note', 'Record a thought, written out for you', Icons.mic_none),
+  voice('Voice note', 'Record a thought as you read', Icons.mic_none),
   dictate('Dictate', 'Speak instead of typing', Icons.keyboard_voice_outlined),
   template(
     'Literature note template',

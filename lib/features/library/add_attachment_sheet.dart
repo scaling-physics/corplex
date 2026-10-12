@@ -9,6 +9,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import '../../data/tables/attachments_table.dart';
+import '../voice/voice_services.dart' show transcribesRecordingsProvider;
 import '../voice/voice_sheet.dart';
 
 /// Records an attachment for a note and/or a paper and returns its id.
@@ -50,8 +51,9 @@ Future<AttachmentType?> showAddAttachmentSheet(
   String? paperId,
   String? noteId,
   void Function(VoiceResult result)? onVoiceNote,
-}) {
+}) async {
   final db = ref.read(databaseProvider);
+  final transcribes = ref.read(transcribesRecordingsProvider);
   Future<String> insert({
     required AttachmentType type,
     String? path,
@@ -67,7 +69,10 @@ Future<AttachmentType?> showAddAttachmentSheet(
     title: title,
   );
 
-  return showModalBottomSheet<AttachmentType>(
+  // "Record audio" closes this sheet first and opens the recorder in its
+  // place, rather than stacking a second sheet on top of it.
+  var recordVoice = false;
+  final picked = await showModalBottomSheet<AttachmentType>(
     context: context,
     builder: (sheetContext) {
       Future<void> run(Future<AttachmentType?> Function() action) async {
@@ -91,24 +96,15 @@ Future<AttachmentType?> showAddAttachmentSheet(
               ListTile(
                 leading: const Icon(Icons.mic_none),
                 title: const Text('Record audio'),
-                subtitle: const Text(
-                  'A voice note, transcribed on this device',
+                subtitle: Text(
+                  transcribes
+                      ? 'A voice note, transcribed on this device'
+                      : 'A voice note',
                 ),
-                onTap: () => run(() async {
-                  final result = await showVoiceSheet(
-                    sheetContext,
-                    noteId: noteId,
-                    paperId: paperId,
-                  );
-                  if (result == null) return null;
-                  // A note takes the link and text itself; the caller then
-                  // has nothing to start playing.
-                  if (onVoiceNote != null) {
-                    onVoiceNote(result);
-                    return null;
-                  }
-                  return AttachmentType.podcast;
-                }),
+                onTap: () {
+                  recordVoice = true;
+                  Navigator.pop(sheetContext);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.podcasts),
@@ -132,6 +128,21 @@ Future<AttachmentType?> showAddAttachmentSheet(
       );
     },
   );
+  if (!recordVoice) return picked;
+  if (!context.mounted) return null;
+  final result = await showVoiceSheet(
+    context,
+    noteId: noteId,
+    paperId: paperId,
+  );
+  if (result == null) return null;
+  // A note takes the link and text itself; the caller then has nothing to
+  // start playing.
+  if (onVoiceNote != null) {
+    onVoiceNote(result);
+    return null;
+  }
+  return AttachmentType.podcast;
 }
 
 typedef _Insert = Future<String> Function({

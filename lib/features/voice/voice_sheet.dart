@@ -68,8 +68,18 @@ class VoiceSheet extends ConsumerStatefulWidget {
 class _VoiceSheetState extends ConsumerState<VoiceSheet> {
   static const _bars = 30;
 
-  late final VoiceRecorder _recorder = ref.read(voiceRecorderProvider);
-  late final Dictation _dictation = ref.read(dictationProvider);
+  // The providers are auto-disposing: a bare `ref.read` let Riverpod
+  // dispose them (and the native recorder) right after the read, so every
+  // recording failed in 1.5.x. These subscriptions hold them for exactly as
+  // long as the sheet is open.
+  ProviderSubscription<VoiceRecorder>? _recorderSub;
+  ProviderSubscription<Dictation>? _dictationSub;
+  VoiceRecorder get _recorder => (_recorderSub ??= ref.listenManual(
+    voiceRecorderProvider,
+    (_, _) {},
+  )).read();
+  Dictation get _dictation =>
+      (_dictationSub ??= ref.listenManual(dictationProvider, (_, _) {})).read();
   var _phase = _Phase.idle;
   var _blockedBy = MicAccess.denied;
   var _levels = List<double>.filled(_bars, 0);
@@ -171,8 +181,10 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
       path: path,
       title: title,
     );
-    var transcript = const Transcript(TranscriptStatus.done);
-    if (widget.noteId != null) {
+    // Where recordings are never transcribed (Android), don't try, and
+    // don't report it: the "Record audio" row already says "A voice note".
+    var transcript = const Transcript(TranscriptStatus.done, '');
+    if (widget.noteId != null && ref.read(transcribesRecordingsProvider)) {
       transcript = await ref.read(transcriberProvider).transcribeFile(path);
     }
     _finish(
@@ -401,7 +413,7 @@ void reportVoiceResult(BuildContext context, WidgetRef ref, VoiceResult r) {
   }
   switch (r.status) {
     case TranscriptStatus.done:
-      if (r.transcript.isEmpty) {
+      if (r.transcript.isEmpty && ref.read(transcribesRecordingsProvider)) {
         messenger.showSnackBar(
           const SnackBar(content: Text('Saved. No speech was heard.')),
         );

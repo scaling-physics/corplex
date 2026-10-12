@@ -100,6 +100,12 @@ final dictationProvider = Provider.autoDispose<Dictation>((ref) {
   return dictation;
 });
 
+/// Whether a finished recording is written out as text (iOS only; Android
+/// has no on-device file transcription).
+final transcribesRecordingsProvider = Provider<bool>(
+  (ref) => defaultTargetPlatform == TargetPlatform.iOS,
+);
+
 /// Whether "Dictate" is offered next to "Voice note": only where a recording
 /// can't be transcribed, so the user can still get speech into text.
 final dictationOfferedProvider = Provider<bool>(
@@ -128,6 +134,7 @@ double levelFromDb(double db) => ((db + 50) / 50).clamp(0.0, 1.0);
 class PluginVoiceRecorder implements VoiceRecorder {
   final AudioRecorder _recorder = AudioRecorder();
   String? _path;
+  var _recording = false;
 
   @override
   Future<MicAccess> ensureAccess() async =>
@@ -151,6 +158,7 @@ class PluginVoiceRecorder implements VoiceRecorder {
       ),
       path: _path!,
     );
+    _recording = true;
   }
 
   @override
@@ -159,11 +167,19 @@ class PluginVoiceRecorder implements VoiceRecorder {
       .map((a) => levelFromDb(a.current));
 
   @override
-  Future<String?> stop() async => await _recorder.stop() ?? _path;
+  Future<String?> stop() async {
+    _recording = false;
+    return await _recorder.stop() ?? _path;
+  }
 
   @override
   Future<void> cancel() async {
-    await _recorder.cancel();
+    _recording = false;
+    try {
+      await _recorder.cancel();
+    } catch (_) {
+      // Already released; the file is still removed below.
+    }
     final path = _path;
     if (path != null) {
       try {
@@ -175,7 +191,11 @@ class PluginVoiceRecorder implements VoiceRecorder {
   }
 
   @override
-  Future<void> dispose() => _recorder.dispose();
+  Future<void> dispose() async {
+    // Closed mid-recording: keep nothing.
+    if (_recording) await cancel();
+    await _recorder.dispose();
+  }
 }
 
 /// On-device file transcription through the `corplex/speech` channel

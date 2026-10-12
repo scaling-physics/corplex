@@ -25,13 +25,26 @@ class FakeRecorder implements VoiceRecorder {
   var started = false;
   var cancelled = false;
   var stopped = false;
+  var disposed = false;
   final _levels = StreamController<double>.broadcast();
 
-  @override
-  Future<MicAccess> ensureAccess() async => access;
+  /// The real plugin can't be used once disposed (1.5.x disposed it right
+  /// after the sheet read it, and every recording failed).
+  void _alive() {
+    if (disposed) throw StateError('recorder used after dispose');
+  }
 
   @override
-  Future<void> start() async => started = true;
+  Future<MicAccess> ensureAccess() async {
+    _alive();
+    return access;
+  }
+
+  @override
+  Future<void> start() async {
+    _alive();
+    started = true;
+  }
 
   @override
   Stream<double> get levels => _levels.stream;
@@ -40,15 +53,19 @@ class FakeRecorder implements VoiceRecorder {
 
   @override
   Future<String?> stop() async {
+    _alive();
     stopped = true;
     return '/tmp/voice_note.m4a';
   }
 
   @override
-  Future<void> cancel() async => cancelled = true;
+  Future<void> cancel() async {
+    _alive();
+    cancelled = true;
+  }
 
   @override
-  Future<void> dispose() async {}
+  Future<void> dispose() async => disposed = true;
 }
 
 class FakeTranscriber implements Transcriber {
@@ -90,6 +107,7 @@ void main() {
   late FakeRecorder recorder;
   late FakeTranscriber transcriber;
   late bool settingsOpened;
+  var transcribes = true;
 
   setUp(() async {
     EditableText.debugDeterministicCursor = true;
@@ -100,6 +118,7 @@ void main() {
       const Transcript(TranscriptStatus.done, 'Attention scales badly.'),
     );
     settingsOpened = false;
+    transcribes = true;
     await db
         .into(db.notes)
         .insert(NotesCompanion.insert(id: const Value('n1')));
@@ -115,10 +134,16 @@ void main() {
   List<Override> overrides() => [
     databaseProvider.overrideWithValue(db),
     audioEngineProvider.overrideWithValue(FakeAudioEngine()),
-    voiceRecorderProvider.overrideWithValue(recorder),
+    // Like production: the provider disposes the recorder when released.
+    voiceRecorderProvider.overrideWith((ref) {
+      ref.onDispose(recorder.dispose);
+      return recorder;
+    }),
     transcriberProvider.overrideWithValue(transcriber),
     dictationProvider.overrideWithValue(FakeDictation()),
     dictationOfferedProvider.overrideWithValue(true),
+    // Most tests stand in for iOS, where recordings are transcribed.
+    transcribesRecordingsProvider.overrideWithValue(transcribes),
     openAppSettingsProvider.overrideWithValue(
       () async => settingsOpened = true,
     ),
@@ -262,15 +287,37 @@ void main() {
     await closeEditor(tester);
   });
 
+  testWidgets('where recordings are not transcribed, it just saves quietly', (
+    tester,
+  ) async {
+    transcribes = false;
+    final c = await openNote(tester);
+    type(c, '/');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Voice note'));
+    await tester.pumpAndSettle();
+    await record(tester);
+
+    expect(await attachments(), hasLength(1));
+    expect(transcriber.calls, 0);
+    expect(c.document.toPlainText(), '▸ 0:00 Voice note\n\n');
+    expect(find.byType(SnackBar), findsNothing);
+    await closeEditor(tester);
+  });
+
   testWidgets('the attach sheet records audio into the note', (tester) async {
     final c = await openNote(tester);
     await tester.tap(find.byTooltip('Attach audio, image or file'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Record audio'));
     await tester.pumpAndSettle();
+    // The attach sheet closes; the recorder takes its place.
+    expect(find.text('Podcast link'), findsNothing);
     await record(tester);
 
     expect((await attachments()).single.noteId, 'n1');
+    // Released (and so disposed) once the sheet closed, not before.
+    expect(recorder.disposed, isTrue);
     expect(c.document.toPlainText(), contains('▸ 0:00 Voice note'));
     expect(c.document.toPlainText(), contains('Attention scales badly.'));
     await closeEditor(tester);

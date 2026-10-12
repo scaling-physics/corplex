@@ -1026,6 +1026,14 @@ so this file stays accurate for future agent sessions.
   `container.listen(provider, callback, fireImmediately: true)` and
   resolve a `Completer` once the callback sees the value you're waiting
   for (see `waitFor` in `test/features/notes/note_papers_providers_test.dart`).
+- **Never `ref.read` an `autoDispose` provider that owns a resource and
+  keep the result** (a recorder, a player, a controller). With no listener
+  Riverpod disposes it right after the read, running its `onDispose` —
+  1.5.0/1.5.1 shipped a voice recorder that was disposed before it could
+  record. Hold it with `ref.listenManual(...)` (closed automatically with
+  the widget) or `ref.watch`. Test overrides must mirror production
+  disposal (`overrideWith((ref) { ref.onDispose(fake.dispose); … })`),
+  not `overrideWithValue`, or the bug can't show up in tests.
 - **Always create test databases via `AppDatabase.inMemoryForTesting()`**,
   never `AppDatabase.forTesting(NativeDatabase.memory())` directly. SQLite
   has foreign key enforcement off by default *per connection*; without

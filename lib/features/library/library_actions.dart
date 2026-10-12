@@ -4,7 +4,6 @@ import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pdfrx/pdfrx.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,6 +13,8 @@ import '../home/adaptive.dart';
 import 'bibtex.dart';
 import 'reference_import.dart';
 import 'metadata_lookup.dart';
+import '../ocr/ocr_service.dart';
+import '../ocr/pdf_pages.dart';
 import 'paper_detail_screen.dart';
 
 void _say(BuildContext context, String message, {SnackBarAction? action}) {
@@ -176,8 +177,17 @@ Future<void> enrichImportedPaper(
   final messenger = ScaffoldMessenger.maybeOf(context);
   final lookup = ref.read(metadataLookupProvider);
   final db = ref.read(databaseProvider);
+  final ocr = ref.read(ocrServiceProvider);
+  final open = ref.read(pdfPagesOpenerProvider);
   try {
-    final start = await readPdfStart(pdfPath);
+    final start = await readPdfStart(
+      pdfPath,
+      open: open,
+      ocr: ocr,
+      paperId: paperId,
+    );
+    // A scan: the rest of its pages are recognised quietly in the background.
+    if (start.scanned) ocr.enqueue(paperId);
     if (start.pageCount > 0) {
       // Known from the document we just opened; reading progress needs it.
       await (db.update(db.papers)..where((p) => p.id.equals(paperId))).write(
@@ -234,22 +244,57 @@ Future<void> enrichImportedPaper(
 /// Reads the first pages of a PDF: a printed DOI or arXiv ID, if any, and
 /// the first page's text (for a title search when there's no ID), and the
 /// page count.
-Future<({PaperIdentifier? id, String firstPage, int pageCount})> readPdfStart(
-  String path,
-) async {
-  final document = await PdfDocument.openFile(path);
+///
+/// When the first pages have no text layer (a scan) and [ocr] and
+/// [paperId] are given, those pages are recognised on-device first, so the
+/// identifier and title search work on scans too; `scanned` is then true
+/// and the caller queues the rest. Born-digital PDFs never touch OCR.
+Future<({PaperIdentifier? id, String firstPage, int pageCount, bool scanned})>
+readPdfStart(
+  String path, {
+  PdfPagesOpener open = PdfrxPages.open,
+  OcrService? ocr,
+  String? paperId,
+}) async {
+  final document = await open(path);
   try {
-    final pageCount = document.pages.length;
-    var firstPage = '';
-    for (final (i, page) in document.pages.take(2).indexed) {
-      final text = (await page.loadStructuredText()).fullText;
-      if (i == 0) firstPage = text;
-      final id = findIdentifierInText(text);
-      if (id != null) {
-        return (id: id, firstPage: firstPage, pageCount: pageCount);
+    final pageCount = document.pageCount;
+    final texts = <String>[];
+    var scanned = false;
+    final canOcr = ocr != null && paperId != null;
+    for (var i = 0; i < pageCount && i < 2; i++) {
+      final text = await document.text(i);
+      if (i == 0 && canOcr && pageLacksTextLayer(text)) {
+        final second = pageCount > 1 ? await document.text(1) : '';
+        if (pageLacksTextLayer(second)) {
+          scanned = true;
+          await ocr.markScanned(paperId, pageCount);
+          for (var j = 0; j < pageCount && j < 2; j++) {
+            final recognised = await ocr.recognizePage(document, paperId, j);
+            texts.add(recognised?.text ?? '');
+          }
+        } else {
+          texts
+            ..add(text)
+            ..add(second);
+        }
+        break;
       }
+      texts.add(text);
+      if (findIdentifierInText(text) != null) break;
     }
-    return (id: null, firstPage: firstPage, pageCount: pageCount);
+    final firstPage = texts.isEmpty ? '' : texts.first;
+    PaperIdentifier? id;
+    for (final text in texts) {
+      id = findIdentifierInText(text);
+      if (id != null) break;
+    }
+    return (
+      id: id,
+      firstPage: firstPage,
+      pageCount: pageCount,
+      scanned: scanned,
+    );
   } finally {
     await document.dispose();
   }

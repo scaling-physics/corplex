@@ -17,7 +17,12 @@ import 'annotations_providers.dart';
 import 'flight.dart';
 import 'highlight_sweep.dart';
 import 'highlights.dart';
+import 'pdf_search.dart';
 import '../settings/appearance_settings.dart';
+import '../ocr/ocr_engine.dart';
+import '../ocr/ocr_service.dart';
+import 'ocr_search.dart';
+import 'ocr_selection.dart';
 import 'quote_to_note.dart';
 import 'reading_progress.dart';
 import 'snapshot.dart';
@@ -40,6 +45,9 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
     required this.pdfPath,
     this.initialPage,
     this.viewerBuilder,
+    this.searchSourceBuilder,
+    this.onSearchReveal,
+    this.textProbe,
   });
 
   final String paperId;
@@ -57,8 +65,34 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
   )?
   viewerBuilder;
 
+  /// Replaces the text source behind Find (tests have no PDF engine).
+  @visibleForTesting
+  final PageTextSource Function(PdfViewerController controller)?
+  searchSourceBuilder;
+
+  /// Called whenever Find moves to a match, before the viewer scrolls.
+  @visibleForTesting
+  final void Function(SearchMatch match)? onSearchReveal;
+
+  /// Replaces the PDF's own text layer when checking whether a page is a
+  /// scan (tests have no PDF engine).
+  @visibleForTesting
+  final PageTextProbe? textProbe;
+
   @override
   ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
+}
+
+/// Page count and per-page text layer of the open document, for deciding
+/// whether the current page is a scan.
+@visibleForTesting
+class PageTextProbe {
+  const PageTextProbe({required this.pageCount, required this.text});
+
+  final int pageCount;
+
+  /// The text layer of a 1-based page.
+  final Future<String> Function(int page) text;
 }
 
 class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
@@ -89,8 +123,85 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
   bool _immersive = false;
   bool _stripOpen = false;
 
+  /// Find in document; non-null while the search bar is open.
+  DocumentSearch? _search;
+  final _findField = TextEditingController();
+  final _findFocus = FocusNode();
+  Timer? _findDebounce;
+
+  /// Whether each checked page has no text layer, and whether the current
+  /// one has none (offers "Recognise text" on papers not yet marked scanned).
+  final _noTextLayer = <int, bool>{};
+  bool _lacksText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.textProbe != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkTextLayer());
+    }
+  }
+
+  Future<void> _checkTextLayer() async {
+    final page = _page.value;
+    var lacks = _noTextLayer[page];
+    if (lacks == null) {
+      try {
+        final probe = widget.textProbe;
+        final String text;
+        if (probe != null) {
+          text = await probe.text(page);
+        } else if (_document case final doc?) {
+          text = (await doc.pages[page - 1].loadStructuredText()).fullText;
+        } else {
+          return;
+        }
+        lacks = _noTextLayer[page] = pageLacksTextLayer(text);
+      } catch (_) {
+        return;
+      }
+    }
+    if (!mounted || _page.value != page) return;
+    if (lacks != _lacksText) setState(() => _lacksText = lacks!);
+  }
+
+  /// ⋮ → "Recognise text": reads the whole paper in the background.
+  Future<void> _recogniseText() async {
+    final count = _pageCount ?? widget.textProbe?.pageCount;
+    if (count == null) return;
+    final service = ref.read(ocrServiceProvider);
+    await service.markScanned(widget.paperId, count);
+    service.enqueue(widget.paperId);
+  }
+
+  /// Highlight or quote a selection of recognised words.
+  Future<void> _onOcrSelection(
+    int page,
+    OcrSelectionAction action,
+    List<OcrWord> words,
+    Rect? from,
+  ) async {
+    final made = await createOcrHighlight(
+      _db,
+      paperId: widget.paperId,
+      page: page,
+      words: words,
+      color: _color,
+    );
+    if (!mounted) return;
+    AppHaptics.confirm();
+    ref.read(freshHighlightsProvider).add(made.id);
+    if (action == OcrSelectionAction.quote) {
+      await showQuoteToNoteSheet(context, ref, made, from: from);
+    }
+  }
+
   @override
   void dispose() {
+    _findDebounce?.cancel();
+    _search?.dispose();
+    _findField.dispose();
+    _findFocus.dispose();
     if (_immersive) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
@@ -109,6 +220,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
       _pageCount = count;
     });
     savePageCountIfChanged(_db, widget.paperId, count);
+    _checkTextLayer();
   }
 
   /// Hides (or brings back) everything but the page. On a phone the
@@ -155,6 +267,98 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     return false;
   }
 
+  /// Opens Find (or, when already open, refocuses and selects the field).
+  void _openSearch() {
+    if (_inkMode || _snapping) return;
+    if (_search == null) {
+      PageTextSource source =
+          widget.searchSourceBuilder?.call(_controller) ??
+          PdfrxTextSource(_controller);
+      final service = ref.read(ocrServiceProvider);
+      final scanned = ref.read(isScannedPaperProvider(widget.paperId));
+      if (scanned) {
+        source = OcrFallbackSource(
+          source,
+          (page) => service.storedPage(widget.paperId, page),
+        );
+      }
+      setState(() {
+        _search = DocumentSearch(source, incomplete: _ocrRunning)
+          ..onReveal = _reveal;
+        _stripOpen = false;
+      });
+      _setFocus(false);
+    }
+    _findFocus.requestFocus();
+    _findField.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _findField.text.length,
+    );
+  }
+
+  bool _ocrRunning() {
+    final p = ref.read(ocrProgressProvider(widget.paperId)).value;
+    return p != null && !p.isDone;
+  }
+
+  void _closeSearch() {
+    if (_search == null) return;
+    _findDebounce?.cancel();
+    final search = _search!;
+    setState(() => _search = null);
+    _findField.clear();
+    // Let the marks' listeners go before the notifier does.
+    WidgetsBinding.instance.addPostFrameCallback((_) => search.dispose());
+  }
+
+  void _onFindChanged(String text) {
+    _findDebounce?.cancel();
+    final search = _search;
+    if (search == null) return;
+    if (text.trim().isEmpty) {
+      search.search('');
+      return;
+    }
+    _findDebounce = Timer(
+      const Duration(milliseconds: 250),
+      () => search.search(text),
+    );
+  }
+
+  /// Enter: the next match (the query is applied first if still pending).
+  void _findStep(int delta) {
+    final search = _search;
+    if (search == null) return;
+    if (_findDebounce?.isActive ?? false) {
+      _findDebounce!.cancel();
+      search.search(_findField.text);
+      return;
+    }
+    if (delta > 0) {
+      search.next();
+    } else {
+      search.previous();
+    }
+    AppHaptics.selection();
+  }
+
+  void _reveal(SearchMatch m) {
+    widget.onSearchReveal?.call(m);
+    try {
+      final box = _controller.layout.pageLayouts[m.page - 1];
+      final target = Rect.fromLTWH(
+        box.left + m.rect.left * box.width,
+        box.top + m.rect.top * box.height,
+        m.rect.width * box.width,
+        m.rect.height * box.height,
+      );
+      _controller.ensureVisible(target, margin: 60).catchError((_) {});
+      _controller.setCurrentPageNumber(m.page);
+    } catch (_) {
+      _jumpTo(m.page);
+    }
+  }
+
   Future<void> _jumpTo(int page) async {
     try {
       await _controller.goToPage(pageNumber: page);
@@ -164,6 +368,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
   void _onPageChanged(int? page) {
     if (page == null) return;
     _page.value = page;
+    _checkTextLayer();
     _pendingPage = page;
     _pageSave?.cancel();
     _pageSave = Timer(const Duration(seconds: 2), () {
@@ -320,13 +525,25 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
           pageRect: pageRect,
           inkMode: _inkMode,
           color: _color,
+          onOcrSelection: (action, words, from) =>
+              _onOcrSelection(page.pageNumber, action, words, from),
         ),
+        if (_search case final search?)
+          SearchMarks(
+            search: search,
+            page: page.pageNumber,
+            pageRect: pageRect,
+          ),
       ],
     );
     final marks =
         ref.watch(paperMarksProvider(widget.paperId)).value ?? const [];
     final pageCount = _pageCount;
     final document = _document;
+    final ocr = ref.watch(ocrProgressProvider(widget.paperId)).value;
+    final reading = ocr != null && !ocr.isDone
+        ? 'Reading text… ${(ocr.fraction * 100).floor()}%'
+        : null;
 
     final body = Stack(
       fit: StackFit.expand,
@@ -367,7 +584,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
               ),
             ),
           ),
-        if (pageCount != null && pageCount > 1)
+        if ((pageCount != null && pageCount > 1) || reading != null)
           Positioned(
             left: 0,
             right: 0,
@@ -380,10 +597,26 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                   opacity: _stripOpen ? 0 : 1,
                   child: IgnorePointer(
                     ignoring: _stripOpen,
-                    child: PageIndicator(
-                      page: _page,
-                      pageCount: pageCount,
-                      onTap: () => setState(() => _stripOpen = true),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (reading != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              reading,
+                              key: const ValueKey('ocr-progress'),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: c.onSurfaceVariant),
+                            ),
+                          ),
+                        if (pageCount != null && pageCount > 1)
+                          PageIndicator(
+                            page: _page,
+                            pageCount: pageCount,
+                            onTap: () => setState(() => _stripOpen = true),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -422,181 +655,276 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     // easy to start by accident when dragging the box) cancels the
     // snapshot instead of leaving the paper. In focus mode back brings the
     // chrome back first.
-    return PopScope(
-      canPop: !_snapping && !_focus && !_stripOpen,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (_snapping) {
-          setState(() => _snapping = false);
-        } else if (_stripOpen) {
-          setState(() => _stripOpen = false);
-        } else {
-          _setFocus(false);
-        }
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _openSearch,
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _openSearch,
+        if (_search != null)
+          const SingleActivator(LogicalKeyboardKey.escape): _closeSearch,
       },
-      // Only the bars follow the animation; the body is built once.
-      child: AnimatedBuilder(
-        animation: _chrome,
-        child: body,
-        builder: (context, body) {
-          final t = _chrome.value;
-          final inset = MediaQuery.paddingOf(context).top;
-          return Scaffold(
-            appBar: t <= 0
-                ? null
-                : PreferredSize(
-                    preferredSize: Size.fromHeight(kToolbarHeight * t),
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.bottomCenter,
-                        minHeight: 0,
-                        maxHeight: kToolbarHeight + inset,
-                        child: Opacity(
-                          opacity: t,
-                          child: AppBar(
-                            actions: [
-                              IconButton(
-                                icon: const Icon(Icons.format_quote_outlined),
-                                tooltip: 'Highlights',
-                                onPressed: _showHighlightsList,
-                              ),
-                              IconButton(
-                                isSelected: _inkMode,
-                                icon: const Icon(Icons.draw_outlined),
-                                selectedIcon: const Icon(Icons.draw),
-                                tooltip: _inkMode
-                                    ? 'Stop drawing'
-                                    : 'Draw on the page',
-                                onPressed: () {
-                                  AppHaptics.selection();
-                                  setState(() => _inkMode = !_inkMode);
-                                },
-                              ),
-                              PopupMenuButton<String>(
-                                tooltip: 'More',
-                                onSelected: (v) {
-                                  if (v == 'snapshot') {
-                                    setState(() => _snapping = true);
-                                  }
-                                  if (v == 'focus') _setFocus(true);
-                                  if (v == 'pages') {
-                                    setState(() => _stripOpen = true);
-                                  }
-                                  if (v == 'contents') _showContents();
-                                  if (v.startsWith('read:')) {
-                                    ref
-                                        .read(appearanceSettingsProvider)
-                                        .setReading(
-                                          ReadingTheme.values.byName(
-                                            v.substring(5),
+      child: Focus(
+        autofocus: true,
+        child: PopScope(
+          canPop: !_snapping && !_focus && !_stripOpen && _search == null,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            if (_search != null) {
+              _closeSearch();
+            } else if (_snapping) {
+              setState(() => _snapping = false);
+            } else if (_stripOpen) {
+              setState(() => _stripOpen = false);
+            } else {
+              _setFocus(false);
+            }
+          },
+          // Only the bars follow the animation; the body is built once.
+          child: AnimatedBuilder(
+            animation: _chrome,
+            child: body,
+            builder: (context, body) {
+              final t = _chrome.value;
+              final inset = MediaQuery.paddingOf(context).top;
+              return Scaffold(
+                appBar: t <= 0
+                    ? null
+                    : PreferredSize(
+                        preferredSize: Size.fromHeight(kToolbarHeight * t),
+                        child: ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.bottomCenter,
+                            minHeight: 0,
+                            maxHeight: kToolbarHeight + inset,
+                            child: Opacity(
+                              opacity: t,
+                              child: AppBar(
+                                title: _search == null
+                                    ? null
+                                    : FindField(
+                                        search: _search!,
+                                        controller: _findField,
+                                        focusNode: _findFocus,
+                                        onChanged: _onFindChanged,
+                                        onStep: _findStep,
+                                      ),
+                                actions: _search != null
+                                    ? [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.keyboard_arrow_up,
                                           ),
-                                        );
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  if (_pageCount != null && _pageCount! > 1)
-                                    const PopupMenuItem(
-                                      value: 'pages',
-                                      child: ListTile(
-                                        leading: Icon(
-                                          Icons.view_carousel_outlined,
+                                          tooltip: 'Previous match',
+                                          onPressed: () => _findStep(-1),
                                         ),
-                                        title: Text('Page strip'),
-                                      ),
-                                    ),
-                                  const PopupMenuItem(
-                                    value: 'focus',
-                                    child: ListTile(
-                                      leading: Icon(Icons.fullscreen),
-                                      title: Text('Focus'),
-                                      subtitle: Text(
-                                        'Tap the page to bring back',
-                                      ),
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'contents',
-                                    child: ListTile(
-                                      leading: Icon(Icons.toc),
-                                      title: Text('Contents'),
-                                    ),
-                                  ),
-                                  for (final theme in ReadingTheme.values)
-                                    CheckedPopupMenuItem(
-                                      value: 'read:${theme.name}',
-                                      checked:
-                                          ref
-                                              .read(appearanceSettingsProvider)
-                                              .reading ==
-                                          theme,
-                                      child: Text('${theme.label} page'),
-                                    ),
-                                  const PopupMenuDivider(),
-                                  PopupMenuItem(
-                                    value: 'snapshot',
-                                    enabled: !_extracting,
-                                    child: const ListTile(
-                                      leading: Icon(Icons.crop_free),
-                                      title: Text('Snapshot to a note'),
-                                      subtitle: Text('For figures and tables'),
-                                    ),
-                                  ),
-                                ],
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.keyboard_arrow_down,
+                                          ),
+                                          tooltip: 'Next match',
+                                          onPressed: () => _findStep(1),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close),
+                                          tooltip: 'Close search',
+                                          onPressed: _closeSearch,
+                                        ),
+                                      ]
+                                    : [
+                                        IconButton(
+                                          icon: const Icon(Icons.search),
+                                          tooltip: 'Find in document',
+                                          onPressed: _openSearch,
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.format_quote_outlined,
+                                          ),
+                                          tooltip: 'Highlights',
+                                          onPressed: _showHighlightsList,
+                                        ),
+                                        IconButton(
+                                          isSelected: _inkMode,
+                                          icon: const Icon(Icons.draw_outlined),
+                                          selectedIcon: const Icon(Icons.draw),
+                                          tooltip: _inkMode
+                                              ? 'Stop drawing'
+                                              : 'Draw on the page',
+                                          onPressed: () {
+                                            AppHaptics.selection();
+                                            setState(
+                                              () => _inkMode = !_inkMode,
+                                            );
+                                          },
+                                        ),
+                                        PopupMenuButton<String>(
+                                          tooltip: 'More',
+                                          onSelected: (v) {
+                                            if (v == 'snapshot') {
+                                              setState(() => _snapping = true);
+                                            }
+                                            if (v == 'find') _openSearch();
+                                            if (v == 'focus') _setFocus(true);
+                                            if (v == 'ocr') _recogniseText();
+                                            if (v == 'pages') {
+                                              setState(() => _stripOpen = true);
+                                            }
+                                            if (v == 'contents') {
+                                              _showContents();
+                                            }
+                                            if (v.startsWith('read:')) {
+                                              ref
+                                                  .read(
+                                                    appearanceSettingsProvider,
+                                                  )
+                                                  .setReading(
+                                                    ReadingTheme.values.byName(
+                                                      v.substring(5),
+                                                    ),
+                                                  );
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            if (_pageCount != null &&
+                                                _pageCount! > 1)
+                                              const PopupMenuItem(
+                                                value: 'pages',
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons
+                                                        .view_carousel_outlined,
+                                                  ),
+                                                  title: Text('Page strip'),
+                                                ),
+                                              ),
+                                            const PopupMenuItem(
+                                              value: 'find',
+                                              child: ListTile(
+                                                leading: Icon(Icons.search),
+                                                title: Text('Find in document'),
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'focus',
+                                              child: ListTile(
+                                                leading: Icon(Icons.fullscreen),
+                                                title: Text('Focus'),
+                                                subtitle: Text(
+                                                  'Tap the page to bring back',
+                                                ),
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'contents',
+                                              child: ListTile(
+                                                leading: Icon(Icons.toc),
+                                                title: Text('Contents'),
+                                              ),
+                                            ),
+                                            if (_lacksText && ocr == null)
+                                              const PopupMenuItem(
+                                                value: 'ocr',
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons
+                                                        .document_scanner_outlined,
+                                                  ),
+                                                  title: Text('Recognise text'),
+                                                  subtitle: Text(
+                                                    'Search and highlight a scan',
+                                                  ),
+                                                ),
+                                              ),
+                                            for (final theme
+                                                in ReadingTheme.values)
+                                              CheckedPopupMenuItem(
+                                                value: 'read:${theme.name}',
+                                                checked:
+                                                    ref
+                                                        .read(
+                                                          appearanceSettingsProvider,
+                                                        )
+                                                        .reading ==
+                                                    theme,
+                                                child: Text(
+                                                  '${theme.label} page',
+                                                ),
+                                              ),
+                                            const PopupMenuDivider(),
+                                            PopupMenuItem(
+                                              value: 'snapshot',
+                                              enabled: !_extracting,
+                                              child: const ListTile(
+                                                leading: Icon(Icons.crop_free),
+                                                title: Text(
+                                                  'Snapshot to a note',
+                                                ),
+                                                subtitle: Text(
+                                                  'For figures and tables',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-            body: body,
-            // One palette for both kinds of marking: the ink for new
-            // strokes, and the color the next text highlight gets.
-            bottomNavigationBar: t <= 0
-                ? null
-                : ClipRect(
-                    child: Align(
-                      heightFactor: t,
-                      alignment: Alignment.topCenter,
-                      child: Opacity(
-                        opacity: t,
-                        child: SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                for (final ink in highlightInks)
-                                  GestureDetector(
-                                    onTap: () => setState(() => _color = ink),
-                                    child: AnimatedContainer(
-                                      duration: AppMotion.short,
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: ink,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: ink == _color
-                                              ? c.primary
-                                              : c.outlineVariant,
-                                          width: ink == _color ? 3 : 1,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-          );
-        },
+                body: body,
+                // One palette for both kinds of marking: the ink for new
+                // strokes, and the color the next text highlight gets.
+                bottomNavigationBar: t <= 0
+                    ? null
+                    : ClipRect(
+                        child: Align(
+                          heightFactor: t,
+                          alignment: Alignment.topCenter,
+                          child: Opacity(
+                            opacity: t,
+                            child: SafeArea(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    for (final ink in highlightInks)
+                                      GestureDetector(
+                                        onTap: () =>
+                                            setState(() => _color = ink),
+                                        child: AnimatedContainer(
+                                          duration: AppMotion.short,
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          width: 28,
+                                          height: 28,
+                                          decoration: BoxDecoration(
+                                            color: ink,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: ink == _color
+                                                  ? c.primary
+                                                  : c.outlineVariant,
+                                              width: ink == _color ? 3 : 1,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -692,6 +1020,7 @@ class PageOverlay extends ConsumerStatefulWidget {
     required this.pageRect,
     required this.inkMode,
     required this.color,
+    this.onOcrSelection,
   });
 
   final String paperId;
@@ -699,6 +1028,15 @@ class PageOverlay extends ConsumerStatefulWidget {
   final Rect pageRect;
   final bool inkMode;
   final Color color;
+
+  /// Makes recognised words on a scanned page selectable; null leaves the
+  /// page alone.
+  final void Function(
+    OcrSelectionAction action,
+    List<OcrWord> words,
+    Rect? from,
+  )?
+  onOcrSelection;
 
   @override
   ConsumerState<PageOverlay> createState() => _PageOverlayState();
@@ -860,6 +1198,13 @@ class _PageOverlayState extends ConsumerState<PageOverlay>
               child: RepaintBoundary(
                 child: CustomPaint(size: size, painter: _SweepPainter(_active)),
               ),
+            ),
+          if (!widget.inkMode && widget.onOcrSelection != null)
+            OcrSelectionLayer(
+              key: const ValueKey('ocr-selection'),
+              paperId: widget.paperId,
+              page: widget.pageNumber,
+              onAction: widget.onOcrSelection!,
             ),
           if (!widget.inkMode)
             for (final (:highlight, :rects) in _highlights)
@@ -1402,4 +1747,77 @@ class _Chrome extends StatelessWidget {
         ? const SizedBox.shrink()
         : Opacity(opacity: animation.value, child: child),
   );
+}
+
+/// The compact search field that replaces the app bar title: the query,
+/// then "3 of 41" as its suffix. Enter goes to the next match,
+/// Shift+Enter to the previous.
+@visibleForTesting
+class FindField extends StatelessWidget {
+  const FindField({
+    super.key,
+    required this.search,
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+    required this.onStep,
+  });
+
+  final DocumentSearch search;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onChanged;
+  final void Function(int delta) onStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    return Focus(
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.enter &&
+            HardwareKeyboard.instance.isShiftPressed) {
+          onStep(-1);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: TextField(
+        key: const ValueKey('find-field'),
+        controller: controller,
+        focusNode: focusNode,
+        autofocus: true,
+        textInputAction: TextInputAction.search,
+        style: t.titleMedium,
+        onChanged: onChanged,
+        onSubmitted: (_) {
+          onStep(1);
+          focusNode.requestFocus();
+        },
+        decoration: InputDecoration(
+          hintText: 'Find in document',
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          suffixIcon: ListenableBuilder(
+            listenable: search,
+            builder: (context, _) => Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  search.summary,
+                  key: const ValueKey('find-count'),
+                  style: t.labelMedium?.copyWith(color: c.onSurfaceVariant),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

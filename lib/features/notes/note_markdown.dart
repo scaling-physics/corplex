@@ -1,5 +1,6 @@
 import '../audio/audio_link.dart';
 import '../library/highlights.dart';
+import 'math_markers.dart';
 import 'note_content.dart';
 import 'note_links.dart';
 
@@ -20,7 +21,13 @@ String noteToMarkdown({required String title, required String content}) {
     final attrs = op.attributes ?? const <String, dynamic>{};
 
     if (data is Map) {
-      line.write(data.containsKey('sketch') ? '[Sketch]' : '');
+      if (data[mathInlineType] case final String tex) {
+        line.write(inlineMathMarker(tex));
+      } else if (data[mathBlockType] case final String tex) {
+        line.write(displayMathMarker(tex));
+      } else {
+        line.write(data.containsKey('sketch') ? '[Sketch]' : '');
+      }
       continue;
     }
     final text = data as String;

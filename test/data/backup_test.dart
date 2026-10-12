@@ -75,6 +75,12 @@ void main() {
             rectsJson: '[]',
           ),
         );
+    await db
+        .into(db.ocrPapers)
+        .insert(OcrPapersCompanion.insert(paperId: 'p1', pageCount: 3));
+    await db
+        .into(db.ocrPages)
+        .insert(OcrPagesCompanion.insert(paperId: 'p1', pageNumber: 1));
     await db.customStatement(
       "UPDATE sync_meta SET user_id = 'someone', last_pull = '{}'",
     );
@@ -135,6 +141,9 @@ void main() {
     addTearDown(db.close);
     expect((await db.select(db.notes).getSingle()).title, 'Lecture');
     expect(await db.select(db.highlights).get(), hasLength(1));
+    // Recognised text is derived, so a backup leaves it out.
+    expect(await db.select(db.ocrPages).get(), isEmpty);
+    expect(await db.select(db.ocrPapers).get(), isEmpty);
 
     final paper = await db.select(db.papers).getSingle();
     expect(paper.pdfPath, p.join(newDocs.path, 'papers', 'attention.pdf'));

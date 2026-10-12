@@ -82,9 +82,9 @@ the rest are the remaining v1 work, in priority order.
 6. **Projects/collections (built)** — a named group of papers and notes
    (one per literature review or thesis chapter); invisible until one is
    created.
-7. **Capture from other apps (Android built; iOS not)** — Android
+7. **Capture from other apps (built; iOS untested on a device)** —
    share-sheet/Open-with import for PDFs, audio, DOIs/arXiv links, links and
-   text. iOS needs an Xcode Share Extension target — see Status.
+   text. iOS uses the `ShareExtension` target — see v1.6.
 8. **Data safety (built)** — trash with undo (swipe a card, or ⋮ → Move
    to trash), full backup/restore as a zip, and data-preserving
    migrations (the destructive v3 migration must not be repeated).
@@ -137,9 +137,9 @@ the default screens until the user opts in by using the feature.
   does), since a chip is one `\uFFFC` in `toPlainText()`. Unknown keys
   show as written, in the error tone; tap a chip to open its paper.
   ⋮ → "Add bibliography" writes/rewrites a "References" H2 at
-  the end in a chosen style (`note_bibliography.dart`). Styles: APA, MLA,
-  Chicago (author-date), Harvard, IEEE (numbered), BibTeX
-  (`citation_formatter.dart`, hand-written, not CSL).
+  the end in a chosen style (`note_bibliography.dart`). Styles come from
+  the CSL engine (v1.6), with the original hand-written formatters
+  (`citation_formatter.dart`) as fallbacks and for BibTeX.
 - **Synthesis matrix** (`features/projects/matrix*.dart`, tables
   `matrix_columns` / `matrix_cells`, schema v10): long-press a project chip
   → "Synthesis matrix". Papers × themes; tap a cell to write or pull a
@@ -167,8 +167,7 @@ the default screens until the user opts in by using the feature.
   from `assets/fonts/` (curly quotes and accents render), including the
   Italic and BoldItalic faces, so italics print as italics. Sketches
   export as "[Sketch]".
-- **Not done: real CSL/citeproc.** Styles are hand-written formatters;
-  fine for common cases, not a full CSL engine.
+- CSL styles: done in v1.6 (a subset of CSL 1.0.2; see there).
 
 ### v1.3 — iPad & pen (built, except as noted)
 - **Split view**: on wide windows (≥ 840 px) the paper screen shows "Read
@@ -269,17 +268,102 @@ the default screens until the user opts in by using the feature.
   real ones — don't make the defaults real. The widget shows "Continue
   reading" (newest `reading` paper, else newest with a `lastPage`),
   republished on a 2 s debounce only when it changes. Android widget
-  resources must be listed in `res/raw/keep.xml`. **iOS widget not
-  done**: needs a WidgetKit extension target named `CorplexWidget` plus
-  App Group `group.com.corplex.corplex` (`widgetAppGroupId`) on Runner
-  and the extension, created in Xcode; the Swift widget reads `title`,
-  `detail`, `uri` from that group's `UserDefaults`, uses `.widgetURL` for
-  the paper line and a `Link` to `corplex://new-note`. The Dart side is
-  ready.
+  resources must be listed in `res/raw/keep.xml`. The iOS widget is the
+  `CorplexWidget` extension (v1.6).
 - **Pointer hover**: a mouse/trackpad lifts an `OpenCard` slightly
   (`OpenCard.hoverLift`); touch and pen don't.
 - Untested on devices: the widget, shortcuts, thumbnails and the
   page-count hook (pdfium doesn't run under `flutter test`).
+
+### v1.6 — Research gaps & capture (built; untested on devices)
+- **Find in document** (`library/pdf_search.dart`): viewer search icon,
+  ⋮ → Find, or Cmd/Ctrl+F (wins over the shell's app search because the
+  viewer is a pushed route with its own `CallbackShortcuts`). "3 of 41",
+  Enter/Shift+Enter, 250 ms debounce, wrap-around; opening leaves focus
+  mode. `SearchMarks` paints matches via `pageOverlaysBuilder` only while
+  open. `DocumentSearch` reads through the `PageTextSource` seam
+  (`find(page, query)` → 0..1 rects); `PdfrxTextSource` is the text layer.
+  Test hooks: `searchSourceBuilder`, `onSearchReveal`, `textProbe`.
+- **Scanned PDFs / OCR** (`features/ocr/`, schema v13): `OcrEngine` is
+  on-device — Apple Vision in `AppDelegate.swift`, ML Kit Latin in
+  `OcrChannel.kt` (channel `corplex/ocr`). **No google_mlkit plugins**:
+  iOS builds use Swift Package Manager and CocoaPods isn't installed. Text
+  lives in local-only `ocr_pages`/`ocr_papers` (derived: not synced, not
+  backed up). `readPdfStart` OCRs pages 1–2 only when both lack a text
+  layer (`pageLacksTextLayer`), so identifier lookup works on scans;
+  `OcrService` queues the rest page by page and resumes via
+  `ocrStartupProvider` (read in `HomeShell`; inert with no scanned
+  papers). In the viewer (`ocr_search.dart`, `ocr_selection.dart`): Find
+  uses `OcrFallbackSource` (text layer first, OCR words where it has
+  none; "+" while OCR runs); long-press-and-drag on a scanned page selects
+  words → Highlight / Quote to note / Copy, creating ordinary `Highlights`
+  rows (`createOcrHighlight`); ⋮ → "Recognise text" only when the page has
+  no text layer and the paper isn't marked scanned; a quiet "Reading
+  text… N%" line while it runs.
+- **Export with highlights** (`library/annotated_pdf*.dart`): paper ⋮,
+  only with a local PDF and marks. A hand-written PDF *incremental update*
+  (not pdfium — pdfrx doesn't expose its annotation API, and this is
+  testable): `/Highlight` (QuadPoints, colour, comment as `/Contents`,
+  Multiply `/AP`) and `/Ink` annotations; classic xref tables, xref
+  streams and object streams; `PageGeometry` handles CropBox and /Rotate;
+  encrypted/damaged PDFs are refused. Verified with macOS PDFKit only.
+- **References / Cited by** (`library/openalex.dart`,
+  `citation_network_section.dart`): a collapsed row on papers with a DOI;
+  OpenAlex is asked only when it's opened (https, no personal data, no
+  `mailto`). `CitationCache`: one JSON per DOI in the cache folder,
+  30-day freshness, stale copy used offline. In-library items open; others
+  Add via `addPaperFromMetadata`. The Map draws dashed "cites" edges from
+  cached reference lists only (`GraphData.citationEdges`).
+- **Maths** (`notes/math_markers.dart`, `math_embed.dart`,
+  `math_render.dart`): stored as plain text — inline `$x$`, display as a
+  paragraph that is exactly `$$ … $$` — so search, preview, sync merge,
+  Markdown and old app versions see the source. The editor shows `math` /
+  `mathblock` embeds (flutter_math_fork); `mathToEmbeds`/`mathEmbedsToText`
+  wrap the citation conversions in `_editable()`/`_stored()`. Pandoc rules
+  (`findInlineMath`), so "$5 and $10" stays text. PDF export rasterises
+  (`renderMathPng`, falls back to source); DOCX writes the source in
+  Consolas (no OMML).
+- **Voice notes** (`features/voice/`): `/` → Voice note or the attach
+  sheet's "Record audio". `record` (AAC m4a) → podcast attachment +
+  `▸ 0:00 Voice note` link + transcript. iOS transcribes the file on
+  device (`SFSpeechURLRecognitionRequest`, `requiresOnDeviceRecognition`,
+  `corplex/speech` channel in `SceneDelegate.swift`). Android has no
+  on-device file transcription: Voice note is audio only, and `/` →
+  "Dictate" (`speech_to_text`, live, no audio) is offered instead. Seams:
+  `VoiceRecorder` / `Transcriber` / `Dictation`.
+- **Markdown vault export** (`export/vault_export.dart`, account sheet):
+  `Corplex/Notes/<Folder>/<Title>.md`, `Papers/@<citekey> <title>.md`
+  (frontmatter, highlights by page), `Attachments/`, `references.bib` with
+  citekeys as keys. Note links → `[[Title]]`, citations and page links →
+  `[[@key Title|@key]]` (rewritten in the Delta before `noteToMarkdown`,
+  which flattens internal links). PDFs only if the dialog switch is on.
+  Filenames sanitised and deduplicated oldest-first, stable between
+  exports. Built in memory.
+- **CSL styles** (`features/csl/`, `assets/csl/`): a hand-written CSL
+  1.0.2 processor (no Dart citeproc exists) with APA 7, MLA 9, Chicago
+  author-date, Harvard (Cite Them Right), IEEE, Vancouver (NLM), Nature,
+  Science, ACM and Elsevier Harvard (CC BY-SA 3.0, unmodified, see
+  `assets/csl/ATTRIBUTION.txt`; en-US locale only). `CitationStyle` is a
+  class; `formatCitation` stays sync and uses the hand-written formatter
+  until a style's CSL file has loaded (`ensureLoaded()`).
+  `pickCitationStyle` is the one picker (note and project bibliography,
+  export, the paper screen's "More…" chip) and "Add a style…" imports a
+  `.csl` per device. Exports follow the style (`buildStyledExportDoc`).
+  Not done: collapse by year, subsequent-author-substitute, locators,
+  other locales; editor citation chips stay author-year.
+- **iOS extensions** (`ios/ShareExtension`, `ios/CorplexWidget`, targets
+  added by `tool/ios/add_extensions.rb` with the `xcodeproj` gem — rerun
+  it rather than editing the pbxproj by hand). Both use App Group
+  `group.com.corplex.corplex` (entitlements on Runner and each
+  extension); Runner's `Info.plist` has `AppGroupId` and URL schemes
+  `corplex` (missing before — iOS widget/shortcut links couldn't open the
+  app) and `ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)`. The Share Extension
+  is a self-contained controller (SPM links the plugin only into Runner).
+  The embed phase must sit before "Thin Binary" or Xcode reports a cycle.
+  **Sideloading**: a free Apple ID allows 3 app IDs and each extension
+  uses one; AltStore may strip extensions and App Groups are unreliable on
+  free accounts, so without them the app works minus sharing and the
+  widget.
 
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This
@@ -813,10 +897,8 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   with an Open action. Android: intent filters for `SEND`
   (`application/pdf`, `audio/*`, `text/plain`) and `VIEW` on PDFs, and the
   activity is `singleTask` (required so a share reaches the running app).
-  **iOS is not done**: sharing *into* an iOS app needs a Share Extension
-  target created in Xcode (plus an App Group), which can't be scripted
-  here or tested without a device; `receive_sharing_intent`'s README lists
-  the steps. Until then iOS users import PDFs with the in-app picker.
+  iOS: the `ShareExtension` target (v1.6) writes the plugin's
+  `ShareKey` format into the App Group; untested on a device.
   **Testing IO in widget tests**: real file IO never completes under the
   fake clock, and each awaited step needs its own round trip — see
   `settle()` in `test/features/share/share_test.dart` (alternate `pump()`

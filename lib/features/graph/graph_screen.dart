@@ -165,19 +165,31 @@ class GraphCanvas extends StatelessWidget {
         }
         if (best != null) onTapNode(best);
       },
-      child: RepaintBoundary(child: CustomPaint(
-        size: size,
-        painter: _GraphPainter(
-          layout: layout,
-          visible: visible,
-          noteColor: c.primary,
-          paperColor: c.tertiary,
-          edgeColor: c.outlineVariant,
-          labelStyle: labelStyle,
-          direction: Directionality.of(context),
+      child: RepaintBoundary(
+        child: CustomPaint(
+          size: size,
+          painter: _GraphPainter(
+            layout: layout,
+            visible: visible,
+            noteColor: c.primary,
+            paperColor: c.tertiary,
+            edgeColor: c.outlineVariant,
+            labelStyle: labelStyle,
+            direction: Directionality.of(context),
+          ),
         ),
-      )),
+      ),
     );
+  }
+}
+
+void _dashedLine(Canvas canvas, Offset a, Offset b, Paint paint) {
+  const dash = 5.0, gap = 4.0;
+  final total = (b - a).distance;
+  if (total == 0) return;
+  final dir = (b - a) / total;
+  for (var d = 0.0; d < total; d += dash + gap) {
+    canvas.drawLine(a + dir * d, a + dir * math.min(d + dash, total), paint);
   }
 }
 
@@ -207,8 +219,21 @@ class _GraphPainter extends CustomPainter {
     final edgePaint = Paint()
       ..color = edgeColor
       ..strokeWidth = 1.2;
-    for (final (a, b) in data.edges) {
-      if (shown.contains(a) && shown.contains(b)) {
+    // Citations: dashed and fainter than links, in the paper colour.
+    final citePaint = Paint()
+      ..color = paperColor.withValues(alpha: 0.5)
+      ..strokeWidth = 1;
+    for (final e in data.edges) {
+      final (a, b) = e;
+      if (!shown.contains(a) || !shown.contains(b)) continue;
+      if (data.citationEdges.contains(e)) {
+        _dashedLine(
+          canvas,
+          layout.positions[a],
+          layout.positions[b],
+          citePaint,
+        );
+      } else {
         canvas.drawLine(layout.positions[a], layout.positions[b], edgePaint);
       }
     }

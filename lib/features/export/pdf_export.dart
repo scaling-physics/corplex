@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../notes/math_render.dart';
 import 'export_model.dart';
 
 /// Loads a bundled font file's bytes. Injectable so tests can read from
@@ -37,7 +38,36 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     lineSpacing: 3,
   );
 
+  // Equations are drawn up front (async); one that won't render falls back
+  // to its LaTeX source as text.
+  final maths = <String, MathImage?>{};
+  for (final b in doc.blocks) {
+    for (final r in b.runs) {
+      if (!r.math) continue;
+      final display = b.kind == BlockKind.displayMath;
+      maths['${display ? 'D' : 'I'}${r.text}'] ??= await renderMathPng(
+        r.text,
+        display: display,
+        fontSize: display ? 14 : 11,
+      );
+    }
+  }
+
   pw.InlineSpan span(Run r, double size, {bool forceBold = false}) {
+    if (r.math) {
+      final img = maths['I${r.text}'];
+      if (img == null) {
+        return pw.TextSpan(text: '\$${r.text}\$', style: style(size));
+      }
+      return pw.WidgetSpan(
+        baseline: img.descent,
+        child: pw.Image(
+          pw.MemoryImage(img.png),
+          width: img.width,
+          height: img.height,
+        ),
+      );
+    }
     return pw.TextSpan(
       text: r.link == null ? r.text : '${r.text} (${r.link})',
       style: style(
@@ -67,6 +97,22 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
       );
     }
 
+    if (b.kind == BlockKind.displayMath) {
+      final src = b.runs.isEmpty ? '' : b.runs.first.text;
+      final img = maths['D$src'];
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Center(
+          child: img == null
+              ? pw.Text(src, style: style(11, isItalic: true))
+              : pw.Image(
+                  pw.MemoryImage(img.png),
+                  width: img.width > 480 ? 480 : img.width,
+                  fit: pw.BoxFit.contain,
+                ),
+        ),
+      );
+    }
     return switch (b.kind) {
       BlockKind.heading1 => rich(20, isBold: true, before: 14, after: 6),
       BlockKind.heading2 => rich(16, isBold: true, before: 10, after: 4),
@@ -88,6 +134,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
         ),
         child: rich(11, after: 0),
       ),
+      BlockKind.displayMath => pw.SizedBox(),
       BlockKind.paragraph =>
         b.runs.every((r) => r.text.isEmpty) ? pw.SizedBox(height: 6) : rich(11),
     };

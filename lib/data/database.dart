@@ -15,6 +15,7 @@ import 'tables/highlights_table.dart';
 import 'tables/matrix_table.dart';
 import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
+import 'tables/ocr_table.dart';
 import 'tables/notes_table.dart';
 import 'tables/papers_table.dart';
 import 'tables/projects_table.dart';
@@ -40,6 +41,8 @@ part 'database.g.dart';
     MatrixColumns,
     MatrixCells,
     TrashItems,
+    OcrPages,
+    OcrPapers,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -60,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -192,6 +195,14 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(papers, papers.pageCount);
         }
         await _createSyncSchema(markExisting: false);
+      }
+      if (from < 13) {
+        // v13: local-only OCR text for scanned PDFs (derived, not synced).
+        for (final table in <TableInfo>[ocrPages, ocrPapers]) {
+          if (!await _hasTable(table.actualTableName)) {
+            await m.createTable(table);
+          }
+        }
       }
     },
   );

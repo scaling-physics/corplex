@@ -15,6 +15,8 @@ import '../../data/tables/attachments_table.dart';
 import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
+import '../voice/voice_services.dart' show dictationOfferedProvider;
+import '../voice/voice_sheet.dart';
 import '../export/export_actions.dart';
 import '../export/export_model.dart';
 import '../ink/sketch_embed.dart';
@@ -31,12 +33,14 @@ import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
 import 'cite_paper_sheet.dart';
 import 'citation_embed.dart';
+import '../csl/style_picker.dart';
+import 'math_embed.dart';
+import 'math_markers.dart';
 import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
 import 'note_templates.dart';
 import '../library/add_attachment_sheet.dart';
-import '../library/citation_formatter.dart';
 import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../library/paper_detail_screen.dart';
@@ -219,11 +223,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   /// The note as it is stored: citation chips written out as `[@key]`
   /// (see `citation_embed.dart`).
   String _stored() =>
-      citationEmbedsToText(encodeNoteContent(_quillController.document));
+      citationEmbedsToText(
+        mathEmbedsToText(encodeNoteContent(_quillController.document)),
+      );
 
   /// Stored content as the editor shows it, with citations as chips.
   static Document _editable(String stored) =>
-      decodeNoteContent(citationsToEmbeds(stored));
+      decodeNoteContent(citationsToEmbeds(mathToEmbeds(stored)));
 
   void _scheduleSave() {
     _debounce?.cancel();
@@ -298,6 +304,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       context,
       ref,
       noteId: widget.noteId,
+      onVoiceNote: _insertVoiceResult,
     );
     if (type != AttachmentType.podcast || !mounted) return;
     // Start what was just added, so "Mark" is usable straight away.
@@ -310,6 +317,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (latest != null && audioSourceOf(latest) != null) {
       await ref.read(audioPlaybackProvider).open(latest);
     }
+  }
+
+  /// Records a voice note (or dictates) and puts it at the cursor.
+  Future<void> _recordVoice(BuildContext context, VoiceMode mode) async {
+    final result = await showVoiceSheet(
+      context,
+      mode: mode,
+      noteId: widget.noteId,
+    );
+    if (result != null && mounted) _insertVoiceResult(result);
+  }
+
+  /// `▸ 0:00 Voice note` (a tappable link to the recording) and its
+  /// transcript, or just the text of a dictation.
+  void _insertVoiceResult(VoiceResult result) {
+    if (!mounted) return;
+    if (result.attachmentId case final id?) {
+      _insertTimestamp(id, Duration.zero);
+    }
+    insertVoiceText(_quillController, result);
+    reportVoiceResult(context, ref, result);
   }
 
   /// Opens a quoted paper at the cited page (the PDF if it's on this
@@ -418,6 +446,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             _offerPastedCitation(at, pasted, id);
             return;
           }
+        }
+        if (op.data == r'$') {
+          convertTypedDollar(context, _quillController, at);
+          return;
         }
         if (op.data == '[' || op.data == '@') end = at + 1;
         break;
@@ -533,7 +565,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             shrinkWrap: true,
             children: [
               for (final c in _Command.values)
-                ListTile(
+                if (c != _Command.dictate || ref.read(dictationOfferedProvider))
+                  ListTile(
                   leading: Icon(c.icon),
                   title: Text(c.label),
                   subtitle: Text(c.hint),
@@ -558,6 +591,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       switch (command) {
         case _Command.cite:
           await _citePaper(context);
+        case _Command.equation:
+          await insertDisplayMath(context, _quillController);
         case _Command.link:
           await _linkNote(context);
         case _Command.draw:
@@ -570,6 +605,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           await _addBibliography(context);
         case _Command.attach:
           await _attach(context);
+        case _Command.voice:
+          await _recordVoice(context, VoiceMode.voiceNote);
+        case _Command.dictate:
+          await _recordVoice(context, VoiceMode.dictate);
       }
     });
   }
@@ -599,21 +638,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   Future<void> _addBibliography(BuildContext context) async {
-    final style = await showDialog<CitationStyle>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Reference style'),
-        children: [
-          for (final s in CitationStyle.values.where(
-            (s) => s != CitationStyle.bibtex,
-          ))
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, s),
-              child: Text(s.label),
-            ),
-        ],
-      ),
-    );
+    final style = await pickCitationStyle(context);
     if (style == null || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final n = await insertBibliography(
@@ -1054,6 +1079,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       embedBuilders: const [
                         SketchEmbedBuilder(),
                         CitationEmbedBuilder(),
+                        MathInlineEmbedBuilder(),
+                        MathBlockEmbedBuilder(),
                       ],
                       // Audio timestamps play on a plain tap; other links
                       // keep Quill's default long-press menu.
@@ -1427,10 +1454,13 @@ enum _Command {
     'Insert a citation from your library',
     Icons.format_quote,
   ),
+  equation('Equation', r'LaTeX maths, or type $$', Icons.functions),
   link('Link to a note', 'Or type [[', Icons.link),
   draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
   heading('Heading', 'Make this line a heading', Icons.title),
   attach('Attach', 'Audio, an image or a file', Icons.attach_file),
+  voice('Voice note', 'Record a thought, written out for you', Icons.mic_none),
+  dictate('Dictate', 'Speak instead of typing', Icons.keyboard_voice_outlined),
   template(
     'Literature note template',
     'Summary, method, findings, critique',

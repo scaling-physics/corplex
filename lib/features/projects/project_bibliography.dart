@@ -6,7 +6,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/citation_formatter.dart';
-import '../library/citations.dart';
+import '../csl/csl_format.dart';
+import '../csl/style_picker.dart';
 
 /// The reference list of every paper in [project], as plain text.
 Future<String> projectBibliography(
@@ -23,7 +24,7 @@ Future<String> projectBibliography(
           ])..where(db.projectPapers.projectId.equals(project.id)))
           .map((r) => r.readTable(db.papers))
           .get();
-  return '${referenceList(papers, style).join('\n\n')}\n';
+  return '${(await referenceLines(papers, style)).join('\n\n')}\n';
 }
 
 /// Asks for a style, then shares the project's bibliography.
@@ -32,19 +33,7 @@ Future<void> shareProjectBibliography(
   WidgetRef ref,
   Project project,
 ) async {
-  final style = await showDialog<CitationStyle>(
-    context: context,
-    builder: (context) => SimpleDialog(
-      title: const Text('Reference style'),
-      children: [
-        for (final s in CitationStyle.values)
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, s),
-            child: Text(s.label),
-          ),
-      ],
-    ),
-  );
+  final style = await pickCitationStyle(context);
   if (style == null || !context.mounted) return;
   final text = await projectBibliography(
     ref.read(databaseProvider),

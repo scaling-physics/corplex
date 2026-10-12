@@ -3,6 +3,7 @@ import 'package:flutter_quill/quill_delta.dart';
 
 import '../../data/database.dart';
 import '../library/citation_formatter.dart';
+import '../csl/csl_format.dart';
 import '../library/citations.dart';
 import 'citation_embed.dart';
 
@@ -73,8 +74,26 @@ Future<int> insertBibliography(
     controller.replaceText(at, 0, gap, null);
     at += gap.length;
   }
-  final refs = referenceList(papers, style);
-  controller.replaceText(at, 0, '$referencesHeading\n${refs.join('\n')}', null);
+  final refs = await referenceEntries(papers, style);
+  final text =
+      '$referencesHeading\n${refs.map((r) => r.plainWithSuperscripts).join('\n')}';
+  controller.replaceText(at, 0, text, null);
   controller.formatText(at, referencesHeading.length, Attribute.h2);
+  // Italic titles and journal names, where the style asks for them.
+  var offset = at + referencesHeading.length + 1;
+  for (final r in refs) {
+    var local = 0;
+    for (final span in r.spans) {
+      final len = span.text.length;
+      if (span.italic && span.text.trim().isNotEmpty) {
+        controller.formatText(offset + local, len, Attribute.italic);
+      }
+      if (span.bold && span.text.trim().isNotEmpty) {
+        controller.formatText(offset + local, len, Attribute.bold);
+      }
+      local += len;
+    }
+    offset += r.plainWithSuperscripts.length + 1;
+  }
   return refs.length;
 }

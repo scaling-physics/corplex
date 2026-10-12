@@ -9,6 +9,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import '../../data/tables/attachments_table.dart';
+import '../voice/voice_sheet.dart';
 
 /// Records an attachment for a note and/or a paper and returns its id.
 /// Kept free of UI so it can be tested and reused (e.g. by share import).
@@ -48,6 +49,7 @@ Future<AttachmentType?> showAddAttachmentSheet(
   WidgetRef ref, {
   String? paperId,
   String? noteId,
+  void Function(VoiceResult result)? onVoiceNote,
 }) {
   final db = ref.read(databaseProvider);
   Future<String> insert({
@@ -74,34 +76,58 @@ Future<AttachmentType?> showAddAttachmentSheet(
       }
 
       return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.headphones_outlined),
-              title: const Text('Audio'),
-              subtitle: const Text(
-                'A NotebookLM audio overview, lecture or podcast file',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.headphones_outlined),
+                title: const Text('Audio'),
+                subtitle: const Text(
+                  'A NotebookLM audio overview, lecture or podcast file',
+                ),
+                onTap: () => run(() => _addAudio(insert)),
               ),
-              onTap: () => run(() => _addAudio(insert)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.podcasts),
-              title: const Text('Podcast link'),
-              subtitle: const Text('A NotebookLM share link or audio URL'),
-              onTap: () => run(() => _addPodcastLink(sheetContext, insert)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.image_outlined),
-              title: const Text('Image'),
-              onTap: () => run(() => _addImage(insert)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.attach_file),
-              title: const Text('File'),
-              onTap: () => run(() => _addFile(insert)),
-            ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.mic_none),
+                title: const Text('Record audio'),
+                subtitle: const Text(
+                  'A voice note, transcribed on this device',
+                ),
+                onTap: () => run(() async {
+                  final result = await showVoiceSheet(
+                    sheetContext,
+                    noteId: noteId,
+                    paperId: paperId,
+                  );
+                  if (result == null) return null;
+                  // A note takes the link and text itself; the caller then
+                  // has nothing to start playing.
+                  if (onVoiceNote != null) {
+                    onVoiceNote(result);
+                    return null;
+                  }
+                  return AttachmentType.podcast;
+                }),
+              ),
+              ListTile(
+                leading: const Icon(Icons.podcasts),
+                title: const Text('Podcast link'),
+                subtitle: const Text('A NotebookLM share link or audio URL'),
+                onTap: () => run(() => _addPodcastLink(sheetContext, insert)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.image_outlined),
+                title: const Text('Image'),
+                onTap: () => run(() => _addImage(insert)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.attach_file),
+                title: const Text('File'),
+                onTap: () => run(() => _addFile(insert)),
+              ),
+            ],
+          ),
         ),
       );
     },

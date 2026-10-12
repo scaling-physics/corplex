@@ -177,7 +177,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Cite a paper'), findsOneWidget);
     expect(find.text('Literature note template'), findsOneWidget);
-    await tester.tapAt(const Offset(20, 20));
+    // The list now fills the screen, so there is no barrier left to tap.
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(controller.document.toPlainText(), 'and/or /\n');
 

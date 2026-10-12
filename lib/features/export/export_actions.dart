@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../data/database.dart';
+import '../csl/csl_format.dart';
+import '../csl/csl_rich.dart';
+import '../csl/style_picker.dart';
 import '../library/citation_formatter.dart';
+import '../library/citations.dart';
+import '../notes/note_content.dart';
 import 'docx_export.dart';
 import 'export_model.dart';
 import 'markdown_export.dart';
@@ -82,17 +88,12 @@ class _ExportSheetState extends State<_ExportSheet> {
         children: [
           ListTile(
             title: const Text('Citations and references'),
-            trailing: DropdownButton<CitationStyle>(
-              value: _style,
-              underline: const SizedBox.shrink(),
-              items: [
-                for (final s in CitationStyle.values.where(
-                  (s) => s != CitationStyle.bibtex,
-                ))
-                  DropdownMenuItem(value: s, child: Text(s.label)),
-              ],
-              onChanged: (s) => setState(() => _style = s ?? _style),
-            ),
+            subtitle: Text(_style.label),
+            trailing: const Icon(Icons.expand_more),
+            onTap: () async {
+              final picked = await pickCitationStyle(context);
+              if (picked != null) setState(() => _style = picked);
+            },
           ),
           for (final f in ExportFormat.values)
             ListTile(
@@ -140,7 +141,7 @@ Future<void> exportNotes(
 }) async {
   final choice = await showExportSheet(context);
   if (choice == null || !context.mounted) return;
-  final doc = await buildExportDoc(
+  final doc = await buildStyledExportDoc(
     db,
     notes,
     title: title,
@@ -148,4 +149,74 @@ Future<void> exportNotes(
   );
   if (!context.mounted) return;
   await shareExport(context, doc, choice.format);
+}
+
+/// Like [buildExportDoc], but a CSL style (bundled or imported) formats the
+/// in-text citations and the reference list with its real rules: numbered
+/// styles number in order of first citation, author-date styles get
+/// 2017a/2017b where needed. Other styles go through [buildExportDoc].
+Future<ExportDoc> buildStyledExportDoc(
+  AppDatabase db,
+  List<ExportNote> notes, {
+  required String title,
+  required CitationStyle style,
+}) async {
+  if (!style.isCsl) {
+    return buildExportDoc(db, notes, title: title, style: style);
+  }
+  // Read each note's text pieces once, in order.
+  final deltas = [
+    for (final n in notes)
+      [
+        for (final op in decodeNoteContent(n.content).toDelta().toList())
+          op.toJson(),
+      ],
+  ];
+  String? textOf(Map op) =>
+      op['insert'] is String ? op['insert'] as String : null;
+  final pieces = <String>[];
+  final keys = <String>[];
+  for (final ops in deltas) {
+    for (final op in ops) {
+      final t = textOf(op);
+      if (t == null) continue;
+      pieces.add(t);
+      for (final k in citedKeys(t)) {
+        if (!keys.contains(k)) keys.add(k);
+      }
+    }
+  }
+  final papers = await papersForCitekeys(db, keys);
+  final plan = await CslCitationPlan.build(pieces, {
+    for (final p in papers) p.citekey!: p,
+  }, style);
+  if (plan == null) {
+    return buildExportDoc(db, notes, title: title, style: style);
+  }
+  final rewritten = <ExportNote>[];
+  for (var i = 0; i < notes.length; i++) {
+    for (final op in deltas[i]) {
+      final t = textOf(op);
+      if (t != null) op['insert'] = plan.replace(t);
+    }
+    rewritten.add(ExportNote(notes[i].title, jsonEncode(deltas[i])));
+  }
+  final doc = await buildExportDoc(db, rewritten, title: title);
+  if (plan.cited.isEmpty) return doc;
+  final refs = await referenceEntries(plan.cited, style);
+  return ExportDoc(title, [
+    ...doc.blocks,
+    const ExportBlock(BlockKind.heading2, [Run('References')]),
+    for (final r in refs)
+      ExportBlock(BlockKind.paragraph, [
+        for (final span in r.spans)
+          Run(
+            span.vAlign == 1
+                ? CslRich([span]).plainWithSuperscripts
+                : span.text,
+            italic: span.italic,
+            bold: span.bold,
+          ),
+      ]),
+  ]);
 }

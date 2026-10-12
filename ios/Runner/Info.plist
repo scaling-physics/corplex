@@ -28,8 +28,37 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>AppGroupId</key>
+	<string>group.com.corplex.corplex</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>corplex</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>corplex</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>share-extension</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Corplex uses the microphone to record voice notes.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Corplex turns your voice notes into text on this device.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Corplex needs photo access to attach images to your notes and papers.</string>
 	<key>UIApplicationSceneManifest</key>

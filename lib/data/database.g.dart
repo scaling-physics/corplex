@@ -6054,6 +6054,650 @@ class TrashItemsCompanion extends UpdateCompanion<TrashItem> {
   }
 }
 
+class $OcrPagesTable extends OcrPages with TableInfo<$OcrPagesTable, OcrPage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OcrPagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _paperIdMeta = const VerificationMeta(
+    'paperId',
+  );
+  @override
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
+    'paper_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES papers (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _pageNumberMeta = const VerificationMeta(
+    'pageNumber',
+  );
+  @override
+  late final GeneratedColumn<int> pageNumber = GeneratedColumn<int>(
+    'page_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _wordsJsonMeta = const VerificationMeta(
+    'wordsJson',
+  );
+  @override
+  late final GeneratedColumn<String> wordsJson = GeneratedColumn<String>(
+    'words_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    paperId,
+    pageNumber,
+    content,
+    wordsJson,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ocr_pages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OcrPage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('paper_id')) {
+      context.handle(
+        _paperIdMeta,
+        paperId.isAcceptableOrUnknown(data['paper_id']!, _paperIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paperIdMeta);
+    }
+    if (data.containsKey('page_number')) {
+      context.handle(
+        _pageNumberMeta,
+        pageNumber.isAcceptableOrUnknown(data['page_number']!, _pageNumberMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pageNumberMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    }
+    if (data.containsKey('words_json')) {
+      context.handle(
+        _wordsJsonMeta,
+        wordsJson.isAcceptableOrUnknown(data['words_json']!, _wordsJsonMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {paperId, pageNumber};
+  @override
+  OcrPage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OcrPage(
+      paperId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paper_id'],
+      )!,
+      pageNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_number'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      wordsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}words_json'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $OcrPagesTable createAlias(String alias) {
+    return $OcrPagesTable(attachedDatabase, alias);
+  }
+}
+
+class OcrPage extends DataClass implements Insertable<OcrPage> {
+  final String paperId;
+
+  /// 1-based, like `Highlights.pageNumber`.
+  final int pageNumber;
+
+  /// The page's recognised text, lines joined by newlines. Empty for a
+  /// page with nothing to read (it is still recorded as done).
+  final String content;
+
+  /// Lines and words with boxes as fractions (0..1) of the page; see
+  /// `OcrPageText` in `lib/features/ocr/ocr_engine.dart`.
+  final String wordsJson;
+  final DateTime createdAt;
+  const OcrPage({
+    required this.paperId,
+    required this.pageNumber,
+    required this.content,
+    required this.wordsJson,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['paper_id'] = Variable<String>(paperId);
+    map['page_number'] = Variable<int>(pageNumber);
+    map['content'] = Variable<String>(content);
+    map['words_json'] = Variable<String>(wordsJson);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  OcrPagesCompanion toCompanion(bool nullToAbsent) {
+    return OcrPagesCompanion(
+      paperId: Value(paperId),
+      pageNumber: Value(pageNumber),
+      content: Value(content),
+      wordsJson: Value(wordsJson),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory OcrPage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OcrPage(
+      paperId: serializer.fromJson<String>(json['paperId']),
+      pageNumber: serializer.fromJson<int>(json['pageNumber']),
+      content: serializer.fromJson<String>(json['content']),
+      wordsJson: serializer.fromJson<String>(json['wordsJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'paperId': serializer.toJson<String>(paperId),
+      'pageNumber': serializer.toJson<int>(pageNumber),
+      'content': serializer.toJson<String>(content),
+      'wordsJson': serializer.toJson<String>(wordsJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  OcrPage copyWith({
+    String? paperId,
+    int? pageNumber,
+    String? content,
+    String? wordsJson,
+    DateTime? createdAt,
+  }) => OcrPage(
+    paperId: paperId ?? this.paperId,
+    pageNumber: pageNumber ?? this.pageNumber,
+    content: content ?? this.content,
+    wordsJson: wordsJson ?? this.wordsJson,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  OcrPage copyWithCompanion(OcrPagesCompanion data) {
+    return OcrPage(
+      paperId: data.paperId.present ? data.paperId.value : this.paperId,
+      pageNumber: data.pageNumber.present
+          ? data.pageNumber.value
+          : this.pageNumber,
+      content: data.content.present ? data.content.value : this.content,
+      wordsJson: data.wordsJson.present ? data.wordsJson.value : this.wordsJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OcrPage(')
+          ..write('paperId: $paperId, ')
+          ..write('pageNumber: $pageNumber, ')
+          ..write('content: $content, ')
+          ..write('wordsJson: $wordsJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(paperId, pageNumber, content, wordsJson, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OcrPage &&
+          other.paperId == this.paperId &&
+          other.pageNumber == this.pageNumber &&
+          other.content == this.content &&
+          other.wordsJson == this.wordsJson &&
+          other.createdAt == this.createdAt);
+}
+
+class OcrPagesCompanion extends UpdateCompanion<OcrPage> {
+  final Value<String> paperId;
+  final Value<int> pageNumber;
+  final Value<String> content;
+  final Value<String> wordsJson;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const OcrPagesCompanion({
+    this.paperId = const Value.absent(),
+    this.pageNumber = const Value.absent(),
+    this.content = const Value.absent(),
+    this.wordsJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OcrPagesCompanion.insert({
+    required String paperId,
+    required int pageNumber,
+    this.content = const Value.absent(),
+    this.wordsJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : paperId = Value(paperId),
+       pageNumber = Value(pageNumber);
+  static Insertable<OcrPage> custom({
+    Expression<String>? paperId,
+    Expression<int>? pageNumber,
+    Expression<String>? content,
+    Expression<String>? wordsJson,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (paperId != null) 'paper_id': paperId,
+      if (pageNumber != null) 'page_number': pageNumber,
+      if (content != null) 'content': content,
+      if (wordsJson != null) 'words_json': wordsJson,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OcrPagesCompanion copyWith({
+    Value<String>? paperId,
+    Value<int>? pageNumber,
+    Value<String>? content,
+    Value<String>? wordsJson,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return OcrPagesCompanion(
+      paperId: paperId ?? this.paperId,
+      pageNumber: pageNumber ?? this.pageNumber,
+      content: content ?? this.content,
+      wordsJson: wordsJson ?? this.wordsJson,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (paperId.present) {
+      map['paper_id'] = Variable<String>(paperId.value);
+    }
+    if (pageNumber.present) {
+      map['page_number'] = Variable<int>(pageNumber.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (wordsJson.present) {
+      map['words_json'] = Variable<String>(wordsJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OcrPagesCompanion(')
+          ..write('paperId: $paperId, ')
+          ..write('pageNumber: $pageNumber, ')
+          ..write('content: $content, ')
+          ..write('wordsJson: $wordsJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $OcrPapersTable extends OcrPapers
+    with TableInfo<$OcrPapersTable, OcrPaper> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OcrPapersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _paperIdMeta = const VerificationMeta(
+    'paperId',
+  );
+  @override
+  late final GeneratedColumn<String> paperId = GeneratedColumn<String>(
+    'paper_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES papers (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _pageCountMeta = const VerificationMeta(
+    'pageCount',
+  );
+  @override
+  late final GeneratedColumn<int> pageCount = GeneratedColumn<int>(
+    'page_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _donePagesMeta = const VerificationMeta(
+    'donePages',
+  );
+  @override
+  late final GeneratedColumn<int> donePages = GeneratedColumn<int>(
+    'done_pages',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [paperId, pageCount, donePages];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ocr_papers';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OcrPaper> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('paper_id')) {
+      context.handle(
+        _paperIdMeta,
+        paperId.isAcceptableOrUnknown(data['paper_id']!, _paperIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paperIdMeta);
+    }
+    if (data.containsKey('page_count')) {
+      context.handle(
+        _pageCountMeta,
+        pageCount.isAcceptableOrUnknown(data['page_count']!, _pageCountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pageCountMeta);
+    }
+    if (data.containsKey('done_pages')) {
+      context.handle(
+        _donePagesMeta,
+        donePages.isAcceptableOrUnknown(data['done_pages']!, _donePagesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {paperId};
+  @override
+  OcrPaper map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OcrPaper(
+      paperId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paper_id'],
+      )!,
+      pageCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_count'],
+      )!,
+      donePages: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}done_pages'],
+      )!,
+    );
+  }
+
+  @override
+  $OcrPapersTable createAlias(String alias) {
+    return $OcrPapersTable(attachedDatabase, alias);
+  }
+}
+
+class OcrPaper extends DataClass implements Insertable<OcrPaper> {
+  final String paperId;
+  final int pageCount;
+
+  /// Pages handled in order from the first (recognised, or skipped because
+  /// they have a text layer). Done when it reaches [pageCount].
+  final int donePages;
+  const OcrPaper({
+    required this.paperId,
+    required this.pageCount,
+    required this.donePages,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['paper_id'] = Variable<String>(paperId);
+    map['page_count'] = Variable<int>(pageCount);
+    map['done_pages'] = Variable<int>(donePages);
+    return map;
+  }
+
+  OcrPapersCompanion toCompanion(bool nullToAbsent) {
+    return OcrPapersCompanion(
+      paperId: Value(paperId),
+      pageCount: Value(pageCount),
+      donePages: Value(donePages),
+    );
+  }
+
+  factory OcrPaper.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OcrPaper(
+      paperId: serializer.fromJson<String>(json['paperId']),
+      pageCount: serializer.fromJson<int>(json['pageCount']),
+      donePages: serializer.fromJson<int>(json['donePages']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'paperId': serializer.toJson<String>(paperId),
+      'pageCount': serializer.toJson<int>(pageCount),
+      'donePages': serializer.toJson<int>(donePages),
+    };
+  }
+
+  OcrPaper copyWith({String? paperId, int? pageCount, int? donePages}) =>
+      OcrPaper(
+        paperId: paperId ?? this.paperId,
+        pageCount: pageCount ?? this.pageCount,
+        donePages: donePages ?? this.donePages,
+      );
+  OcrPaper copyWithCompanion(OcrPapersCompanion data) {
+    return OcrPaper(
+      paperId: data.paperId.present ? data.paperId.value : this.paperId,
+      pageCount: data.pageCount.present ? data.pageCount.value : this.pageCount,
+      donePages: data.donePages.present ? data.donePages.value : this.donePages,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OcrPaper(')
+          ..write('paperId: $paperId, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('donePages: $donePages')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(paperId, pageCount, donePages);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OcrPaper &&
+          other.paperId == this.paperId &&
+          other.pageCount == this.pageCount &&
+          other.donePages == this.donePages);
+}
+
+class OcrPapersCompanion extends UpdateCompanion<OcrPaper> {
+  final Value<String> paperId;
+  final Value<int> pageCount;
+  final Value<int> donePages;
+  final Value<int> rowid;
+  const OcrPapersCompanion({
+    this.paperId = const Value.absent(),
+    this.pageCount = const Value.absent(),
+    this.donePages = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OcrPapersCompanion.insert({
+    required String paperId,
+    required int pageCount,
+    this.donePages = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : paperId = Value(paperId),
+       pageCount = Value(pageCount);
+  static Insertable<OcrPaper> custom({
+    Expression<String>? paperId,
+    Expression<int>? pageCount,
+    Expression<int>? donePages,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (paperId != null) 'paper_id': paperId,
+      if (pageCount != null) 'page_count': pageCount,
+      if (donePages != null) 'done_pages': donePages,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OcrPapersCompanion copyWith({
+    Value<String>? paperId,
+    Value<int>? pageCount,
+    Value<int>? donePages,
+    Value<int>? rowid,
+  }) {
+    return OcrPapersCompanion(
+      paperId: paperId ?? this.paperId,
+      pageCount: pageCount ?? this.pageCount,
+      donePages: donePages ?? this.donePages,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (paperId.present) {
+      map['paper_id'] = Variable<String>(paperId.value);
+    }
+    if (pageCount.present) {
+      map['page_count'] = Variable<int>(pageCount.value);
+    }
+    if (donePages.present) {
+      map['done_pages'] = Variable<int>(donePages.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OcrPapersCompanion(')
+          ..write('paperId: $paperId, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('donePages: $donePages, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6072,6 +6716,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MatrixColumnsTable matrixColumns = $MatrixColumnsTable(this);
   late final $MatrixCellsTable matrixCells = $MatrixCellsTable(this);
   late final $TrashItemsTable trashItems = $TrashItemsTable(this);
+  late final $OcrPagesTable ocrPages = $OcrPagesTable(this);
+  late final $OcrPapersTable ocrPapers = $OcrPapersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6092,6 +6738,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     matrixColumns,
     matrixCells,
     trashItems,
+    ocrPages,
+    ocrPapers,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -6206,6 +6854,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('matrix_cells', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'papers',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('ocr_pages', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'papers',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('ocr_papers', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -7341,6 +8003,43 @@ final class $$PapersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$OcrPagesTable, List<OcrPage>> _ocrPagesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.ocrPages,
+    aliasName: 'papers__id__ocr_pages__paper_id',
+  );
+
+  $$OcrPagesTableProcessedTableManager get ocrPagesRefs {
+    final manager = $$OcrPagesTableTableManager(
+      $_db,
+      $_db.ocrPages,
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_ocrPagesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$OcrPapersTable, List<OcrPaper>>
+  _ocrPapersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.ocrPapers,
+    aliasName: 'papers__id__ocr_papers__paper_id',
+  );
+
+  $$OcrPapersTableProcessedTableManager get ocrPapersRefs {
+    final manager = $$OcrPapersTableTableManager(
+      $_db,
+      $_db.ocrPapers,
+    ).filter((f) => f.paperId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_ocrPapersRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PapersTableFilterComposer
@@ -7569,6 +8268,56 @@ class $$PapersTableFilterComposer
           }) => $$MatrixCellsTableFilterComposer(
             $db: $db,
             $table: $db.matrixCells,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> ocrPagesRefs(
+    Expression<bool> Function($$OcrPagesTableFilterComposer f) f,
+  ) {
+    final $$OcrPagesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ocrPages,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$OcrPagesTableFilterComposer(
+            $db: $db,
+            $table: $db.ocrPages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> ocrPapersRefs(
+    Expression<bool> Function($$OcrPapersTableFilterComposer f) f,
+  ) {
+    final $$OcrPapersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ocrPapers,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$OcrPapersTableFilterComposer(
+            $db: $db,
+            $table: $db.ocrPapers,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -7872,6 +8621,56 @@ class $$PapersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> ocrPagesRefs<T extends Object>(
+    Expression<T> Function($$OcrPagesTableAnnotationComposer a) f,
+  ) {
+    final $$OcrPagesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ocrPages,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$OcrPagesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.ocrPages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> ocrPapersRefs<T extends Object>(
+    Expression<T> Function($$OcrPapersTableAnnotationComposer a) f,
+  ) {
+    final $$OcrPapersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ocrPapers,
+      getReferencedColumn: (t) => t.paperId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$OcrPapersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.ocrPapers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PapersTableTableManager
@@ -7894,6 +8693,8 @@ class $$PapersTableTableManager
             bool highlightsRefs,
             bool projectPapersRefs,
             bool matrixCellsRefs,
+            bool ocrPagesRefs,
+            bool ocrPapersRefs,
           })
         > {
   $$PapersTableTableManager(_$AppDatabase db, $PapersTable table)
@@ -7995,6 +8796,8 @@ class $$PapersTableTableManager
                 highlightsRefs = false,
                 projectPapersRefs = false,
                 matrixCellsRefs = false,
+                ocrPagesRefs = false,
+                ocrPapersRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -8005,6 +8808,8 @@ class $$PapersTableTableManager
                     if (highlightsRefs) db.highlights,
                     if (projectPapersRefs) db.projectPapers,
                     if (matrixCellsRefs) db.matrixCells,
+                    if (ocrPagesRefs) db.ocrPages,
+                    if (ocrPapersRefs) db.ocrPapers,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -8135,6 +8940,44 @@ class $$PapersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (ocrPagesRefs)
+                        await $_getPrefetchedData<Paper, $PapersTable, OcrPage>(
+                          currentTable: table,
+                          referencedTable: $$PapersTableReferences
+                              ._ocrPagesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PapersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).ocrPagesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.paperId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (ocrPapersRefs)
+                        await $_getPrefetchedData<
+                          Paper,
+                          $PapersTable,
+                          OcrPaper
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PapersTableReferences
+                              ._ocrPapersRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PapersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).ocrPapersRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.paperId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -8162,6 +9005,8 @@ typedef $$PapersTableProcessedTableManager =
         bool highlightsRefs,
         bool projectPapersRefs,
         bool matrixCellsRefs,
+        bool ocrPagesRefs,
+        bool ocrPapersRefs,
       })
     >;
 typedef $$AttachmentsTableCreateCompanionBuilder =
@@ -12648,6 +13493,596 @@ typedef $$TrashItemsTableProcessedTableManager =
       TrashItem,
       PrefetchHooks Function()
     >;
+typedef $$OcrPagesTableCreateCompanionBuilder = OcrPagesCompanion Function({
+  required String paperId,
+  required int pageNumber,
+  Value<String> content,
+  Value<String> wordsJson,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$OcrPagesTableUpdateCompanionBuilder = OcrPagesCompanion Function({
+  Value<String> paperId,
+  Value<int> pageNumber,
+  Value<String> content,
+  Value<String> wordsJson,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+final class $$OcrPagesTableReferences
+    extends BaseReferences<_$AppDatabase, $OcrPagesTable, OcrPage> {
+  $$OcrPagesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PapersTable _paperIdTable(_$AppDatabase db) =>
+      db.papers.createAlias('ocr_pages__paper_id__papers__id');
+
+  $$PapersTableProcessedTableManager get paperId {
+    final $_column = $_itemColumn<String>('paper_id')!;
+
+    final manager = $$PapersTableTableManager(
+      $_db,
+      $_db.papers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_paperIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$OcrPagesTableFilterComposer
+    extends Composer<_$AppDatabase, $OcrPagesTable> {
+  $$OcrPagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get wordsJson => $composableBuilder(
+    column: $table.wordsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PapersTableFilterComposer get paperId {
+    final $$PapersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableFilterComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$OcrPagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $OcrPagesTable> {
+  $$OcrPagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get wordsJson => $composableBuilder(
+    column: $table.wordsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PapersTableOrderingComposer get paperId {
+    final $$PapersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableOrderingComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$OcrPagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OcrPagesTable> {
+  $$OcrPagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get pageNumber => $composableBuilder(
+    column: $table.pageNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get wordsJson =>
+      $composableBuilder(column: $table.wordsJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PapersTableAnnotationComposer get paperId {
+    final $$PapersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$OcrPagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OcrPagesTable,
+          OcrPage,
+          $$OcrPagesTableFilterComposer,
+          $$OcrPagesTableOrderingComposer,
+          $$OcrPagesTableAnnotationComposer,
+          $$OcrPagesTableCreateCompanionBuilder,
+          $$OcrPagesTableUpdateCompanionBuilder,
+          (OcrPage, $$OcrPagesTableReferences),
+          OcrPage,
+          PrefetchHooks Function({bool paperId})
+        > {
+  $$OcrPagesTableTableManager(_$AppDatabase db, $OcrPagesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OcrPagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OcrPagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OcrPagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> paperId = const Value.absent(),
+                Value<int> pageNumber = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String> wordsJson = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OcrPagesCompanion(
+                paperId: paperId,
+                pageNumber: pageNumber,
+                content: content,
+                wordsJson: wordsJson,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String paperId,
+                required int pageNumber,
+                Value<String> content = const Value.absent(),
+                Value<String> wordsJson = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OcrPagesCompanion.insert(
+                paperId: paperId,
+                pageNumber: pageNumber,
+                content: content,
+                wordsJson: wordsJson,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$OcrPagesTable, OcrPage>(table),
+                  $$OcrPagesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({paperId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (paperId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.paperId,
+                        referencedTable: $$OcrPagesTableReferences
+                            ._paperIdTable(db),
+                        referencedColumn: $$OcrPagesTableReferences
+                            ._paperIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$OcrPagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OcrPagesTable,
+      OcrPage,
+      $$OcrPagesTableFilterComposer,
+      $$OcrPagesTableOrderingComposer,
+      $$OcrPagesTableAnnotationComposer,
+      $$OcrPagesTableCreateCompanionBuilder,
+      $$OcrPagesTableUpdateCompanionBuilder,
+      (OcrPage, $$OcrPagesTableReferences),
+      OcrPage,
+      PrefetchHooks Function({bool paperId})
+    >;
+typedef $$OcrPapersTableCreateCompanionBuilder = OcrPapersCompanion Function({
+  required String paperId,
+  required int pageCount,
+  Value<int> donePages,
+  Value<int> rowid,
+});
+typedef $$OcrPapersTableUpdateCompanionBuilder = OcrPapersCompanion Function({
+  Value<String> paperId,
+  Value<int> pageCount,
+  Value<int> donePages,
+  Value<int> rowid,
+});
+
+final class $$OcrPapersTableReferences
+    extends BaseReferences<_$AppDatabase, $OcrPapersTable, OcrPaper> {
+  $$OcrPapersTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PapersTable _paperIdTable(_$AppDatabase db) =>
+      db.papers.createAlias('ocr_papers__paper_id__papers__id');
+
+  $$PapersTableProcessedTableManager get paperId {
+    final $_column = $_itemColumn<String>('paper_id')!;
+
+    final manager = $$PapersTableTableManager(
+      $_db,
+      $_db.papers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_paperIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$OcrPapersTableFilterComposer
+    extends Composer<_$AppDatabase, $OcrPapersTable> {
+  $$OcrPapersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get donePages => $composableBuilder(
+    column: $table.donePages,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PapersTableFilterComposer get paperId {
+    final $$PapersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableFilterComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$OcrPapersTableOrderingComposer
+    extends Composer<_$AppDatabase, $OcrPapersTable> {
+  $$OcrPapersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get donePages => $composableBuilder(
+    column: $table.donePages,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PapersTableOrderingComposer get paperId {
+    final $$PapersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableOrderingComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$OcrPapersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OcrPapersTable> {
+  $$OcrPapersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get pageCount =>
+      $composableBuilder(column: $table.pageCount, builder: (column) => column);
+
+  GeneratedColumn<int> get donePages =>
+      $composableBuilder(column: $table.donePages, builder: (column) => column);
+
+  $$PapersTableAnnotationComposer get paperId {
+    final $$PapersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.paperId,
+      referencedTable: $db.papers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PapersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.papers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$OcrPapersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OcrPapersTable,
+          OcrPaper,
+          $$OcrPapersTableFilterComposer,
+          $$OcrPapersTableOrderingComposer,
+          $$OcrPapersTableAnnotationComposer,
+          $$OcrPapersTableCreateCompanionBuilder,
+          $$OcrPapersTableUpdateCompanionBuilder,
+          (OcrPaper, $$OcrPapersTableReferences),
+          OcrPaper,
+          PrefetchHooks Function({bool paperId})
+        > {
+  $$OcrPapersTableTableManager(_$AppDatabase db, $OcrPapersTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OcrPapersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OcrPapersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OcrPapersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> paperId = const Value.absent(),
+                Value<int> pageCount = const Value.absent(),
+                Value<int> donePages = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OcrPapersCompanion(
+                paperId: paperId,
+                pageCount: pageCount,
+                donePages: donePages,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String paperId,
+                required int pageCount,
+                Value<int> donePages = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OcrPapersCompanion.insert(
+                paperId: paperId,
+                pageCount: pageCount,
+                donePages: donePages,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$OcrPapersTable, OcrPaper>(table),
+                  $$OcrPapersTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({paperId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (paperId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.paperId,
+                        referencedTable: $$OcrPapersTableReferences
+                            ._paperIdTable(db),
+                        referencedColumn: $$OcrPapersTableReferences
+                            ._paperIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$OcrPapersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OcrPapersTable,
+      OcrPaper,
+      $$OcrPapersTableFilterComposer,
+      $$OcrPapersTableOrderingComposer,
+      $$OcrPapersTableAnnotationComposer,
+      $$OcrPapersTableCreateCompanionBuilder,
+      $$OcrPapersTableUpdateCompanionBuilder,
+      (OcrPaper, $$OcrPapersTableReferences),
+      OcrPaper,
+      PrefetchHooks Function({bool paperId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -12681,4 +14116,8 @@ class $AppDatabaseManager {
       $$MatrixCellsTableTableManager(_db, _db.matrixCells);
   $$TrashItemsTableTableManager get trashItems =>
       $$TrashItemsTableTableManager(_db, _db.trashItems);
+  $$OcrPagesTableTableManager get ocrPages =>
+      $$OcrPagesTableTableManager(_db, _db.ocrPages);
+  $$OcrPapersTableTableManager get ocrPapers =>
+      $$OcrPapersTableTableManager(_db, _db.ocrPapers);
 }

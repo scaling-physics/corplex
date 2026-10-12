@@ -23,6 +23,14 @@ List<int> exportToDocx(ExportDoc doc) {
       ]),
       BlockKind.quote => _para('Quote', b.runs),
       BlockKind.paragraph => _para(null, b.runs),
+      // Word can't take LaTeX directly; the source goes in as monospace
+      // text, centred (Word's equation box accepts pasted LaTeX).
+      BlockKind.displayMath => _para(
+        null,
+        [Run('\$\$ ${b.text} \$\$', math: true)],
+        centered: true,
+        wrap: false,
+      ),
     });
   }
 
@@ -47,15 +55,25 @@ List<int> exportToDocx(ExportDoc doc) {
 
 const _ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
-String _para(String? style, List<Run> runs) {
-  final pPr = style == null ? '' : '<w:pPr><w:pStyle w:val="$style"/></w:pPr>';
-  return '<w:p>$pPr${runs.map(_run).join()}</w:p>';
+String _para(
+  String? style,
+  List<Run> runs, {
+  bool centered = false,
+  bool wrap = true,
+}) {
+  final pPr = style == null && !centered
+      ? ''
+      : '<w:pPr>${style == null ? '' : '<w:pStyle w:val="$style"/>'}'
+            '${centered ? '<w:jc w:val="center"/>' : ''}</w:pPr>';
+  return '<w:p>$pPr${runs.map((r) => _run(r.math && wrap ? Run('\$${r.text}\$', math: true, bold: r.bold) : r)).join()}</w:p>';
 }
 
 String _run(Run r) {
   if (r.text.isEmpty) return '';
-  final text = r.link == null ? r.text : '${r.text} (${r.link})';
+  final text = r.math || r.link == null ? r.text : '${r.text} (${r.link})';
   final props = [
+    if (r.math)
+      '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/>',
     if (r.bold) '<w:b/>',
     if (r.italic) '<w:i/>',
     if (r.strike) '<w:strike/>',

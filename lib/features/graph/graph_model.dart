@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/citations.dart' show citedKeys;
+import '../library/openalex.dart';
 import '../notes/note_content.dart' show notePlainTextPreview;
 
 enum GraphNodeKind { note, paper }
@@ -22,7 +23,8 @@ class GraphNode {
 /// paper a note is linked to, and each paper a note cites with `[@key]`.
 /// Edges are undirected pairs of node indexes, `a < b`, without duplicates.
 class GraphData {
-  GraphData(this.nodes, this.edges) : degrees = List.filled(nodes.length, 0) {
+  GraphData(this.nodes, this.edges, {this.citationEdges = const {}})
+    : degrees = List.filled(nodes.length, 0) {
     for (final (a, b) in edges) {
       degrees[a]++;
       degrees[b]++;
@@ -32,13 +34,24 @@ class GraphData {
   final List<GraphNode> nodes;
   final List<(int, int)> edges;
   final List<int> degrees;
+
+  /// The paper-to-paper subset of [edges] that mean "cites" (from reference
+  /// lists already cached; direction is not kept).
+  final Set<(int, int)> citationEdges;
 }
 
 final _noteLink = RegExp(r'corplex://note/([A-Za-z0-9\-]+)');
 
 /// Builds the graph. With [projectId] only that project's notes and papers
 /// (and the edges between them) are included.
-Future<GraphData> buildGraph(AppDatabase db, {String? projectId}) async {
+///
+/// With [citations], paper-to-paper "cites" edges are added where the citing
+/// paper's reference list is already cached; nothing is fetched.
+Future<GraphData> buildGraph(
+  AppDatabase db, {
+  String? projectId,
+  CitationNetwork? citations,
+}) async {
   var notes = await db.select(db.notes).get();
   var papers = await db.select(db.papers).get();
   if (projectId != null) {
@@ -113,9 +126,29 @@ Future<GraphData> buildGraph(AppDatabase db, {String? projectId}) async {
     final a = index['n:${r.noteId}'];
     if (a != null) connect(a, index['p:${r.paperId}']);
   }
+  final cites = <(int, int)>{};
+  if (citations != null) {
+    final byDoi = <String, int>{};
+    for (final p in papers) {
+      final doi = normalizeCitationDoi(p.doi);
+      if (doi != null) byDoi[doi] = index['p:${p.id}']!;
+    }
+    for (final p in papers) {
+      if (normalizeCitationDoi(p.doi) == null) continue;
+      final from = index['p:${p.id}']!;
+      for (final doi in await citations.cachedReferenceDois(p.doi!)) {
+        final to = byDoi[doi];
+        if (to == null || to == from) continue;
+        final edge = from < to ? (from, to) : (to, from);
+        cites.add(edge);
+        edges.add(edge);
+      }
+    }
+  }
   return GraphData(
     nodes,
     edges.toList()..sort((a, b) => a.$1 != b.$1 ? a.$1 - b.$1 : a.$2 - b.$2),
+    citationEdges: cites,
   );
 }
 
@@ -242,7 +275,11 @@ GraphLayout layoutGraph(GraphData data, {int maxRounds = 300}) {
 final graphLayoutProvider = FutureProvider.autoDispose
     .family<GraphLayout, String?>((ref, projectId) async {
       final db = ref.watch(databaseProvider);
-      final data = await buildGraph(db, projectId: projectId);
+      final data = await buildGraph(
+        db,
+        projectId: projectId,
+        citations: ref.read(citationNetworkProvider),
+      );
       // Let the screen paint its loading state before the layout work.
       await Future<void>.delayed(Duration.zero);
       return layoutGraph(data);

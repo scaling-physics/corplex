@@ -47,8 +47,8 @@ and year by itself; if it can't, type the DOI and tap **Look up**. Every
 citation style (APA, MLA, Chicago, Harvard, IEEE, BibTeX) is then ready
 to copy.
 
-You can also share a PDF or a link *into* Corplex from other apps on
-Android, or import a whole reference library from Zotero, Mendeley or
+You can also share a PDF or a link *into* Corplex from other apps, or
+import a whole reference library from Zotero, Mendeley or
 EndNote (BibTeX, RIS or CSL JSON).
 
 </td>
@@ -110,7 +110,12 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
   Each project has its own page (how much you've read, its papers and
   notes) and a **synthesis matrix** (papers × themes like method,
   sample, findings) that you can fill from your highlights.
-- **Search everything** — notes, papers and highlights, as you type.
+- **Search everything** — notes, papers and highlights, as you type, and
+  find any phrase inside an open PDF.
+- **Scanned papers too** — old or library-scanned PDFs are read on your
+  device, so you can search, highlight and quote them like any other.
+- **Follow the trail** — a paper's references and the papers that cite
+  it, one tap from adding them to your library.
 - **Map** — see how your notes and papers link and cite each other, for
   the whole library or one project.
 - **Revisit highlights** — old highlights come back one at a time, less
@@ -125,8 +130,18 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
 - **Writing comfort** — typewriter scrolling, word count and reading
   time, a preview card when you long-press a citation, and paste a DOI or
   arXiv link to add the paper and cite it in one go.
-- **Shortcuts** — long-press the app icon for a new note or a PDF import;
-  on Android, a home-screen widget to continue reading or start a note.
+- **Maths** — type `$x^2$` or `$$` for equations; they print properly in
+  PDF exports.
+- **Voice notes** — record a thought while you read; on iPad and iPhone
+  it's written out for you, on the device.
+- **Any citation style** — APA, MLA, Chicago, Harvard, IEEE, Vancouver,
+  Nature, Science, ACM and more, or add any `.csl` style file.
+- **Take it with you** — export your PDFs with highlights as real
+  annotations (Preview, Acrobat, Zotero see them), or your whole library
+  as a Markdown folder for Obsidian.
+- **Shortcuts** — long-press the app icon for a new note or a PDF import,
+  a home-screen widget to continue reading or start a note, and share
+  PDFs and links into Corplex from other apps.
 - **Your data is safe** — deleted items go to a trash you can undo from,
   and you can back up everything to a single file and restore it.
 

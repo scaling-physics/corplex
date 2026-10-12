@@ -8,6 +8,7 @@ import '../../data/database_provider.dart';
 import '../../data/trash.dart';
 import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
+import '../ocr/ocr_service.dart';
 import '../settings/appearance_settings.dart';
 import 'adaptive.dart';
 import '../sync/sync_ring.dart';
@@ -39,6 +40,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Housekeeping: items that have sat in the trash past the retention
     // period go for good. Never worth failing startup over.
     purgeTrash(ref.read(databaseProvider)).catchError((_) => 0);
+    // Scanned papers whose text recognition was cut short carry on. With
+    // none (every test, every fresh install) this is one empty query.
+    ref.read(ocrStartupProvider);
   }
 
   static const _screens = [NotesScreen(), LibraryScreen()];
@@ -365,6 +369,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 onTap: () => Navigator.pop(context, 'backup'),
               ),
               ListTile(
+                leading: const Icon(Icons.folder_zip_outlined),
+                title: const Text('Export as Markdown'),
+                subtitle: const Text('A folder of notes for Obsidian'),
+                onTap: () => Navigator.pop(context, 'markdown'),
+              ),
+              ListTile(
                 leading: const Icon(Icons.settings_backup_restore),
                 title: const Text('Restore from a backup'),
                 onTap: () => Navigator.pop(context, 'restore'),
@@ -400,6 +410,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             .push(MaterialPageRoute(builder: (_) => const TrashScreen()));
       case 'backup':
         await backUpToFile(context, ref);
+      case 'markdown':
+        await exportAsMarkdown(context, ref);
       case 'restore':
         await restoreFromBackupFile(context, ref);
       case 'signout':

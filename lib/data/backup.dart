@@ -80,6 +80,9 @@ Future<File> createBackup(
       copy.execute('DELETE FROM sync_base');
       // Derived; each device rebuilds its own (see SearchIndex).
       copy.execute('DROP TABLE IF EXISTS search_index');
+      // Recognised text is derived from the PDFs too.
+      copy.execute('DELETE FROM ocr_pages');
+      copy.execute('DELETE FROM ocr_papers');
     } finally {
       copy.close();
     }

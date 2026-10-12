@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -9,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../data/backup.dart';
 import '../../data/database_provider.dart';
+import '../export/vault_export.dart';
 
 /// Makes a backup zip and hands it to the share sheet (save to Files,
 /// AirDrop, email, Drive…).
@@ -31,6 +33,80 @@ Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
         const SnackBar(content: Text('Couldn\'t create the backup.')),
       );
   }
+}
+
+/// Exports notes, papers and highlights as an Obsidian-friendly Markdown
+/// folder (zipped) and opens the share sheet. Asks whether to include PDFs.
+Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
+  var includePdfs = false;
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('Export as Markdown'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'One Markdown file per note and paper, with links, highlights '
+              'and a BibTeX file. Open the folder as an Obsidian vault.',
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include PDFs'),
+              subtitle: const Text('Makes the export much larger'),
+              value: includePdfs,
+              onChanged: (v) => setState(() => includePdfs = v),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Export'),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (go != true || !context.mounted) return;
+
+  final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final db = ref.read(databaseProvider);
+  final out = await getTemporaryDirectory();
+  if (!context.mounted) return;
+  unawaited(
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    ),
+  );
+  File? zip;
+  try {
+    zip = await writeVaultZip(db, outDir: out, includePdfs: includePdfs);
+  } catch (_) {
+    zip = null;
+  }
+  navigator.pop();
+  if (zip == null) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Couldn\'t create the export.')),
+    );
+    return;
+  }
+  await SharePlus.instance.share(
+    ShareParams(files: [XFile(zip.path)], subject: 'Corplex notes (Markdown)'),
+  );
 }
 
 /// Picks a backup, confirms what's in it, stages it, and tells the user to

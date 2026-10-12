@@ -44,6 +44,11 @@ kotlin {
     }
 }
 
+dependencies {
+    // On-device OCR for scanned PDFs (bundled Latin model, works offline).
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+}
+
 flutter {
     source = "../.."
 }

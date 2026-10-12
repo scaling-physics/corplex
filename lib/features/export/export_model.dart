@@ -6,6 +6,7 @@ import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../audio/audio_link.dart';
 import '../notes/note_content.dart';
+import '../notes/math_markers.dart';
 import '../notes/note_links.dart';
 
 /// A note (or several) flattened to what every output format needs:
@@ -20,6 +21,9 @@ enum BlockKind {
   bullet,
   ordered,
   quote,
+
+  /// A display equation: one run whose text is the LaTeX source.
+  displayMath,
 }
 
 class Run {
@@ -29,9 +33,14 @@ class Run {
     this.italic = false,
     this.strike = false,
     this.link,
+    this.math = false,
   });
 
+  /// The text, or the LaTeX source when [math] is set.
   final String text;
+
+  /// An inline equation.
+  final bool math;
   final bool bold;
   final bool italic;
   final bool strike;
@@ -139,13 +148,35 @@ List<ExportBlock> _blocks(Delta delta, CitationResolver resolver) {
     final data = op.data;
     final attrs = op.attributes ?? const <String, dynamic>{};
     if (data is Map) {
-      runs.add(Run(data.containsKey('sketch') ? '[Sketch]' : ''));
+      if (data[mathInlineType] case final String tex) {
+        runs.add(Run(tex, math: true));
+      } else if (data[mathBlockType] case final String tex) {
+        if (runs.isNotEmpty) {
+          blocks.add(ExportBlock(BlockKind.paragraph, runs));
+          runs = [];
+        }
+        blocks.add(ExportBlock(BlockKind.displayMath, [Run(tex, math: true)]));
+      } else {
+        runs.add(Run(data.containsKey('sketch') ? '[Sketch]' : ''));
+      }
       continue;
     }
     final parts = (data as String).split('\n');
     for (var i = 0; i < parts.length; i++) {
-      if (parts[i].isNotEmpty) runs.add(_run(parts[i], attrs, resolver));
-      if (i < parts.length - 1) {
+      final endsLine = i < parts.length - 1;
+      // A line that is only `$$ … $$` is a display equation.
+      final display =
+          endsLine && runs.isEmpty && _kind(attrs) == BlockKind.paragraph
+          ? displayMathOf(parts[i])
+          : null;
+      if (display != null) {
+        blocks.add(
+          ExportBlock(BlockKind.displayMath, [Run(display, math: true)]),
+        );
+        continue;
+      }
+      if (parts[i].isNotEmpty) runs.addAll(_runs(parts[i], attrs, resolver));
+      if (endsLine) {
         // A newline: its attributes are the line's block style.
         final list = attrs['list'];
         ordinal = list == 'ordered' ? ordinal + 1 : 0;
@@ -156,6 +187,30 @@ List<ExportBlock> _blocks(Delta delta, CitationResolver resolver) {
   }
   if (runs.isNotEmpty) blocks.add(ExportBlock(BlockKind.paragraph, runs));
   return blocks;
+}
+
+/// The runs of one line's worth of text: prose with inline `$…$` maths
+/// pulled out (code spans keep their dollars).
+List<Run> _runs(
+  String text,
+  Map<String, dynamic> attrs,
+  CitationResolver resolver,
+) {
+  final spans = attrs.containsKey('code')
+      ? const <MathSpan>[]
+      : findInlineMath(text);
+  if (spans.isEmpty) return [_run(text, attrs, resolver)];
+  final out = <Run>[];
+  var pos = 0;
+  for (final m in spans) {
+    if (m.start > pos) {
+      out.add(_run(text.substring(pos, m.start), attrs, resolver));
+    }
+    out.add(Run(m.latex, math: true, bold: attrs['bold'] == true));
+    pos = m.end;
+  }
+  if (pos < text.length) out.add(_run(text.substring(pos), attrs, resolver));
+  return out;
 }
 
 Run _run(String text, Map<String, dynamic> attrs, CitationResolver resolver) {

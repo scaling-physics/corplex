@@ -15,6 +15,7 @@ String exportToMarkdown(ExportDoc doc) {
       BlockKind.ordered => '${b.ordinal}. $text',
       BlockKind.quote => '> $text',
       BlockKind.paragraph => text,
+      BlockKind.displayMath => '\$\$\n${b.text}\n\$\$',
     };
     // Markdown paragraphs are separated by a blank line; list items stick
     // together. Empty lines in the note are just that blank line.
@@ -37,6 +38,7 @@ String exportToMarkdown(ExportDoc doc) {
 String _inline(Run r) {
   var out = r.text;
   if (out.isEmpty) return out;
+  if (r.math) return '\$$out\$';
   if (r.bold) out = '**$out**';
   if (r.italic) out = '*$out*';
   if (r.strike) out = '~~$out~~';

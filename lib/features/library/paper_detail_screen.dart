@@ -23,8 +23,12 @@ import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
 import '../sync/sync_service.dart';
 import 'metadata_lookup.dart';
+import 'citation_network_section.dart';
+import 'openalex.dart' show normalizeCitationDoi;
 import '../../data/tables/papers_table.dart';
+import '../csl/style_picker.dart';
 import 'citation_formatter.dart';
+import 'annotated_pdf_export.dart';
 import 'papers_providers.dart';
 import 'pdf_viewer_screen.dart';
 import 'split_reader.dart';
@@ -68,6 +72,26 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   Timer? _debounce;
   bool _loaded = false;
   CitationStyle _citationStyle = CitationStyle.apa;
+
+  /// The styles offered as chips; the rest (and imported ones) are behind
+  /// "More…", so the row doesn't grow with every style there is.
+  static final _quickStyles = [
+    CitationStyle.apa,
+    CitationStyle.mla,
+    CitationStyle.chicago,
+    CitationStyle.harvard,
+    CitationStyle.ieee,
+    CitationStyle.bibtex,
+  ];
+
+  /// Shows [style] at once (the hand-written formatter covers it until
+  /// its CSL file has loaded), then again with the real CSL output.
+  void _useCitationStyle(CitationStyle style) {
+    setState(() => _citationStyle = style);
+    style.ensureLoaded().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   final _scroll = ScrollController();
   final _scrollKey = GlobalKey();
@@ -286,6 +310,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     final notesAsync = ref.watch(notesForPaperProvider(widget.paperId));
 
     final paper = paperAsync.value;
+    final hasMarks =
+        ref.watch(paperHasMarksProvider(widget.paperId)).value ?? false;
     return Scaffold(
       bottomNavigationBar: const SafeArea(child: AudioPlayerBar()),
       body: LayoutBuilder(
@@ -307,9 +333,20 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                     tooltip: 'More',
                     onSelected: (v) {
                       if (v == 'trash') _moveToTrash();
+                      if (v == 'annotated' && paper != null) {
+                        exportAnnotatedPdf(context, ref, paper);
+                      }
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
+                    itemBuilder: (_) => [
+                      if (paper?.pdfPath != null && hasMarks)
+                        const PopupMenuItem(
+                          value: 'annotated',
+                          child: ListTile(
+                            leading: Icon(Icons.ios_share),
+                            title: Text('Export with highlights'),
+                          ),
+                        ),
+                      const PopupMenuItem(
                         value: 'trash',
                         child: ListTile(
                           leading: Icon(Icons.delete_outline),
@@ -524,6 +561,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                           ),
                         ),
                       ),
+                      if (paperAsync.value?.doi case final doi?
+                          when normalizeCitationDoi(doi) != null)
+                        CitationNetworkSection(doi: doi),
                       if (paperAsync.value case final paper?)
                         _Section(
                           title: 'Citation',
@@ -555,16 +595,35 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                                   spacing: 6,
                                   runSpacing: 6,
                                   children: [
-                                    for (final style in CitationStyle.values)
+                                    for (final style in [
+                                      ..._quickStyles,
+                                      if (!_quickStyles.contains(
+                                        _citationStyle,
+                                      ))
+                                        _citationStyle,
+                                    ])
                                       ChoiceChip(
                                         label: Text(style.label),
                                         selected: _citationStyle == style,
                                         showCheckmark: false,
                                         visualDensity: VisualDensity.compact,
-                                        onSelected: (_) => setState(
-                                          () => _citationStyle = style,
-                                        ),
+                                        onSelected: (_) =>
+                                            _useCitationStyle(style),
                                       ),
+                                    ActionChip(
+                                      label: const Text('More…'),
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () async {
+                                        final style = await pickCitationStyle(
+                                          context,
+                                          includeBibtex: true,
+                                          title: 'Citation style',
+                                        );
+                                        if (style != null) {
+                                          _useCitationStyle(style);
+                                        }
+                                      },
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),

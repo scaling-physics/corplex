@@ -822,6 +822,27 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
 - **Android manifest**: `INTERNET` is declared in the *main* manifest.
   Debug/profile manifests add it implicitly, so leaving it out breaks
   sync and streaming only in release builds.
+- **Release-only crashes (1.5.0 shipped one)**: `OcrChannel.register`
+  called ML Kit's `TextRecognition.getClient()` inside
+  `MainActivity.configureFlutterEngine`; in the R8-shrunk release build
+  ML Kit's component lookup failed and the app crashed at launch for
+  everyone, while every test and the debug build were fine. Rules: native
+  channel code must never initialise an SDK at registration — create it
+  lazily on the first call and turn failures into a channel error; keep
+  rules for reflection-heavy SDKs go in `android/app/proguard-rules.pro`
+  (wired in `build.gradle.kts`). **Before every release**, install the
+  release APK on the emulator *over the previous release with data in it*
+  and launch it (`adb install -r …; adb shell am start -W -n
+  com.corplex.corplex/.MainActivity; adb logcat -b crash`); retrace
+  obfuscated traces with `cmdline-tools/latest/bin/retrace` and
+  `build/app/outputs/mapping/release/mapping.txt` (needs
+  `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`).
+- **Flutter deep linking is off** (`flutter_deeplinking_enabled` in the
+  manifest, `FlutterDeepLinkingEnabled` in Info.plist): the app routes
+  links itself (share plugin, `home_widget`, shortcuts), and Flutter's
+  router was pushing every opened PDF / `corplex://` link as an unknown
+  route. iOS widget links carry a `homeWidget` query item (`widgetLink`
+  in `CorplexWidget.swift`) — `home_widget` ignores taps without it.
 - **Pen input** (`lib/features/ink/`): a note can hold any number of
   sketch blocks between its paragraphs — the "Draw" button (first in the
   editor's bottom toolbar) inserts one at the cursor and opens

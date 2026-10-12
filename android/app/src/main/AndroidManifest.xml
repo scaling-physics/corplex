@@ -31,6 +31,10 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Corplex routes incoming links itself (share plugin, home
+                 widget, shortcuts); Flutter's own deep linking would also push
+                 each opened PDF / corplex:// link as an unknown route. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

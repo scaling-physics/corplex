@@ -3,6 +3,7 @@ package com.corplex.corplex
 import android.graphics.BitmapFactory
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
@@ -12,11 +13,23 @@ import io.flutter.plugin.common.MethodChannel
  * lines with word boxes as fractions of the image, origin top-left.
  */
 object OcrChannel {
+    // Created on first use, never at registration: this runs inside
+    // MainActivity.onCreate, and an ML Kit failure there crashes the app at
+    // launch (1.5.0). A failure here only fails that one OCR call.
+    private var recognizer: TextRecognizer? = null
+
     fun register(messenger: BinaryMessenger) {
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         MethodChannel(messenger, "corplex/ocr").setMethodCallHandler { call, result ->
             if (call.method != "recognize") {
                 result.notImplemented()
+                return@setMethodCallHandler
+            }
+            val recognizer = try {
+                recognizer ?: TextRecognition
+                    .getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                    .also { recognizer = it }
+            } catch (e: Exception) {
+                result.error("ocr_unavailable", e.message, null)
                 return@setMethodCallHandler
             }
             val bytes = call.argument<ByteArray>("image")

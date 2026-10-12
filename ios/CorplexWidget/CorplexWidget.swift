@@ -6,7 +6,20 @@ import WidgetKit
 // and `uri` with home_widget; `updateWidget(iOSName:)` reloads this kind.
 private let appGroupId = "group.com.corplex.corplex"
 private let widgetKind = "CorplexWidget"
-private let newNoteURL = URL(string: "corplex://new-note")!
+private let newNoteURL = widgetLink(URL(string: "corplex://new-note")!)
+
+/// home_widget on iOS only reports a tap to the app (`widgetClicked`) when
+/// the URL carries a `homeWidget` query item; without it the app opens
+/// and nothing happens. The Dart side ignores the extra item.
+private func widgetLink(_ url: URL) -> URL {
+  guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+  var items = parts.queryItems ?? []
+  if !items.contains(where: { $0.name == "homeWidget" }) {
+    items.append(URLQueryItem(name: "homeWidget", value: nil))
+  }
+  parts.queryItems = items
+  return parts.url ?? url
+}
 
 struct ReadingEntry: TimelineEntry {
   let date: Date
@@ -39,7 +52,7 @@ struct ReadingProvider: TimelineProvider {
       date: Date(),
       title: text("title"),
       detail: text("detail"),
-      url: text("uri").flatMap(URL.init(string:)))
+      url: text("uri").flatMap(URL.init(string:)).map(widgetLink))
   }
 }
 

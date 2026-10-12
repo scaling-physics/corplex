@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show OrderingTerm, innerJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +5,8 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../export/export_actions.dart';
 import '../export/export_model.dart';
+import 'chapters.dart';
+import 'chapters_section.dart' show pickProjectDueDate;
 import 'matrix_screen.dart';
 import 'project_bibliography.dart';
 import 'project_page.dart';
@@ -50,6 +51,20 @@ Future<void> showProjectMenu(
               onTap: () => Navigator.pop(context, 'export'),
             ),
             ListTile(
+              leading: const Icon(Icons.event_outlined),
+              title: Text(
+                project.dueDate == null ? 'Set due date' : 'Change due date',
+              ),
+              subtitle: const Text('The submission date'),
+              onTap: () => Navigator.pop(context, 'due'),
+            ),
+            if (project.dueDate != null)
+              ListTile(
+                leading: const Icon(Icons.event_busy_outlined),
+                title: const Text('Clear due date'),
+                onTap: () => Navigator.pop(context, 'clear-due'),
+              ),
+            ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('Rename'),
               onTap: () => Navigator.pop(context, 'rename'),
@@ -80,6 +95,14 @@ Future<void> showProjectMenu(
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => MatrixScreen(project: project)));
+    return;
+  }
+  if (action == 'due') {
+    await pickProjectDueDate(context, db, project);
+    return;
+  }
+  if (action == 'clear-due') {
+    await setProjectDueDate(db, project.id, null);
     return;
   }
   if (action == 'export') {
@@ -118,24 +141,14 @@ Future<void> showProjectMenu(
   }
 }
 
-/// Exports every note in [project] as one document, oldest first, under
+/// Exports every note in [project] as one document in chapter order, under
 /// one reference list.
 Future<void> exportProject(
   BuildContext context,
   AppDatabase db,
   Project project,
 ) async {
-  final notes =
-      await (db.select(db.notes).join([
-              innerJoin(
-                db.projectNotes,
-                db.projectNotes.noteId.equalsExp(db.notes.id),
-              ),
-            ])
-            ..where(db.projectNotes.projectId.equals(project.id))
-            ..orderBy([OrderingTerm.asc(db.notes.createdAt)]))
-          .map((r) => r.readTable(db.notes))
-          .get();
+  final notes = await orderedProjectNotes(db, project.id);
   if (!context.mounted) return;
   if (notes.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(

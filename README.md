@@ -110,6 +110,10 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
   Each project has its own page (how much you've read, its papers and
   notes) and a **synthesis matrix** (papers × themes like method,
   sample, findings) that you can fill from your highlights.
+- **Write the thesis** — a project's notes become ordered chapters with a
+  status (outline → final), word targets and a due date; see which papers
+  you read but never cited, and every `TODO`, `[@?]` (needs a citation)
+  and `[fig: …]` you left in the text.
 - **Search everything** — notes, papers and highlights, as you type, and
   find any phrase inside an open PDF.
 - **Scanned papers too** — old or library-scanned PDFs are read on your

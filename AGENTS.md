@@ -365,6 +365,37 @@ the default screens until the user opts in by using the feature.
   free accounts, so without them the app works minus sharing and the
   widget.
 
+### v1.7 — Thesis writing (built; not yet on a device)
+- **Thesis outline** (`projects/chapters*.dart`, schema v14, server file
+  `20261005000000_thesis_outline.sql`, **apply it before schema-v14 data
+  syncs**): a project's notes are its chapters. `ProjectNotes` gains
+  `position`, `status` (`ChapterStatus`: outline, draft, withSupervisor,
+  revised, finished — `final` is a Dart keyword; shown as "Final") and
+  `wordTarget`; `Projects` gains `dueDate` — all synced. `dueDate` is the
+  first nullable synced date, so the engine's `syncDateTimeColumns`
+  conversions are null-safe. `position` stays null until the first
+  reorder; order is stored positions, then unplaced notes by creation
+  date (`compareChapterRows`). The project page shows "Chapters"
+  (drag to reorder, status menu, words vs target, "Add chapter") and a
+  header summary ("12,400 / 40,000 words · 2 of 5 chapters final · Due
+  14 March · 152 days"); nothing new for a project with no notes.
+  `projectChaptersProvider(id)` is the ordered list; Export project uses
+  `orderedProjectNotes`. The Notes-tab project filter still sorts by
+  last edit.
+- **Coverage & writing to-dos** (`projects/coverage.dart`, `todos.dart`,
+  `todos_request.dart`), under the chapter list and invisible when empty:
+  `ChapterCoverageSection` — papers each chapter cites, "Read but not
+  cited" (project papers and highlighted papers linked to its notes that
+  no chapter cites, ranked by highlights; untouched "To read" papers are
+  left out), and citations to papers outside the project.
+  `ProjectTodosSection` — `TODO` (whole word, case-sensitive), `[@?]`
+  (needs a citation; stays plain text, never a chip) and `[fig: …]` /
+  `[FIG]` markers by chapter. `findTodos` measures offsets on the document
+  the editor shows (chips, maths and sketches are one character each);
+  a tap opens the note with the marker selected via
+  `NoteEditorScreen.initialSelection`, or, in the ≥ 900 px pane, via
+  `pendingNoteSelectionProvider`, which the editor takes and clears.
+
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This
   conflicts with offline-first, so it would be strictly additive and
@@ -837,7 +868,7 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   export, maths, CSL assets, recorder, Markdown export through the real
   plugins; `adb shell pm grant com.corplex.corplex
   android.permission.RECORD_AUDIO` first, then `flutter test
-  integration_test/smoke_test.dart -d <device>`). To install and launch: (`adb install -r …; adb shell am start -W -n
+  integration_test/smoke_test.dart -d <device>`; a fresh debug install resets the grant, so the run can stop on the microphone dialog — tap Allow, or re-grant while it starts). To install and launch: (`adb install -r …; adb shell am start -W -n
   com.corplex.corplex/.MainActivity; adb logcat -b crash`); retrace
   obfuscated traces with `cmdline-tools/latest/bin/retrace` and
   `build/app/outputs/mapping/release/mapping.txt` (needs

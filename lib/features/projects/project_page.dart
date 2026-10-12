@@ -11,7 +11,8 @@ import '../graph/graph_screen.dart';
 import '../home/adaptive.dart' show ReadableColumn;
 import '../library/authors.dart' show displayAuthors;
 import '../library/paper_cover.dart';
-import '../notes/note_content.dart' show notePlainTextPreview;
+import 'chapters.dart';
+import 'chapters_section.dart';
 import 'matrix_screen.dart';
 import 'open_from_page.dart';
 import 'project_bibliography.dart';
@@ -44,24 +45,6 @@ final projectPapersProvider = StreamProvider.autoDispose
       );
     });
 
-/// A project's notes, most recently edited first.
-final projectNotesProvider = StreamProvider.autoDispose
-    .family<List<Note>, String>((ref, id) {
-      final db = ref.watch(databaseProvider);
-      final query =
-          db.select(db.notes).join([
-              innerJoin(
-                db.projectNotes,
-                db.projectNotes.noteId.equalsExp(db.notes.id),
-              ),
-            ])
-            ..where(db.projectNotes.projectId.equals(id))
-            ..orderBy([OrderingTerm.desc(db.notes.updatedAt)]);
-      return query.watch().map(
-        (rows) => [for (final r in rows) r.readTable(db.notes)],
-      );
-    });
-
 String _count(int n, String noun) => '$n $noun${n == 1 ? '' : 's'}';
 
 /// Papers in [papers] marked done, as a 0..1 share (0 when there are none).
@@ -84,7 +67,9 @@ class ProjectScreen extends ConsumerWidget {
     final project = ref.watch(projectByIdProvider(projectId)).value;
     final papers =
         ref.watch(projectPapersProvider(projectId)).value ?? const [];
-    final notes = ref.watch(projectNotesProvider(projectId)).value ?? const [];
+    final chapters =
+        ref.watch(projectChaptersProvider(projectId)).value ?? const [];
+    final notes = chapters;
 
     if (project == null) {
       return Scaffold(appBar: AppBar(), body: const SizedBox.shrink());
@@ -113,6 +98,7 @@ class ProjectScreen extends ConsumerWidget {
           ),
         ),
       ),
+      ChapterHeader(project: project, chapters: chapters),
       if (papers.isNotEmpty)
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -152,6 +138,16 @@ class ProjectScreen extends ConsumerWidget {
                 onPressed: () =>
                     exportProject(context, ref.read(databaseProvider), project),
               ),
+            if (notes.isNotEmpty && project.dueDate == null)
+              ActionChip(
+                avatar: const Icon(Icons.event_outlined, size: 18),
+                label: const Text('Set due date'),
+                onPressed: () => pickProjectDueDate(
+                  context,
+                  ref.read(databaseProvider),
+                  project,
+                ),
+              ),
             if (papers.isNotEmpty || notes.isNotEmpty)
               ActionChip(
                 avatar: const Icon(Icons.hub_outlined, size: 18),
@@ -178,18 +174,7 @@ class ProjectScreen extends ConsumerWidget {
             ),
           ),
       ],
-      if (notes.isNotEmpty) ...[
-        _Heading('Notes'),
-        for (final (i, n) in notes.indexed)
-          EntranceTransition(
-            key: ValueKey('note-${n.id}'),
-            index: i,
-            child: _NoteTile(
-              note: n,
-              onTap: () => openNoteFromPage(context, ref, n.id),
-            ),
-          ),
-      ],
+      ChaptersSection(project: project, chapters: chapters),
       if (papers.isEmpty && notes.isEmpty)
         const Padding(
           padding: EdgeInsets.only(top: 48),
@@ -287,30 +272,6 @@ class _PaperTile extends StatelessWidget {
       subtitle: sub.isEmpty
           ? null
           : Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis),
-      onTap: onTap,
-    );
-  }
-}
-
-class _NoteTile extends StatelessWidget {
-  const _NoteTile({required this.note, required this.onTap});
-
-  final Note note;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final preview = notePlainTextPreview(note.content);
-    return ListTile(
-      leading: const Icon(Icons.edit_note_outlined),
-      title: Text(
-        note.title.trim().isEmpty ? 'Untitled' : note.title.trim(),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: preview.isEmpty
-          ? null
-          : Text(preview, maxLines: 2, overflow: TextOverflow.ellipsis),
       onTap: onTap,
     );
   }

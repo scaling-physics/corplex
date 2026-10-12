@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -203,6 +203,24 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(table);
           }
         }
+      }
+      if (from < 14) {
+        // v14: thesis outline. Chapter order/status/target on project_notes
+        // and a due date on projects, all synced. Positions stay null so
+        // existing notes keep their (creation) order until reordered.
+        for (final (table, column, type) in [
+          ('project_notes', 'position', 'INTEGER'),
+          ('project_notes', 'status', 'TEXT'),
+          ('project_notes', 'word_target', 'INTEGER'),
+          ('projects', 'due_date', 'INTEGER'),
+        ]) {
+          if (!await _hasColumn(table, column)) {
+            await customStatement(
+              'ALTER TABLE $table ADD COLUMN $column $type',
+            );
+          }
+        }
+        await _createSyncSchema(markExisting: false);
       }
     },
   );

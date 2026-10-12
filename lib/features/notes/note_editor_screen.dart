@@ -29,6 +29,7 @@ import 'note_stats.dart';
 import 'paste_citation.dart';
 import '../../theme/haptics.dart';
 import '../projects/projects_providers.dart';
+import '../projects/todos_request.dart';
 import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
 import 'cite_paper_sheet.dart';
@@ -78,9 +79,15 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
     this.handle,
     this.embedded = false,
     this.onClose,
+    this.initialSelection,
   });
 
   final String noteId;
+
+  /// Where to put the caret (or select a range) once the note has loaded,
+  /// in the editor's own offsets — chips and maths count as one character
+  /// each. The page scrolls it into view. See `todos.dart`.
+  final TextSelection? initialSelection;
 
   /// Set when the editor sits beside a PDF; see [NoteEditorHandle].
   final NoteEditorHandle? handle;
@@ -133,6 +140,21 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   void initState() {
     super.initState();
     _loadNote();
+    // A to-do tapped on the project page while this note is already open.
+    ref.listenManual<NoteSelectionRequest?>(pendingNoteSelectionProvider, (
+      _,
+      request,
+    ) {
+      if (request == null || request.noteId != widget.noteId || !_loaded) {
+        return;
+      }
+      ref.read(pendingNoteSelectionProvider.notifier).state = null;
+      _quillController.updateSelection(
+        _initialSelection(_quillController.document, request.selection),
+        ChangeSource.local,
+      );
+      _revealInitialSelection();
+    });
   }
 
   Future<void> _loadNote() async {
@@ -141,9 +163,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       db.notes,
     )..where((n) => n.id.equals(widget.noteId))).getSingleOrNull();
 
+    final document = note == null ? Document() : _editable(note.content);
+    var want = widget.initialSelection;
+    final pending = mounted ? ref.read(pendingNoteSelectionProvider) : null;
+    if (pending != null && pending.noteId == widget.noteId) {
+      want ??= pending.selection;
+      ref.read(pendingNoteSelectionProvider.notifier).state = null;
+    }
     _quillController = QuillController(
-      document: note == null ? Document() : _editable(note.content),
-      selection: const TextSelection.collapsed(offset: 0),
+      document: document,
+      selection: _initialSelection(document, want),
     );
     if (note != null && mounted) {
       _titleController.text = note.title;
@@ -157,6 +186,49 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
     widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
+    if (want != null) _revealInitialSelection();
+  }
+
+  /// [NoteEditorScreen.initialSelection] clamped to the loaded document.
+  TextSelection _initialSelection(Document document, TextSelection? want) {
+    if (want == null || !want.isValid) {
+      return const TextSelection.collapsed(offset: 0);
+    }
+    final max = (document.length - 1).clamp(0, 1 << 30);
+    return TextSelection(
+      baseOffset: want.start.clamp(0, max),
+      extentOffset: want.end.clamp(0, max),
+    );
+  }
+
+  /// Scrolls the page so the initial selection sits about a third of the way
+  /// down, and focuses the body so the selection shows. Retries for a few
+  /// frames while the editor is still being laid out.
+  void _revealInitialSelection([int attempt = 0]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final render = _editorKey.currentState?.renderEditor;
+      final viewport = _viewportKey.currentContext?.findRenderObject();
+      if (render == null ||
+          !render.attached ||
+          viewport is! RenderBox ||
+          !viewport.hasSize ||
+          !_pageScroll.hasClients) {
+        if (attempt < 6) _revealInitialSelection(attempt + 1);
+        return;
+      }
+      _bodyFocus.requestFocus();
+      final sel = _quillController.selection;
+      final caret = render.getLocalRectForCaret(
+        TextPosition(offset: sel.start.clamp(0, sel.end)),
+      );
+      final caretY = render.localToGlobal(caret.center).dy;
+      final top = viewport.localToGlobal(Offset.zero).dy;
+      final position = _pageScroll.position;
+      final to = (position.pixels + caretY - (top + viewport.size.height / 3))
+          .clamp(position.minScrollExtent, position.maxScrollExtent);
+      _pageScroll.jumpTo(to);
+    });
   }
 
   /// Typewriter mode: after the caret moves (typing, arrow keys, a tap),

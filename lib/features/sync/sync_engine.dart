@@ -267,7 +267,7 @@ class SyncEngine {
       if (base == null) continue;
       final theirs = {
         for (final c in table.allColumns)
-          c: syncDateTimeColumns.contains(c)
+          c: syncDateTimeColumns.contains(c) && server[c] != null
               ? _fromIso(server[c]! as String)
               : server[c],
       };
@@ -351,7 +351,8 @@ class SyncEngine {
     return {
       for (final entry in row.entries)
         if (entry.key != '_seq')
-          entry.key: syncDateTimeColumns.contains(entry.key)
+          entry.key:
+              syncDateTimeColumns.contains(entry.key) && entry.value != null
               ? _toIso(entry.value! as int)
               : entry.value,
       // Explicit null so re-linking a previously deleted join row revives it.
@@ -449,7 +450,7 @@ class SyncEngine {
     final columns = table.allColumns;
     final values = [
       for (final c in columns)
-        syncDateTimeColumns.contains(c)
+        syncDateTimeColumns.contains(c) && remote[c] != null
             ? _fromIso(remote[c]! as String)
             : remote[c],
     ];

@@ -45,7 +45,7 @@ class SyncTableSpec {
 
 /// Columns holding a DateTime, stored locally as unix seconds and remotely
 /// as `timestamptz`.
-const syncDateTimeColumns = {'created_at', 'updated_at'};
+const syncDateTimeColumns = {'created_at', 'updated_at', 'due_date'};
 
 /// Ordered parents-before-children so foreign keys are satisfied when
 /// applying pulled rows; deletes are applied in the reverse order.
@@ -82,7 +82,7 @@ const syncTables = [
   SyncTableSpec(
     'projects',
     keys: ['id'],
-    columns: ['name', 'created_at', 'updated_at'],
+    columns: ['name', 'due_date', 'created_at', 'updated_at'],
   ),
   SyncTableSpec(
     'notes',
@@ -107,7 +107,7 @@ const syncTables = [
   SyncTableSpec(
     'project_notes',
     keys: ['project_id', 'note_id'],
-    columns: ['updated_at'],
+    columns: ['position', 'status', 'word_target', 'updated_at'],
   ),
   SyncTableSpec(
     'matrix_columns',

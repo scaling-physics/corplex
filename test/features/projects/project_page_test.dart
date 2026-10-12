@@ -12,6 +12,7 @@ import 'package:corplex/data/tables/papers_table.dart';
 import 'package:corplex/features/audio/audio_playback.dart';
 import 'package:corplex/features/library/paper_cover.dart';
 import 'package:corplex/features/notes/note_editor_screen.dart';
+import 'package:corplex/features/projects/chapters.dart';
 import 'package:corplex/features/projects/project_menu.dart';
 import 'package:corplex/features/projects/project_page.dart';
 import 'package:corplex/features/projects/projects_providers.dart';
@@ -97,7 +98,7 @@ void main() {
     );
     expect(bar.value, 0.5);
     expect(find.text('Papers'), findsOneWidget);
-    expect(find.text('Notes'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
     expect(find.text('Attention'), findsOneWidget);
     expect(find.text('Lecture'), findsOneWidget);
     expect(find.text('Synthesis matrix'), findsOneWidget);
@@ -116,7 +117,7 @@ void main() {
     expect(find.byKey(const ValueKey('project-progress')), findsNothing);
     expect(find.text('Synthesis matrix'), findsNothing);
     expect(find.text('Export project'), findsOneWidget);
-    expect(find.text('Notes'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
@@ -127,7 +128,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nothing here yet'), findsOneWidget);
     expect(find.text('Papers'), findsNothing);
-    expect(find.text('Notes'), findsNothing);
+    expect(find.text('Chapters'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
@@ -162,6 +163,110 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
 
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  Future<void> addNote(String id, String title, String projectId) async {
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: Value(id),
+            title: Value(title),
+            content: const Value('[{"insert":"one two three\\n"}]'),
+            createdAt: Value(DateTime(2026, 1, id.codeUnitAt(0) - 96)),
+          ),
+        );
+    await addNoteToProject(db, projectId: projectId, noteId: id);
+  }
+
+  testWidgets('a chapter with writing to-dos lists them under the outline', (
+    tester,
+  ) async {
+    final id = await findOrCreateProject(db, 'Thesis');
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: const Value('t'),
+            title: const Value('Results'),
+            content: const Value(
+              '[{"insert":"Firing rates rose [@?] in CA1. TODO: add stats\\n"}]',
+            ),
+          ),
+        );
+    await addNoteToProject(db, projectId: id, noteId: 't');
+    await tester.pumpWidget(app(ProjectScreen(projectId: id)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.textContaining('To do in the writing'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('chapters: summary, status menu, target, due date', (
+    tester,
+  ) async {
+    final id = await findOrCreateProject(db, 'Thesis');
+    await addNote('a', 'Intro', id);
+    await addNote('b', 'Methods', id);
+    await setChapterTarget(db, id, 'b', 6);
+    await setProjectDueDate(
+      db,
+      id,
+      DateTime.now().add(const Duration(days: 40)),
+    );
+    await tester.pumpWidget(app(ProjectScreen(projectId: id)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.text('6 / 6 words'), findsOneWidget);
+    expect(find.text('3 / 6'), findsOneWidget);
+    expect(find.text('3 words'), findsOneWidget);
+    expect(find.textContaining('40 days'), findsOneWidget);
+    expect(find.textContaining('chapters final'), findsNothing);
+    // Intro comes first.
+    expect(
+      tester.getTopLeft(find.text('Intro')).dy <
+          tester.getTopLeft(find.text('Methods')).dy,
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('status-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Final'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 of 2 chapters final'), findsOneWidget);
+    expect(find.byKey(const ValueKey('progress-b')), findsOneWidget);
+    expect(find.byKey(const ValueKey('progress-a')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('long-press drag reorders chapters and persists', (tester) async {
+    final id = await findOrCreateProject(db, 'Thesis');
+    await addNote('a', 'Intro', id);
+    await addNote('b', 'Methods', id);
+    await tester.pumpWidget(app(ProjectScreen(projectId: id)));
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Intro')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, 60));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(
+      [for (final n in await orderedProjectNotes(db, id)) n.id],
+      ['b', 'a'],
+    );
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });

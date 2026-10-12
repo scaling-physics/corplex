@@ -4111,6 +4111,17 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _dueDateMeta = const VerificationMeta(
+    'dueDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dueDate = GeneratedColumn<DateTime>(
+    'due_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -4124,7 +4135,13 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     clientDefault: () => DateTime.now(),
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, createdAt, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    createdAt,
+    dueDate,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4154,6 +4171,12 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('due_date')) {
+      context.handle(
+        _dueDateMeta,
+        dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -4181,6 +4204,10 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      dueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}due_date'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -4199,12 +4226,16 @@ class Project extends DataClass implements Insertable<Project> {
   final String name;
   final DateTime createdAt;
 
+  /// The submission date, if the writer set one.
+  final DateTime? dueDate;
+
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
   final DateTime updatedAt;
   const Project({
     required this.id,
     required this.name,
     required this.createdAt,
+    this.dueDate,
     required this.updatedAt,
   });
   @override
@@ -4213,6 +4244,9 @@ class Project extends DataClass implements Insertable<Project> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<DateTime>(dueDate);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -4222,6 +4256,9 @@ class Project extends DataClass implements Insertable<Project> {
       id: Value(id),
       name: Value(name),
       createdAt: Value(createdAt),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
       updatedAt: Value(updatedAt),
     );
   }
@@ -4235,6 +4272,7 @@ class Project extends DataClass implements Insertable<Project> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -4245,6 +4283,7 @@ class Project extends DataClass implements Insertable<Project> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'dueDate': serializer.toJson<DateTime?>(dueDate),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -4253,11 +4292,13 @@ class Project extends DataClass implements Insertable<Project> {
     String? id,
     String? name,
     DateTime? createdAt,
+    Value<DateTime?> dueDate = const Value.absent(),
     DateTime? updatedAt,
   }) => Project(
     id: id ?? this.id,
     name: name ?? this.name,
     createdAt: createdAt ?? this.createdAt,
+    dueDate: dueDate.present ? dueDate.value : this.dueDate,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   Project copyWithCompanion(ProjectsCompanion data) {
@@ -4265,6 +4306,7 @@ class Project extends DataClass implements Insertable<Project> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -4275,13 +4317,14 @@ class Project extends DataClass implements Insertable<Project> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
+          ..write('dueDate: $dueDate, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, createdAt, updatedAt);
+  int get hashCode => Object.hash(id, name, createdAt, dueDate, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4289,6 +4332,7 @@ class Project extends DataClass implements Insertable<Project> {
           other.id == this.id &&
           other.name == this.name &&
           other.createdAt == this.createdAt &&
+          other.dueDate == this.dueDate &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -4296,12 +4340,14 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
   final Value<String> id;
   final Value<String> name;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> dueDate;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ProjectsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.dueDate = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4309,6 +4355,7 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.id = const Value.absent(),
     required String name,
     this.createdAt = const Value.absent(),
+    this.dueDate = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
@@ -4316,6 +4363,7 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? dueDate,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -4323,6 +4371,7 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (createdAt != null) 'created_at': createdAt,
+      if (dueDate != null) 'due_date': dueDate,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4332,6 +4381,7 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Value<String>? id,
     Value<String>? name,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? dueDate,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -4339,6 +4389,7 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       id: id ?? this.id,
       name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
+      dueDate: dueDate ?? this.dueDate,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4356,6 +4407,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (dueDate.present) {
+      map['due_date'] = Variable<DateTime>(dueDate.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -4371,6 +4425,7 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
+          ..write('dueDate: $dueDate, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4683,6 +4738,37 @@ class $ProjectNotesTable extends ProjectNotes
       'REFERENCES notes (id) ON DELETE CASCADE',
     ),
   );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<ChapterStatus?, String> status =
+      GeneratedColumn<String>(
+        'status',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<ChapterStatus?>($ProjectNotesTable.$converterstatusn);
+  static const VerificationMeta _wordTargetMeta = const VerificationMeta(
+    'wordTarget',
+  );
+  @override
+  late final GeneratedColumn<int> wordTarget = GeneratedColumn<int>(
+    'word_target',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -4696,7 +4782,14 @@ class $ProjectNotesTable extends ProjectNotes
     clientDefault: () => DateTime.now(),
   );
   @override
-  List<GeneratedColumn> get $columns => [projectId, noteId, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    projectId,
+    noteId,
+    position,
+    status,
+    wordTarget,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4725,6 +4818,18 @@ class $ProjectNotesTable extends ProjectNotes
     } else if (isInserting) {
       context.missing(_noteIdMeta);
     }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    if (data.containsKey('word_target')) {
+      context.handle(
+        _wordTargetMeta,
+        wordTarget.isAcceptableOrUnknown(data['word_target']!, _wordTargetMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -4748,6 +4853,20 @@ class $ProjectNotesTable extends ProjectNotes
         DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      ),
+      status: $ProjectNotesTable.$converterstatusn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        ),
+      ),
+      wordTarget: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}word_target'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -4759,15 +4878,33 @@ class $ProjectNotesTable extends ProjectNotes
   $ProjectNotesTable createAlias(String alias) {
     return $ProjectNotesTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<ChapterStatus, String, String> $converterstatus =
+      const EnumNameConverter<ChapterStatus>(ChapterStatus.values);
+  static JsonTypeConverter2<ChapterStatus?, String?, String?>
+  $converterstatusn = JsonTypeConverter2.asNullable($converterstatus);
 }
 
 class ProjectNote extends DataClass implements Insertable<ProjectNote> {
   final String projectId;
   final String noteId;
+
+  /// Place among the project's chapters. Null until the writer first
+  /// reorders; unplaced rows follow the placed ones, oldest note first.
+  final int? position;
+
+  /// How far the chapter has got; null = no status.
+  final ChapterStatus? status;
+
+  /// Words the chapter should reach, if set.
+  final int? wordTarget;
   final DateTime updatedAt;
   const ProjectNote({
     required this.projectId,
     required this.noteId,
+    this.position,
+    this.status,
+    this.wordTarget,
     required this.updatedAt,
   });
   @override
@@ -4775,6 +4912,17 @@ class ProjectNote extends DataClass implements Insertable<ProjectNote> {
     final map = <String, Expression>{};
     map['project_id'] = Variable<String>(projectId);
     map['note_id'] = Variable<String>(noteId);
+    if (!nullToAbsent || position != null) {
+      map['position'] = Variable<int>(position);
+    }
+    if (!nullToAbsent || status != null) {
+      map['status'] = Variable<String>(
+        $ProjectNotesTable.$converterstatusn.toSql(status),
+      );
+    }
+    if (!nullToAbsent || wordTarget != null) {
+      map['word_target'] = Variable<int>(wordTarget);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -4783,6 +4931,15 @@ class ProjectNote extends DataClass implements Insertable<ProjectNote> {
     return ProjectNotesCompanion(
       projectId: Value(projectId),
       noteId: Value(noteId),
+      position: position == null && nullToAbsent
+          ? const Value.absent()
+          : Value(position),
+      status: status == null && nullToAbsent
+          ? const Value.absent()
+          : Value(status),
+      wordTarget: wordTarget == null && nullToAbsent
+          ? const Value.absent()
+          : Value(wordTarget),
       updatedAt: Value(updatedAt),
     );
   }
@@ -4795,6 +4952,11 @@ class ProjectNote extends DataClass implements Insertable<ProjectNote> {
     return ProjectNote(
       projectId: serializer.fromJson<String>(json['projectId']),
       noteId: serializer.fromJson<String>(json['noteId']),
+      position: serializer.fromJson<int?>(json['position']),
+      status: $ProjectNotesTable.$converterstatusn.fromJson(
+        serializer.fromJson<String?>(json['status']),
+      ),
+      wordTarget: serializer.fromJson<int?>(json['wordTarget']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -4804,6 +4966,11 @@ class ProjectNote extends DataClass implements Insertable<ProjectNote> {
     return <String, dynamic>{
       'projectId': serializer.toJson<String>(projectId),
       'noteId': serializer.toJson<String>(noteId),
+      'position': serializer.toJson<int?>(position),
+      'status': serializer.toJson<String?>(
+        $ProjectNotesTable.$converterstatusn.toJson(status),
+      ),
+      'wordTarget': serializer.toJson<int?>(wordTarget),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -4811,16 +4978,27 @@ class ProjectNote extends DataClass implements Insertable<ProjectNote> {
   ProjectNote copyWith({
     String? projectId,
     String? noteId,
+    Value<int?> position = const Value.absent(),
+    Value<ChapterStatus?> status = const Value.absent(),
+    Value<int?> wordTarget = const Value.absent(),
     DateTime? updatedAt,
   }) => ProjectNote(
     projectId: projectId ?? this.projectId,
     noteId: noteId ?? this.noteId,
+    position: position.present ? position.value : this.position,
+    status: status.present ? status.value : this.status,
+    wordTarget: wordTarget.present ? wordTarget.value : this.wordTarget,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   ProjectNote copyWithCompanion(ProjectNotesCompanion data) {
     return ProjectNote(
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      position: data.position.present ? data.position.value : this.position,
+      status: data.status.present ? data.status.value : this.status,
+      wordTarget: data.wordTarget.present
+          ? data.wordTarget.value
+          : this.wordTarget,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -4830,36 +5008,52 @@ class ProjectNote extends DataClass implements Insertable<ProjectNote> {
     return (StringBuffer('ProjectNote(')
           ..write('projectId: $projectId, ')
           ..write('noteId: $noteId, ')
+          ..write('position: $position, ')
+          ..write('status: $status, ')
+          ..write('wordTarget: $wordTarget, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(projectId, noteId, updatedAt);
+  int get hashCode =>
+      Object.hash(projectId, noteId, position, status, wordTarget, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ProjectNote &&
           other.projectId == this.projectId &&
           other.noteId == this.noteId &&
+          other.position == this.position &&
+          other.status == this.status &&
+          other.wordTarget == this.wordTarget &&
           other.updatedAt == this.updatedAt);
 }
 
 class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
   final Value<String> projectId;
   final Value<String> noteId;
+  final Value<int?> position;
+  final Value<ChapterStatus?> status;
+  final Value<int?> wordTarget;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ProjectNotesCompanion({
     this.projectId = const Value.absent(),
     this.noteId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.status = const Value.absent(),
+    this.wordTarget = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProjectNotesCompanion.insert({
     required String projectId,
     required String noteId,
+    this.position = const Value.absent(),
+    this.status = const Value.absent(),
+    this.wordTarget = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : projectId = Value(projectId),
@@ -4867,12 +5061,18 @@ class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
   static Insertable<ProjectNote> custom({
     Expression<String>? projectId,
     Expression<String>? noteId,
+    Expression<int>? position,
+    Expression<String>? status,
+    Expression<int>? wordTarget,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (projectId != null) 'project_id': projectId,
       if (noteId != null) 'note_id': noteId,
+      if (position != null) 'position': position,
+      if (status != null) 'status': status,
+      if (wordTarget != null) 'word_target': wordTarget,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4881,12 +5081,18 @@ class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
   ProjectNotesCompanion copyWith({
     Value<String>? projectId,
     Value<String>? noteId,
+    Value<int?>? position,
+    Value<ChapterStatus?>? status,
+    Value<int?>? wordTarget,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return ProjectNotesCompanion(
       projectId: projectId ?? this.projectId,
       noteId: noteId ?? this.noteId,
+      position: position ?? this.position,
+      status: status ?? this.status,
+      wordTarget: wordTarget ?? this.wordTarget,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4900,6 +5106,17 @@ class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
     }
     if (noteId.present) {
       map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $ProjectNotesTable.$converterstatusn.toSql(status.value),
+      );
+    }
+    if (wordTarget.present) {
+      map['word_target'] = Variable<int>(wordTarget.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -4915,6 +5132,9 @@ class ProjectNotesCompanion extends UpdateCompanion<ProjectNote> {
     return (StringBuffer('ProjectNotesCompanion(')
           ..write('projectId: $projectId, ')
           ..write('noteId: $noteId, ')
+          ..write('position: $position, ')
+          ..write('status: $status, ')
+          ..write('wordTarget: $wordTarget, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -11256,6 +11476,7 @@ typedef $$ProjectsTableCreateCompanionBuilder = ProjectsCompanion Function({
   Value<String> id,
   required String name,
   Value<DateTime> createdAt,
+  Value<DateTime?> dueDate,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -11263,6 +11484,7 @@ typedef $$ProjectsTableUpdateCompanionBuilder = ProjectsCompanion Function({
   Value<String> id,
   Value<String> name,
   Value<DateTime> createdAt,
+  Value<DateTime?> dueDate,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -11347,6 +11569,11 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11455,6 +11682,11 @@ class $$ProjectsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -11478,6 +11710,9 @@ class $$ProjectsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -11593,12 +11828,14 @@ class $$ProjectsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion(
                 id: id,
                 name: name,
                 createdAt: createdAt,
+                dueDate: dueDate,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -11607,12 +11844,14 @@ class $$ProjectsTableTableManager
                 Value<String> id = const Value.absent(),
                 required String name,
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion.insert(
                 id: id,
                 name: name,
                 createdAt: createdAt,
+                dueDate: dueDate,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -12098,6 +12337,9 @@ typedef $$ProjectNotesTableCreateCompanionBuilder =
     ProjectNotesCompanion Function({
       required String projectId,
       required String noteId,
+      Value<int?> position,
+      Value<ChapterStatus?> status,
+      Value<int?> wordTarget,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12105,6 +12347,9 @@ typedef $$ProjectNotesTableUpdateCompanionBuilder =
     ProjectNotesCompanion Function({
       Value<String> projectId,
       Value<String> noteId,
+      Value<int?> position,
+      Value<ChapterStatus?> status,
+      Value<int?> wordTarget,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12157,6 +12402,22 @@ class $$ProjectNotesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<ChapterStatus?, ChapterStatus, String>
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<int> get wordTarget => $composableBuilder(
+    column: $table.wordTarget,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
@@ -12218,6 +12479,21 @@ class $$ProjectNotesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get wordTarget => $composableBuilder(
+    column: $table.wordTarget,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -12279,6 +12555,17 @@ class $$ProjectNotesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<ChapterStatus?, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get wordTarget => $composableBuilder(
+    column: $table.wordTarget,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -12359,11 +12646,17 @@ class $$ProjectNotesTableTableManager
               ({
                 Value<String> projectId = const Value.absent(),
                 Value<String> noteId = const Value.absent(),
+                Value<int?> position = const Value.absent(),
+                Value<ChapterStatus?> status = const Value.absent(),
+                Value<int?> wordTarget = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectNotesCompanion(
                 projectId: projectId,
                 noteId: noteId,
+                position: position,
+                status: status,
+                wordTarget: wordTarget,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -12371,11 +12664,17 @@ class $$ProjectNotesTableTableManager
               ({
                 required String projectId,
                 required String noteId,
+                Value<int?> position = const Value.absent(),
+                Value<ChapterStatus?> status = const Value.absent(),
+                Value<int?> wordTarget = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectNotesCompanion.insert(
                 projectId: projectId,
                 noteId: noteId,
+                position: position,
+                status: status,
+                wordTarget: wordTarget,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

@@ -832,7 +832,12 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   rules for reflection-heavy SDKs go in `android/app/proguard-rules.pro`
   (wired in `build.gradle.kts`). **Before every release**, install the
   release APK on the emulator *over the previous release with data in it*
-  and launch it (`adb install -r …; adb shell am start -W -n
+  and launch it, and run the on-device smoke test
+  (`integration_test/smoke_test.dart`: PDF engine, covers, OCR, annotated
+  export, maths, CSL assets, recorder, Markdown export through the real
+  plugins; `adb shell pm grant com.corplex.corplex
+  android.permission.RECORD_AUDIO` first, then `flutter test
+  integration_test/smoke_test.dart -d <device>`) and launch it (`adb install -r …; adb shell am start -W -n
   com.corplex.corplex/.MainActivity; adb logcat -b crash`); retrace
   obfuscated traces with `cmdline-tools/latest/bin/retrace` and
   `build/app/outputs/mapping/release/mapping.txt` (needs

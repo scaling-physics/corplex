@@ -156,6 +156,8 @@ void main() {
 
     await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Move to trash'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Move to trash'));
     await tester.pumpAndSettle();
 

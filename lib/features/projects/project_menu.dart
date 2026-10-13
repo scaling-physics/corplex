@@ -5,6 +5,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../export/export_actions.dart';
 import '../export/export_model.dart';
+import 'abbreviations.dart' show abbreviationBlocks;
 import 'chapters.dart';
 import 'chapters_section.dart' show pickProjectDueDate;
 import 'matrix_screen.dart';
@@ -156,9 +157,13 @@ Future<void> exportProject(
     );
     return;
   }
-  await exportNotes(context, db, [
-    for (final n in notes) ExportNote(n.title, n.content),
-  ], title: project.name);
+  await exportNotes(
+    context,
+    db,
+    [for (final n in notes) ExportNote(n.title, n.content)],
+    title: project.name,
+    extraFrontMatter: abbreviationBlocks([for (final n in notes) n.content]),
+  );
 }
 
 /// Asks for a new name for [project] and saves it.

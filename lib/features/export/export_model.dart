@@ -6,7 +6,9 @@ import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../audio/audio_link.dart';
 import '../notes/note_content.dart';
+import '../notes/figure_markers.dart';
 import '../notes/math_markers.dart';
+import '../projects/figures.dart';
 import '../notes/note_links.dart';
 
 /// A note (or several) flattened to what every output format needs:
@@ -21,6 +23,9 @@ enum BlockKind {
   bullet,
   ordered,
   quote,
+
+  /// A figure or table caption; its first run is the bold "Figure 3.2.".
+  caption,
 
   /// A display equation: one run whose text is the LaTeX source.
   displayMath,
@@ -78,15 +83,60 @@ class ExportNote {
 
 const _references = 'References';
 
+/// The "List of figures" / "List of tables" that open a project export
+/// (nothing for a kind with no entries), then [extra] blocks (e.g. a list
+/// of abbreviations). [text] resolves a caption's references and citations.
+List<ExportBlock> exportFrontMatter(
+  FigureIndex figures, {
+  String Function(String caption)? text,
+  List<ExportBlock> extra = const [],
+}) {
+  final out = <ExportBlock>[];
+  for (final kind in FigureKind.values) {
+    final entries = figures.ofKind(kind).toList();
+    if (entries.isEmpty) continue;
+    out.add(ExportBlock(BlockKind.heading2, [Run(kind.listTitle)]));
+    for (final e in entries) {
+      final caption = (text ?? figures.resolve)(e.caption).trim();
+      out.add(
+        ExportBlock(BlockKind.paragraph, [
+          Run(caption.isEmpty ? e.name : '${e.name}  $caption'),
+        ]),
+      );
+    }
+  }
+  return [...out, ...extra];
+}
+
 /// Builds the export of [notes] (one document; several notes become
 /// chapters under their titles). `[@key]` citations become in-text
 /// citations in [style] and a reference list is added at the end.
+///
+/// Figures and tables are numbered by [figures] when given (a single note
+/// exported on its own passes the project's numbering, so it matches the
+/// editor). Otherwise, with several notes (a project export, in chapter
+/// order) a figure is "chapter.n" by the note's position; a lone note's is
+/// "n". A multi-note export opens with the lists of figures and tables
+/// followed by [extraFrontMatter].
 Future<ExportDoc> buildExportDoc(
   AppDatabase db,
   List<ExportNote> notes, {
   required String title,
   CitationStyle style = CitationStyle.apa,
+  FigureIndex? figures,
+  List<ExportBlock> extraFrontMatter = const [],
 }) async {
+  final index =
+      figures ??
+      buildFigureIndex([
+        for (final (i, n) in notes.indexed)
+          FigureNote(
+            noteId: '$i',
+            title: n.title,
+            content: n.content,
+            chapter: notes.length > 1 ? '${i + 1}' : null,
+          ),
+      ]);
   final deltas = [
     for (final n in notes) decodeNoteContent(n.content).toDelta(),
   ];
@@ -102,8 +152,17 @@ Future<ExportDoc> buildExportDoc(
   }, style);
 
   final blocks = <ExportBlock>[];
+  if (notes.length > 1) {
+    blocks.addAll(
+      exportFrontMatter(
+        index,
+        text: (c) => resolver.replace(index.resolve(c)),
+        extra: extraFrontMatter,
+      ),
+    );
+  }
   for (var i = 0; i < notes.length; i++) {
-    final own = _blocks(deltas[i], resolver);
+    final own = _blocks(deltas[i], resolver, index);
     if (notes.length > 1) {
       final heading = notes[i].title.trim().isEmpty
           ? 'Untitled'
@@ -138,7 +197,11 @@ List<ExportBlock> _withoutReferences(List<ExportBlock> blocks) {
   return at < 0 ? blocks : blocks.sublist(0, at);
 }
 
-List<ExportBlock> _blocks(Delta delta, CitationResolver resolver) {
+List<ExportBlock> _blocks(
+  Delta delta,
+  CitationResolver resolver,
+  FigureIndex figures,
+) {
   final blocks = <ExportBlock>[];
   var runs = <Run>[];
   var ordinal = 0;
@@ -175,17 +238,21 @@ List<ExportBlock> _blocks(Delta delta, CitationResolver resolver) {
         );
         continue;
       }
-      if (parts[i].isNotEmpty) runs.addAll(_runs(parts[i], attrs, resolver));
+      if (parts[i].isNotEmpty) {
+        runs.addAll(_runs(parts[i], attrs, resolver, figures));
+      }
       if (endsLine) {
         // A newline: its attributes are the line's block style.
         final list = attrs['list'];
         ordinal = list == 'ordered' ? ordinal + 1 : 0;
-        blocks.add(ExportBlock(_kind(attrs), runs, ordinal: ordinal));
+        blocks.add(_line(_kind(attrs), runs, ordinal, figures));
         runs = [];
       }
     }
   }
-  if (runs.isNotEmpty) blocks.add(ExportBlock(BlockKind.paragraph, runs));
+  if (runs.isNotEmpty) {
+    blocks.add(_line(BlockKind.paragraph, runs, 0, figures));
+  }
   return blocks;
 }
 
@@ -195,25 +262,66 @@ List<Run> _runs(
   String text,
   Map<String, dynamic> attrs,
   CitationResolver resolver,
+  FigureIndex figures,
 ) {
   final spans = attrs.containsKey('code')
       ? const <MathSpan>[]
       : findInlineMath(text);
-  if (spans.isEmpty) return [_run(text, attrs, resolver)];
+  if (spans.isEmpty) return [_run(text, attrs, resolver, figures)];
   final out = <Run>[];
   var pos = 0;
   for (final m in spans) {
     if (m.start > pos) {
-      out.add(_run(text.substring(pos, m.start), attrs, resolver));
+      out.add(_run(text.substring(pos, m.start), attrs, resolver, figures));
     }
     out.add(Run(m.latex, math: true, bold: attrs['bold'] == true));
     pos = m.end;
   }
-  if (pos < text.length) out.add(_run(text.substring(pos), attrs, resolver));
+  if (pos < text.length) {
+    out.add(_run(text.substring(pos), attrs, resolver, figures));
+  }
   return out;
 }
 
-Run _run(String text, Map<String, dynamic> attrs, CitationResolver resolver) {
+/// A finished line: a paragraph that starts with a caption definition
+/// becomes a [BlockKind.caption] opening with the bold "Figure 3.2.".
+ExportBlock _line(
+  BlockKind kind,
+  List<Run> runs,
+  int ordinal,
+  FigureIndex figures,
+) {
+  if (kind == BlockKind.paragraph && runs.isNotEmpty) {
+    final first = runs.first;
+    final marker = findFigureMarkers(first.text).firstOrNull;
+    if (!first.math &&
+        marker != null &&
+        marker.isDefinition &&
+        marker.start == 0) {
+      final rest = first.text.substring(marker.end);
+      return ExportBlock(BlockKind.caption, [
+        Run('${figures.nameOf(marker.kind, marker.label)}.', bold: true),
+        if (rest.isNotEmpty)
+          Run(
+            rest,
+            bold: first.bold,
+            italic: first.italic,
+            strike: first.strike,
+            link: first.link,
+          ),
+        ...runs.skip(1),
+      ]);
+    }
+  }
+  return ExportBlock(kind, runs, ordinal: ordinal);
+}
+
+Run _run(
+  String text,
+  Map<String, dynamic> attrs,
+  CitationResolver resolver,
+  FigureIndex figures,
+) {
   final link = attrs['link'] as String?;
   final internal =
       link != null &&
@@ -221,7 +329,7 @@ Run _run(String text, Map<String, dynamic> attrs, CitationResolver resolver) {
           parsePaperPageLink(link) != null ||
           parseAudioTimestampLink(link) != null);
   return Run(
-    resolver.replace(text),
+    resolver.replace(figures.resolve(text)),
     bold: attrs['bold'] == true,
     italic: attrs['italic'] == true,
     strike: attrs['strike'] == true,

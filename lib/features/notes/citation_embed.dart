@@ -125,6 +125,111 @@ class FreshCitations {
   }
 }
 
+/// Rewrites the chip [node] to show [marker], keeping the selection where
+/// it was. The replacement is a plain node: it never plays the entrance.
+void replaceCitationMarker(
+  QuillController controller,
+  Node node,
+  String marker,
+) {
+  final offset = node.documentOffset;
+  controller.replaceText(
+    offset,
+    1,
+    Embeddable(citationEmbedType, marker),
+    null,
+  );
+}
+
+/// A small dialog to set, change or clear the pinpoint of [item]: the page
+/// (or chapter, section, …) and its kind. Returns the new item (with no
+/// locator when cleared), or null when cancelled.
+Future<CiteItem?> showLocatorDialog(BuildContext context, CiteItem item) {
+  return showDialog<CiteItem>(
+    context: context,
+    builder: (_) => _LocatorDialog(item: item),
+  );
+}
+
+class _LocatorDialog extends StatefulWidget {
+  const _LocatorDialog({required this.item});
+
+  final CiteItem item;
+
+  @override
+  State<_LocatorDialog> createState() => _LocatorDialogState();
+}
+
+class _LocatorDialogState extends State<_LocatorDialog> {
+  late final _text = TextEditingController(text: widget.item.locator ?? '');
+  late String _label = widget.item.label ?? 'page';
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final value = _text.text.trim();
+    Navigator.pop(
+      context,
+      value.isEmpty
+          ? CiteItem(widget.item.key)
+          : CiteItem(
+              widget.item.key,
+              locator: value.replaceAllMapped(
+                RegExp(r'(\d)\s*-\s*(?=\d)'),
+                (m) => '${m[1]}–',
+              ),
+              label: _label,
+            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.item.hasLocator ? 'Change page' : 'Page'),
+      content: Row(
+        children: [
+          DropdownButton<String>(
+            value: _label,
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final l in locatorLabels)
+                DropdownMenuItem(value: l, child: Text(locatorName(l))),
+            ],
+            onChanged: (v) => setState(() => _label = v ?? 'page'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _text,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: '42 or 3–5'),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _save(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        if (widget.item.hasLocator)
+          TextButton(
+            onPressed: () => Navigator.pop(context, CiteItem(widget.item.key)),
+            child: const Text('Clear'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Set')),
+      ],
+    );
+  }
+}
+
 /// Inserts a citation chip for [citekey] at [index], followed by a space,
 /// and puts the cursor after it.
 void insertCitation(QuillController controller, int index, String citekey) {
@@ -187,6 +292,7 @@ class CitationEmbedBuilder extends EmbedBuilder {
     final marker = embedContext.node.value.data as String;
     return _CitationChip(
       node: embedContext.node,
+      controller: embedContext.controller,
       marker: marker,
       textStyle: embedContext.textStyle,
     );
@@ -196,11 +302,13 @@ class CitationEmbedBuilder extends EmbedBuilder {
 class _CitationChip extends ConsumerStatefulWidget {
   const _CitationChip({
     required this.node,
+    required this.controller,
     required this.marker,
     required this.textStyle,
   });
 
   final Node node;
+  final QuillController controller;
   final String marker;
   final TextStyle textStyle;
 
@@ -250,6 +358,7 @@ class _CitationChipState extends ConsumerState<_CitationChip>
         anchor: anchor,
         marker: marker,
         onOpen: _openPaper,
+        onPage: _editLocator,
         onDismiss: _closeCard,
         onHover: (over) {
           _overCard = over;
@@ -259,6 +368,21 @@ class _CitationChipState extends ConsumerState<_CitationChip>
     );
     _card = entry;
     overlay.insert(entry);
+  }
+
+  /// Asks for a page (or chapter, …) for the [index]th paper of this chip
+  /// and rewrites the chip in place. The new chip is another node that
+  /// nobody [FreshCitations.mark]ed, so it doesn't animate.
+  Future<void> _editLocator(int index) async {
+    _closeCard();
+    final items = parseCitationGroup(widget.marker);
+    if (index >= items.length) return;
+    final node = widget.node;
+    final result = await showLocatorDialog(context, items[index]);
+    if (result == null || result == items[index]) return;
+    if (node.parent == null) return; // the chip was deleted meanwhile
+    items[index] = result;
+    replaceCitationMarker(widget.controller, node, citationMarkerFor(items));
   }
 
   void _closeCard() {
@@ -410,6 +534,7 @@ class _CitationCardOverlay extends ConsumerWidget {
     required this.anchor,
     required this.marker,
     required this.onOpen,
+    required this.onPage,
     required this.onDismiss,
     required this.onHover,
   });
@@ -417,6 +542,7 @@ class _CitationCardOverlay extends ConsumerWidget {
   final Rect anchor;
   final String marker;
   final void Function(String paperId) onOpen;
+  final void Function(int index) onPage;
   final VoidCallback onDismiss;
   final void Function(bool over) onHover;
 
@@ -428,6 +554,7 @@ class _CitationCardOverlay extends ConsumerWidget {
     final screen = MediaQuery.sizeOf(context);
     final c = Theme.of(context).colorScheme;
     final byKey = ref.watch(_citedPapersProvider(marker)).value ?? const {};
+    final items = parseCitationGroup(marker);
     final width = _width.clamp(0.0, screen.width - 24);
     final left = (anchor.left).clamp(12.0, screen.width - width - 12);
     final below =
@@ -461,10 +588,17 @@ class _CitationCardOverlay extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final (i, key) in citedKeys(marker).indexed) ...[
+                  for (final (i, key) in [
+                    for (final it in items) it.key,
+                  ].indexed) ...[
                     if (i > 0) const Divider(height: 20),
                     if (byKey[key] case final paper?)
-                      _CitedPaperSection(paper: paper, onOpen: onOpen)
+                      _CitedPaperSection(
+                        paper: paper,
+                        item: items[i],
+                        onOpen: onOpen,
+                        onPage: () => onPage(i),
+                      )
                     else
                       Text(
                         '@$key isn\'t in your library.',
@@ -502,10 +636,17 @@ class _CitationCardOverlay extends ConsumerWidget {
 }
 
 class _CitedPaperSection extends ConsumerWidget {
-  const _CitedPaperSection({required this.paper, required this.onOpen});
+  const _CitedPaperSection({
+    required this.paper,
+    required this.item,
+    required this.onOpen,
+    required this.onPage,
+  });
 
   final Paper paper;
+  final CiteItem item;
   final void Function(String paperId) onOpen;
+  final VoidCallback onPage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -555,9 +696,17 @@ class _CitedPaperSection extends ConsumerWidget {
           ),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () => onOpen(paper.id),
-            child: const Text('Open paper'),
+          child: Wrap(
+            children: [
+              TextButton(
+                onPressed: onPage,
+                child: Text(item.hasLocator ? 'Change page' : 'Page…'),
+              ),
+              TextButton(
+                onPressed: () => onOpen(paper.id),
+                child: const Text('Open paper'),
+              ),
+            ],
           ),
         ),
       ],

@@ -57,6 +57,7 @@ class CslContext {
     this.fullNames = false,
     this.position = 'first',
     this.locator,
+    this.locatorLabel = 'page',
   });
 
   /// CSL-JSON, plus `citation-number`.
@@ -77,6 +78,9 @@ class CslContext {
   final bool fullNames;
   final String position;
   final String? locator;
+
+  /// The CSL locator type of [locator] (`page`, `chapter`, `section`, …).
+  final String locatorLabel;
 
   final suppressed = <String>{};
   final emitted = <String>{};
@@ -298,8 +302,8 @@ class CslEngine {
       final d = ctx.item[v];
       results.add(d is Map && d['circa'] == true);
     }
-    for (final _ in list('locator')) {
-      results.add(false);
+    for (final v in list('locator')) {
+      results.add(ctx.locator != null && ctx.locatorLabel == v);
     }
     for (final v in list('position')) {
       results.add(switch (v) {
@@ -488,6 +492,7 @@ class CslEngine {
     if (raw == null) return _Out();
     final plural = _labelPlural(e, v, raw, null);
     final termName = switch (v) {
+      'locator' => ctx.locatorLabel,
       'number-of-pages' => 'page',
       'number-of-volumes' => 'volume',
       'chapter-number' => 'chapter',

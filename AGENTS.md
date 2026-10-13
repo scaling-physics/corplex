@@ -420,6 +420,66 @@ the default screens until the user opts in by using the feature.
   matrix "+" sheet ("Add study columns" skips fields already present);
   deleting one leaves papers untouched; Markdown copy includes it.
 
+### v1.9 — Thesis writing II (built; emulator-checked)
+- **Page locators** (`library/citations.dart`, `csl/`,
+  `notes/citation_embed.dart`): pandoc locators in the stored marker —
+  `[@key, p. 42]`, `[@a, pp. 3–5; @b]`, `[@key, chap. 2]`; a bare number is
+  a page, unrecognised text a label-less free-text locator.
+  `parseCitationGroup` → `CiteItem {key, locator, label}` is the one parser;
+  `citedKeys` ignores locators and `[@?]` stays a to-do. Output: APA
+  "(Kandel et al., 2013, p. 42)", MLA "(Smith 42)", IEEE "[1, p. 42]"; CSL
+  gets them through `CslCite` clusters (`CslProcessor.process(cites:)`,
+  `CslContext.locatorLabel`, `<if locator=…>`); styles without locator rules
+  (Nature) ignore them. The chip shows the locator; its long-press card has
+  "Page…"/"Change page" (`replaceCitationMarker`, no pop-in). The cite
+  picker deliberately has no page field (it would add a step). Vault:
+  `[[@key Title|@key]], p. 42`.
+- **Chapter versions** (`notes/note_versions*.dart`, table `note_versions`,
+  schema v16, synced; server file `20261007000000_note_versions.sql`,
+  **apply it before schema-v16 data syncs**): an immutable copy of a note's
+  title and body (only the label changes), cascading with the note.
+  `setChapterStatus` saves "Sent to supervisor" when a chapter becomes
+  "With supervisor" (skipped if the newest version is identical). Note ⋮ →
+  Versions (`showNoteVersions`, which flushes the editor's `_save` first):
+  newest first with words and change since, "Save a version now" (optional
+  name), rename/delete with Undo. A version opens a compare view (line LCS
+  over plain text, citations as `[@key]`, sketches as "[Sketch]"); Restore
+  saves the current text as "Before restoring", then rewrites the note — the
+  open editor takes it as a clean replace because it was flushed. In trash
+  snapshots and backups; not in search or the vault.
+- **Figures and tables** (`notes/figure_markers.dart`, `figure_embed.dart`,
+  `projects/figures.dart`): stored as text — a caption is a paragraph
+  starting `{#fig:LABEL}` / `{#tbl:LABEL}` (LABEL a short random id), a
+  reference is `{@fig:LABEL}` / `{@tbl:LABEL}`; numbers are never stored.
+  The editor shows chips via `editorDocument`/`storedFromEditor`
+  (`notes/editor_document.dart` — the single stored↔editor crossing point;
+  to-dos and abbreviations measure offsets with it). A number is
+  `chapter.n` (chapter = position in `projectChaptersProvider`, n = same-kind
+  captions in the note, live from the document via `FigureScope`, told once
+  per document change); outside a project just `n`; a note in several
+  projects uses the first by `createdAt`. Unknown label → "Figure ??".
+  `/` → Figure caption, Table caption, Refer to a figure or table. Exports:
+  `BlockKind.caption` with bold "Figure 3.2."; project exports open with
+  lists of figures and tables (`exportFrontMatter`, plus
+  `extraFrontMatter`); single-note exports use `figureIndexForNote` so
+  numbers match the editor; Markdown share and the vault number per note.
+  List previews and search read markers as words (`notePlainTextPreview`).
+- **Abbreviations** (`projects/abbreviations*.dart`, nothing stored):
+  `findAbbreviationDefinitions` runs Schwartz & Hearst over the editor text
+  ("medial prefrontal cortex (mPFC)", also "mPFC (medial prefrontal
+  cortex)"; plural short forms define the singular), with citations, figure
+  markers, maths and URLs blanked at equal length so offsets match
+  `editorDocument`. `analyzeAbbreviations` flags, per chapter, a short form
+  defined anywhere in the project whose first use in that chapter isn't its
+  definition; one long form per short form (most common across chapters,
+  tie → first); undefined abbreviation-like tokens go under a collapsed
+  "Never spelled out" (ignores Roman numerals, panel labels like 2A, `TODO`,
+  all-caps headings). `ProjectAbbreviationsSection` sits on the project page
+  under the to-dos, invisible without definitions or issues; "List" copies
+  Markdown or tab-separated text. Project exports get an "Abbreviations"
+  front-matter section (`abbreviationBlocks`, via `extraFrontMatter` in
+  `project_menu.dart`).
+
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This
   conflicts with offline-first, so it would be strictly additive and

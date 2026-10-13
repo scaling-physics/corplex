@@ -15,7 +15,7 @@ List<Map<String, Object?>> _json(Iterable<Insertable> rows) => [
   for (final r in rows) (r as dynamic).toJson() as Map<String, Object?>,
 ];
 
-/// Moves a note to the trash: snapshots it with its attachments, tags,
+/// Moves a note to the trash: snapshots it with its attachments, saved versions, tags,
 /// paper links and project memberships, then deletes it. Returns the trash
 /// item's id (for Undo).
 Future<String> trashNote(AppDatabase db, String noteId) => db.transaction(() async {
@@ -26,6 +26,7 @@ Future<String> trashNote(AppDatabase db, String noteId) => db.transaction(() asy
     'tags': _json(await (db.select(db.noteTags)..where((r) => r.noteId.equals(noteId))).get()),
     'papers': _json(await (db.select(db.notePaperRefs)..where((r) => r.noteId.equals(noteId))).get()),
     'projects': _json(await (db.select(db.projectNotes)..where((r) => r.noteId.equals(noteId))).get()),
+    'versions': _json(await (db.select(db.noteVersions)..where((r) => r.noteId.equals(noteId))).get()),
   };
   final id = await _store(db, TrashKind.note, noteId, note.title, payload);
   await (db.delete(db.notes)..where((n) => n.id.equals(noteId))).go();
@@ -106,6 +107,11 @@ Future<void> restoreFromTrash(AppDatabase db, String trashId) => db.transaction(
     for (final a in list('attachments')) {
       await db.into(db.attachments).insertOnConflictUpdate(
         Attachment.fromJson({...reupload(a, 'path'), 'updatedAt': now.millisecondsSinceEpoch}),
+      );
+    }
+    for (final v in list('versions')) {
+      await db.into(db.noteVersions).insertOnConflictUpdate(
+        NoteVersion.fromJson({...v, 'updatedAt': now.millisecondsSinceEpoch}),
       );
     }
     for (final r in list('tags')) {

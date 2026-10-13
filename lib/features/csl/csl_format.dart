@@ -66,22 +66,26 @@ class CslCitationPlan {
     if (csl == null) return null;
     final keyIndex = <String, int>{};
     final papers = <Paper>[];
-    final clusters = <List<int>>[];
+    final clusters = <List<CslCite>>[];
     final order = <int>[]; // marker occurrence -> cluster index or -1
     for (final text in pieces) {
       for (final m in _marker.allMatches(text)) {
-        final keys = citedKeys(m.group(0)!);
-        if (keys.isEmpty || keys.any((k) => !byKey.containsKey(k))) {
+        final items = parseCitationGroup(m.group(0)!);
+        if (items.isEmpty || items.any((i) => !byKey.containsKey(i.key))) {
           order.add(-1);
           continue;
         }
-        final cluster = <int>[];
-        for (final k in keys) {
+        final cluster = <CslCite>[];
+        for (final i in items) {
           cluster.add(
-            keyIndex.putIfAbsent(k, () {
-              papers.add(byKey[k]!);
-              return papers.length - 1;
-            }),
+            CslCite(
+              keyIndex.putIfAbsent(i.key, () {
+                papers.add(byKey[i.key]!);
+                return papers.length - 1;
+              }),
+              locator: i.hasLocator ? i.locator : null,
+              label: i.label ?? '', // free text: no label
+            ),
           );
         }
         order.add(clusters.length);
@@ -90,7 +94,7 @@ class CslCitationPlan {
     }
     if (papers.isEmpty) return CslCitationPlan._(const [], const [], order);
     final out = CslProcessor(csl)
-        .process([for (final p in papers) paperToCsl(p)], clusters: clusters);
+        .process([for (final p in papers) paperToCsl(p)], cites: clusters);
     return CslCitationPlan._(out.citations, papers, order);
   }
 

@@ -95,6 +95,18 @@ const syncTables = [
     columns: ['title', 'content', 'folder_id', 'created_at', 'updated_at'],
   ),
   SyncTableSpec(
+    'note_versions',
+    keys: ['id'],
+    columns: [
+      'note_id',
+      'title',
+      'content',
+      'label',
+      'created_at',
+      'updated_at',
+    ],
+  ),
+  SyncTableSpec(
     'note_tags',
     keys: ['note_id', 'tag_id'],
     columns: ['updated_at'],

@@ -1,5 +1,7 @@
 import '../audio/audio_link.dart';
 import '../library/highlights.dart';
+import '../projects/figures.dart';
+import 'figure_markers.dart';
 import 'math_markers.dart';
 import 'note_content.dart';
 import 'note_links.dart';
@@ -8,9 +10,20 @@ import 'note_links.dart';
 /// italic, strikethrough, lists, quotes and links. Corplex's own links
 /// (other notes, paper pages, audio timestamps) only mean something inside
 /// the app, so they're written as their plain text; sketches become a
-/// "[Sketch]" placeholder.
-String noteToMarkdown({required String title, required String content}) {
-  final delta = decodeNoteContent(content).toDelta();
+/// "[Sketch]" placeholder. Figure and table captions become
+/// "**Figure 2.** caption" and references "Figure 2", numbered within this
+/// note alone (a project's chapter numbers need the other notes).
+String noteToMarkdown({
+  required String title,
+  required String content,
+  FigureIndex? figures,
+}) {
+  // The editor's form (figure chips) is turned back to markers first.
+  final stored = figureEmbedsToText(content);
+  final index =
+      figures ??
+      buildFigureIndex([FigureNote(noteId: '', title: title, content: stored)]);
+  final delta = decodeNoteContent(stored).toDelta();
   final lines = <String>[];
   var line = StringBuffer();
   var ordinal = 0;
@@ -33,7 +46,16 @@ String noteToMarkdown({required String title, required String content}) {
     final text = data as String;
     final parts = text.split('\n');
     for (var i = 0; i < parts.length; i++) {
-      if (parts[i].isNotEmpty) line.write(_inline(parts[i], attrs));
+      var part = parts[i];
+      if (line.isEmpty && part.isNotEmpty) {
+        final m = findFigureMarkers(part).firstOrNull;
+        if (m != null && m.isDefinition && m.start == 0) {
+          line.write('**${index.nameOf(m.kind, m.label)}.**');
+          part = part.substring(m.end);
+        }
+      }
+      part = index.resolve(part);
+      if (part.isNotEmpty) line.write(_inline(part, attrs));
       if (i < parts.length - 1) {
         // A newline: its attributes are the line's block style.
         final list = attrs['list'];

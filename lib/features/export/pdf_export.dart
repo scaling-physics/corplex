@@ -134,6 +134,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
         ),
         child: rich(11, after: 0),
       ),
+      BlockKind.caption => rich(10, before: 2, after: 10),
       BlockKind.displayMath => pw.SizedBox(),
       BlockKind.paragraph =>
         b.runs.every((r) => r.text.isEmpty) ? pw.SizedBox(height: 6) : rich(11),

@@ -14,7 +14,7 @@ String exportToMarkdown(ExportDoc doc) {
       BlockKind.bullet => '- $text',
       BlockKind.ordered => '${b.ordinal}. $text',
       BlockKind.quote => '> $text',
-      BlockKind.paragraph => text,
+      BlockKind.paragraph || BlockKind.caption => text,
       BlockKind.displayMath => '\$\$\n${b.text}\n\$\$',
     };
     // Markdown paragraphs are separated by a blank line; list items stick

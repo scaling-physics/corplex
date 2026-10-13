@@ -12,6 +12,7 @@ import '../csl/csl_rich.dart';
 import '../csl/style_picker.dart';
 import '../library/citation_formatter.dart';
 import '../library/citations.dart';
+import '../projects/figures.dart';
 import '../notes/note_content.dart';
 import 'docx_export.dart';
 import 'export_model.dart';
@@ -138,6 +139,8 @@ Future<void> exportNotes(
   AppDatabase db,
   List<ExportNote> notes, {
   required String title,
+  FigureIndex? figures,
+  List<ExportBlock> extraFrontMatter = const [],
 }) async {
   final choice = await showExportSheet(context);
   if (choice == null || !context.mounted) return;
@@ -146,6 +149,8 @@ Future<void> exportNotes(
     notes,
     title: title,
     style: choice.style,
+    figures: figures,
+    extraFrontMatter: extraFrontMatter,
   );
   if (!context.mounted) return;
   await shareExport(context, doc, choice.format);
@@ -160,10 +165,19 @@ Future<ExportDoc> buildStyledExportDoc(
   List<ExportNote> notes, {
   required String title,
   required CitationStyle style,
+  FigureIndex? figures,
+  List<ExportBlock> extraFrontMatter = const [],
 }) async {
-  if (!style.isCsl) {
-    return buildExportDoc(db, notes, title: title, style: style);
-  }
+  Future<ExportDoc> plain(List<ExportNote> n, CitationStyle st) =>
+      buildExportDoc(
+        db,
+        n,
+        title: title,
+        style: st,
+        figures: figures,
+        extraFrontMatter: extraFrontMatter,
+      );
+  if (!style.isCsl) return plain(notes, style);
   // Read each note's text pieces once, in order.
   final deltas = [
     for (final n in notes)
@@ -190,9 +204,7 @@ Future<ExportDoc> buildStyledExportDoc(
   final plan = await CslCitationPlan.build(pieces, {
     for (final p in papers) p.citekey!: p,
   }, style);
-  if (plan == null) {
-    return buildExportDoc(db, notes, title: title, style: style);
-  }
+  if (plan == null) return plain(notes, style);
   final rewritten = <ExportNote>[];
   for (var i = 0; i < notes.length; i++) {
     for (final op in deltas[i]) {
@@ -201,7 +213,13 @@ Future<ExportDoc> buildStyledExportDoc(
     }
     rewritten.add(ExportNote(notes[i].title, jsonEncode(deltas[i])));
   }
-  final doc = await buildExportDoc(db, rewritten, title: title);
+  final doc = await buildExportDoc(
+    db,
+    rewritten,
+    title: title,
+    figures: figures,
+    extraFrontMatter: extraFrontMatter,
+  );
   if (plan.cited.isEmpty) return doc;
   final refs = await referenceEntries(plan.cited, style);
   return ExportDoc(title, [

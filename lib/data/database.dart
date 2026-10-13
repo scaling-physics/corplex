@@ -15,6 +15,7 @@ import 'tables/highlights_table.dart';
 import 'tables/matrix_table.dart';
 import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
+import 'tables/note_versions_table.dart';
 import 'tables/ocr_table.dart';
 import 'tables/notes_table.dart';
 import 'tables/papers_table.dart';
@@ -40,6 +41,7 @@ part 'database.g.dart';
     ProjectNotes,
     MatrixColumns,
     MatrixCells,
+    NoteVersions,
     TrashItems,
     OcrPages,
     OcrPapers,
@@ -63,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -238,6 +240,14 @@ class AppDatabase extends _$AppDatabase {
               'ALTER TABLE $table ADD COLUMN $column $type',
             );
           }
+        }
+        await _createSyncSchema(markExisting: false);
+      }
+      if (from < 16) {
+        // v16: saved versions of a note. A new synced table; nothing to
+        // backfill.
+        if (!await _hasTable('note_versions')) {
+          await m.createTable(noteVersions);
         }
         await _createSyncSchema(markExisting: false);
       }

@@ -114,6 +114,15 @@ ignored. On iPad, Pencil double-tap follows your iPadOS setting.
   status (outline → final), word targets and a due date; see which papers
   you read but never cited, and every `TODO`, `[@?]` (needs a citation)
   and `[fig: …]` you left in the text.
+- **Thesis finishing touches** — cite a specific page (long-press a
+  citation, **Page…**, and *(Kandel et al., 2013, p. 42)* follows into every
+  style); numbered figures and tables per chapter ("Figure 3.2") with
+  references that stay right when things move; a list of abbreviations built
+  from what you wrote, with a nudge wherever one isn't spelled out at first
+  use in a chapter; and **versions** — a copy is kept when a chapter goes to
+  your supervisor (or save one any time), to compare line by line or
+  restore. Project exports open with lists of figures, tables and
+  abbreviations.
 - **Study details** — record species, brain regions, techniques, sample
   size and paradigm for each paper, filter the Library by them ("mouse
   2-photon studies with n ≥ 10"), and pull them into the synthesis matrix

@@ -9,6 +9,7 @@ import '../../data/database.dart';
 import '../../data/tables/attachments_table.dart';
 import '../library/authors.dart';
 import '../library/citation_formatter.dart';
+import '../library/citations.dart' show parseCitationGroup;
 import '../library/highlights.dart';
 import '../library/study_details.dart';
 import '../notes/note_content.dart';
@@ -27,7 +28,8 @@ import '../notes/note_markdown.dart';
 /// Obsidian wiki-link with an alias, so the graph and backlinks work:
 /// a note link is `[[Other title]]`; a citation `[@key]` becomes
 /// `[[@key Short title|@key]]` and a "— p. 4" paper link
-/// `[[@key Short title|— p. 4]]`. Wiki-links win over keeping pandoc's
+/// `[[@key Short title|— p. 4]]`. A citation's page stays outside the link:
+/// `[@key, p. 42]` is `[[@key Short title|@key]], p. 42`. Wiki-links win over keeping pandoc's
 /// `[@key]` because Obsidian cannot link from inside a citation, while
 /// pandoc users lose nothing: the alias is `@key` and `references.bib` uses
 /// the same keys, so `s/\[\[[^|]*\|(@[^\]]+)\]\]/[\1]/` (or pandoc's
@@ -544,11 +546,15 @@ String _rewriteLinks(
       op['insert'] = replacement;
     } else if (link == null) {
       op['insert'] = data.replaceAllMapped(_citation, (m) {
-        final parts = m.group(1)!.split(';').map((s) => s.trim()).toList();
+        final items = parseCitationGroup(m.group(0)!);
+        if (items.isEmpty) return m.group(0)!;
+        // A pinpoint follows its link: `[[@key Title|@key]], p. 42`.
         final linked = [
-          for (final part in parts)
-            citation(part.startsWith('@') ? part.substring(1) : part) ??
-                '[$part]',
+          for (final item in items)
+            if (citation(item.key) case final link?)
+              item.display == null ? link : '$link, ${item.display}'
+            else
+              '[${item.markup}]',
         ];
         return linked.join('; ');
       });

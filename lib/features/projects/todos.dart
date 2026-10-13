@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database_provider.dart';
 import '../home/adaptive.dart';
-import '../notes/citation_embed.dart' show citationsToEmbeds;
-import '../notes/math_markers.dart' show mathToEmbeds;
-import '../notes/note_content.dart' show decodeNoteContent;
+import '../notes/editor_document.dart';
 import '../notes/note_editor_screen.dart';
 import 'coverage.dart' show ChapterQuery;
 import 'open_from_page.dart';
@@ -70,9 +68,7 @@ final _figure = RegExp(r'\[fig:\s*([^\]\n]*)\]|\[FIG\]');
 /// each), so selecting `offset` .. `offset + length` in the editor lands on
 /// the marker even after chips earlier in the text.
 List<WritingTodo> findTodos(String storedContent) {
-  final plain = decodeNoteContent(
-    citationsToEmbeds(mathToEmbeds(storedContent)),
-  ).toPlainText();
+  final plain = editorDocument(storedContent).toPlainText();
   final out = <WritingTodo>[];
   final taken = <(int, int)>[];
 

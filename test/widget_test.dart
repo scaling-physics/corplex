@@ -748,7 +748,9 @@ void main() {
 
       await tester.tap(find.byTooltip('More').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Move to trash'));
+      await tester.ensureVisible(find.text('Move to trash'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to trash'));
       await tester.pumpAndSettle();
 
       // Back on the library, which no longer lists it.
@@ -808,7 +810,9 @@ void main() {
 
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Move to trash'));
+      await tester.ensureVisible(find.text('Move to trash'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to trash'));
       await tester.pumpAndSettle();
 
       expect(find.text('Notes'), findsWidgets); // back on the list

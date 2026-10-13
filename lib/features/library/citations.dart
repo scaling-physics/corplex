@@ -65,25 +65,182 @@ Future<String> ensureCitekey(AppDatabase db, String paperId) async {
 }
 
 final _group = RegExp(r'\[@[^\]]+\]');
-final _keyPattern = RegExp(r'^[A-Za-z0-9_:.\-]+$');
 
-/// Citekeys used in [text], in order of first use.
+/// One cited paper inside a `[@…]` marker, with its optional pinpoint:
+/// `@key, p. 42` is key `key`, locator `42`, label `page`.
+class CiteItem {
+  const CiteItem(this.key, {this.locator, this.label});
+
+  final String key;
+
+  /// The pinpoint as written without its label (`42`, `3–5`, `2`), or free
+  /// text when it didn't parse as a labelled locator.
+  final String? locator;
+
+  /// A CSL locator type (`page`, `chapter`, `section`, `figure`,
+  /// `paragraph`, `volume`, `line`, `note`), or null for free text.
+  final String? label;
+
+  bool get hasLocator => locator != null && locator!.isNotEmpty;
+
+  /// Whether the locator names several things (`3–5`, `3, 7`), which turns
+  /// "p." into "pp.".
+  bool get plural => hasLocator && _rangeMark.hasMatch(locator!);
+
+  /// The locator as printed in a hand-written style: `p. 42`, `pp. 3–5`,
+  /// `chap. 2`; free text as is. Null without a locator.
+  String? get display {
+    if (!hasLocator) return null;
+    final l = label;
+    if (l == null) return locator;
+    return '${locatorAbbreviation(l, plural: plural)} $locator';
+  }
+
+  /// This item as written inside a marker: `@key, p. 42`.
+  String get markup => hasLocator
+      ? '@$key, ${label == null ? '' : '${locatorAbbreviation(label!, plural: plural)} '}$locator'
+      : '@$key';
+
+  @override
+  bool operator ==(Object other) =>
+      other is CiteItem &&
+      other.key == key &&
+      other.locator == locator &&
+      other.label == label;
+
+  @override
+  int get hashCode => Object.hash(key, locator, label);
+
+  @override
+  String toString() => 'CiteItem($markup)';
+}
+
+final _rangeMark = RegExp(r'[,&\-–—]');
+
+/// The locator types a citation can carry, in the order a picker shows them.
+const locatorLabels = [
+  'page',
+  'chapter',
+  'section',
+  'figure',
+  'paragraph',
+  'volume',
+  'line',
+  'note',
+];
+
+/// `p.` / `pp.`, `chap.`, `sec.`, `fig.`, `para.`, `vol.`, `l.` / `ll.`,
+/// `n.` / `nn.` for a CSL locator type.
+String locatorAbbreviation(String label, {bool plural = false}) =>
+    switch (label) {
+      'page' => plural ? 'pp.' : 'p.',
+      'chapter' => plural ? 'chaps.' : 'chap.',
+      'section' => plural ? 'secs.' : 'sec.',
+      'figure' => plural ? 'figs.' : 'fig.',
+      'paragraph' => plural ? 'paras.' : 'para.',
+      'volume' => plural ? 'vols.' : 'vol.',
+      'line' => plural ? 'll.' : 'l.',
+      'note' => plural ? 'nn.' : 'n.',
+      _ => label,
+    };
+
+/// "Page", "Chapter" … for a picker.
+String locatorName(String label) =>
+    label.isEmpty ? label : '${label[0].toUpperCase()}${label.substring(1)}';
+
+final _itemPattern = RegExp(r'^@([A-Za-z0-9_:.\-]+)(?:\s*,\s*(.*))?$');
+
+// Longest alternatives first; one-letter forms need their period.
+final _labelPattern = RegExp(
+  r'^(?:(pp?)\.?|(pages?)|(chaps?|chs?)\.?|(chapters?)|(secs?)\.?|(sections?)|'
+  r'(§§?)|(figs?)\.?|(figures?)|(paras?)\.?|(paragraphs?)|(¶¶?)|'
+  r'(vols?)\.?|(volumes?)|(ll?)\.|(nn?)\.|(notes?))(?=[\s\d]|$)\s*(.*)$',
+  caseSensitive: false,
+);
+final _bareLocator = RegExp(
+  r'^[A-Za-z]?\d+[A-Za-z]?(\s*[,&\-–—]\s*[A-Za-z]?\d+[A-Za-z]?)*$',
+);
+
+String _normalizeRange(String s) =>
+    s.replaceAllMapped(RegExp(r'(\d)\s*-\s*(?=\d)'), (m) => '${m[1]}–');
+
+String? _labelOf(RegExpMatch m) {
+  const labels = [
+    'page',
+    'page',
+    'chapter',
+    'chapter',
+    'section',
+    'section',
+    'section',
+    'figure',
+    'figure',
+    'paragraph',
+    'paragraph',
+    'paragraph',
+    'volume',
+    'volume',
+    'line',
+    'note',
+    'note',
+  ];
+  for (var i = 1; i <= labels.length; i++) {
+    if (m.group(i) != null) return labels[i - 1];
+  }
+  return null;
+}
+
+/// The items of one marker such as `[@a, pp. 3–5; @b]`. Text after a comma
+/// is a locator: a leading `p.`/`pp.`/`page`, `chap.`/`ch.`, `sec.`/`§`,
+/// `fig.`, `para.`/`¶`, `vol.`, `l.`/`ll.`, `n.` sets its label, a bare
+/// number means a page, anything else is kept as free text without a
+/// label. Parts that aren't a citekey (the `[@?]` to-do marker) are
+/// skipped. Ranges written with a hyphen print with an en dash.
+List<CiteItem> parseCitationGroup(String marker) {
+  var inner = marker.trim();
+  if (inner.startsWith('[')) inner = inner.substring(1);
+  if (inner.endsWith(']')) inner = inner.substring(0, inner.length - 1);
+  final out = <CiteItem>[];
+  for (final part in inner.split(';')) {
+    final m = _itemPattern.firstMatch(part.trim());
+    if (m == null) continue;
+    final key = m.group(1)!;
+    final rest = (m.group(2) ?? '').trim();
+    if (rest.isEmpty) {
+      out.add(CiteItem(key));
+      continue;
+    }
+    final lm = _labelPattern.firstMatch(rest);
+    if (lm != null && lm.group(18)!.trim().isNotEmpty) {
+      out.add(
+        CiteItem(
+          key,
+          locator: _normalizeRange(lm.group(18)!.trim()),
+          label: _labelOf(lm),
+        ),
+      );
+    } else if (_bareLocator.hasMatch(rest)) {
+      out.add(CiteItem(key, locator: _normalizeRange(rest), label: 'page'));
+    } else {
+      out.add(CiteItem(key, locator: rest));
+    }
+  }
+  return out;
+}
+
+/// A marker for [items]: `[@a, p. 3; @b]`.
+String citationMarkerFor(List<CiteItem> items) =>
+    '[${items.map((i) => i.markup).join('; ')}]';
+
+/// Citekeys used in [text], in order of first use. Locators are ignored.
 List<String> citedKeys(String text) {
   final keys = <String>[];
   for (final m in _group.allMatches(text)) {
-    for (final key in _keysIn(m.group(0)!)) {
-      if (!keys.contains(key)) keys.add(key);
+    for (final item in parseCitationGroup(m.group(0)!)) {
+      if (!keys.contains(item.key)) keys.add(item.key);
     }
   }
   return keys;
-}
-
-Iterable<String> _keysIn(String group) sync* {
-  final inner = group.substring(1, group.length - 1); // drop [ ]
-  for (final part in inner.split(';')) {
-    final key = part.trim().replaceFirst('@', '');
-    if (key.isNotEmpty && _keyPattern.hasMatch(key)) yield key;
-  }
 }
 
 /// The papers behind [keys], in the order of [keys]; unknown keys are
@@ -99,7 +256,18 @@ Future<List<Paper>> papersForCitekeys(AppDatabase db, List<String> keys) async {
 
 /// `(Vaswani et al., 2017)` in APA/Harvard/Chicago, `(Vaswani)` in MLA,
 /// `[1]` numbering is handled by [replaceCitations] for IEEE.
-String inTextCitation(Paper paper, CitationStyle style) {
+///
+/// A [locator] (with its CSL [label], default page) is added: `(Vaswani et
+/// al., 2017, p. 42)`, MLA `(Vaswani 42)`.
+String inTextCitation(
+  Paper paper,
+  CitationStyle style, {
+  String? locator,
+  String? label,
+}) {
+  final cite = locator == null || locator.isEmpty
+      ? null
+      : CiteItem('', locator: locator, label: label);
   final list = parseAuthors(paper.authors);
   final year = paper.year?.toString() ?? 'n.d.';
   String who() {
@@ -113,9 +281,15 @@ String inTextCitation(Paper paper, CitationStyle style) {
     return a.single.family;
   }
 
+  final pin = cite?.display;
   return switch (style) {
-    CitationStyle.mla => '(${who()})',
-    _ => '(${who()}, $year)',
+    CitationStyle.mla =>
+      pin == null
+          ? '(${who()})'
+          : cite!.label == 'page'
+          ? '(${who()} ${cite.locator})'
+          : '(${who()}, $pin)',
+    _ => pin == null ? '(${who()}, $year)' : '(${who()}, $year, $pin)',
   };
 }
 
@@ -147,21 +321,31 @@ class CitationResolver {
   List<Paper> get cited => [for (final k in _order) byKey[k]!];
 
   String replace(String text) => text.replaceAllMapped(_group, (m) {
-    final keys = _keysIn(m.group(0)!).toList();
-    if (keys.isEmpty || keys.any((k) => !byKey.containsKey(k))) {
+    final items = parseCitationGroup(m.group(0)!);
+    if (items.isEmpty || items.any((i) => !byKey.containsKey(i.key))) {
       return m.group(0)!;
     }
-    for (final k in keys) {
-      if (!_order.contains(k)) _order.add(k);
+    for (final i in items) {
+      if (!_order.contains(i.key)) _order.add(i.key);
     }
     if (style == CitationStyle.ieee) {
-      return keys.map((k) => '[${_order.indexOf(k) + 1}]').join('');
+      return items
+          .map((i) {
+            final n = _order.indexOf(i.key) + 1;
+            return i.display == null ? '[$n]' : '[$n, ${i.display}]';
+          })
+          .join('');
     }
-    if (keys.length == 1) return inTextCitation(byKey[keys.single]!, style);
+    String one(CiteItem i) => inTextCitation(
+      byKey[i.key]!,
+      style,
+      locator: i.locator,
+      label: i.label,
+    );
+    if (items.length == 1) return one(items.single);
     // (A, 2017; B, 2019)
     final parts = [
-      for (final k in keys)
-        inTextCitation(byKey[k]!, style).replaceAll(RegExp(r'^\(|\)$'), ''),
+      for (final i in items) one(i).replaceAll(RegExp(r'^\(|\)$'), ''),
     ];
     return '(${parts.join('; ')})';
   });

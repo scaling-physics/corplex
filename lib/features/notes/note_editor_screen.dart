@@ -25,7 +25,13 @@ import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
 import '../settings/appearance_settings.dart';
 import '../library/metadata_lookup.dart';
+import 'editor_document.dart';
+import 'figure_embed.dart';
+import 'figure_markers.dart';
+import '../projects/figures.dart';
+import '../projects/todos.dart' show openNoteAtSelection;
 import 'note_stats.dart';
+import 'note_versions_screen.dart';
 import 'paste_citation.dart';
 import '../../theme/haptics.dart';
 import '../projects/projects_providers.dart';
@@ -36,7 +42,6 @@ import 'cite_paper_sheet.dart';
 import 'citation_embed.dart';
 import '../csl/style_picker.dart';
 import 'math_embed.dart';
-import 'math_markers.dart';
 import 'note_bibliography.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
@@ -113,6 +118,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   late final AppDatabase _db = ref.read(databaseProvider);
   StreamSubscription<DocChange>? _docChanges;
 
+  /// Figure and table numbers for the chips in this note.
+  final _figures = FigureScope();
+
   // Owned here, not left to QuillEditor.basic: it makes a fresh FocusNode on
   // every build, so any rebuild (e.g. after an autosave) dropped the body's
   // focus and the keyboard jumped to the title mid-sentence.
@@ -140,6 +148,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   void initState() {
     super.initState();
     _loadNote();
+    _figures.onOpen = _openFigure;
+    ref.listenManual<FigureContext>(
+      figureContextProvider(widget.noteId),
+      (_, next) => _figures.setContext(next, widget.noteId),
+      fireImmediately: true,
+    );
     // A to-do tapped on the project page while this note is already open.
     ref.listenManual<NoteSelectionRequest?>(pendingNoteSelectionProvider, (
       _,
@@ -184,6 +198,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _quillController.addListener(_scheduleSave);
     _quillController.addListener(_followCursor);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
+    _figures.documentChanged(document);
     widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
     if (want != null) _revealInitialSelection();
@@ -288,20 +303,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await _docChanges?.cancel();
     _quillController.document = _editable(content);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
+    _figures.documentChanged(_quillController.document);
     await linkPaperToNote(_db, noteId: widget.noteId, paperId: paperId);
     _scheduleSave();
   }
 
   /// The note as it is stored: citation chips written out as `[@key]`
   /// (see `citation_embed.dart`).
-  String _stored() =>
-      citationEmbedsToText(
-        mathEmbedsToText(encodeNoteContent(_quillController.document)),
-      );
+  String _stored() => storedFromEditor(_quillController.document);
 
   /// Stored content as the editor shows it, with citations as chips.
-  static Document _editable(String stored) =>
-      decodeNoteContent(citationsToEmbeds(mathToEmbeds(stored)));
+  static Document _editable(String stored) => editorDocument(stored);
 
   void _scheduleSave() {
     _debounce?.cancel();
@@ -361,6 +373,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final document = _editable(merged);
     _quillController.document = document;
     _docChanges = document.changes.listen(_watchForWikilink);
+    _figures.documentChanged(document);
     final max = document.length - 1;
     _quillController.updateSelection(
       TextSelection(
@@ -500,6 +513,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   /// Typing "[[" opens the note picker, like a wiki link; "[@" opens the
   /// paper picker for a citation.
   void _watchForWikilink(DocChange change) {
+    _figures.documentChanged(_quillController.document);
     if (change.source != ChangeSource.local) return;
     // Where the change inserted a single "[", from the change itself
     // rather than the cursor (which may not have moved yet).
@@ -633,18 +647,22 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         // Sized to the list, so every command shows without scrolling.
         isScrollControlled: true,
         builder: (context) => SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final c in _Command.values)
-                if (c != _Command.dictate || ref.read(dictationOfferedProvider))
-                  ListTile(
-                  leading: Icon(c.icon),
-                  title: Text(c.label),
-                  subtitle: Text(c.hint),
-                  onTap: () => Navigator.pop(context, c),
-                ),
-            ],
+          // A column in a scroll view, not a lazy list: every command is
+          // built (and findable), and it scrolls when the screen is short.
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                for (final c in _Command.values)
+                  if (c != _Command.dictate ||
+                      ref.read(dictationOfferedProvider))
+                    ListTile(
+                      leading: Icon(c.icon),
+                      title: Text(c.label),
+                      subtitle: Text(c.hint),
+                      onTap: () => Navigator.pop(context, c),
+                    ),
+              ],
+            ),
           ),
         ),
       );
@@ -665,6 +683,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           await _citePaper(context);
         case _Command.equation:
           await insertDisplayMath(context, _quillController);
+        case _Command.figure:
+          _insertCaption(FigureKind.figure);
+        case _Command.table:
+          _insertCaption(FigureKind.table);
+        case _Command.refer:
+          await _referToFigure(context);
         case _Command.link:
           await _linkNote(context);
         case _Command.draw:
@@ -683,6 +707,93 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           await _recordVoice(context, VoiceMode.dictate);
       }
     });
+  }
+
+  /// Starts a figure or table caption: a numbered chip at the start of the
+  /// current line (on a new line below when the line has text), the cursor
+  /// after it ready for the caption.
+  void _insertCaption(FigureKind kind) {
+    final controller = _quillController;
+    final docEnd = controller.document.length - 1;
+    final cursor = controller.selection.baseOffset;
+    final index = cursor < 0 || cursor > docEnd ? docEnd : cursor;
+    var at = index;
+    final found = controller.document.queryChild(index);
+    if (found.node case final Line line) {
+      at = line.documentOffset;
+      if (line.length > 1) {
+        at += line.length - 1;
+        controller.replaceText(at, 0, '\n', null);
+        at += 1;
+      }
+    }
+    controller.replaceText(
+      at,
+      0,
+      Embeddable(figureDefType, figureDefMarker(kind, newFigureLabel())),
+      null,
+    );
+    controller.replaceText(
+      at + 1,
+      0,
+      ' ',
+      TextSelection.collapsed(offset: at + 2),
+    );
+    _bodyFocus.requestFocus();
+  }
+
+  /// Offers this note's figures and tables and the other chapters', and
+  /// inserts a reference chip at the cursor.
+  Future<void> _referToFigure(BuildContext context) async {
+    final picked = await showFigureRefSheet(context, _figures);
+    if (picked == null || !mounted) return;
+    final controller = _quillController;
+    final docEnd = controller.document.length - 1;
+    final sel = controller.selection;
+    final start = sel.start < 0 || sel.start > docEnd ? docEnd : sel.start;
+    final length = sel.isValid && sel.end <= docEnd ? sel.end - sel.start : 0;
+    controller.replaceText(
+      start,
+      length,
+      Embeddable(figureRefType, figureRefMarker(picked.kind, picked.label)),
+      TextSelection.collapsed(offset: start + 1),
+    );
+    _bodyFocus.requestFocus();
+  }
+
+  /// A reference chip was tapped: select the definition here, or open the
+  /// chapter that holds it, with the definition selected.
+  Future<void> _openFigure(FigureKind kind, String label) async {
+    final entry = _figures.find(kind, label);
+    if (entry == null) return;
+    if (entry.noteId == widget.noteId) {
+      // After the tap itself, which also places the caret under the chip.
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+      for (final d in figureDefsIn(_quillController.document.toDelta())) {
+        if (d.kind != kind || d.label != label) continue;
+        _quillController.updateSelection(
+          TextSelection(baseOffset: d.offset, extentOffset: d.offset + 1),
+          ChangeSource.local,
+        );
+        _revealInitialSelection();
+        return;
+      }
+      return;
+    }
+    final note = await (_db.select(
+      _db.notes,
+    )..where((n) => n.id.equals(entry.noteId))).getSingleOrNull();
+    final offset = note == null
+        ? null
+        : figureOffset(note.content, kind, label);
+    if (!mounted) return;
+    openNoteAtSelection(
+      context,
+      ref,
+      entry.noteId,
+      TextSelection(baseOffset: offset ?? 0, extentOffset: (offset ?? 0) + 1),
+    );
   }
 
   /// Inserts `[@citekey]` for a chosen paper at the cursor (assigning the
@@ -788,9 +899,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _export(BuildContext context) async {
     await _save();
     if (!context.mounted) return;
-    await exportNotes(context, ref.read(databaseProvider), [
-      ExportNote(_titleController.text, _stored()),
-    ], title: _titleController.text);
+    final content = _stored();
+    final figures = await figureIndexForNote(
+      _db,
+      widget.noteId,
+      liveContent: content,
+    );
+    if (!context.mounted) return;
+    await exportNotes(
+      context,
+      _db,
+      [ExportNote(_titleController.text, content)],
+      title: _titleController.text,
+      figures: figures,
+    );
   }
 
   @override
@@ -801,6 +923,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (_debounce?.isActive ?? false) _save();
     _debounce?.cancel();
     _titleController.dispose();
+    _figures.dispose();
     _bodyFocus.dispose();
     _bodyScroll.dispose();
     _pageScroll.dispose();
@@ -871,6 +994,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               'bibliography' => _addBibliography(context),
               'export' => _export(context),
               'words' => _showWordCount(context),
+              'versions' => showNoteVersions(
+                context,
+                noteId: widget.noteId,
+                flush: _save,
+              ),
               'typewriter' =>
                 ref
                     .read(appearanceSettingsProvider)
@@ -933,6 +1061,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   leading: Icon(Icons.format_list_numbered),
                   title: Text('Word count'),
                   subtitle: Text('And reading time'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'versions',
+                child: ListTile(
+                  leading: Icon(Icons.history),
+                  title: Text('Versions'),
                 ),
               ),
               PopupMenuItem(
@@ -1138,41 +1273,46 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       const SizedBox(height: 8),
                     ],
                   },
-                  QuillEditor.basic(
-                    controller: _quillController,
-                    focusNode: _bodyFocus,
-                    scrollController: _bodyScroll,
-                    config: QuillEditorConfig(
-                      editorKey: _editorKey,
-                      scrollable: false,
-                      padding: EdgeInsets.zero,
-                      placeholder: 'Start writing…',
-                      customLinkPrefixes: const [audioLinkScheme],
-                      embedBuilders: const [
-                        SketchEmbedBuilder(),
-                        CitationEmbedBuilder(),
-                        MathInlineEmbedBuilder(),
-                        MathBlockEmbedBuilder(),
-                      ],
-                      // Audio timestamps play on a plain tap; other links
-                      // keep Quill's default long-press menu.
-                      customRecognizerBuilder: (attribute, leaf) {
-                        if (attribute.key != Attribute.link.key) return null;
-                        final link = attribute.value?.toString() ?? '';
-                        if (parseAudioTimestampLink(link) case final t?) {
-                          return TapGestureRecognizer()
-                            ..onTap = () => _playFrom(t.attachmentId, t.at);
-                        }
-                        if (parsePaperPageLink(link) case final p?) {
-                          return TapGestureRecognizer()
-                            ..onTap = () => _openPaperAt(p.paperId, p.page);
-                        }
-                        if (parseNoteLink(link) case final id?) {
-                          return TapGestureRecognizer()
-                            ..onTap = () => _openNote(id);
-                        }
-                        return null;
-                      },
+                  FigureScopeInherited(
+                    scope: _figures,
+                    child: QuillEditor.basic(
+                      controller: _quillController,
+                      focusNode: _bodyFocus,
+                      scrollController: _bodyScroll,
+                      config: QuillEditorConfig(
+                        editorKey: _editorKey,
+                        scrollable: false,
+                        padding: EdgeInsets.zero,
+                        placeholder: 'Start writing…',
+                        customLinkPrefixes: const [audioLinkScheme],
+                        embedBuilders: const [
+                          FigureDefEmbedBuilder(),
+                          FigureRefEmbedBuilder(),
+                          SketchEmbedBuilder(),
+                          CitationEmbedBuilder(),
+                          MathInlineEmbedBuilder(),
+                          MathBlockEmbedBuilder(),
+                        ],
+                        // Audio timestamps play on a plain tap; other links
+                        // keep Quill's default long-press menu.
+                        customRecognizerBuilder: (attribute, leaf) {
+                          if (attribute.key != Attribute.link.key) return null;
+                          final link = attribute.value?.toString() ?? '';
+                          if (parseAudioTimestampLink(link) case final t?) {
+                            return TapGestureRecognizer()
+                              ..onTap = () => _playFrom(t.attachmentId, t.at);
+                          }
+                          if (parsePaperPageLink(link) case final p?) {
+                            return TapGestureRecognizer()
+                              ..onTap = () => _openPaperAt(p.paperId, p.page);
+                          }
+                          if (parseNoteLink(link) case final id?) {
+                            return TapGestureRecognizer()
+                              ..onTap = () => _openNote(id);
+                          }
+                          return null;
+                        },
+                      ),
                     ),
                   ),
                   _Backlinks(noteId: widget.noteId),
@@ -1527,6 +1667,21 @@ enum _Command {
     Icons.format_quote,
   ),
   equation('Equation', r'LaTeX maths, or type $$', Icons.functions),
+  figure(
+    'Figure caption',
+    'A numbered figure caption for this line',
+    Icons.image_outlined,
+  ),
+  table(
+    'Table caption',
+    'A numbered table caption for this line',
+    Icons.table_chart_outlined,
+  ),
+  refer(
+    'Refer to a figure or table',
+    'Insert its number, kept right as things move',
+    Icons.tag,
+  ),
   link('Link to a note', 'Or type [[', Icons.link),
   draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
   heading('Heading', 'Make this line a heading', Icons.title),

@@ -22,6 +22,20 @@ class CslOutput {
   final List<int> bibliographyOrder;
 }
 
+/// One cited item in a cluster, with its optional pinpoint (`p. 42`).
+class CslCite {
+  const CslCite(this.item, {this.locator, this.label = 'page'});
+
+  /// Index into the items given to [CslProcessor.process].
+  final int item;
+
+  /// The pinpoint text, e.g. `42` or `3–5`; null for none.
+  final String? locator;
+
+  /// The CSL locator type: `page`, `chapter`, `section`, …
+  final String label;
+}
+
 class _State {
   int? useFirst;
   bool full = false;
@@ -40,10 +54,13 @@ class CslProcessor {
   /// [items] are CSL-JSON maps in order of first citation (that order gives
   /// citation numbers). [clusters] are the in-text citations to format, as
   /// lists of indexes into [items]. [numbers] leaves numbering out of the
-  /// entries (a single reference shown on its own).
+  /// entries (a single reference shown on its own). [cites] is the same as
+  /// [clusters] but each cited item can carry a locator; it is used after
+  /// [clusters].
   CslOutput process(
     List<Map<String, dynamic>> items, {
     List<List<int>> clusters = const [],
+    List<List<CslCite>> cites = const [],
     bool suppressNumbers = false,
   }) {
     final data = [
@@ -53,16 +70,22 @@ class CslProcessor {
     final states = [for (final _ in data) _State()];
     _disambiguate(data, states, order);
 
-    CslContext ctxFor(int i, {bool bib = false, String position = 'first'}) =>
-        CslContext(
-          data[i],
-          bibliography: bib,
-          suppressNumber: suppressNumbers,
-          yearSuffix: states[i].suffix,
-          etAlUseFirst: bib ? null : states[i].useFirst,
-          fullNames: !bib && states[i].full,
-          position: position,
-        );
+    CslContext ctxFor(
+      int i, {
+      bool bib = false,
+      String position = 'first',
+      CslCite? cite,
+    }) => CslContext(
+      data[i],
+      bibliography: bib,
+      suppressNumber: suppressNumbers,
+      yearSuffix: states[i].suffix,
+      etAlUseFirst: bib ? null : states[i].useFirst,
+      fullNames: !bib && states[i].full,
+      position: position,
+      locator: cite?.locator,
+      locatorLabel: cite?.label ?? 'page',
+    );
 
     final bibliography = [
       for (final i in order) engine.bibliographyEntry(ctxFor(i, bib: true)),
@@ -73,26 +96,40 @@ class CslProcessor {
     final layout = style.citationLayout;
     final delimiter = layout?.getAttribute('delimiter') ?? '';
     final collapse = style.citation?.getAttribute('collapse');
-    for (final cluster in clusters) {
-      final sorted = _sortCluster(data, cluster);
+    final all = [
+      for (final c in clusters) [for (final i in c) CslCite(i)],
+      ...cites,
+    ];
+    for (final cluster in all) {
+      final sorted = _sortCluster(data, [for (final c in cluster) c.item]);
+      final pending = [...cluster];
+      final ordered = <CslCite>[
+        for (final i in sorted)
+          pending.removeAt(pending.indexWhere((c) => c.item == i)),
+      ];
       final rendered = <CslRich>[];
-      for (final i in sorted) {
+      for (final c in ordered) {
         rendered.add(
           engine.citationItem(
-            ctxFor(i, position: seen.contains(i) ? 'subsequent' : 'first'),
+            ctxFor(
+              c.item,
+              position: seen.contains(c.item) ? 'subsequent' : 'first',
+              cite: c,
+            ),
           ),
         );
       }
-      seen.addAll(cluster);
+      seen.addAll(sorted);
       final spans = <CslSpan>[];
       void add(List<CslSpan> s, {String joiner = ''}) {
         if (spans.isNotEmpty && joiner.isNotEmpty) spans.add(CslSpan(joiner));
         spans.addAll(s);
       }
 
+      final hasLocator = ordered.any((c) => c.locator != null);
       var k = 0;
       while (k < sorted.length) {
-        if (collapse == 'citation-number') {
+        if (collapse == 'citation-number' && !hasLocator) {
           var end = k;
           while (end + 1 < sorted.length &&
               (data[sorted[end + 1]]['citation-number'] as int) ==
@@ -111,7 +148,10 @@ class CslProcessor {
         k++;
       }
       citations.add(
-        engine.wrapCitation(spans, ctxFor(cluster.isEmpty ? 0 : cluster.first)),
+        engine.wrapCitation(
+          spans,
+          ctxFor(cluster.isEmpty ? 0 : cluster.first.item),
+        ),
       );
     }
     return CslOutput(

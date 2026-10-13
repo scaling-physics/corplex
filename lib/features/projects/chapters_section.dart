@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import 'abbreviations_section.dart';
 import 'chapters.dart';
 import 'coverage.dart';
 import 'open_from_page.dart';
@@ -179,6 +180,7 @@ class ChaptersSection extends ConsumerWidget {
           projectId: project.id,
           orderedNoteIds: [for (final c in chapters) c.note.id],
         ),
+        ProjectAbbreviationsSection(projectId: project.id),
         ChapterCoverageSection(
           projectId: project.id,
           orderedNoteIds: [for (final c in chapters) c.note.id],

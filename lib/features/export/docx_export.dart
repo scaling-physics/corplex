@@ -23,6 +23,7 @@ List<int> exportToDocx(ExportDoc doc) {
       ]),
       BlockKind.quote => _para('Quote', b.runs),
       BlockKind.paragraph => _para(null, b.runs),
+      BlockKind.caption => _para('Caption', b.runs),
       // Word can't take LaTeX directly; the source goes in as monospace
       // text, centred (Word's equation box accepts pasted LaTeX).
       BlockKind.displayMath => _para(
@@ -141,4 +142,6 @@ const _styles =
     '<w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs><w:spacing w:after="60"/><w:ind w:left="720" w:hanging="360"/></w:pPr></w:style>'
     '<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/>'
     '<w:pPr><w:ind w:left="720"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="caption"/><w:basedOn w:val="Normal"/>'
+    '<w:pPr><w:spacing w:before="60" w:after="200"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style>'
     '</w:styles>';

@@ -21,12 +21,18 @@ String encodeNoteContent(Document document) =>
 /// Quill controller just to render a subtitle.
 /// Embeds (sketches) have no text, so they're dropped rather than shown as
 /// the object-replacement character.
-String notePlainTextPreview(String content) =>
-    decodeNoteContent(content)
-        .toPlainText()
-        .replaceAll('\uFFFC', '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+/// Figure/table markers read as words: a caption's `{#fig:x}` is dropped,
+/// a reference `{@fig:x}` reads "Figure" (numbers need the project).
+String notePlainTextPreview(String content) => decodeNoteContent(content)
+    .toPlainText()
+    .replaceAll('\uFFFC', '')
+    .replaceAll(RegExp(r'\{#(?:fig|tbl):[A-Za-z0-9_-]+\}'), '')
+    .replaceAllMapped(
+      RegExp(r'\{@(fig|tbl):[A-Za-z0-9_-]+\}'),
+      (m) => m[1] == 'fig' ? 'Figure' : 'Table',
+    )
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
 
 /// Appends a quoted passage to [content]: the quote as a block quote, then
 /// "— p. 12" linked to [pageLink] (so tapping it reopens the PDF there),

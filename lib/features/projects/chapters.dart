@@ -8,6 +8,7 @@ import '../../data/database_provider.dart';
 import '../../data/tables/projects_table.dart' show ChapterStatus;
 import '../notes/note_content.dart';
 import '../notes/note_stats.dart';
+import '../notes/note_versions.dart';
 
 export '../../data/tables/projects_table.dart' show ChapterStatus;
 
@@ -191,11 +192,24 @@ Future<void> setChapterStatus(
   String projectId,
   String noteId,
   ChapterStatus? status,
-) =>
-    (db.update(db.projectNotes)..where(
-          (r) => r.projectId.equals(projectId) & r.noteId.equals(noteId),
-        ))
-        .write(ProjectNotesCompanion(status: Value(status)));
+) async {
+  final where = db.select(db.projectNotes)
+    ..where((r) => r.projectId.equals(projectId) & r.noteId.equals(noteId));
+  final before = (await where.getSingleOrNull())?.status;
+  await (db.update(db.projectNotes)
+        ..where((r) => r.projectId.equals(projectId) & r.noteId.equals(noteId)))
+      .write(ProjectNotesCompanion(status: Value(status)));
+  // Handing a chapter over keeps a copy of what was sent.
+  if (status == ChapterStatus.withSupervisor &&
+      before != ChapterStatus.withSupervisor) {
+    await saveNoteVersion(
+      db,
+      noteId,
+      label: sentToSupervisorLabel,
+      skipIfUnchanged: true,
+    );
+  }
+}
 
 Future<void> setChapterTarget(
   AppDatabase db,

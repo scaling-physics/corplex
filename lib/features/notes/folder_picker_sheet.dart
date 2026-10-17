@@ -12,10 +12,8 @@ Future<void> showFolderPickerSheet(
 ) {
   return showModalBottomSheet(
     context: context,
-    builder: (_) => _FolderPickerSheet(
-      noteId: noteId,
-      currentFolderId: currentFolderId,
-    ),
+    builder: (_) =>
+        _FolderPickerSheet(noteId: noteId, currentFolderId: currentFolderId),
   );
 }
 
@@ -39,9 +37,7 @@ class _FolderPickerSheet extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.block),
             title: const Text('No folder'),
-            trailing: currentFolderId == null
-                ? const Icon(Icons.check)
-                : null,
+            trailing: currentFolderId == null ? const Icon(Icons.check) : null,
             onTap: () => _select(context, ref, null),
           ),
           ...switch (foldersAsync.value) {

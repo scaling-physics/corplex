@@ -1,17 +1,30 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show OrderingTerm, Value;
+import 'package:drift/drift.dart'
+    show
+        BooleanExpressionOperators,
+        OrderingTerm,
+        StringExpressionOperators,
+        Value;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
+import '../lock/lock_screen.dart';
+import '../lock/locked_edit_rescue.dart';
+import '../lock/note_crypto.dart' show NoteDecryptException, lockedPrefix;
+import '../lock/note_lock_service.dart';
+import '../lock/notes_password_dialogs.dart';
 import '../audio/audio_link.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
@@ -38,6 +51,9 @@ import '../projects/projects_providers.dart';
 import '../projects/todos_request.dart';
 import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
+import '../platform/mac_window.dart'
+    show MenuCommand, MenuCommandHandler, isDesktop, isMac, macPanePadding;
+import 'note_zoom.dart';
 import 'cite_paper_sheet.dart';
 import 'citation_embed.dart';
 import '../csl/style_picker.dart';
@@ -56,10 +72,15 @@ import 'folders_providers.dart';
 import 'link_paper_sheet.dart';
 import 'note_attachments_providers.dart';
 import 'note_content.dart';
+import 'note_lock_actions.dart' show openNoteFlushProvider;
 import 'note_papers_providers.dart';
 import 'notes_providers.dart';
 import 'tag_picker_sheet.dart';
 import 'tags_providers.dart';
+
+/// Bumped by the Notes list (Return / Tab) to move the keyboard into the
+/// open note's body; the embedded editor listens.
+final noteBodyFocusRequestProvider = StateProvider<int>((ref) => 0);
 
 /// Lets the reader beside a note (split view) push a quoted passage into
 /// it without going through the database: the open editor owns the note's
@@ -77,9 +98,54 @@ class NoteEditorHandle {
 
 /// A single note, editable in place with no separate "edit mode" — typing
 /// autosaves after a short pause, so there's nothing to remember to save.
-class NoteEditorScreen extends ConsumerStatefulWidget {
+///
+/// A locked note whose key isn't unlocked shows [NoteLockScreen] instead of
+/// the editor; unlocking (or the notes locking again, by timer, app pause
+/// or "Close All Locked Notes") swaps between the two.
+class NoteEditorScreen extends ConsumerWidget {
   const NoteEditorScreen({
     super.key,
+    required this.noteId,
+    this.handle,
+    this.embedded = false,
+    this.onClose,
+    this.initialSelection,
+  });
+
+  final String noteId;
+  final TextSelection? initialSelection;
+  final NoteEditorHandle? handle;
+  final bool embedded;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lock = ref.watch(noteLockServiceProvider);
+    final note = ref.watch(noteByIdProvider(noteId));
+    final loaded = note.hasValue;
+    if (!loaded) {
+      return Scaffold(appBar: AppBar(automaticallyImplyLeading: !embedded));
+    }
+    final value = note.value;
+    if (value != null &&
+        isLockedContent(value.content) &&
+        !lock.canRead(value.content)) {
+      return NoteLockScreen(title: value.title, embedded: embedded);
+    }
+    return _NoteEditorBody(
+      noteId: noteId,
+      handle: handle,
+      embedded: embedded,
+      onClose: onClose,
+      initialSelection: initialSelection,
+    );
+  }
+}
+
+/// A single note, editable in place with no separate "edit mode" — typing
+/// autosaves after a short pause, so there's nothing to remember to save.
+class _NoteEditorBody extends ConsumerStatefulWidget {
+  const _NoteEditorBody({
     required this.noteId,
     this.handle,
     this.embedded = false,
@@ -105,10 +171,10 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
   final VoidCallback? onClose;
 
   @override
-  ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
+  ConsumerState<_NoteEditorBody> createState() => _NoteEditorBodyState();
 }
 
-class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
+class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   final _titleController = TextEditingController();
   late final QuillController _quillController;
   Timer? _debounce;
@@ -125,6 +191,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   // every build, so any rebuild (e.g. after an autosave) dropped the body's
   // focus and the keyboard jumped to the title mid-sentence.
   final _bodyFocus = FocusNode();
+  final _titleFocus = FocusNode();
   final _bodyScroll = ScrollController();
 
   // The page scrolls (the editor inside it doesn't), so typewriter mode
@@ -144,9 +211,39 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   final _ownTitles = <String>{};
   final _ownContents = <String>{};
 
+  // ---- Locked notes ----
+  // The editor only ever holds a locked note's *text*; the database gets an
+  // envelope (`encryptBody`) on every save, and `_savedContent` /
+  // `_ownContents` are the decrypted bodies, since every save produces
+  // different ciphertext.
+  late final NoteLockService _lock;
+  late final LockedEditRescue _rescue;
+  late final Map<String, Future<void> Function()> _flushRegistry;
+
+  /// This note is locked: saves encrypt.
+  bool _locked = false;
+
+  /// The envelope last seen in the database (to know when its key goes).
+  String? _envelope;
+
+  /// The body couldn't be decrypted (damaged): never save over it.
+  bool _blocked = false;
+
+  /// The notes locked under this editor and a save was cut short; the
+  /// text went to [LockedEditRescue] instead.
+  bool _lockedOut = false;
+
+  /// Saves run one at a time (encrypting is async).
+  Future<void> _saveQueue = Future.value();
+  int _absorbSeq = 0;
+
   @override
   void initState() {
     super.initState();
+    _lock = ref.read(noteLockServiceProvider);
+    _rescue = ref.read(lockedEditRescueProvider);
+    _flushRegistry = ref.read(openNoteFlushProvider);
+    _flushRegistry[widget.noteId] = _save;
     _loadNote();
     _figures.onOpen = _openFigure;
     ref.listenManual<FigureContext>(
@@ -177,7 +274,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       db.notes,
     )..where((n) => n.id.equals(widget.noteId))).getSingleOrNull();
 
-    final document = note == null ? Document() : _editable(note.content);
+    var body = note?.content ?? '';
+    if (note != null && isLockedContent(body)) {
+      _locked = true;
+      _envelope = body;
+      try {
+        body = await _lock.decryptBody(widget.noteId, body);
+      } on NoteLockedException {
+        // The gate shows the lock screen; this editor is about to go.
+        body = '';
+        _blocked = true;
+      } on NoteDecryptException {
+        body = '';
+        _blocked = true;
+      }
+    }
+    if (!mounted) return;
+    _lock.addListener(_onLockChanged);
+
+    final document = note == null ? Document() : _editable(body);
     var want = widget.initialSelection;
     final pending = mounted ? ref.read(pendingNoteSelectionProvider) : null;
     if (pending != null && pending.noteId == widget.noteId) {
@@ -202,6 +317,29 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
     if (want != null) _revealInitialSelection();
+    _restoreRescued();
+  }
+
+  /// Typing that was cut off when the notes locked: back into the editor
+  /// (and saved, encrypted, by the usual autosave).
+  void _restoreRescued() {
+    final rescued = _rescue.take(widget.noteId);
+    if (rescued == null || !mounted || _blocked) return;
+    if (rescued.content == _stored() &&
+        rescued.title == _titleController.text) {
+      return;
+    }
+    if (rescued.content != _stored()) {
+      _docChanges?.cancel();
+      final document = _editable(rescued.content);
+      _quillController.document = document;
+      _docChanges = document.changes.listen(_watchForWikilink);
+      _figures.documentChanged(document);
+    }
+    if (rescued.title != _titleController.text) {
+      _titleController.text = rescued.title;
+    }
+    _scheduleSave();
   }
 
   /// [NoteEditorScreen.initialSelection] clamped to the loaded document.
@@ -317,14 +455,71 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   void _scheduleSave() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), _save);
+    if (_locked) _lock.touch();
+    // Sooner for a locked note: if the notes lock, whatever hasn't been
+    // encrypted and saved yet has to be rescued from memory.
+    _debounce = Timer(Duration(milliseconds: _locked ? 150 : 400), _save);
   }
 
-  Future<void> _save() async {
+  Future<void> _save() {
     _debounce?.cancel();
+    // Read now: dispose() calls this and then tears the controllers down.
     final title = _titleController.text;
-    final content = _stored();
+    final content = _blocked ? '' : _stored();
+    return _saveQueue = _saveQueue.then((_) => _saveNow(title, content));
+  }
+
+  Future<void> _saveNow(String title, String content) async {
+    if (_blocked || _lockedOut) return;
     if (title == _savedTitle && content == _savedContent) return;
+    var written = content;
+    if (!_locked) {
+      // Someone else may have locked the note since this editor loaded it
+      // (the list's menu, another path): never write plain text over an
+      // envelope. Checked and written in one transaction.
+      // One conditional UPDATE: it only matches while the row isn't locked.
+      final changed =
+          await (_db.update(_db.notes)..where(
+                (n) =>
+                    n.id.equals(widget.noteId) &
+                    n.content.like('$lockedPrefix%').not(),
+              ))
+              .write(
+                NotesCompanion(
+                  title: Value(title),
+                  content: Value(content),
+                  updatedAt: Value(DateTime.now()),
+                ),
+              );
+      final row = changed > 0
+          ? null
+          : await (_db.select(
+              _db.notes,
+            )..where((n) => n.id.equals(widget.noteId))).getSingleOrNull();
+      final nowLocked = row != null && isLockedContent(row.content);
+      if (nowLocked) _envelope = row.content;
+      if (!nowLocked) {
+        _savedTitle = title;
+        _savedContent = content;
+        _remember(_ownTitles, title);
+        _remember(_ownContents, content);
+        return;
+      }
+      _locked = true;
+      if (mounted) setState(() {});
+    }
+    if (_locked) {
+      try {
+        written = await _lock.encryptBody(widget.noteId, content);
+      } on NoteLockedException {
+        // The key went before this could be written: keep the text in
+        // memory for the next unlock instead of losing it (or, worse,
+        // writing it unencrypted).
+        _lockedOut = true;
+        _rescue.keep(widget.noteId, title, content);
+        return;
+      }
+    }
     _savedTitle = title;
     _savedContent = content;
     _remember(_ownTitles, title);
@@ -334,10 +529,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     )..where((n) => n.id.equals(widget.noteId))).write(
       NotesCompanion(
         title: Value(title),
-        content: Value(content),
+        content: Value(written),
         updatedAt: Value(DateTime.now()),
       ),
     );
+  }
+
+  /// The notes locked or unlocked. If this note's key just went and there
+  /// is typing that isn't saved yet, keep it for the next unlock — the lock
+  /// screen replaces this editor in the same frame.
+  void _onLockChanged() {
+    if (!_locked || _blocked || _lockedOut || !_loaded) return;
+    if (_envelope == null || _lock.canRead(_envelope!)) return;
+    _lockedOut = true;
+    _debounce?.cancel();
+    final title = _titleController.text;
+    final content = _stored();
+    if (title != _savedTitle || content != _savedContent) {
+      _rescue.keep(widget.noteId, title, content);
+    }
   }
 
   static void _remember(Set<String> recent, String value) {
@@ -352,6 +562,30 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   /// anything typed here since the last save, so the next autosave doesn't
   /// write the stale text back over it.
   void _absorbOutsideChange(Note note) {
+    if (isLockedContent(note.content)) {
+      _locked = true;
+      _envelope = note.content;
+      final seq = ++_absorbSeq;
+      _lock
+          .decryptBody(widget.noteId, note.content)
+          .then((plain) {
+            if (mounted && seq == _absorbSeq) _absorbPlain(note, plain);
+          })
+          .catchError((_) {
+            // Locked meanwhile (the gate shows the lock screen), or damaged.
+          });
+      return;
+    }
+    if (_locked) {
+      // The lock was taken off (here or on another device).
+      _locked = false;
+      _envelope = null;
+    }
+    _absorbPlain(note, note.content);
+  }
+
+  void _absorbPlain(Note note, String body) {
+    if (_blocked) return;
     if (note.title != _savedTitle && !_ownTitles.contains(note.title)) {
       final untouched = _titleController.text == _savedTitle;
       _savedTitle = note.title;
@@ -359,7 +593,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
     // Compared as the editor would save it: an empty or plain-text body
     // in the database is the same note as its Delta form.
-    final theirs = encodeNoteContent(decodeNoteContent(note.content));
+    final theirs = encodeNoteContent(decodeNoteContent(body));
     if (theirs == _savedContent || _ownContents.contains(theirs)) return;
     final current = _stored();
     final merged = current == _savedContent
@@ -641,31 +875,47 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (slashAt > 0 && !RegExp(r'\s').hasMatch(text[slashAt - 1])) return;
     Future.microtask(() async {
       if (!mounted) return;
-      final command = await showModalBottomSheet<_Command>(
-        context: context,
-        showDragHandle: true,
-        // Sized to the list, so every command shows without scrolling.
-        isScrollControlled: true,
-        builder: (context) => SafeArea(
-          // A column in a scroll view, not a lazy list: every command is
-          // built (and findable), and it scrolls when the screen is short.
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                for (final c in _Command.values)
-                  if (c != _Command.dictate ||
-                      ref.read(dictationOfferedProvider))
-                    ListTile(
-                      leading: Icon(c.icon),
-                      title: Text(c.label),
-                      subtitle: Text(c.hint),
-                      onTap: () => Navigator.pop(context, c),
-                    ),
-              ],
-            ),
-          ),
+      // A column in a scroll view, not a lazy list: every command is
+      // built (and findable), and it scrolls when the screen is short.
+      Widget list(BuildContext context) => SingleChildScrollView(
+        child: Column(
+          children: [
+            for (final c in _Command.values)
+              if (c != _Command.dictate || ref.read(dictationOfferedProvider))
+                ListTile(
+                  leading: Icon(c.icon),
+                  title: Text(c.label),
+                  subtitle: Text(c.hint),
+                  dense: isDesktop(context),
+                  onTap: () => Navigator.pop(context, c),
+                ),
+          ],
         ),
       );
+      // A desktop shows it as a small panel in the middle of the window; a
+      // bottom sheet would sit alone at the foot of a very wide one.
+      final command = isDesktop(context)
+          ? await showDialog<_Command>(
+              context: context,
+              builder: (context) => Dialog(
+                clipBehavior: Clip.antiAlias,
+                insetPadding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: list(context),
+                  ),
+                ),
+              ),
+            )
+          : await showModalBottomSheet<_Command>(
+              context: context,
+              showDragHandle: true,
+              // Sized to the list, so every command shows without scrolling.
+              isScrollControlled: true,
+              builder: (context) => SafeArea(child: list(context)),
+            );
       if (command == null || !mounted) return;
       // Remove the "/" if it's still where it was typed.
       final now = _quillController.document.toPlainText();
@@ -887,6 +1137,61 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     await deleteNoteWithUndo(ref, messenger, widget.noteId, title);
   }
 
+  /// Locks this note: asks for (or first sets) the notes password, saves
+  /// what's typed, then encrypts the note and its versions. The editor stays
+  /// open and unlocked.
+  Future<void> _lockNote() async {
+    if (!_loaded || _locked || _blocked) return;
+    final ok = await ensureNotesUnlocked(context, _lock);
+    if (!ok || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final attachments = await (_db.select(
+      _db.attachments,
+    )..where((a) => a.noteId.equals(widget.noteId))).get();
+    if (!mounted) return;
+    _debounce?.cancel();
+    await _save();
+    // From here saves encrypt, so nothing typed meanwhile is written plain.
+    _locked = true;
+    try {
+      await _lock.lockNote(widget.noteId);
+    } catch (_) {
+      _locked = false;
+      rethrow;
+    }
+    if (!mounted) return;
+    setState(() {});
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            attachments.isEmpty
+                ? 'Note locked'
+                : 'Note locked. Attached files (images, audio, PDFs) '
+                      'aren\'t encrypted — only the note\'s text and sketches.',
+          ),
+        ),
+      );
+  }
+
+  /// Takes the lock off (needs the notes unlocked).
+  Future<void> _removeLock() async {
+    if (!_locked) return;
+    if (!await _lock.isUnlocked() && !await _lock.unlockWithBiometrics()) {
+      if (!mounted) return;
+      final ok = await showUnlockNotesDialog(context, _lock);
+      if (!ok || !mounted) return;
+    }
+    _debounce?.cancel();
+    await _save();
+    // Plain from here on; the database echo of the change sees it.
+    await _lock.removeLock(widget.noteId);
+    _locked = false;
+    _envelope = null;
+    if (mounted) setState(() {});
+  }
+
   Future<void> _showWordCount(BuildContext context) async {
     final stats = noteStats(_quillController.document);
     final linked = await ref.read(
@@ -904,6 +1209,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       _db,
       widget.noteId,
       liveContent: content,
+      lock: _lock,
     );
     if (!context.mounted) return;
     await exportNotes(
@@ -918,6 +1224,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   void dispose() {
     widget.handle?.appendQuote = null;
+    _lock.removeListener(_onLockChanged);
+    if (_flushRegistry[widget.noteId] == _save) {
+      _flushRegistry.remove(widget.noteId);
+    }
     _docChanges?.cancel();
     // Leaving right after typing must not drop the last edit.
     if (_debounce?.isActive ?? false) _save();
@@ -925,6 +1235,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _titleController.dispose();
     _figures.dispose();
     _bodyFocus.dispose();
+    _titleFocus.dispose();
     _bodyScroll.dispose();
     _pageScroll.dispose();
     if (_loaded) _quillController.dispose();
@@ -953,13 +1264,37 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               .map((f) => f.name)
               .firstOrNull;
 
-    return Scaffold(
+    final desktop = isDesktop(context);
+    final zoom = desktop ? ref.watch(noteZoomProvider).scale : 1.0;
+    ref.listen(noteBodyFocusRequestProvider, (_, _) {
+      if (widget.embedded && _loaded) _bodyFocus.requestFocus();
+    });
+    final scaffold = Scaffold(
       // The toolbar rides on top of the keyboard (see bottomNavigationBar),
       // so the body must not also shrink for it.
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         automaticallyImplyLeading: !widget.embedded,
+        // One toolbar row, as in Apple Notes: the formatting controls on
+        // the left of the header, the note's actions on the right. The
+        // header never holds the note's title.
+        titleSpacing: 8,
+        centerTitle: false,
+        title: desktop && _loaded
+            ? _DesktopFormatBar(
+                controller: _quillController,
+                mac: isMac(context),
+                onDraw: () => insertSketch(context, _quillController),
+                onDone: _bodyFocus.requestFocus,
+              )
+            : null,
         actions: [
+          if (_locked)
+            IconButton(
+              icon: const Icon(Icons.lock_outline),
+              tooltip: 'Locked — tap to lock now',
+              onPressed: _lock.lockNow,
+            ),
           IconButton(
             icon: const Icon(Icons.folder_outlined),
             tooltip: folderName ?? 'Move to folder',
@@ -1005,6 +1340,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     .setTypewriter(
                       !ref.read(appearanceSettingsProvider).typewriter,
                     ),
+              'lock' => _lockNote(),
+              'unlock' => _removeLock(),
               'trash' => _moveToTrash(),
               _ => null,
             },
@@ -1081,6 +1418,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       : null,
                 ),
               ),
+              if (_locked)
+                const PopupMenuItem(
+                  value: 'unlock',
+                  child: ListTile(
+                    leading: Icon(Icons.lock_open_outlined),
+                    title: Text('Remove lock'),
+                  ),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'lock',
+                  child: ListTile(
+                    leading: Icon(Icons.lock_outline),
+                    title: Text('Lock note'),
+                    subtitle: Text('Needs your notes password to open'),
+                  ),
+                ),
               const PopupMenuItem(
                 value: 'trash',
                 child: ListTile(
@@ -1101,32 +1455,72 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 // Centred at a readable width on a tablet. In typewriter
                 // mode the end of the note can rise to the caret line.
                 padding: EdgeInsets.fromLTRB(
-                  readablePadding(box.maxWidth),
+                  _sideMargin(box.maxWidth, desktop),
                   0,
-                  readablePadding(box.maxWidth),
+                  _sideMargin(box.maxWidth, desktop),
                   ref.watch(appearanceSettingsProvider).typewriter
                       ? box.maxHeight * 0.6
                       : 32,
                 ),
                 children: [
-                  TextField(
-                    controller: _titleController,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    textCapitalization: TextCapitalization.sentences,
-                    // A long title wraps rather than scrolling out of
-                    // sight; Return moves on to the body (a title is one
-                    // line of text, even when it wraps).
-                    maxLines: null,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => _bodyFocus.requestFocus(),
-                    decoration: const InputDecoration(
-                      hintText: 'Title',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                  if (desktop && noteAsync.value != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: Center(
+                        child: Text(
+                          DateFormat("d MMMM y 'at' HH:mm")
+                              .format(noteAsync.value!.updatedAt),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                    ),
+                  // Tab goes on into the body, as Return does.
+                  Focus(
+                    canRequestFocus: false,
+                    skipTraversal: true,
+                    onKeyEvent: (_, e) {
+                      if (desktop &&
+                          e is KeyDownEvent &&
+                          e.logicalKey == LogicalKeyboardKey.tab &&
+                          !HardwareKeyboard.instance.isShiftPressed) {
+                        _bodyFocus.requestFocus();
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: TextField(
+                      controller: _titleController,
+                      focusNode: _titleFocus,
+                      style: desktop
+                          ? Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(
+                                  fontSize: 32 * zoom,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
+                                )
+                          : Theme.of(context).textTheme.headlineMedium,
+                      textCapitalization: TextCapitalization.sentences,
+                      // A long title wraps rather than scrolling out of
+                      // sight; Return moves on to the body (a title is one
+                      // line of text, even when it wraps).
+                      maxLines: null,
+                      keyboardType: TextInputType.text,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _bodyFocus.requestFocus(),
+                      decoration: const InputDecoration(
+                        hintText: 'Title',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.symmetric(vertical: 8),
+                      ),
                     ),
                   ),
                   if (folderName != null)
@@ -1284,6 +1678,26 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         scrollable: false,
                         padding: EdgeInsets.zero,
                         placeholder: 'Start writing…',
+                        customStyles: desktop
+                            ? _desktopStyles(context, zoom)
+                            : null,
+                        customShortcuts: desktop ? _desktopShortcuts : null,
+                        customActions: desktop
+                            ? {
+                                _NoteCommandIntent:
+                                    CallbackAction<_NoteCommandIntent>(
+                                      onInvoke: (i) {
+                                        _commands[i.command]?.call();
+                                        return null;
+                                      },
+                                    ),
+                                _PassKeyIntent: DoNothingAction(
+                                  consumesKey: false,
+                                ),
+                              }
+                            : null,
+                        // ignore: experimental_member_use
+                        onKeyPressed: desktop ? _onBodyKey : null,
                         customLinkPrefixes: const [audioLinkScheme],
                         embedBuilders: const [
                           FigureDefEmbedBuilder(),
@@ -1323,6 +1737,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       // keyboard's height so formatting and Draw stay in reach while typing.
       bottomNavigationBar: !_loaded
           ? null
+          : desktop
+          ? AudioPlayerBar(onMark: _insertTimestamp)
           : Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -1391,8 +1807,121 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               ),
             ),
     );
+    if (!desktop) return scaffold;
+    return MenuCommandHandler(commands: _commands, child: scaffold);
+  }
+
+  /// Menu-bar and shortcut commands the editor takes (Format menu, text
+  /// zoom, Move to Trash). Clicking a Format item while editing applies it
+  /// at the selection, exactly like the toolbar buttons.
+  late final Map<MenuCommand, VoidCallback> _commands = {
+    MenuCommand.bold: () => _toggle(Attribute.bold),
+    MenuCommand.italic: () => _toggle(Attribute.italic),
+    MenuCommand.underline: () => _toggle(Attribute.underline),
+    MenuCommand.strikethrough: () => _toggle(Attribute.strikeThrough),
+    MenuCommand.title: () => _setHeader(Attribute.h1),
+    MenuCommand.heading: () => _setHeader(Attribute.h2),
+    MenuCommand.subheading: () => _setHeader(Attribute.h3),
+    MenuCommand.body: () => _setHeader(Attribute.header),
+    MenuCommand.bulletList: () => _toggle(Attribute.ul),
+    MenuCommand.numberedList: () => _toggle(Attribute.ol),
+    MenuCommand.blockQuote: () => _toggle(Attribute.blockQuote),
+    MenuCommand.linkNote: () => _linkNote(context),
+    MenuCommand.citePaper: () => _citePaper(context),
+    MenuCommand.zoomIn: () => ref.read(noteZoomProvider).zoomIn(),
+    MenuCommand.zoomOut: () => ref.read(noteZoomProvider).zoomOut(),
+    MenuCommand.actualSize: () => ref.read(noteZoomProvider).reset(),
+    MenuCommand.moveToTrash: () => _moveToTrash(),
+    // File → Lock Note: lock this note, or, if it already is, lock now.
+    MenuCommand.lockNote: () => _locked ? _lock.lockNow() : _lockNote(),
+  };
+
+  void _toggle(Attribute attribute) {
+    if (!_loaded) return;
+    final on = _quillController.getSelectionStyle().attributes.containsKey(
+      attribute.key,
+    );
+    // A list or quote toggled "on" over another list kind switches kind.
+    final sameValue =
+        on &&
+        _quillController.getSelectionStyle().attributes[attribute.key]?.value ==
+            attribute.value;
+    _quillController.formatSelection(
+      on && sameValue ? Attribute.clone(attribute, null) : attribute,
+    );
+    _bodyFocus.requestFocus();
+  }
+
+  void _setHeader(Attribute attribute) {
+    if (!_loaded) return;
+    _quillController.formatSelection(attribute);
+    _bodyFocus.requestFocus();
+  }
+
+  /// Shift+Tab at the very start of the body goes back to the title.
+  KeyEventResult? _onBodyKey(KeyEvent event, Node? node) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.tab &&
+        HardwareKeyboard.instance.isShiftPressed &&
+        _quillController.selection.isCollapsed &&
+        _quillController.selection.baseOffset == 0) {
+      _titleFocus.requestFocus();
+      return KeyEventResult.handled;
+    }
+    return null;
   }
 }
+
+double _sideMargin(double width, bool desktop) =>
+    desktop ? macPanePadding(width) : readablePadding(width);
+
+class _NoteCommandIntent extends Intent {
+  const _NoteCommandIntent(this.command);
+  final MenuCommand command;
+}
+
+/// A key flutter_quill binds that the Mac menu bar owns (⌘1/⌘2 tabs, ⌘0,
+/// ⌘M minimise, ⌘F/⌘G find): let it through to the menu.
+class _PassKeyIntent extends Intent {
+  const _PassKeyIntent();
+}
+
+/// Overrides of flutter_quill's macOS shortcuts so the Format menu's keys
+/// do what the menu says. Everything else Quill binds stays.
+final Map<ShortcutActivator, Intent> _desktopShortcuts = {
+  const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+      const _NoteCommandIntent(MenuCommand.linkNote),
+  const SingleActivator(LogicalKeyboardKey.keyK, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.citePaper),
+  const SingleActivator(LogicalKeyboardKey.keyB, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.body),
+  const SingleActivator(LogicalKeyboardKey.keyT, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.title),
+  const SingleActivator(LogicalKeyboardKey.keyH, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.heading),
+  const SingleActivator(LogicalKeyboardKey.keyJ, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.subheading),
+  const SingleActivator(LogicalKeyboardKey.keyX, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.strikethrough),
+  const SingleActivator(LogicalKeyboardKey.quote, meta: true):
+      const _NoteCommandIntent(MenuCommand.blockQuote),
+  for (final key in [
+    LogicalKeyboardKey.digit0,
+    LogicalKeyboardKey.digit1,
+    LogicalKeyboardKey.digit2,
+    LogicalKeyboardKey.digit3,
+    LogicalKeyboardKey.digit4,
+    LogicalKeyboardKey.digit5,
+    LogicalKeyboardKey.digit6,
+    LogicalKeyboardKey.keyF,
+    LogicalKeyboardKey.keyG,
+    LogicalKeyboardKey.keyM,
+    LogicalKeyboardKey.backquote,
+  ])
+    SingleActivator(key, meta: true): const _PassKeyIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyM, meta: true, shift: true):
+      const _PassKeyIntent(),
+};
 
 /// A note's non-image attachment: audio plays in the player bar, a
 /// podcast/web link opens in the browser, anything else just shows.
@@ -1507,7 +2036,10 @@ class _ImagePreview extends StatelessWidget {
           ),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 220),
+          constraints: BoxConstraints(
+            maxHeight: isDesktop(context) ? 340 : 220,
+            maxWidth: isDesktop(context) ? readableWidth : double.infinity,
+          ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.file(
@@ -1537,6 +2069,127 @@ class _ImageViewer extends StatelessWidget {
       body: InteractiveViewer(
         maxScale: 6,
         child: Center(child: Image.file(File(path))),
+      ),
+    );
+  }
+}
+
+/// Body type for the note on a desktop: a little smaller than the phone's
+/// 16 pt but looser (1.5), headings stepped down, calm paragraph spacing.
+DefaultStyles _desktopStyles(BuildContext context, double zoom) {
+  final theme = Theme.of(context);
+  final c = theme.colorScheme;
+  final base = DefaultTextStyle.of(context).style.copyWith(
+    fontSize: 15.5 * zoom,
+    height: 1.55,
+    color: c.onSurface,
+    decoration: TextDecoration.none,
+  );
+  DefaultTextBlockStyle heading(double size, double top, FontWeight weight) =>
+      DefaultTextBlockStyle(
+        base.copyWith(
+          fontSize: size * zoom,
+          height: 1.25,
+          fontWeight: weight,
+          letterSpacing: -0.2,
+        ),
+        const HorizontalSpacing(0, 0),
+        VerticalSpacing(top, 4),
+        VerticalSpacing.zero,
+        null,
+      );
+  const none = HorizontalSpacing(0, 0);
+  return DefaultStyles(
+    paragraph: DefaultTextBlockStyle(
+      base,
+      none,
+      const VerticalSpacing(0, 6),
+      VerticalSpacing.zero,
+      null,
+    ),
+    h1: heading(28, 18, FontWeight.w700),
+    h2: heading(21, 16, FontWeight.w600),
+    h3: heading(17, 12, FontWeight.w600),
+    placeHolder: DefaultTextBlockStyle(
+      base.copyWith(color: c.onSurfaceVariant.withValues(alpha: 0.6)),
+      none,
+      VerticalSpacing.zero,
+      VerticalSpacing.zero,
+      null,
+    ),
+    lists: DefaultListBlockStyle(
+      base,
+      none,
+      const VerticalSpacing(2, 4),
+      const VerticalSpacing(0, 3),
+      null,
+      null,
+    ),
+    quote: DefaultTextBlockStyle(
+      base.copyWith(color: c.onSurfaceVariant, fontStyle: FontStyle.italic),
+      none,
+      const VerticalSpacing(6, 8),
+      const VerticalSpacing(2, 2),
+      BoxDecoration(
+        border: Border(left: BorderSide(width: 3, color: c.primary)),
+      ),
+    ),
+  );
+}
+
+/// The desktop formatting controls, in the header row: small icon buttons
+/// whose tooltips name their shortcuts.
+class _DesktopFormatBar extends StatelessWidget {
+  const _DesktopFormatBar({
+    required this.controller,
+    required this.mac,
+    required this.onDraw,
+    required this.onDone,
+  });
+
+  final QuillController controller;
+  final bool mac;
+  final VoidCallback onDraw;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final cmd = mac ? '\u2318' : 'Ctrl+';
+    final shift = mac ? '\u21e7' : 'Shift+';
+    Widget toggle(Attribute attribute, String tip) =>
+        QuillToolbarToggleStyleButton(
+          controller: controller,
+          attribute: attribute,
+          options: QuillToolbarToggleStyleButtonOptions(
+            iconSize: 15,
+            iconButtonFactor: 1.8,
+            tooltip: tip,
+          ),
+        );
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 30,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              iconSize: 18,
+              icon: const Icon(Icons.draw_outlined),
+              tooltip: 'Draw',
+              onPressed: onDraw,
+            ),
+          ),
+          Container(width: 1, height: 20, color: c.outlineVariant),
+          const SizedBox(width: 4),
+          toggle(Attribute.bold, 'Bold ${cmd}B'),
+          toggle(Attribute.italic, 'Italic ${cmd}I'),
+          toggle(Attribute.underline, 'Underline ${cmd}U'),
+          toggle(Attribute.ul, 'Bulleted list $shift${cmd}7'),
+          toggle(Attribute.ol, 'Numbered list $shift${cmd}9'),
+          _TextStyleButton(controller: controller, onDone: onDone, size: 30),
+        ],
       ),
     );
   }
@@ -1589,10 +2242,15 @@ enum _TextStyle {
 
 /// "Aa": the less frequent formats, as a menu that says which is on.
 class _TextStyleButton extends StatelessWidget {
-  const _TextStyleButton({required this.controller, required this.onDone});
+  const _TextStyleButton({
+    required this.controller,
+    required this.onDone,
+    this.size = 40,
+  });
 
   final QuillController controller;
   final VoidCallback onDone;
+  final double size;
 
   bool _isOn(_TextStyle style, Map<String, Attribute> attrs) {
     final header = attrs[Attribute.header.key]?.value;
@@ -1644,7 +2302,7 @@ class _TextStyleButton extends StatelessWidget {
         ];
       },
       child: SizedBox.square(
-        dimension: 40,
+        dimension: size,
         child: Center(
           child: Text(
             'Aa',

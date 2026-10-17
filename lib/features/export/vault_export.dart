@@ -12,6 +12,7 @@ import '../library/citation_formatter.dart';
 import '../library/citations.dart' show parseCitationGroup;
 import '../library/highlights.dart';
 import '../library/study_details.dart';
+import '../lock/note_crypto.dart' show isLockedContent;
 import '../notes/note_content.dart';
 import '../notes/note_links.dart';
 import '../notes/note_markdown.dart';
@@ -42,6 +43,19 @@ class VaultExportResult {
   final Archive archive;
   final int notes;
   final int papers;
+}
+
+/// What a locked note's file says. A vault is a plain-text copy on disk, so
+/// a locked note is never written out, even while the notes are unlocked.
+const lockedNotePlaceholder = '🔒 This note is locked in Corplex.';
+
+/// Whether any note is locked (the export dialog then says they become
+/// placeholders).
+Future<bool> anyLockedNotes(AppDatabase db) async {
+  for (final n in await db.select(db.notes).get()) {
+    if (isLockedContent(n.content)) return true;
+  }
+  return false;
 }
 
 /// Builds the export in memory. [includePdfs] adds the (large) PDF files.
@@ -166,8 +180,9 @@ Future<VaultExportResult> buildVaultArchive(
         if (r.noteId == n.id && paperNames.containsKey(r.paperId)) r.paperId,
     ]..sort((a, b) => paperNames[a]!.compareTo(paperNames[b]!));
 
+    final locked = isLockedContent(n.content);
     final rewritten = _rewriteLinks(
-      n.content,
+      locked ? '' : n.content,
       noteTitleOf: (id) => notesById.containsKey(id)
           ? p.basenameWithoutExtension(noteNames[id]!)
           : null,
@@ -179,10 +194,15 @@ Future<VaultExportResult> buildVaultArchive(
       },
     );
     final body = StringBuffer(
-      noteToMarkdown(title: n.title, content: rewritten).trimRight(),
+      locked
+          ? '${n.title.trim().isEmpty ? '' : '# ${n.title.trim()}\n\n'}'
+                '$lockedNotePlaceholder'
+          : noteToMarkdown(title: n.title, content: rewritten).trimRight(),
     );
 
-    final mine = attachments.where((a) => a.noteId == n.id).toList()
+    // A locked note's attachments are left out too: they'd be plain copies
+    // of what the lock is protecting.
+    final mine = attachments.where((a) => a.noteId == n.id && !locked).toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     final lines = <String>[];
     for (final a in mine) {
@@ -208,6 +228,7 @@ Future<VaultExportResult> buildVaultArchive(
       'id': n.id,
       'created': n.createdAt.toUtc().toIso8601String(),
       'updated': n.updatedAt.toUtc().toIso8601String(),
+      if (locked) 'locked': true,
       'tags': myTags,
       'projects': myProjects,
       'papers': [for (final id in myPapers) paperLink(id)],
@@ -489,7 +510,7 @@ String _frontmatter(Map<String, Object?> fields) {
           b.write('  - ${_q('$item')}\n');
         }
       }
-    } else if (v is int) {
+    } else if (v is int || v is bool) {
       b.write('$k: $v\n');
     } else if (k == 'created' || k == 'updated') {
       b.write('$k: $v\n');

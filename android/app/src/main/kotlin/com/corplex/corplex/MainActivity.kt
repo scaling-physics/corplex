@@ -1,11 +1,12 @@
 package com.corplex.corplex
 
-import com.ryanheise.audioservice.AudioServiceActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 
-// AudioServiceActivity (a FlutterActivity) shares the Flutter engine with
+// AudioServiceFragmentActivity (a FlutterFragmentActivity, which local_auth's
+// biometric prompt requires) shares the Flutter engine with
 // the background audio service, so playback survives the app going away.
-class MainActivity : AudioServiceActivity() {
+class MainActivity : AudioServiceFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         OcrChannel.register(flutterEngine.dartExecutor.binaryMessenger)

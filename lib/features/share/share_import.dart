@@ -58,6 +58,21 @@ class PluginShareIntentSource implements ShareIntentSource {
   }
 }
 
+/// For platforms without the share plugin (macOS: files arrive through
+/// Import PDF instead).
+class NoShareIntentSource implements ShareIntentSource {
+  const NoShareIntentSource();
+
+  @override
+  Future<List<SharedMediaFile>> initial() async => const [];
+
+  @override
+  Stream<List<SharedMediaFile>> get stream => const Stream.empty();
+
+  @override
+  Future<void> reset() async {}
+}
+
 final shareIntentSourceProvider = Provider<ShareIntentSource>(
   (ref) => PluginShareIntentSource(),
 );

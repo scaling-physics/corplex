@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:corplex/data/database_provider.dart';
 
 void main() {
+  // The chapter outline reads the lock service, whose provider listens to
+  // app lifecycle changes and so needs a binding.
+  TestWidgetsFlutterBinding.ensureInitialized();
   late AppDatabase db;
   late String pr;
 

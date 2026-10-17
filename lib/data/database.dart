@@ -13,6 +13,7 @@ import 'tables/attachments_table.dart';
 import 'tables/folders_table.dart';
 import 'tables/highlights_table.dart';
 import 'tables/matrix_table.dart';
+import 'tables/note_keys_table.dart';
 import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
 import 'tables/note_versions_table.dart';
@@ -42,6 +43,7 @@ part 'database.g.dart';
     MatrixColumns,
     MatrixCells,
     NoteVersions,
+    NoteKeys,
     TrashItems,
     OcrPages,
     OcrPapers,
@@ -59,13 +61,16 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.inMemoryForTesting() {
     return AppDatabase.forTesting(
       NativeDatabase.memory(
-        setup: (database) => database.execute('PRAGMA foreign_keys = ON;'),
+        setup: (database) {
+          database.execute('PRAGMA foreign_keys = ON;');
+          database.execute('PRAGMA secure_delete = ON;');
+        },
       ),
     );
   }
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -251,6 +256,15 @@ class AppDatabase extends _$AppDatabase {
         }
         await _createSyncSchema(markExisting: false);
       }
+      if (from < 17) {
+        // v17: the notes password (wrapped keys for locked notes). A new
+        // synced table; locked note bodies live in `notes.content` as an
+        // envelope, so no other table changes.
+        if (!await _hasTable('note_keys')) {
+          await m.createTable(noteKeys);
+        }
+        await _createSyncSchema(markExisting: false);
+      }
     },
   );
 
@@ -301,7 +315,12 @@ LazyDatabase _openConnection() {
     final file = File(p.join(dbFolder.path, 'corplex.sqlite'));
     return NativeDatabase.createInBackground(
       file,
-      setup: (database) => database.execute('PRAGMA foreign_keys = ON;'),
+      // secure_delete zeroes freed pages, so a note's plain text doesn't
+      // linger in the file after the note is locked.
+      setup: (database) {
+        database.execute('PRAGMA foreign_keys = ON;');
+        database.execute('PRAGMA secure_delete = ON;');
+      },
     );
   });
 }

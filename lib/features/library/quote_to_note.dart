@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../export/unlock_for_export.dart' show requestUnlock;
+import '../lock/note_lock_service.dart';
 import '../notes/note_content.dart';
 import '../notes/note_editor_screen.dart';
 import 'flight.dart';
@@ -14,11 +16,17 @@ import 'highlights.dart';
 /// Appends [highlight] (quote, page link, comment) to a note and links the
 /// note to the paper. With no [noteId] a new note is created, titled after
 /// the paper. Returns the note's id. UI-free, so it can be tested.
+///
+/// A locked target note is decrypted, appended to and encrypted again, so
+/// it stays locked; that needs [lock] with its key unlocked, else this
+/// throws [NoteLockedException] and writes nothing (never plain JSON onto
+/// an envelope).
 Future<String> quoteHighlightIntoNote(
   AppDatabase db, {
   required Highlight highlight,
   required Paper paper,
   String? noteId,
+  NoteLockService? lock,
 }) async {
   return db.transaction(() async {
     final id = noteId ?? const Uuid().v4();
@@ -35,16 +43,22 @@ Future<String> quoteHighlightIntoNote(
     final note = await (db.select(
       db.notes,
     )..where((n) => n.id.equals(id))).getSingle();
+    final locked = isLockedContent(note.content);
+    if (locked && lock == null) throw const NoteLockedException();
+    final current = locked
+        ? await lock!.decryptBody(id, note.content)
+        : note.content;
+    final appended = appendQuote(
+      current,
+      quote: highlight.quote,
+      page: highlight.pageNumber,
+      pageLink: paperPageLink(paper.id, highlight.pageNumber),
+      comment: highlight.comment,
+    );
     await (db.update(db.notes)..where((n) => n.id.equals(id))).write(
       NotesCompanion(
         content: Value(
-          appendQuote(
-            note.content,
-            quote: highlight.quote,
-            page: highlight.pageNumber,
-            pageLink: paperPageLink(paper.id, highlight.pageNumber),
-            comment: highlight.comment,
-          ),
+          locked ? await lock!.encryptBody(id, appended) : appended,
         ),
         updatedAt: Value(DateTime.now()),
       ),
@@ -173,12 +187,41 @@ Future<void> showQuoteToNoteSheet(
   );
   if (choice == null) return;
 
-  final noteId = await quoteHighlightIntoNote(
-    db,
-    highlight: highlight,
-    paper: paper,
-    noteId: choice.isEmpty ? null : choice,
-  );
+  final lock = ref.read(noteLockServiceProvider);
+  String noteId;
+  try {
+    noteId = await quoteHighlightIntoNote(
+      db,
+      highlight: highlight,
+      paper: paper,
+      noteId: choice.isEmpty ? null : choice,
+      lock: lock,
+    );
+  } on NoteLockedException {
+    // The chosen note is locked: unlock to add to it, else leave it alone.
+    final ok =
+        context.mounted &&
+        await requestUnlock(
+          context,
+          lock,
+          reason: 'Unlock the note to add this quote to it.',
+        );
+    if (!ok || !context.mounted) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unlock the note to add to it.')),
+        );
+      }
+      return;
+    }
+    noteId = await quoteHighlightIntoNote(
+      db,
+      highlight: highlight,
+      paper: paper,
+      noteId: choice,
+      lock: lock,
+    );
+  }
   if (!context.mounted) return;
   await Navigator.of(
     context,

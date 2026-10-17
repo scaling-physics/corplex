@@ -100,10 +100,12 @@ final dictationProvider = Provider.autoDispose<Dictation>((ref) {
   return dictation;
 });
 
-/// Whether a finished recording is written out as text (iOS only; Android
-/// has no on-device file transcription).
+/// Whether a finished recording is written out as text (iOS and macOS;
+/// Android has no on-device file transcription).
 final transcribesRecordingsProvider = Provider<bool>(
-  (ref) => defaultTargetPlatform == TargetPlatform.iOS,
+  (ref) =>
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS,
 );
 
 /// Whether "Dictate" is offered next to "Voice note": only where a recording
@@ -111,6 +113,10 @@ final transcribesRecordingsProvider = Provider<bool>(
 final dictationOfferedProvider = Provider<bool>(
   (ref) => defaultTargetPlatform == TargetPlatform.android,
 );
+
+/// System Settings > Privacy & Security > Microphone.
+const macMicrophoneSettingsUrl =
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone';
 
 /// Opens this app's page in the system Settings.
 final openAppSettingsProvider = Provider<Future<void> Function()>(
@@ -120,6 +126,8 @@ final openAppSettingsProvider = Provider<Future<void> Function()>(
         action: 'android.settings.APPLICATION_DETAILS_SETTINGS',
         data: 'package:com.corplex.corplex',
       ).launch();
+    } else if (defaultTargetPlatform == TargetPlatform.macOS) {
+      await launchUrl(Uri.parse(macMicrophoneSettingsUrl));
     } else {
       await launchUrl(Uri.parse('app-settings:'));
     }
@@ -199,7 +207,7 @@ class PluginVoiceRecorder implements VoiceRecorder {
 }
 
 /// On-device file transcription through the `corplex/speech` channel
-/// (`SceneDelegate.swift`: `SFSpeechURLRecognitionRequest` with
+/// (`SceneDelegate.swift` on iOS, `AppDelegate.swift` on macOS: `SFSpeechURLRecognitionRequest` with
 /// `requiresOnDeviceRecognition`). Other platforms have no such API.
 class PlatformTranscriber implements Transcriber {
   const PlatformTranscriber();

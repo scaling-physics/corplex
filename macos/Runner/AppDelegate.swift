@@ -1,0 +1,143 @@
+import Cocoa
+import FlutterMacOS
+import Speech
+import Vision
+
+@main
+class AppDelegate: FlutterAppDelegate {
+  override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    return true
+  }
+
+  override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+    return true
+  }
+}
+
+/// App-specific platform channels (OCR, speech), registered by
+/// `MainFlutterWindow` once the engine exists. Each must create its SDK
+/// objects lazily, on the first call — never here.
+func registerNativeChannels(_ messenger: FlutterBinaryMessenger) {
+  registerOcrChannel(messenger)
+  registerSpeechChannel(messenger)
+}
+
+private var ocrChannel: FlutterMethodChannel?
+private var speechChannel: FlutterMethodChannel?
+private var speechRecognizer: SFSpeechRecognizer?
+private var speechTask: SFSpeechRecognitionTask?
+
+/// On-device OCR (`corplex/ocr`): Apple Vision, accurate level with language
+/// correction. Same contract as iOS: PNG bytes in, lines with word boxes as
+/// fractions of the image (origin top-left) out. Vision objects are created
+/// per call, never at registration.
+private func registerOcrChannel(_ messenger: FlutterBinaryMessenger) {
+  let channel = FlutterMethodChannel(name: "corplex/ocr", binaryMessenger: messenger)
+  ocrChannel = channel
+  channel.setMethodCallHandler { call, result in
+    guard call.method == "recognize",
+      let args = call.arguments as? [String: Any],
+      let data = (args["image"] as? FlutterStandardTypedData)?.data,
+      let image = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    else {
+      result(FlutterError(code: "bad_args", message: "Expected PNG bytes", details: nil))
+      return
+    }
+    DispatchQueue.global(qos: .utility).async {
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate
+      request.usesLanguageCorrection = true
+      if #available(macOS 13.0, *) { request.automaticallyDetectsLanguage = true }
+      let handler = VNImageRequestHandler(cgImage: image, options: [:])
+      do {
+        try handler.perform([request])
+        var lines: [[String: Any]] = []
+        for observation in request.results ?? [] {
+          guard let candidate = observation.topCandidates(1).first else { continue }
+          let string = candidate.string
+          var words: [[String: Any]] = []
+          string.enumerateSubstrings(in: string.startIndex..<string.endIndex, options: .byWords) {
+            _, range, _, _ in
+            guard let box = try? candidate.boundingBox(for: range) else { return }
+            let b = box.boundingBox
+            words.append([
+              "text": String(string[range]),
+              "left": Double(b.minX), "right": Double(b.maxX),
+              "top": Double(1 - b.maxY), "bottom": Double(1 - b.minY),
+            ])
+          }
+          lines.append(["text": string, "words": words])
+        }
+        DispatchQueue.main.async { result(lines) }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "ocr_failed", message: error.localizedDescription, details: nil))
+        }
+      }
+    }
+  }
+}
+
+/// Voice notes (`corplex/speech`): transcribe a finished recording on this
+/// device only. Replies {status: ok|denied|unavailable, text}. The recogniser
+/// and authorisation request are created on the first call.
+private func registerSpeechChannel(_ messenger: FlutterBinaryMessenger) {
+  let channel = FlutterMethodChannel(name: "corplex/speech", binaryMessenger: messenger)
+  speechChannel = channel
+  channel.setMethodCallHandler { call, result in
+    guard call.method == "transcribe" else {
+      result(FlutterMethodNotImplemented)
+      return
+    }
+    guard let args = call.arguments as? [String: Any], let path = args["path"] as? String else {
+      result(FlutterError(code: "bad_args", message: "Expected a path", details: nil))
+      return
+    }
+    SFSpeechRecognizer.requestAuthorization { status in
+      DispatchQueue.main.async {
+        switch status {
+        case .authorized: runRecognition(path: path, result: result)
+        case .denied, .restricted: result(["status": "denied"])
+        default: result(["status": "unavailable"])
+        }
+      }
+    }
+  }
+}
+
+private func runRecognition(path: String, result: @escaping FlutterResult) {
+  guard let recognizer = SFSpeechRecognizer(), recognizer.isAvailable,
+    recognizer.supportsOnDeviceRecognition
+  else {
+    result(["status": "unavailable"])
+    return
+  }
+  speechRecognizer = recognizer
+  let request = SFSpeechURLRecognitionRequest(url: URL(fileURLWithPath: path))
+  request.requiresOnDeviceRecognition = true
+  request.shouldReportPartialResults = false
+  var replied = false
+  var best = ""
+  speechTask = recognizer.recognitionTask(with: request) { recognition, error in
+    if replied { return }
+    if let recognition = recognition {
+      best = recognition.bestTranscription.formattedString
+      if recognition.isFinal {
+        replied = true
+        speechTask = nil
+        result(["status": "ok", "text": best])
+        return
+      }
+    }
+    if let error = error as NSError? {
+      replied = true
+      speechTask = nil
+      // 1110: no speech detected. Not a failure, just nothing to write.
+      if error.code == 1110 || !best.isEmpty {
+        result(["status": "ok", "text": best])
+      } else {
+        result(["status": "unavailable"])
+      }
+    }
+  }
+}

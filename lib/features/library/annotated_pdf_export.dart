@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../platform/share_origin.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -95,6 +98,7 @@ Future<void> exportAnnotatedPdf(
   Paper paper,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
+  final origin = shareOrigin(context);
   final db = ref.read(databaseProvider);
   void say(String m) => messenger.showSnackBar(SnackBar(content: Text(m)));
 
@@ -120,6 +124,7 @@ Future<void> exportAnnotatedPdf(
       ShareParams(
         files: [XFile(file.path, mimeType: 'application/pdf')],
         subject: paper.title,
+        sharePositionOrigin: origin,
       ),
     );
   } on AnnotatedPdfException catch (e) {

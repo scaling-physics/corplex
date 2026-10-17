@@ -9,6 +9,7 @@ import '../../theme/motion_widgets.dart';
 import '../library/highlights.dart';
 import '../library/study_details.dart';
 import 'matrix.dart';
+import '../platform/share_origin.dart';
 
 /// A project's synthesis matrix: papers × themes. Tap a cell to write in
 /// it — or pull a passage from the paper's highlights.
@@ -46,7 +47,11 @@ class MatrixScreen extends ConsumerWidget {
                   }
                 } else {
                   await SharePlus.instance.share(
-                    ShareParams(text: md, subject: '${project.name} matrix'),
+                    ShareParams(
+                      text: md,
+                      subject: '${project.name} matrix',
+                      sharePositionOrigin: shareOrigin(context),
+                    ),
                   );
                 }
               },

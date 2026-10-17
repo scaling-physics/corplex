@@ -17,9 +17,8 @@ class Attachments extends Table {
 
   TextColumn get noteId =>
       text().nullable().references(Notes, #id, onDelete: KeyAction.cascade)();
-  TextColumn get paperId => text()
-      .nullable()
-      .references(Papers, #id, onDelete: KeyAction.cascade)();
+  TextColumn get paperId =>
+      text().nullable().references(Papers, #id, onDelete: KeyAction.cascade)();
 
   TextColumn get type => textEnum<AttachmentType>()();
   TextColumn get title => text().nullable()();

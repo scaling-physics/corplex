@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home/adaptive.dart' show ReadableColumn;
+import '../platform/mac_window.dart';
+import '../../theme/context_menu.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -81,20 +83,36 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
     );
   }
 
+  /// Notes-like margins on a Mac: the page fills the window.
+  double _side(BuildContext context) =>
+      macPanePadding(MediaQuery.sizeOf(context).width);
+
+  Widget _fill(bool mac, {required Widget child}) =>
+      mac ? child : ReadableColumn(child: child);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final all = ref.watch(allHighlightsProvider).value ?? const [];
     final shown = filterHighlights(all, _query);
 
+    final mac = isMac(context);
     final children = <Widget>[];
+    // On a Mac each paper's highlights are cards flowing across the width.
+    var group = <Widget>[];
+    void flush() {
+      if (group.isNotEmpty) children.add(_CardFlow(cards: group));
+      group = <Widget>[];
+    }
+
     String? currentPaper;
     for (final e in shown) {
       if (e.paper.id != currentPaper) {
+        flush();
         currentPaper = e.paper.id;
         children.add(
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+            padding: EdgeInsets.fromLTRB(mac ? 0 : 20, 20, 20, 4),
             child: Text(
               e.paper.title,
               maxLines: 2,
@@ -104,34 +122,60 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
           ),
         );
       }
-      children.add(
-        ListTile(
-          title: Text(
-            e.highlight.quote,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-          subtitle: Text(
-            [
-              'p. ${e.highlight.pageNumber}',
-              if ((e.highlight.comment ?? '').trim().isNotEmpty)
-                e.highlight.comment!.trim(),
-            ].join(' · '),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () => _open(e),
-          onLongPress: () => showModalBottomSheet<void>(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => HighlightSheet(highlightId: e.highlight.id),
+      final tile = ListTile(
+        title: Text(
+          e.highlight.quote,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontStyle: FontStyle.italic,
           ),
         ),
+        subtitle: Text(
+          [
+            'p. ${e.highlight.pageNumber}',
+            if ((e.highlight.comment ?? '').trim().isNotEmpty)
+              e.highlight.comment!.trim(),
+          ].join(' · '),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onTap: () => _open(e),
+        onLongPress: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => HighlightSheet(highlightId: e.highlight.id),
+        ),
+      );
+      (mac ? group : children).add(
+        isDesktop(context)
+            ? ContextMenuRegion(
+                // The desktop's long-press: recolour, comment, copy, delete.
+                actions: [
+                  ContextMenuAction(
+                    label: 'Open',
+                    icon: Icons.open_in_new,
+                    onSelected: () => _open(e),
+                  ),
+                  null,
+                  ...highlightContextActions(
+                    context,
+                    ref,
+                    e.highlight,
+                    onComment: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) =>
+                          HighlightSheet(highlightId: e.highlight.id),
+                    ),
+                  ),
+                ],
+                child: tile,
+              )
+            : tile,
       );
     }
+    flush();
 
     return Scaffold(
       appBar: AppBar(
@@ -158,7 +202,8 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
           ),
         ],
       ),
-      body: ReadableColumn(
+      body: _fill(
+        mac,
         child: all.isEmpty
             ? const EmptyState(
                 icon: Icons.format_quote_outlined,
@@ -170,10 +215,42 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
             : shown.isEmpty
             ? const Center(child: Text('No matches.'))
             : ListView(
-                padding: const EdgeInsets.only(bottom: 32),
+                padding: EdgeInsets.fromLTRB(
+                  mac ? _side(context) : 0,
+                  0,
+                  mac ? _side(context) : 0,
+                  32,
+                ),
                 children: children,
               ),
       ),
     );
   }
+}
+
+/// Highlight cards flowing in as many columns (at least 360 pt wide) as fit.
+class _CardFlow extends StatelessWidget {
+  const _CardFlow({required this.cards});
+
+  final List<Widget> cards;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      const gap = 12.0;
+      final columns = ((box.maxWidth + gap) / (360 + gap)).floor().clamp(1, 6);
+      final width = (box.maxWidth - gap * (columns - 1)) / columns;
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final card in cards)
+            SizedBox(
+              width: width,
+              child: Card(margin: EdgeInsets.zero, child: card),
+            ),
+        ],
+      );
+    },
+  );
 }

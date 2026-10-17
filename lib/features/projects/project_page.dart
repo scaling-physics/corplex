@@ -135,8 +135,7 @@ class ProjectScreen extends ConsumerWidget {
               ActionChip(
                 avatar: const Icon(Icons.ios_share, size: 18),
                 label: const Text('Export project'),
-                onPressed: () =>
-                    exportProject(context, ref.read(databaseProvider), project),
+                onPressed: () => exportProject(context, ref, project),
               ),
             if (notes.isNotEmpty && project.dueDate == null)
               ActionChip(

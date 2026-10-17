@@ -24,6 +24,10 @@ class InkInputPolicy {
 
   bool get fingersDraw => fingerDrawsOverride ?? !stylusSeen;
 
+  /// On a desktop a mouse or trackpad click is the main way to draw, whether
+  /// or not a pen tablet has also been used (there are no palms to reject).
+  bool mouseAlwaysDraws = false;
+
   /// [stylusButton] is the pen's barrel button (S Pen, Wacom-style styluses):
   /// held while touching, it erases, like flipping a pencil over.
   InkAction actionFor(
@@ -38,8 +42,10 @@ class InkInputPolicy {
       case PointerDeviceKind.stylus:
         stylusSeen = true;
         return eraserTool || stylusButton ? InkAction.erase : InkAction.draw;
-      case PointerDeviceKind.touch:
       case PointerDeviceKind.mouse:
+        if (!fingersDraw && !mouseAlwaysDraws) return InkAction.ignore;
+        return eraserTool ? InkAction.erase : InkAction.draw;
+      case PointerDeviceKind.touch:
         if (!fingersDraw) return InkAction.ignore;
         return eraserTool ? InkAction.erase : InkAction.draw;
       case PointerDeviceKind.trackpad:

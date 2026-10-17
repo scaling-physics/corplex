@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../platform/share_origin.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
@@ -150,6 +153,7 @@ Future<void> importBibtexFile(BuildContext context, WidgetRef ref) async {
 /// Shares the whole library as one BibTeX file's worth of text.
 Future<void> exportLibraryBibtex(BuildContext context, WidgetRef ref) async {
   final db = ref.read(databaseProvider);
+  final origin = shareOrigin(context);
   final papers = await db.select(db.papers).get();
   if (!context.mounted) return;
   if (papers.isEmpty) {
@@ -157,7 +161,11 @@ Future<void> exportLibraryBibtex(BuildContext context, WidgetRef ref) async {
     return;
   }
   await SharePlus.instance.share(
-    ShareParams(text: exportBibtex(papers), subject: 'Corplex library.bib'),
+    ShareParams(
+      text: exportBibtex(papers),
+      subject: 'Corplex library.bib',
+      sharePositionOrigin: origin,
+    ),
   );
 }
 

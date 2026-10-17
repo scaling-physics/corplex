@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../lock/note_lock_service.dart';
 import 'editor_document.dart';
 import 'note_content.dart';
 import 'note_stats.dart';
@@ -60,10 +61,18 @@ Future<void> saveNoteVersion(
 /// Whether a version's title and body equal the note's, comparing bodies
 /// in normalised Delta form (an empty or plain-text body is the same note
 /// as its Delta).
+///
+/// Locked bodies are compared as stored (each lock uses a fresh nonce, so
+/// equal envelopes are the very same copy); use [sameReadableBody] when the
+/// plain text of both is at hand.
 bool sameBody(String title, String content, Note note) =>
-    title == note.title &&
-    encodeNoteContent(decodeNoteContent(content)) ==
-        encodeNoteContent(decodeNoteContent(note.content));
+    title == note.title && _sameContent(content, note.content);
+
+bool _sameContent(String a, String b) {
+  if (isLockedContent(a) || isLockedContent(b)) return a == b;
+  return encodeNoteContent(decodeNoteContent(a)) ==
+      encodeNoteContent(decodeNoteContent(b));
+}
 
 /// Renames a version. The label is the only thing about a version that
 /// can change; empty clears it.
@@ -106,26 +115,76 @@ Future<void> undoDeleteNoteVersion(AppDatabase db, NoteVersion row) async {
 /// version), so a restore can itself be undone. The note is stamped "now",
 /// so it syncs, and an open editor absorbs it. Returns false if the
 /// version or note no longer exists.
-Future<bool> restoreNoteVersion(AppDatabase db, String versionId) =>
-    db.transaction(() async {
-      final version = await (db.select(
-        db.noteVersions,
-      )..where((v) => v.id.equals(versionId))).getSingleOrNull();
-      if (version == null) return false;
-      final note = await (db.select(
-        db.notes,
-      )..where((n) => n.id.equals(version.noteId))).getSingleOrNull();
-      if (note == null) return false;
-      if (sameBody(version.title, version.content, note)) return true;
-      await saveNoteVersion(db, note.id, label: beforeRestoringLabel);
-      await (db.update(db.notes)..where((n) => n.id.equals(note.id))).write(
-        NotesCompanion(
-          title: Value(version.title),
-          content: Value(version.content),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
+///
+/// A locked note (or version) needs [lock] with its key unlocked: both
+/// sides are decrypted to compare, and the restored body is encrypted for
+/// the note again with the current key (a locked note stays locked, an
+/// unlocked one stays unlocked). Throws [NoteLockedException] — before
+/// changing anything — if a key isn't unlocked, so the caller can ask.
+Future<bool> restoreNoteVersion(
+  AppDatabase db,
+  String versionId, {
+  NoteLockService? lock,
+}) => db.transaction(() async {
+  final version = await (db.select(
+    db.noteVersions,
+  )..where((v) => v.id.equals(versionId))).getSingleOrNull();
+  if (version == null) return false;
+  final note = await (db.select(
+    db.notes,
+  )..where((n) => n.id.equals(version.noteId))).getSingleOrNull();
+  if (note == null) return false;
+
+  var body = version.content;
+  if (isLockedContent(version.content) || isLockedContent(note.content)) {
+    if (lock == null) throw const NoteLockedException();
+    final versionText = await lock.decryptBody(note.id, version.content);
+    final noteText = await lock.decryptBody(note.id, note.content);
+    if (version.title == note.title && _sameContent(versionText, noteText)) {
       return true;
+    }
+    body = isLockedContent(note.content)
+        ? await lock.encryptBody(note.id, versionText)
+        : versionText;
+  } else if (sameBody(version.title, version.content, note)) {
+    return true;
+  }
+  await saveNoteVersion(db, note.id, label: beforeRestoringLabel);
+  await (db.update(db.notes)..where((n) => n.id.equals(note.id))).write(
+    NotesCompanion(
+      title: Value(version.title),
+      content: Value(body),
+      updatedAt: Value(DateTime.now()),
+    ),
+  );
+  return true;
+});
+
+/// The plain text of a note's body and of its versions, for the versions
+/// screens: keyed by version id, and `note` for the note itself. A locked
+/// body appears only while its key is unlocked, so a missing entry means
+/// "locked". Refreshes when notes lock or unlock.
+final versionTextsProvider = FutureProvider.autoDispose
+    .family<Map<String, String>, String>((ref, noteId) async {
+      final lock = ref.watch(noteLockServiceProvider);
+      final versions =
+          ref.watch(noteVersionsProvider(noteId)).value ?? const [];
+      final note = ref.watch(versionNoteProvider(noteId)).value;
+      final out = <String, String>{};
+      Future<void> add(String key, String content) async {
+        if (!lock.canRead(content)) return;
+        try {
+          out[key] = await lock.decryptBody(noteId, content);
+        } on Object {
+          // Damaged envelope: treated as locked.
+        }
+      }
+
+      if (note != null) await add('note', note.content);
+      for (final v in versions) {
+        await add(v.id, v.content);
+      }
+      return out;
     });
 
 /// A note's versions, newest first.

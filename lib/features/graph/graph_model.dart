@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/citations.dart' show citedKeys;
+import '../lock/note_crypto.dart' show isLockedContent;
 import '../library/openalex.dart';
 import '../notes/note_content.dart' show notePlainTextPreview;
 
@@ -86,7 +87,9 @@ Future<GraphData> buildGraph(
         kind: GraphNodeKind.note,
         id: n.id,
         label: n.title.trim().isEmpty
-            ? _firstWords(notePlainTextPreview(n.content))
+            ? (isLockedContent(n.content)
+                  ? 'Locked note'
+                  : _firstWords(notePlainTextPreview(n.content)))
             : n.title.trim(),
       ),
     );
@@ -113,6 +116,9 @@ Future<GraphData> buildGraph(
   }
 
   for (final n in notes) {
+    // A locked body is an envelope: no links or citations to read (the
+    // note keeps its paper links below, which live in NotePaperRefs).
+    if (isLockedContent(n.content)) continue;
     final from = index['n:${n.id}']!;
     for (final m in _noteLink.allMatches(n.content)) {
       connect(from, index['n:${m.group(1)}']);

@@ -57,6 +57,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Corplex uses Face ID to unlock your locked notes.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Corplex uses the microphone to record voice notes.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

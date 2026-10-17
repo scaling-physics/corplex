@@ -4,7 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database_provider.dart';
 import 'tags_providers.dart';
 
-Future<void> showTagPickerSheet(BuildContext context, WidgetRef ref, String noteId) {
+Future<void> showTagPickerSheet(
+  BuildContext context,
+  WidgetRef ref,
+  String noteId,
+) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,

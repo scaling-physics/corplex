@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database_provider.dart';
 import '../home/adaptive.dart';
+import '../lock/note_lock_service.dart';
 import '../notes/editor_document.dart';
 import '../notes/note_editor_screen.dart';
 import 'coverage.dart' show ChapterQuery;
 import 'open_from_page.dart';
+import 'readable_content.dart';
 import 'todos_request.dart';
 
 /// Markers a writer leaves in a note for later.
@@ -158,16 +160,27 @@ class ChapterTodos {
 final todosProvider = StreamProvider.autoDispose
     .family<List<ChapterTodos>, ChapterQuery>((ref, query) {
       final db = ref.watch(databaseProvider);
+      // Locked chapters count only while unlocked (their text is decrypted
+      // in memory for this); otherwise they're left out.
+      final lock = ref.watch(noteLockServiceProvider);
       return (db.select(
         db.notes,
-      )..where((n) => n.id.isIn(query.noteIds))).watch().map((notes) {
+      )..where((n) => n.id.isIn(query.noteIds))).watch().asyncMap((
+        notes,
+      ) async {
         final byId = {for (final n in notes) n.id: n};
-        return [
-          for (final id in query.noteIds)
-            if (byId[id] case final n?)
-              if (findTodos(n.content) case final todos when todos.isNotEmpty)
-                ChapterTodos(noteId: n.id, title: n.title, todos: todos),
-        ];
+        final out = <ChapterTodos>[];
+        for (final id in query.noteIds) {
+          final n = byId[id];
+          if (n == null) continue;
+          final content = await readableNoteContent(lock, n.id, n.content);
+          if (content == null) continue;
+          final todos = findTodos(content);
+          if (todos.isNotEmpty) {
+            out.add(ChapterTodos(noteId: n.id, title: n.title, todos: todos));
+          }
+        }
+        return out;
       });
     });
 

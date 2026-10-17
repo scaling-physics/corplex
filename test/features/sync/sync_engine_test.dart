@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/tables/attachments_table.dart';
 import 'package:corplex/data/tables/papers_table.dart';
+import 'package:corplex/features/lock/note_crypto.dart';
+import 'package:corplex/features/lock/note_lock_service.dart';
 import 'package:corplex/features/notes/note_content.dart';
 import 'package:corplex/features/sync/sync_engine.dart';
 import 'package:corplex/features/sync/sync_remote.dart';
@@ -321,6 +323,155 @@ void main() {
       expect((await b.select(b.notes).getSingle()).title, 'from B');
     },
   );
+
+  group('a lock is never undone by a concurrent edit', () {
+    String body(String t) => jsonEncode([
+      {'insert': '$t\n'},
+    ]);
+
+    Future<String> baseDump(AppDatabase db) async =>
+        (await db.customSelect('SELECT data FROM sync_base').get())
+            .map((r) => r.read<String>('data'))
+            .join();
+
+    Future<NoteLockService> lockOnB() async {
+      final lockB = NoteLockService(
+        b,
+        crypto: NoteCrypto(iterations: 1000),
+        inlineKdf: true,
+      );
+      addTearDown(lockB.dispose);
+      await lockB.setPassword('pw');
+      await lockB.lockNote('n1');
+      return lockB;
+    }
+
+    Future<void> seed() async {
+      await a
+          .into(a.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: const Value('n1'),
+              title: const Value('Grant'),
+              content: Value(body('original zebrafish')),
+            ),
+          );
+      await both();
+    }
+
+    test('B locks offline, A pushes a later plain edit first', () async {
+      await seed();
+      await lockOnB();
+      expect(await baseDump(b), isNot(contains('zebrafish')));
+      await (a.update(a.notes)..where((n) => n.id.equals('n1'))).write(
+        NotesCompanion(
+          content: Value(body('edited on A narwhal')),
+          updatedAt: Value(DateTime.utc(2040)),
+        ),
+      );
+      await syncA.sync(userId: 'u1');
+      await syncB.sync(userId: 'u1');
+      await syncA.sync(userId: 'u1');
+      await syncB.sync(userId: 'u1');
+
+      final serverContent =
+          server.tables['notes']!['n1']!['content']! as String;
+      expect(isLockedContent(serverContent), isTrue);
+      for (final db in [a, b]) {
+        final n = await (db.select(
+          db.notes,
+        )..where((x) => x.id.equals('n1'))).getSingle();
+        expect(n.content, serverContent);
+        expect(await baseDump(db), isNot(contains('narwhal')));
+        expect(await baseDump(db), isNot(contains('zebrafish')));
+        final saved = (await db.select(db.notes).get())
+            .where((x) => x.id != 'n1')
+            .single;
+        expect(saved.content, contains('narwhal'));
+      }
+    });
+
+    test('B locks and nobody else edited: no conflict note', () async {
+      await seed();
+      await lockOnB();
+      await syncB.sync(userId: 'u1');
+      await syncA.sync(userId: 'u1');
+      expect(await a.select(a.notes).get(), hasLength(1));
+      expect(await b.select(b.notes).get(), hasLength(1));
+      expect(
+        isLockedContent((await a.select(a.notes).getSingle()).content),
+        isTrue,
+      );
+    });
+
+    for (final aIsLater in [true, false]) {
+      test(
+        'A edits offline, B locks (A\'s edit is ${aIsLater ? 'later' : 'earlier'})',
+        () async {
+          await a
+              .into(a.folders)
+              .insert(
+                FoldersCompanion.insert(id: const Value('f1'), name: 'F'),
+              );
+          await a
+              .into(a.notes)
+              .insert(
+                NotesCompanion.insert(
+                  id: const Value('n1'),
+                  title: const Value('Grant'),
+                  folderId: const Value('f1'),
+                  content: Value(body('original')),
+                ),
+              );
+          await both();
+
+          await (a.update(a.notes)..where((n) => n.id.equals('n1'))).write(
+            NotesCompanion(
+              content: Value(body('edited on A zebrafish')),
+              updatedAt: Value(DateTime.utc(aIsLater ? 2040 : 2020)),
+            ),
+          );
+          final lockB = NoteLockService(
+            b,
+            crypto: NoteCrypto(iterations: 1000),
+            inlineKdf: true,
+          );
+          addTearDown(lockB.dispose);
+          await lockB.setPassword('pw');
+          await lockB.lockNote('n1');
+          await (b.update(b.notes)..where((n) => n.id.equals('n1'))).write(
+            NotesCompanion(
+              updatedAt: Value(DateTime.utc(aIsLater ? 2030 : 2035)),
+            ),
+          );
+
+          await syncB.sync(userId: 'u1');
+          await syncA.sync(userId: 'u1');
+          await syncB.sync(userId: 'u1');
+          await syncA.sync(userId: 'u1');
+
+          final serverContent = server.tables['notes']!['n1']!['content'];
+          expect(isLockedContent(serverContent! as String), isTrue);
+          for (final db in [a, b]) {
+            final n = await (db.select(
+              db.notes,
+            )..where((x) => x.id.equals('n1'))).getSingle();
+            expect(n.content, serverContent);
+          }
+          // A keeps its edit as a separate note in the same folder.
+          final notesA = await a.select(a.notes).get();
+          final saved = notesA.where((n) => n.id != 'n1').single;
+          expect(saved.title, 'Grant (edit made before it was locked)');
+          expect(saved.folderId, 'f1');
+          expect(saved.content, contains('edited on A zebrafish'));
+          expect((await b.select(b.notes).get()), hasLength(2));
+          expect(await baseDump(a), isNot(contains('zebrafish')));
+          expect(await baseDump(b), isNot(contains('zebrafish')));
+          expect(await baseDump(a), isNot(contains('original')));
+        },
+      );
+    }
+  });
 
   group('the same row edited on two devices between syncs', () {
     String body(List<String> paragraphs) => jsonEncode([

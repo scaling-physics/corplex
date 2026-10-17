@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 
 import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
+import '../export/unlock_for_export.dart' show requestUnlock;
 import '../home/adaptive.dart' show ReadableColumn;
+import '../lock/note_lock_service.dart';
 import 'note_versions.dart';
 
 /// Opens the saved versions of a note. [flush] lets the open editor save
@@ -85,7 +87,11 @@ class NoteVersionsScreen extends ConsumerWidget {
     final note = ref.watch(versionNoteProvider(noteId)).value;
     final db = ref.read(databaseProvider);
     final theme = Theme.of(context);
-    final nowWords = note == null ? 0 : noteWordCount(note.content);
+    // Plain text of the bodies that can be read now (locked ones only
+    // while unlocked); words are shown only for those.
+    final texts = ref.watch(versionTextsProvider(noteId)).value ?? const {};
+    final nowText = texts['note'];
+    final nowWords = nowText == null ? null : noteWordCount(nowText);
 
     Future<void> save() async {
       final label = await _askLabel(
@@ -126,9 +132,11 @@ class NoteVersionsScreen extends ConsumerWidget {
                     ListTile(
                       title: Text(v.label ?? 'Saved version'),
                       subtitle: Text(
-                        '${_when(v.createdAt)} · '
-                        '${noteWordCount(v.content)} words'
-                        '${_since(nowWords - noteWordCount(v.content))}',
+                        texts[v.id] == null
+                            ? '${_when(v.createdAt)} · Locked'
+                            : '${_when(v.createdAt)} · '
+                                  '${noteWordCount(texts[v.id]!)} words'
+                                  '${nowWords == null ? '' : _since(nowWords - noteWordCount(texts[v.id]!))}',
                         style: TextStyle(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -206,10 +214,37 @@ class NoteVersionCompareScreen extends ConsumerWidget {
     final note = ref.watch(versionNoteProvider(noteId)).value;
     final version = versions.where((v) => v.id == versionId).firstOrNull;
     final db = ref.read(databaseProvider);
+    final lock = ref.read(noteLockServiceProvider);
     final scheme = Theme.of(context).colorScheme;
 
     if (version == null || note == null) {
       return Scaffold(appBar: AppBar(title: const Text('Compare')));
+    }
+
+    // Locked bodies are readable only while unlocked (the provider
+    // refreshes when that changes); until then, ask.
+    final texts = ref.watch(versionTextsProvider(noteId)).value;
+    final versionText = texts?[version.id];
+    final noteText = texts?['note'];
+    if (texts == null || versionText == null || noteText == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(version.label ?? 'Saved version')),
+        body: texts == null
+            ? const SizedBox.shrink()
+            : EmptyState(
+                icon: Icons.lock_outline,
+                title: 'Locked',
+                message: 'Unlock this note to compare or restore versions.',
+                action: FilledButton(
+                  onPressed: () => requestUnlock(
+                    context,
+                    lock,
+                    reason: 'Unlock this note to compare its versions.',
+                  ),
+                  child: const Text('Unlock'),
+                ),
+              ),
+      );
     }
 
     final diff = [
@@ -217,11 +252,11 @@ class NoteVersionCompareScreen extends ConsumerWidget {
         DiffLine(DiffKind.removed, version.title),
         DiffLine(DiffKind.added, note.title),
       ],
-      ...diffLines(noteLines(version.content), noteLines(note.content)),
+      ...diffLines(noteLines(versionText), noteLines(noteText)),
     ].where((l) => l.text.trim().isNotEmpty).toList();
     final added = diff.where((l) => l.kind == DiffKind.added).length;
     final removed = diff.where((l) => l.kind == DiffKind.removed).length;
-    final words = noteWordCount(note.content) - noteWordCount(version.content);
+    final words = noteWordCount(noteText) - noteWordCount(versionText);
 
     Future<void> restore() async {
       final ok = await showDialog<bool>(
@@ -246,7 +281,15 @@ class NoteVersionCompareScreen extends ConsumerWidget {
       );
       if (ok != true) return;
       await flush();
-      await restoreNoteVersion(db, versionId);
+      try {
+        await restoreNoteVersion(db, versionId, lock: lock);
+      } on NoteLockedException {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unlock the note to restore it.')),
+        );
+        return;
+      }
       if (!context.mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context)

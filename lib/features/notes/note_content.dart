@@ -2,11 +2,17 @@ import 'dart:convert';
 
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../lock/note_crypto.dart' show isLockedContent;
+
 /// Note content is stored as Quill Delta JSON. This decodes it back into a
 /// [Document], falling back to treating the stored string as plain text for
 /// notes created before rich text existed (or if the JSON is malformed).
+///
+/// A *locked* body (an encrypted envelope) is never text: it decodes to an
+/// empty document, so no preview, count or export can ever show ciphertext
+/// as if it were the note. Decrypt first (`NoteLockService.decryptBody`).
 Document decodeNoteContent(String content) {
-  if (content.isEmpty) return Document();
+  if (content.isEmpty || isLockedContent(content)) return Document();
   try {
     return Document.fromJson(jsonDecode(content) as List);
   } catch (_) {

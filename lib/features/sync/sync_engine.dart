@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/sync_schema.dart';
+import '../lock/note_crypto.dart'
+    show isLockedContent, isRedactedBase, redactedBody;
 import 'file_sync.dart';
 import 'merge.dart';
 import 'sync_remote.dart';
@@ -296,6 +299,35 @@ class SyncEngine {
       final theirsAt = theirs['updated_at']! as int;
       result['updated_at'] = mineAt > theirsAt ? mineAt : theirsAt + 1;
 
+      // A lock beat a plain edit: the plain side's changes would vanish,
+      // so keep them as a separate note (already plain on that device).
+      final content = result['content'];
+      final hereLocked =
+          mine['content'] is String &&
+          isLockedContent(mine['content']! as String);
+      final thereLocked =
+          theirs['content'] is String &&
+          isLockedContent(theirs['content']! as String);
+      String? lostBody, lostTitle, lostFolder;
+      if (table.name == 'notes' && hereLocked != thereLocked) {
+        final plain = hereLocked ? theirs : mine;
+        final plainBody = plain['content'];
+        final baseBody = base['content'];
+        // Did the plain side change the body since the base? A base kept
+        // from before a lock is only a fingerprint of the old body.
+        final changed =
+            plainBody is String &&
+            (baseBody is String && isRedactedBase(baseBody)
+                ? await redactedBody(plainBody) != baseBody
+                : plainBody != baseBody);
+        if (changed && content is String && isLockedContent(content)) {
+          lostBody = plainBody;
+          lostTitle = '${mine['title']} (edit made before it was locked)';
+          lostFolder = mine['folder_id'] as String?;
+        }
+      }
+      final locked = content is String && isLockedContent(content);
+
       await _db.transaction(() async {
         await _db.customStatement('UPDATE sync_meta SET applying = 1');
         try {
@@ -309,11 +341,31 @@ class SyncEngine {
         }
         // The server's version is what this device has now seen: if the
         // push fails, the next attempt merges against it, not the old base.
+        // A locked result never keeps a plain base: if the server copy is
+        // plain, its body is stored as a fingerprint only.
+        final baseData = locked && !thereLocked
+            ? {
+                ...theirs,
+                'content': await redactedBody(theirs['content']! as String),
+              }
+            : theirs;
         await _db.customStatement(
           'UPDATE sync_base SET data = ? '
           "WHERE table_name = ? AND row_key = json_object('id', ?)",
-          [jsonEncode(theirs), table.name, id],
+          [jsonEncode(baseData), table.name, id],
         );
+        if (lostBody != null) {
+          await _db
+              .into(_db.notes)
+              .insert(
+                NotesCompanion.insert(
+                  id: Value(const Uuid().v4()),
+                  title: Value(lostTitle!),
+                  content: Value(lostBody),
+                  folderId: Value(lostFolder),
+                ),
+              );
+        }
       });
       merged = true;
     }
@@ -472,6 +524,34 @@ class SyncEngine {
         'ON CONFLICT (${table.keys.join(', ')}) DO UPDATE SET $updates',
         values,
       );
+      // A locked body arrived: no plain merge base may outlive it. If the
+      // row is still dirty here its base stays, as a fingerprint.
+      if (remote['content'] is String &&
+          isLockedContent(remote['content']! as String)) {
+        final bases = await _db
+            .customSelect(
+              'SELECT data FROM sync_base WHERE table_name = ? '
+              "AND row_key = json_object('id', ?)",
+              variables: [
+                Variable.withString(table.name),
+                Variable.withString(remote['id']! as String),
+              ],
+            )
+            .get();
+        for (final r in bases) {
+          final data = (jsonDecode(r.read<String>('data')) as Map)
+              .cast<String, Object?>();
+          final body = data['content'];
+          if (body is String && !isRedactedBase(body)) {
+            data['content'] = await redactedBody(body);
+            await _db.customStatement(
+              'UPDATE sync_base SET data = ? WHERE table_name = ? '
+              "AND row_key = json_object('id', ?)",
+              [jsonEncode(data), table.name, remote['id']],
+            );
+          }
+        }
+      }
       return _Applied.written;
     } catch (e) {
       // A row whose parent was deleted (or never arrived) can't be stored.

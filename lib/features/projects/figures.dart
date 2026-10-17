@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../lock/note_lock_service.dart';
 import '../notes/editor_document.dart';
 import '../notes/figure_markers.dart';
 import '../notes/note_content.dart';
 import 'chapters.dart';
+import 'readable_content.dart';
 
 export '../notes/figure_markers.dart' show FigureKind;
 
@@ -143,6 +145,10 @@ FigureIndex projectFigureIndex(
   List<Note> orderedNotes, {
   String? replaceId,
   String? replaceContent,
+
+  /// Decrypted bodies of unlocked locked notes, by id. A locked note not
+  /// in here contributes no figures (its envelope is never parsed).
+  Map<String, String> unlocked = const {},
 }) => buildFigureIndex([
   for (final (i, n) in orderedNotes.indexed)
     FigureNote(
@@ -150,7 +156,7 @@ FigureIndex projectFigureIndex(
       title: n.title,
       content: n.id == replaceId && replaceContent != null
           ? replaceContent
-          : n.content,
+          : unlocked[n.id] ?? (isLockedContent(n.content) ? '' : n.content),
       chapter: '${i + 1}',
     ),
 ]);
@@ -189,10 +195,23 @@ final figureContextProvider = Provider.autoDispose
       final notes = ref.watch(projectNotesProvider(projectId)).value;
       if (notes == null) return FigureContext.none;
       final at = notes.indexWhere((n) => n.id == noteId);
+      // Locked chapters add their figures once decrypted (async), so the
+      // index is rebuilt when one is unlocked or locks again.
+      final unlocked =
+          ref.watch(_unlockedFiguresProvider(projectId)).value ?? const {};
       return FigureContext(
         at < 0 ? null : '${at + 1}',
-        projectFigureIndex(notes),
+        projectFigureIndex(notes, unlocked: unlocked),
       );
+    });
+
+final _unlockedFiguresProvider = FutureProvider.autoDispose
+    .family<Map<String, String>, String>((ref, projectId) async {
+      final lock = ref.watch(noteLockServiceProvider);
+      final notes = ref.watch(projectNotesProvider(projectId)).value ?? [];
+      return unlockedContents(lock, [
+        for (final n in notes) (id: n.id, content: n.content),
+      ]);
     });
 
 /// The numbering for exporting [noteId] on its own: the same numbers the
@@ -202,6 +221,7 @@ Future<FigureIndex> figureIndexForNote(
   AppDatabase db,
   String noteId, {
   String? liveContent,
+  NoteLockService? lock,
 }) async {
   final first = await _firstProject(db, noteId).get();
   if (first.isNotEmpty) {
@@ -212,6 +232,9 @@ Future<FigureIndex> figureIndexForNote(
         notes,
         replaceId: noteId,
         replaceContent: liveContent,
+        unlocked: await unlockedContents(lock, [
+          for (final n in notes) (id: n.id, content: n.content),
+        ]),
       );
     }
   }
@@ -222,7 +245,14 @@ Future<FigureIndex> figureIndexForNote(
     FigureNote(
       noteId: noteId,
       title: note?.title ?? '',
-      content: liveContent ?? note?.content ?? '',
+      content:
+          liveContent ??
+          (note == null
+              ? ''
+              : (await unlockedContents(lock, [
+                      (id: note.id, content: note.content),
+                    ]))[note.id] ??
+                    (isLockedContent(note.content) ? '' : note.content)),
     ),
   ]);
 }

@@ -6636,6 +6636,515 @@ class NoteVersionsCompanion extends UpdateCompanion<NoteVersion> {
   }
 }
 
+class $NoteKeysTable extends NoteKeys
+    with TableInfo<$NoteKeysTable, NoteKeyRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NoteKeysTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _kdfMeta = const VerificationMeta('kdf');
+  @override
+  late final GeneratedColumn<String> kdf = GeneratedColumn<String>(
+    'kdf',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pbkdf2-sha256'),
+  );
+  static const VerificationMeta _iterationsMeta = const VerificationMeta(
+    'iterations',
+  );
+  @override
+  late final GeneratedColumn<int> iterations = GeneratedColumn<int>(
+    'iterations',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _saltMeta = const VerificationMeta('salt');
+  @override
+  late final GeneratedColumn<String> salt = GeneratedColumn<String>(
+    'salt',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _wrappedKeyMeta = const VerificationMeta(
+    'wrappedKey',
+  );
+  @override
+  late final GeneratedColumn<String> wrappedKey = GeneratedColumn<String>(
+    'wrapped_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hintMeta = const VerificationMeta('hint');
+  @override
+  late final GeneratedColumn<String> hint = GeneratedColumn<String>(
+    'hint',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    kdf,
+    iterations,
+    salt,
+    wrappedKey,
+    hint,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_keys';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NoteKeyRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('kdf')) {
+      context.handle(
+        _kdfMeta,
+        kdf.isAcceptableOrUnknown(data['kdf']!, _kdfMeta),
+      );
+    }
+    if (data.containsKey('iterations')) {
+      context.handle(
+        _iterationsMeta,
+        iterations.isAcceptableOrUnknown(data['iterations']!, _iterationsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_iterationsMeta);
+    }
+    if (data.containsKey('salt')) {
+      context.handle(
+        _saltMeta,
+        salt.isAcceptableOrUnknown(data['salt']!, _saltMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_saltMeta);
+    }
+    if (data.containsKey('wrapped_key')) {
+      context.handle(
+        _wrappedKeyMeta,
+        wrappedKey.isAcceptableOrUnknown(data['wrapped_key']!, _wrappedKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_wrappedKeyMeta);
+    }
+    if (data.containsKey('hint')) {
+      context.handle(
+        _hintMeta,
+        hint.isAcceptableOrUnknown(data['hint']!, _hintMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NoteKeyRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NoteKeyRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      kdf: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kdf'],
+      )!,
+      iterations: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iterations'],
+      )!,
+      salt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}salt'],
+      )!,
+      wrappedKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}wrapped_key'],
+      )!,
+      hint: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}hint'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NoteKeysTable createAlias(String alias) {
+    return $NoteKeysTable(attachedDatabase, alias);
+  }
+}
+
+class NoteKeyRow extends DataClass implements Insertable<NoteKeyRow> {
+  final String id;
+
+  /// Key derivation: `pbkdf2-sha256`, its iteration count and salt
+  /// (base64). Stored per row so the cost can be raised later.
+  final String kdf;
+  final int iterations;
+  final String salt;
+
+  /// The notes key, AES-256-GCM encrypted under the password-derived key:
+  /// base64 of nonce (12 bytes) + ciphertext + tag (16 bytes).
+  final String wrappedKey;
+
+  /// An optional reminder the reader wrote; stored in the clear.
+  final String? hint;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const NoteKeyRow({
+    required this.id,
+    required this.kdf,
+    required this.iterations,
+    required this.salt,
+    required this.wrappedKey,
+    this.hint,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['kdf'] = Variable<String>(kdf);
+    map['iterations'] = Variable<int>(iterations);
+    map['salt'] = Variable<String>(salt);
+    map['wrapped_key'] = Variable<String>(wrappedKey);
+    if (!nullToAbsent || hint != null) {
+      map['hint'] = Variable<String>(hint);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  NoteKeysCompanion toCompanion(bool nullToAbsent) {
+    return NoteKeysCompanion(
+      id: Value(id),
+      kdf: Value(kdf),
+      iterations: Value(iterations),
+      salt: Value(salt),
+      wrappedKey: Value(wrappedKey),
+      hint: hint == null && nullToAbsent ? const Value.absent() : Value(hint),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory NoteKeyRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NoteKeyRow(
+      id: serializer.fromJson<String>(json['id']),
+      kdf: serializer.fromJson<String>(json['kdf']),
+      iterations: serializer.fromJson<int>(json['iterations']),
+      salt: serializer.fromJson<String>(json['salt']),
+      wrappedKey: serializer.fromJson<String>(json['wrappedKey']),
+      hint: serializer.fromJson<String?>(json['hint']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'kdf': serializer.toJson<String>(kdf),
+      'iterations': serializer.toJson<int>(iterations),
+      'salt': serializer.toJson<String>(salt),
+      'wrappedKey': serializer.toJson<String>(wrappedKey),
+      'hint': serializer.toJson<String?>(hint),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  NoteKeyRow copyWith({
+    String? id,
+    String? kdf,
+    int? iterations,
+    String? salt,
+    String? wrappedKey,
+    Value<String?> hint = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => NoteKeyRow(
+    id: id ?? this.id,
+    kdf: kdf ?? this.kdf,
+    iterations: iterations ?? this.iterations,
+    salt: salt ?? this.salt,
+    wrappedKey: wrappedKey ?? this.wrappedKey,
+    hint: hint.present ? hint.value : this.hint,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  NoteKeyRow copyWithCompanion(NoteKeysCompanion data) {
+    return NoteKeyRow(
+      id: data.id.present ? data.id.value : this.id,
+      kdf: data.kdf.present ? data.kdf.value : this.kdf,
+      iterations: data.iterations.present
+          ? data.iterations.value
+          : this.iterations,
+      salt: data.salt.present ? data.salt.value : this.salt,
+      wrappedKey: data.wrappedKey.present
+          ? data.wrappedKey.value
+          : this.wrappedKey,
+      hint: data.hint.present ? data.hint.value : this.hint,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteKeyRow(')
+          ..write('id: $id, ')
+          ..write('kdf: $kdf, ')
+          ..write('iterations: $iterations, ')
+          ..write('salt: $salt, ')
+          ..write('wrappedKey: $wrappedKey, ')
+          ..write('hint: $hint, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    kdf,
+    iterations,
+    salt,
+    wrappedKey,
+    hint,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NoteKeyRow &&
+          other.id == this.id &&
+          other.kdf == this.kdf &&
+          other.iterations == this.iterations &&
+          other.salt == this.salt &&
+          other.wrappedKey == this.wrappedKey &&
+          other.hint == this.hint &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class NoteKeysCompanion extends UpdateCompanion<NoteKeyRow> {
+  final Value<String> id;
+  final Value<String> kdf;
+  final Value<int> iterations;
+  final Value<String> salt;
+  final Value<String> wrappedKey;
+  final Value<String?> hint;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const NoteKeysCompanion({
+    this.id = const Value.absent(),
+    this.kdf = const Value.absent(),
+    this.iterations = const Value.absent(),
+    this.salt = const Value.absent(),
+    this.wrappedKey = const Value.absent(),
+    this.hint = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NoteKeysCompanion.insert({
+    this.id = const Value.absent(),
+    this.kdf = const Value.absent(),
+    required int iterations,
+    required String salt,
+    required String wrappedKey,
+    this.hint = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : iterations = Value(iterations),
+       salt = Value(salt),
+       wrappedKey = Value(wrappedKey);
+  static Insertable<NoteKeyRow> custom({
+    Expression<String>? id,
+    Expression<String>? kdf,
+    Expression<int>? iterations,
+    Expression<String>? salt,
+    Expression<String>? wrappedKey,
+    Expression<String>? hint,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (kdf != null) 'kdf': kdf,
+      if (iterations != null) 'iterations': iterations,
+      if (salt != null) 'salt': salt,
+      if (wrappedKey != null) 'wrapped_key': wrappedKey,
+      if (hint != null) 'hint': hint,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NoteKeysCompanion copyWith({
+    Value<String>? id,
+    Value<String>? kdf,
+    Value<int>? iterations,
+    Value<String>? salt,
+    Value<String>? wrappedKey,
+    Value<String?>? hint,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return NoteKeysCompanion(
+      id: id ?? this.id,
+      kdf: kdf ?? this.kdf,
+      iterations: iterations ?? this.iterations,
+      salt: salt ?? this.salt,
+      wrappedKey: wrappedKey ?? this.wrappedKey,
+      hint: hint ?? this.hint,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (kdf.present) {
+      map['kdf'] = Variable<String>(kdf.value);
+    }
+    if (iterations.present) {
+      map['iterations'] = Variable<int>(iterations.value);
+    }
+    if (salt.present) {
+      map['salt'] = Variable<String>(salt.value);
+    }
+    if (wrappedKey.present) {
+      map['wrapped_key'] = Variable<String>(wrappedKey.value);
+    }
+    if (hint.present) {
+      map['hint'] = Variable<String>(hint.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteKeysCompanion(')
+          ..write('id: $id, ')
+          ..write('kdf: $kdf, ')
+          ..write('iterations: $iterations, ')
+          ..write('salt: $salt, ')
+          ..write('wrappedKey: $wrappedKey, ')
+          ..write('hint: $hint, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TrashItemsTable extends TrashItems
     with TableInfo<$TrashItemsTable, TrashItem> {
   @override
@@ -7710,6 +8219,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MatrixColumnsTable matrixColumns = $MatrixColumnsTable(this);
   late final $MatrixCellsTable matrixCells = $MatrixCellsTable(this);
   late final $NoteVersionsTable noteVersions = $NoteVersionsTable(this);
+  late final $NoteKeysTable noteKeys = $NoteKeysTable(this);
   late final $TrashItemsTable trashItems = $TrashItemsTable(this);
   late final $OcrPagesTable ocrPages = $OcrPagesTable(this);
   late final $OcrPapersTable ocrPapers = $OcrPapersTable(this);
@@ -7733,6 +8243,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     matrixColumns,
     matrixCells,
     noteVersions,
+    noteKeys,
     trashItems,
     ocrPages,
     ocrPapers,
@@ -14917,6 +15428,271 @@ typedef $$NoteVersionsTableProcessedTableManager =
       NoteVersion,
       PrefetchHooks Function({bool noteId})
     >;
+typedef $$NoteKeysTableCreateCompanionBuilder = NoteKeysCompanion Function({
+  Value<String> id,
+  Value<String> kdf,
+  required int iterations,
+  required String salt,
+  required String wrappedKey,
+  Value<String?> hint,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+typedef $$NoteKeysTableUpdateCompanionBuilder = NoteKeysCompanion Function({
+  Value<String> id,
+  Value<String> kdf,
+  Value<int> iterations,
+  Value<String> salt,
+  Value<String> wrappedKey,
+  Value<String?> hint,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$NoteKeysTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteKeysTable> {
+  $$NoteKeysTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kdf => $composableBuilder(
+    column: $table.kdf,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get iterations => $composableBuilder(
+    column: $table.iterations,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get salt => $composableBuilder(
+    column: $table.salt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get wrappedKey => $composableBuilder(
+    column: $table.wrappedKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get hint => $composableBuilder(
+    column: $table.hint,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NoteKeysTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteKeysTable> {
+  $$NoteKeysTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kdf => $composableBuilder(
+    column: $table.kdf,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get iterations => $composableBuilder(
+    column: $table.iterations,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get salt => $composableBuilder(
+    column: $table.salt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get wrappedKey => $composableBuilder(
+    column: $table.wrappedKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get hint => $composableBuilder(
+    column: $table.hint,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NoteKeysTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteKeysTable> {
+  $$NoteKeysTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get kdf =>
+      $composableBuilder(column: $table.kdf, builder: (column) => column);
+
+  GeneratedColumn<int> get iterations => $composableBuilder(
+    column: $table.iterations,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get salt =>
+      $composableBuilder(column: $table.salt, builder: (column) => column);
+
+  GeneratedColumn<String> get wrappedKey => $composableBuilder(
+    column: $table.wrappedKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get hint =>
+      $composableBuilder(column: $table.hint, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$NoteKeysTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NoteKeysTable,
+          NoteKeyRow,
+          $$NoteKeysTableFilterComposer,
+          $$NoteKeysTableOrderingComposer,
+          $$NoteKeysTableAnnotationComposer,
+          $$NoteKeysTableCreateCompanionBuilder,
+          $$NoteKeysTableUpdateCompanionBuilder,
+          (
+            NoteKeyRow,
+            BaseReferences<_$AppDatabase, $NoteKeysTable, NoteKeyRow>,
+          ),
+          NoteKeyRow,
+          PrefetchHooks Function()
+        > {
+  $$NoteKeysTableTableManager(_$AppDatabase db, $NoteKeysTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NoteKeysTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NoteKeysTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NoteKeysTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> kdf = const Value.absent(),
+                Value<int> iterations = const Value.absent(),
+                Value<String> salt = const Value.absent(),
+                Value<String> wrappedKey = const Value.absent(),
+                Value<String?> hint = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteKeysCompanion(
+                id: id,
+                kdf: kdf,
+                iterations: iterations,
+                salt: salt,
+                wrappedKey: wrappedKey,
+                hint: hint,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> kdf = const Value.absent(),
+                required int iterations,
+                required String salt,
+                required String wrappedKey,
+                Value<String?> hint = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteKeysCompanion.insert(
+                id: id,
+                kdf: kdf,
+                iterations: iterations,
+                salt: salt,
+                wrappedKey: wrappedKey,
+                hint: hint,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$NoteKeysTable, NoteKeyRow>(table),
+                  BaseReferences<_$AppDatabase, $NoteKeysTable, NoteKeyRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NoteKeysTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NoteKeysTable,
+      NoteKeyRow,
+      $$NoteKeysTableFilterComposer,
+      $$NoteKeysTableOrderingComposer,
+      $$NoteKeysTableAnnotationComposer,
+      $$NoteKeysTableCreateCompanionBuilder,
+      $$NoteKeysTableUpdateCompanionBuilder,
+      (NoteKeyRow, BaseReferences<_$AppDatabase, $NoteKeysTable, NoteKeyRow>),
+      NoteKeyRow,
+      PrefetchHooks Function()
+    >;
 typedef $$TrashItemsTableCreateCompanionBuilder = TrashItemsCompanion Function({
   Value<String> id,
   required TrashKind kind,
@@ -15766,6 +16542,8 @@ class $AppDatabaseManager {
       $$MatrixCellsTableTableManager(_db, _db.matrixCells);
   $$NoteVersionsTableTableManager get noteVersions =>
       $$NoteVersionsTableTableManager(_db, _db.noteVersions);
+  $$NoteKeysTableTableManager get noteKeys =>
+      $$NoteKeysTableTableManager(_db, _db.noteKeys);
   $$TrashItemsTableTableManager get trashItems =>
       $$TrashItemsTableTableManager(_db, _db.trashItems);
   $$OcrPagesTableTableManager get ocrPages =>

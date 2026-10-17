@@ -7,8 +7,10 @@ import '../../data/tables/papers_table.dart' show ReadingStatus;
 import '../../theme/app_theme.dart';
 import '../library/citation_formatter.dart' show CitationStyle;
 import '../library/citations.dart';
+import '../lock/note_lock_service.dart';
 import '../notes/note_content.dart' show decodeNoteContent;
 import 'open_from_page.dart';
+import 'readable_content.dart';
 
 /// A project's chapters: its notes, in reading order. Equality is by value so
 /// it can key a provider family.
@@ -248,6 +250,7 @@ Coverage computeCoverage({
 final coverageProvider = StreamProvider.autoDispose
     .family<Coverage, ChapterQuery>((ref, query) {
       final db = ref.watch(databaseProvider);
+      final lock = ref.watch(noteLockServiceProvider);
       Future<Coverage> load() async {
         final ids = query.noteIds;
         final notes = await (db.select(
@@ -268,12 +271,22 @@ final coverageProvider = StreamProvider.autoDispose
             )
             .get();
         final papers = await db.select(db.papers).get();
+        // A locked chapter's citations are read only while it's unlocked;
+        // otherwise it shows as a chapter citing nothing.
+        final chapters = <CoverageNote>[];
+        for (final id in ids) {
+          final n = byId[id];
+          if (n == null) continue;
+          chapters.add(
+            CoverageNote(
+              id: n.id,
+              title: n.title,
+              content: await readableNoteContent(lock, n.id, n.content) ?? '',
+            ),
+          );
+        }
         return computeCoverage(
-          chapters: [
-            for (final id in ids)
-              if (byId[id] case final n?)
-                CoverageNote(id: n.id, title: n.title, content: n.content),
-          ],
+          chapters: chapters,
           papers: papers,
           projectPaperIds: {for (final r in projectPapers) r.paperId},
           linkedPaperIds: {for (final r in links) r.paperId},

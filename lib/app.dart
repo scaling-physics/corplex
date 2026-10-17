@@ -5,6 +5,7 @@ import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations;
 
 import 'features/home/home_shell.dart';
+import 'features/platform/mac_window.dart';
 import 'features/platform/platform_coordinator.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
@@ -30,6 +31,8 @@ class CorplexApp extends ConsumerWidget {
       themeMode: ref.watch(appearanceSettingsProvider).themeMode,
       themeAnimationDuration: AppMotion.long,
       themeAnimationCurve: AppMotion.standard,
+      // macOS: the title bar becomes top padding (see MacWindowFrame).
+      builder: (context, child) => MacWindowFrame(child: child!),
       home: const SyncCoordinator(
         child: ShareCoordinator(child: PlatformCoordinator(child: HomeShell())),
       ),

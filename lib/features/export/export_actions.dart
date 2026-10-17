@@ -18,6 +18,7 @@ import 'docx_export.dart';
 import 'export_model.dart';
 import 'markdown_export.dart';
 import 'pdf_export.dart';
+import '../platform/share_origin.dart';
 
 enum ExportFormat {
   markdown('Markdown', 'md', Icons.tag),
@@ -115,6 +116,7 @@ Future<void> shareExport(
   ExportFormat format,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
+  final origin = shareOrigin(context);
   try {
     final dir = Directory(
       p.join((await getTemporaryDirectory()).path, 'exports'),
@@ -124,6 +126,7 @@ Future<void> shareExport(
       ShareParams(
         files: [XFile(file.path)],
         subject: doc.title.isEmpty ? null : doc.title,
+        sharePositionOrigin: origin,
       ),
     );
   } catch (_) {
@@ -168,6 +171,7 @@ Future<ExportDoc> buildStyledExportDoc(
   FigureIndex? figures,
   List<ExportBlock> extraFrontMatter = const [],
 }) async {
+  notes = withoutLockedBodies(notes);
   Future<ExportDoc> plain(List<ExportNote> n, CitationStyle st) =>
       buildExportDoc(
         db,

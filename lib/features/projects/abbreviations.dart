@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database_provider.dart';
 import '../export/export_model.dart';
+import '../lock/note_lock_service.dart';
 import '../notes/editor_document.dart';
 import 'chapters.dart' show ProjectNoteRow, compareChapterRows;
+import 'readable_content.dart';
 
 /// Abbreviations in a thesis, found in the writing itself.
 ///
@@ -477,23 +479,28 @@ String abbreviationsTsv(List<DefinedAbbreviation> list) =>
 final abbreviationsProvider = StreamProvider.autoDispose
     .family<AbbreviationReport, String>((ref, projectId) {
       final db = ref.watch(databaseProvider);
+      final lock = ref.watch(noteLockServiceProvider);
       final query = db.select(db.notes).join([
         innerJoin(
           db.projectNotes,
           db.projectNotes.noteId.equalsExp(db.notes.id),
         ),
       ])..where(db.projectNotes.projectId.equals(projectId));
-      return query.watch().map((rows) {
+      return query.watch().asyncMap((rows) async {
         final list = <ProjectNoteRow>[
           for (final r in rows)
             (note: r.readTable(db.notes), link: r.readTable(db.projectNotes)),
         ]..sort(compareChapterRows);
+        // Locked chapters count only while unlocked; otherwise they have
+        // no text here (never their envelope).
         return analyzeAbbreviations([
           for (final r in list)
             AbbreviationSource(
               noteId: r.note.id,
               title: r.note.title,
-              content: r.note.content,
+              content:
+                  await readableNoteContent(lock, r.note.id, r.note.content) ??
+                  '',
             ),
         ]);
       });

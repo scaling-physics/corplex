@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
+import '../platform/mac_window.dart' show isDesktop;
 import 'ink_canvas.dart';
 import 'ink_model.dart';
 import '../../theme/haptics.dart';
@@ -129,6 +130,8 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
+    final desktop = isDesktop(context);
+    _policy.mouseAlwaysDraws = desktop;
     final fingersDraw = _policy.fingersDraw;
 
     return CallbackShortcuts(
@@ -156,6 +159,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
   }
 
   Widget _buildEditor(ColorScheme c, bool fingersDraw) {
+    final desktop = isDesktop(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -181,16 +185,19 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
               tooltip: 'Redo',
               onPressed: _redo.isEmpty ? null : _redoLast,
             ),
-            IconButton(
-              isSelected: fingersDraw,
-              icon: const Icon(Icons.pan_tool_outlined),
-              selectedIcon: const Icon(Icons.gesture),
-              tooltip: fingersDraw
-                  ? 'Fingers draw (tap to scroll with fingers instead)'
-                  : 'Fingers scroll (tap to draw with fingers)',
-              onPressed: () =>
-                  setState(() => _policy.fingerDrawsOverride = !fingersDraw),
-            ),
+            // A mouse or trackpad always draws on a desktop; the finger
+            // switch is for touch screens.
+            if (!desktop)
+              IconButton(
+                isSelected: fingersDraw,
+                icon: const Icon(Icons.pan_tool_outlined),
+                selectedIcon: const Icon(Icons.gesture),
+                tooltip: fingersDraw
+                    ? 'Fingers draw (tap to scroll with fingers instead)'
+                    : 'Fingers scroll (tap to draw with fingers)',
+                onPressed: () =>
+                    setState(() => _policy.fingerDrawsOverride = !fingersDraw),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilledButton.tonal(
@@ -202,7 +209,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
         ),
         body: SingleChildScrollView(
           // While fingers draw, a finger drag must not also scroll.
-          physics: fingersDraw
+          physics: fingersDraw && !desktop
               ? const NeverScrollableScrollPhysics()
               : const ClampingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),

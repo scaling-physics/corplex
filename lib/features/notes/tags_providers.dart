@@ -12,20 +12,16 @@ final tagsListProvider = StreamProvider.autoDispose<List<Tag>>((ref) {
   )..orderBy([(t) => OrderingTerm.asc(t.name)])).watch();
 });
 
-final tagsForNoteProvider = StreamProvider.autoDispose.family<List<Tag>, String>((
-  ref,
-  noteId,
-) {
-  final db = ref.watch(databaseProvider);
-  final query =
-      db.select(db.tags).join([
-          innerJoin(db.noteTags, db.noteTags.tagId.equalsExp(db.tags.id)),
-        ])
-        ..where(db.noteTags.noteId.equals(noteId));
-  return query.watch().map(
-    (rows) => rows.map((row) => row.readTable(db.tags)).toList(),
-  );
-});
+final tagsForNoteProvider = StreamProvider.autoDispose
+    .family<List<Tag>, String>((ref, noteId) {
+      final db = ref.watch(databaseProvider);
+      final query = db.select(db.tags).join([
+        innerJoin(db.noteTags, db.noteTags.tagId.equalsExp(db.tags.id)),
+      ])..where(db.noteTags.noteId.equals(noteId));
+      return query.watch().map(
+        (rows) => rows.map((row) => row.readTable(db.tags)).toList(),
+      );
+    });
 
 /// Finds an existing tag with this name (case-insensitive) or creates one.
 Future<String> findOrCreateTag(AppDatabase db, String name) async {
@@ -65,8 +61,7 @@ Future<void> removeTagFromNote(
   required String noteId,
   required String tagId,
 }) {
-  return (db.delete(db.noteTags)..where(
-        (t) => t.noteId.equals(noteId) & t.tagId.equals(tagId),
-      ))
-      .go();
+  return (db.delete(
+    db.noteTags,
+  )..where((t) => t.noteId.equals(noteId) & t.tagId.equals(tagId))).go();
 }

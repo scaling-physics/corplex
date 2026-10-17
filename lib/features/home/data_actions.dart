@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../platform/share_origin.dart';
 import '../../data/backup.dart';
 import '../../data/database_provider.dart';
 import '../export/vault_export.dart';
@@ -16,6 +17,7 @@ import '../export/vault_export.dart';
 /// AirDrop, email, Drive…).
 Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
   final messenger = ScaffoldMessenger.of(context);
+  final origin = shareOrigin(context);
   messenger.showSnackBar(const SnackBar(content: Text('Preparing backup…')));
   try {
     final db = ref.read(databaseProvider);
@@ -24,7 +26,11 @@ Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
     final zip = await createBackup(db, docsDir: docs, outDir: out);
     messenger.hideCurrentSnackBar();
     await SharePlus.instance.share(
-      ShareParams(files: [XFile(zip.path)], subject: 'Corplex backup'),
+      ShareParams(
+        files: [XFile(zip.path)],
+        subject: 'Corplex backup',
+        sharePositionOrigin: origin,
+      ),
     );
   } catch (_) {
     messenger
@@ -38,7 +44,12 @@ Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
 /// Exports notes, papers and highlights as an Obsidian-friendly Markdown
 /// folder (zipped) and opens the share sheet. Asks whether to include PDFs.
 Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
+  final origin = shareOrigin(context);
   var includePdfs = false;
+  // An export is a plain-text copy on disk, so locked notes go out as
+  // placeholders (even when unlocked); say so only when there are any.
+  final anyLocked = await anyLockedNotes(ref.read(databaseProvider));
+  if (!context.mounted) return;
   final go = await showDialog<bool>(
     context: context,
     builder: (context) => StatefulBuilder(
@@ -52,6 +63,10 @@ Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
               'One Markdown file per note and paper, with links, highlights '
               'and a BibTeX file. Open the folder as an Obsidian vault.',
             ),
+            if (anyLocked) ...[
+              const SizedBox(height: 8),
+              const Text('Locked notes are exported as placeholders.'),
+            ],
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Include PDFs'),
@@ -105,7 +120,11 @@ Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
     return;
   }
   await SharePlus.instance.share(
-    ShareParams(files: [XFile(zip.path)], subject: 'Corplex notes (Markdown)'),
+    ShareParams(
+      files: [XFile(zip.path)],
+      subject: 'Corplex notes (Markdown)',
+      sharePositionOrigin: origin,
+    ),
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database_provider.dart';
 import '../../theme/app_theme.dart';
+import '../platform/mac_window.dart';
 import 'highlights.dart';
 
 /// Where one highlight sits in the document: its page, how far down that
@@ -45,7 +46,8 @@ class PageIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
-    return GestureDetector(
+    final desktop = isDesktop(context);
+    final pill = GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
@@ -63,6 +65,11 @@ class PageIndicator extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (!desktop) return pill;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Tooltip(message: 'Show pages', child: pill),
     );
   }
 }
@@ -160,7 +167,8 @@ class _PageStripState extends State<PageStrip> {
             itemBuilder: (context, i) {
               final page = i + 1;
               final selected = page == current;
-              return InkWell(
+              final desktop = isDesktop(context);
+              final item = InkWell(
                 key: ValueKey('strip-page-$page'),
                 onTap: () => widget.onJump(page),
                 child: Padding(
@@ -209,6 +217,9 @@ class _PageStripState extends State<PageStrip> {
                   ),
                 ),
               );
+              return desktop
+                  ? Tooltip(message: 'Page $page', child: item)
+                  : item;
             },
           ),
         ),
@@ -231,6 +242,16 @@ class HighlightMinimap extends StatelessWidget {
   final int pageCount;
   final List<HighlightMark> marks;
   final ValueChanged<int> onJump;
+
+  /// A hand cursor and a tooltip with a mouse (desktop); [child] as is on
+  /// touch devices.
+  static Widget _hoverable(BuildContext context, String tip, Widget child) =>
+      isDesktop(context)
+      ? MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Tooltip(message: tip, child: child),
+        )
+      : child;
 
   /// Fraction down the document (0..1) of [mark], pages being equal height.
   static double position(HighlightMark mark, int pageCount) =>
@@ -258,26 +279,30 @@ class HighlightMinimap extends StatelessWidget {
               top: top + tickHeight / 2 - hit / 2,
               width: 22,
               height: hit,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onJump(mark.page),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    width: 8,
-                    height: tickHeight,
-                    decoration: BoxDecoration(
-                      color: mark.color,
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(2),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context).colorScheme.shadow
-                              .withValues(alpha: 0.25),
-                          blurRadius: 1,
+              child: _hoverable(
+                context,
+                'Page ${mark.page}',
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onJump(mark.page),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      width: 8,
+                      height: tickHeight,
+                      decoration: BoxDecoration(
+                        color: mark.color,
+                        borderRadius: const BorderRadius.horizontal(
+                          left: Radius.circular(2),
                         ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.shadow
+                                .withValues(alpha: 0.25),
+                            blurRadius: 1,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

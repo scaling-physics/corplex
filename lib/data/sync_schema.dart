@@ -107,6 +107,19 @@ const syncTables = [
     ],
   ),
   SyncTableSpec(
+    'note_keys',
+    keys: ['id'],
+    columns: [
+      'kdf',
+      'iterations',
+      'salt',
+      'wrapped_key',
+      'hint',
+      'created_at',
+      'updated_at',
+    ],
+  ),
+  SyncTableSpec(
     'note_tags',
     keys: ['note_id', 'tag_id'],
     columns: ['updated_at'],

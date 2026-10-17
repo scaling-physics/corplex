@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +12,12 @@ import '../audio/audio_player_bar.dart';
 import '../library/library_screen.dart';
 import '../ocr/ocr_service.dart';
 import '../settings/appearance_settings.dart';
+import '../library/library_actions.dart';
+import '../platform/mac_window.dart';
 import 'adaptive.dart';
+import '../trash/trash_actions.dart';
+import 'keyboard_shortcuts.dart';
+import 'mac_sidebar.dart';
 import '../sync/sync_ring.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
@@ -21,6 +28,8 @@ import '../trash/trash_screen.dart';
 import 'data_actions.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
+import '../lock/note_lock_service.dart';
+import '../lock/notes_password_settings.dart';
 
 /// Top-level shell switching between the two primary spaces of the app:
 /// quick note capture and the auto-organized paper library.
@@ -33,10 +42,14 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
+  StreamSubscription<MenuCommand>? _menu;
 
   @override
   void initState() {
     super.initState();
+    // The native menu bar (macOS). A plain stream subscription rather than
+    // a provider listener: the same command twice in a row must fire twice.
+    _menu = ref.read(macWindowProvider).menuCommands.listen(_onCommand);
     // Housekeeping: items that have sat in the trash past the retention
     // period go for good. Never worth failing startup over.
     purgeTrash(ref.read(databaseProvider)).catchError((_) => 0);
@@ -44,6 +57,125 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // none (every test, every fresh install) this is one empty query.
     ref.read(ocrStartupProvider);
   }
+
+  @override
+  void dispose() {
+    _menu?.cancel();
+    super.dispose();
+  }
+
+  /// Back to the home screen, closing anything pushed over it.
+  void _home() {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  void _onCommand(MenuCommand command) {
+    if (!mounted) return;
+    switch (command) {
+      case MenuCommand.newNote:
+        _home();
+        createNote(context, ref);
+      case MenuCommand.importPdf:
+        _home();
+        importPaper(context, ref);
+      case MenuCommand.importReferences:
+        importBibtexFile(context, ref);
+      case MenuCommand.backup:
+        backUpToFile(context, ref);
+      case MenuCommand.exportMarkdown:
+        exportAsMarkdown(context, ref);
+      case MenuCommand.trash:
+        _openTrash();
+      case MenuCommand.showNotes:
+        _home();
+        setState(() => _index = 0);
+      case MenuCommand.showLibrary:
+        _home();
+        setState(() => _index = 1);
+      case MenuCommand.search:
+        _openSearch();
+      case MenuCommand.toggleSidebar:
+        final visible = ref.read(macSidebarVisibleProvider.notifier);
+        visible.state = !visible.state;
+      case MenuCommand.settings:
+        _showAccountMenu(context);
+      case MenuCommand.back:
+        Navigator.of(context, rootNavigator: true).maybePop();
+      case MenuCommand.find:
+        _openSearch();
+      case MenuCommand.moveToTrash:
+        _moveOpenItemToTrash();
+      case MenuCommand.keyboardShortcuts:
+        showKeyboardShortcuts(context);
+      case MenuCommand.findNext:
+      case MenuCommand.findPrevious:
+      case MenuCommand.bold:
+      case MenuCommand.italic:
+      case MenuCommand.underline:
+      case MenuCommand.strikethrough:
+      case MenuCommand.title:
+      case MenuCommand.heading:
+      case MenuCommand.subheading:
+      case MenuCommand.body:
+      case MenuCommand.bulletList:
+      case MenuCommand.numberedList:
+      case MenuCommand.blockQuote:
+      case MenuCommand.linkNote:
+      case MenuCommand.citePaper:
+      case MenuCommand.lockAllNotes:
+        ref.read(noteLockServiceProvider).lockNow();
+      case MenuCommand.lockNote:
+        // The open note's editor handles it; nothing open, nothing to lock.
+        break;
+      case MenuCommand.interfaceLarger:
+        ref.read(appearanceSettingsProvider).stepInterfaceScale(1);
+      case MenuCommand.interfaceSmaller:
+        ref.read(appearanceSettingsProvider).stepInterfaceScale(-1);
+      case MenuCommand.interfaceDefault:
+        ref.read(appearanceSettingsProvider).stepInterfaceScale(0);
+      case MenuCommand.zoomIn:
+      case MenuCommand.zoomOut:
+      case MenuCommand.actualSize:
+        // Context commands: they belong to the focused widget's
+        // MenuCommandHandler. None took it, so there is nothing to act on.
+        break;
+    }
+  }
+
+  /// File > Move to Trash: the note or paper open in the pane, with the
+  /// same Undo snackbar as the lists.
+  Future<void> _moveOpenItemToTrash() async {
+    final db = ref.read(databaseProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    if (_index == 0) {
+      final id = ref.read(selectedNoteProvider);
+      if (id == null) return;
+      final note = await db.managers.notes
+          .filter((f) => f.id.equals(id))
+          .getSingleOrNull();
+      if (note == null) return;
+      ref.read(selectedNoteProvider.notifier).state = null;
+      await deleteNoteWithUndo(ref, messenger, id, note.title);
+    } else {
+      final id = ref.read(selectedPaperProvider);
+      if (id == null) return;
+      final paper = await db.managers.papers
+          .filter((f) => f.id.equals(id))
+          .getSingleOrNull();
+      if (paper == null) return;
+      ref.read(selectedPaperProvider.notifier).state = null;
+      await deletePaperWithUndo(ref, messenger, id, paper.title);
+    }
+  }
+
+  void _openSearch() =>
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+
+  void _openTrash() =>
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const TrashScreen()));
 
   static const _screens = [NotesScreen(), LibraryScreen()];
   static const _titles = ['Notes', 'Library'];
@@ -69,12 +201,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     void search() =>
         Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+    // On macOS the menu bar owns Cmd+N/O/1/2 (File and View menus), so
+    // binding them here too would fire twice. Cmd+F stays: the menu's
+    // search is Shift+Cmd+F, and the PDF viewer's own Cmd+F wins over this.
+    final mac = isMac(context);
     final actions = <LogicalKeyboardKey, VoidCallback>{
-      LogicalKeyboardKey.keyN: () => createNote(context, ref),
-      LogicalKeyboardKey.keyO: () => importPaper(context, ref),
+      if (!mac) LogicalKeyboardKey.keyN: () => createNote(context, ref),
+      if (!mac) LogicalKeyboardKey.keyO: () => importPaper(context, ref),
       LogicalKeyboardKey.keyF: search,
-      LogicalKeyboardKey.digit1: () => setState(() => _index = 0),
-      LogicalKeyboardKey.digit2: () => setState(() => _index = 1),
+      if (!mac) LogicalKeyboardKey.digit1: () => setState(() => _index = 0),
+      if (!mac) LogicalKeyboardKey.digit2: () => setState(() => _index = 1),
     };
     return {
       for (final entry in actions.entries)
@@ -88,6 +224,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (layout == HomeLayout.compact) {
       return _phoneScaffold(context, user, theme);
     }
+
+    if (isMac(context)) return _macScaffold(context, user, theme, layout);
 
     // Tablet: a rail instead of bottom tabs; the list (with its own header)
     // and, when there's room, the open note or paper beside it.
@@ -133,6 +271,97 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                     ),
                 ],
               ),
+            ),
+          ),
+          const AudioPlayerBar(),
+        ],
+      ),
+    );
+  }
+
+  /// The Mac window: a collapsible sidebar, then (wide) a resizable list
+  /// column and the detail pane, or (narrower) one readable list column.
+  /// No SafeArea: every column handles the title-bar band at its own top
+  /// (the sidebar by padding, the AppBars by themselves).
+  Widget _macScaffold(
+    BuildContext context,
+    AppUser? user,
+    ThemeData theme,
+    HomeLayout layout,
+  ) {
+    final c = theme.colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final sidebarOn = ref.watch(macSidebarVisibleProvider);
+    final lists = Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 52,
+        titleSpacing: 18,
+        title: Text(_titles[_index], style: theme.textTheme.titleLarge),
+      ),
+      body: _tabs(),
+    );
+    final Widget content;
+    if (layout == HomeLayout.expanded) {
+      final listWidth = ref.watch(macListWidthProvider);
+      final room = width - (sidebarOn ? macSidebarWidth + 1 : 0);
+      // The detail pane always keeps at least 360 points.
+      final maxList = (room - 360 - 7).clamp(macListMinWidth, macListMaxWidth);
+      final w = listWidth.width.clamp(macListMinWidth, maxList);
+      content = Row(
+        children: [
+          SizedBox(
+            key: const ValueKey('mac-list'),
+            width: w.toDouble(),
+            child: FocusTraversalGroup(child: lists),
+          ),
+          ColumnDivider(
+            onDrag: (dx) => listWidth.set(w + dx),
+            onDragEnd: listWidth.save,
+          ),
+          Expanded(
+            child: FocusTraversalGroup(child: DetailPane(tab: _index)),
+          ),
+        ],
+      );
+    } else {
+      content = FocusTraversalGroup(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: readableWidth),
+            child: lists,
+          ),
+        ),
+      );
+    }
+    return Scaffold(
+      body: Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                MacSidebarSlot(
+                  visible: sidebarOn,
+                  child: Row(
+                    children: [
+                      FocusTraversalGroup(
+                        child: MacSidebar(
+                          index: _index,
+                          email: user?.email,
+                          onSelected: (i) => setState(() => _index = i),
+                          onPrimary: () => _index == 0
+                              ? createNote(context, ref)
+                              : importPaper(context, ref),
+                          onSearch: _openSearch,
+                          onTrash: _openTrash,
+                          onSettings: () => _showAccountMenu(context),
+                        ),
+                      ),
+                      VerticalDivider(width: 1, color: c.outlineVariant),
+                    ],
+                  ),
+                ),
+                Expanded(child: content),
+              ],
             ),
           ),
           const AudioPlayerBar(),
@@ -239,165 +468,210 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Future<void> _showAccountMenu(BuildContext context) async {
     final sync = ref.read(syncServiceProvider);
     final user = ref.read(authServiceProvider).currentUser;
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (user == null)
-                ListTile(
-                  leading: const Icon(Icons.account_circle_outlined),
-                  title: const Text('Sign in'),
-                  subtitle: const Text('Sync your library across devices'),
-                  onTap: () => Navigator.pop(context, 'signin'),
-                )
-              else ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                  child: Text(
-                    user.email,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+    Widget content(BuildContext context) => SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (user == null)
+            ListTile(
+              leading: const Icon(Icons.account_circle_outlined),
+              title: const Text('Sign in'),
+              subtitle: const Text('Sync your library across devices'),
+              onTap: () => Navigator.pop(context, 'signin'),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+              child: Text(
+                user.email,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            // Sync detail lives here, not on the main screens: it's
+            // background plumbing until the user goes looking for it.
+            Consumer(
+              builder: (context, ref, _) {
+                final status =
+                    ref.watch(syncStatusProvider).value ?? sync.currentStatus;
+                return ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Sync now'),
+                  subtitle: Text(_syncLabel(status, sync.lastError)),
+                  enabled: status != SyncStatus.offline,
+                  onTap: sync.syncNow,
+                );
+              },
+            ),
+            if (sync.accountMismatch)
+              ListTile(
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text('Use this account on this device'),
+                subtitle: const Text(
+                  'Replaces what\'s on this device with this account\'s data.',
                 ),
-                // Sync detail lives here, not on the main screens: it's
-                // background plumbing until the user goes looking for it.
-                Consumer(
-                  builder: (context, ref, _) {
-                    final status =
-                        ref.watch(syncStatusProvider).value ??
-                        sync.currentStatus;
-                    return ListTile(
-                      leading: const Icon(Icons.sync),
-                      title: const Text('Sync now'),
-                      subtitle: Text(_syncLabel(status, sync.lastError)),
-                      enabled: status != SyncStatus.offline,
-                      onTap: sync.syncNow,
-                    );
-                  },
-                ),
-                if (sync.accountMismatch)
-                  ListTile(
-                    leading: const Icon(Icons.swap_horiz),
-                    title: const Text('Use this account on this device'),
-                    subtitle: const Text(
-                      'Replaces what\'s on this device with this account\'s data.',
+                onTap: () => Navigator.pop(context, 'switch'),
+              ),
+            Consumer(
+              builder: (context, ref, _) {
+                final t = ref.watch(transferSettingsProvider);
+                return Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.wifi),
+                      title: const Text('Send files on Wi-Fi only'),
+                      subtitle: const Text(
+                        'Notes always sync. Opening a file downloads it '
+                        'on any network.',
+                      ),
+                      value: t.wifiOnly,
+                      onChanged: t.setWifiOnly,
                     ),
-                    onTap: () => Navigator.pop(context, 'switch'),
-                  ),
-                Consumer(
-                  builder: (context, ref, _) {
-                    final t = ref.watch(transferSettingsProvider);
-                    return Column(
-                      children: [
-                        SwitchListTile(
-                          secondary: const Icon(Icons.wifi),
-                          title: const Text('Send files on Wi-Fi only'),
-                          subtitle: const Text(
-                            'Notes always sync. Opening a file downloads it '
-                            'on any network.',
-                          ),
-                          value: t.wifiOnly,
-                          onChanged: t.setWifiOnly,
-                        ),
-                        SwitchListTile(
-                          secondary: const Icon(Icons.cloud_download_outlined),
-                          title: const Text('Download files when opened'),
-                          subtitle: const Text(
-                            'Otherwise papers and audio download in the '
-                            'background.',
-                          ),
-                          value: t.onDemand,
-                          onChanged: t.setOnDemand,
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-              const Divider(),
-              Consumer(
-                builder: (context, ref, _) {
-                  final settings = ref.watch(appearanceSettingsProvider);
-                  return ListTile(
-                    leading: const Icon(Icons.brightness_6_outlined),
-                    title: const Text('Appearance'),
-                    trailing: SegmentedButton<ThemeMode>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          label: Text('Auto'),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          label: Text('Light'),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          label: Text('Dark'),
-                        ),
-                      ],
-                      selected: {settings.themeMode},
-                      onSelectionChanged: (s) =>
-                          settings.setThemeMode(s.single),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.cloud_download_outlined),
+                      title: const Text('Download files when opened'),
+                      subtitle: const Text(
+                        'Otherwise papers and audio download in the '
+                        'background.',
+                      ),
+                      value: t.onDemand,
+                      onChanged: t.setOnDemand,
                     ),
-                  );
-                },
-              ),
-              Consumer(
-                builder: (context, ref, _) {
-                  final count =
-                      ref.watch(trashItemsProvider).value?.length ?? 0;
-                  return ListTile(
-                    leading: const Icon(Icons.delete_outline),
-                    title: const Text('Trash'),
-                    subtitle: count == 0
-                        ? null
-                        : Text('$count item${count == 1 ? '' : 's'}'),
-                    onTap: () => Navigator.pop(context, 'trash'),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.save_alt_outlined),
-                title: const Text('Back up to a file'),
-                subtitle: const Text('Notes, papers and files in one zip'),
-                onTap: () => Navigator.pop(context, 'backup'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.folder_zip_outlined),
-                title: const Text('Export as Markdown'),
-                subtitle: const Text('A folder of notes for Obsidian'),
-                onTap: () => Navigator.pop(context, 'markdown'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_backup_restore),
-                title: const Text('Restore from a backup'),
-                onTap: () => Navigator.pop(context, 'restore'),
-              ),
-              if (user != null) ...[
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Sign out'),
-                  onTap: () => Navigator.pop(context, 'signout'),
+                  ],
+                );
+              },
+            ),
+          ],
+          const Divider(),
+          Consumer(
+            builder: (context, ref, _) {
+              final settings = ref.watch(appearanceSettingsProvider);
+              return ListTile(
+                leading: const Icon(Icons.brightness_6_outlined),
+                title: const Text('Appearance'),
+                trailing: SegmentedButton<ThemeMode>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
+                    ButtonSegment(value: ThemeMode.light, label: Text('Light')),
+                    ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+                  ],
+                  selected: {settings.themeMode},
+                  onSelectionChanged: (s) => settings.setThemeMode(s.single),
                 ),
-                if (sync.currentStatus != SyncStatus.offline)
-                  ListTile(
-                    leading: const Icon(Icons.layers_clear_outlined),
-                    title: const Text('Sign out and clear this device'),
-                    onTap: () => Navigator.pop(context, 'clear'),
-                  ),
-              ],
-            ],
+              );
+            },
           ),
-        ),
+          // Desktop only: the whole interface's size, for big or
+          // low-density displays (View → Interface Size, ⌥⌘+ / ⌥⌘−).
+          if (isDesktop(context))
+            Consumer(
+              builder: (context, ref, _) {
+                final settings = ref.watch(appearanceSettingsProvider);
+                return ListTile(
+                  leading: const Icon(Icons.format_size),
+                  title: const Text('Interface size'),
+                  subtitle: const Text('For large or ultrawide displays'),
+                  trailing: DropdownButton<double>(
+                    value: settings.interfaceScale,
+                    underline: const SizedBox.shrink(),
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                    items: [
+                      for (final s in AppearanceSettings.interfaceScales)
+                        DropdownMenuItem(
+                          value: s,
+                          child: Text('${(s * 100).round()}%'),
+                        ),
+                    ],
+                    onChanged: (s) {
+                      if (s != null) settings.setInterfaceScale(s);
+                    },
+                  ),
+                );
+              },
+            ),
+          const NotesPasswordSettings(),
+          Consumer(
+            builder: (context, ref, _) {
+              final count = ref.watch(trashItemsProvider).value?.length ?? 0;
+              return ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Trash'),
+                subtitle: count == 0
+                    ? null
+                    : Text('$count item${count == 1 ? '' : 's'}'),
+                onTap: () => Navigator.pop(context, 'trash'),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.save_alt_outlined),
+            title: const Text('Back up to a file'),
+            subtitle: const Text('Notes, papers and files in one zip'),
+            onTap: () => Navigator.pop(context, 'backup'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.folder_zip_outlined),
+            title: const Text('Export as Markdown'),
+            subtitle: const Text('A folder of notes for Obsidian'),
+            onTap: () => Navigator.pop(context, 'markdown'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_backup_restore),
+            title: const Text('Restore from a backup'),
+            onTap: () => Navigator.pop(context, 'restore'),
+          ),
+          if (user != null) ...[
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Sign out'),
+              onTap: () => Navigator.pop(context, 'signout'),
+            ),
+            if (sync.currentStatus != SyncStatus.offline)
+              ListTile(
+                leading: const Icon(Icons.layers_clear_outlined),
+                title: const Text('Sign out and clear this device'),
+                onTap: () => Navigator.pop(context, 'clear'),
+              ),
+          ],
+        ],
       ),
     );
+    final String? action;
+    if (isDesktop(context)) {
+      // Settings: a centred dialog on the desktop.
+      action = await showDialog<String>(
+        context: context,
+        builder: (context) => Dialog(
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                  child: Text(
+                    'Settings',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                Flexible(child: content(context)),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      action = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => SafeArea(child: content(context)),
+      );
+    }
     if (action == null || !context.mounted) return;
     switch (action) {
       case 'signin':

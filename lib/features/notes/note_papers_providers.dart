@@ -8,14 +8,12 @@ import '../../data/database_provider.dart';
 final linkedPapersForNoteProvider = StreamProvider.autoDispose
     .family<List<Paper>, String>((ref, noteId) {
       final db = ref.watch(databaseProvider);
-      final query =
-          db.select(db.papers).join([
-              innerJoin(
-                db.notePaperRefs,
-                db.notePaperRefs.paperId.equalsExp(db.papers.id),
-              ),
-            ])
-            ..where(db.notePaperRefs.noteId.equals(noteId));
+      final query = db.select(db.papers).join([
+        innerJoin(
+          db.notePaperRefs,
+          db.notePaperRefs.paperId.equalsExp(db.papers.id),
+        ),
+      ])..where(db.notePaperRefs.noteId.equals(noteId));
       return query.watch().map(
         (rows) => rows.map((row) => row.readTable(db.papers)).toList(),
       );
@@ -39,8 +37,7 @@ Future<void> unlinkPaperFromNote(
   required String noteId,
   required String paperId,
 }) {
-  return (db.delete(db.notePaperRefs)..where(
-        (t) => t.noteId.equals(noteId) & t.paperId.equals(paperId),
-      ))
-      .go();
+  return (db.delete(
+    db.notePaperRefs,
+  )..where((t) => t.noteId.equals(noteId) & t.paperId.equals(paperId))).go();
 }

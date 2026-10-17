@@ -8,6 +8,7 @@ import '../../data/database_provider.dart';
 import '../library/citation_formatter.dart';
 import '../csl/csl_format.dart';
 import '../csl/style_picker.dart';
+import '../platform/share_origin.dart';
 
 /// The reference list of every paper in [project], as plain text.
 Future<String> projectBibliography(
@@ -48,6 +49,10 @@ Future<void> shareProjectBibliography(
     return;
   }
   await SharePlus.instance.share(
-    ShareParams(text: text, subject: '${project.name} bibliography'),
+    ShareParams(
+      text: text,
+      subject: '${project.name} bibliography',
+      sharePositionOrigin: shareOrigin(context),
+    ),
   );
 }

@@ -2,6 +2,7 @@ import 'package:flutter_quill/quill_delta.dart';
 
 import '../../data/database.dart';
 import '../library/citation_formatter.dart';
+import '../lock/note_crypto.dart' show isLockedContent;
 import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../audio/audio_link.dart';
@@ -81,6 +82,13 @@ class ExportNote {
   final String content;
 }
 
+/// [notes] with any still-locked body emptied: a caller that couldn't
+/// decrypt a note exports its title only, never the envelope.
+List<ExportNote> withoutLockedBodies(List<ExportNote> notes) => [
+  for (final n in notes)
+    isLockedContent(n.content) ? ExportNote(n.title, '') : n,
+];
+
 const _references = 'References';
 
 /// The "List of figures" / "List of tables" that open a project export
@@ -126,6 +134,7 @@ Future<ExportDoc> buildExportDoc(
   FigureIndex? figures,
   List<ExportBlock> extraFrontMatter = const [],
 }) async {
+  notes = withoutLockedBodies(notes);
   final index =
       figures ??
       buildFigureIndex([

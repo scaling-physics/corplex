@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -7,7 +8,9 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../notes/note_editor_screen.dart';
 import '../notes/note_papers_providers.dart';
+import '../platform/mac_window.dart';
 import 'flight.dart';
+import 'split_fraction.dart';
 import 'pdf_viewer_screen.dart';
 import 'quote_to_note.dart';
 
@@ -78,6 +81,23 @@ class _SplitReaderScreenState extends ConsumerState<SplitReaderScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < splitBreakpoint) return reader;
+        final note = KeyedSubtree(
+          key: _paneKey,
+          child: NoteEditorScreen(
+            noteId: widget.noteId,
+            handle: _handle,
+            embedded: true,
+          ),
+        );
+        if (isDesktop(context)) {
+          return ResizableSplit(
+            total: constraints.maxWidth,
+            fraction: ref.watch(splitFractionProvider),
+            onChanged: ref.read(splitFractionProvider.notifier).save,
+            reader: reader,
+            note: note,
+          );
+        }
         return Row(
           children: [
             Expanded(flex: 11, child: reader),
@@ -99,6 +119,82 @@ class _SplitReaderScreenState extends ConsumerState<SplitReaderScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+/// The PDF and the note side by side with a draggable divider. The divider
+/// is a thin line with a wider invisible grip (resize cursor); the PDF
+/// keeps at least [minReaderFraction] and the note [minNoteWidth]. The new
+/// share is remembered when the drag ends ([onChanged]).
+class ResizableSplit extends StatefulWidget {
+  const ResizableSplit({
+    super.key,
+    required this.total,
+    required this.fraction,
+    required this.onChanged,
+    required this.reader,
+    required this.note,
+  });
+
+  final double total;
+  final double fraction;
+  final ValueChanged<double> onChanged;
+  final Widget reader;
+  final Widget note;
+
+  /// Width of the draggable strip around the divider line.
+  static const grip = 9.0;
+
+  @override
+  State<ResizableSplit> createState() => _ResizableSplitState();
+}
+
+class _ResizableSplitState extends State<ResizableSplit> {
+  /// The share while a drag is in progress; null otherwise.
+  double? _dragging;
+
+  double get _fraction =>
+      clampSplitFraction(_dragging ?? widget.fraction, widget.total);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final readerWidth = (widget.total * _fraction).roundToDouble();
+    return Row(
+      children: [
+        SizedBox(width: readerWidth, child: widget.reader),
+        MouseRegion(
+          cursor: SystemMouseCursors.resizeColumn,
+          child: GestureDetector(
+            key: const ValueKey('split-divider'),
+            behavior: HitTestBehavior.opaque,
+            dragStartBehavior: DragStartBehavior.down,
+            onHorizontalDragStart: (_) => setState(() => _dragging = _fraction),
+            onHorizontalDragUpdate: (d) => setState(() {
+              _dragging = clampSplitFraction(
+                (readerWidth + d.delta.dx) / widget.total,
+                widget.total,
+              );
+            }),
+            onHorizontalDragEnd: (_) {
+              final done = _dragging;
+              setState(() => _dragging = null);
+              if (done != null) widget.onChanged(done);
+            },
+            child: SizedBox(
+              width: ResizableSplit.grip,
+              child: Center(
+                child: VerticalDivider(
+                  width: 1,
+                  color: _dragging != null ? c.primary : c.outlineVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Expanded(child: widget.note),
+      ],
     );
   }
 }

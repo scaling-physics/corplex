@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../lock/note_crypto.dart';
 import '../notes/note_content.dart';
 
 enum SearchKind { note, paper, highlight }
@@ -13,6 +14,7 @@ class SearchHit {
     required this.id,
     required this.title,
     required this.snippet,
+    this.locked = false,
     this.paperId,
     this.page,
   });
@@ -25,6 +27,9 @@ class SearchHit {
 
   /// A short excerpt around the match, with `⟦…⟧` around matched words.
   final String snippet;
+
+  /// A locked note: found by title only, never by its body.
+  final bool locked;
 
   /// For highlights: the paper it belongs to and its page.
   final String? paperId;
@@ -70,10 +75,19 @@ class SearchIndex {
     await _db.transaction(() async {
       await _sync(
         SearchKind.note,
-        'SELECT id, updated_at, title, content AS body, NULL AS aux FROM notes',
+        // The stamp carries "locked" in its low bit, so locking a note
+        // re-indexes it even if `updated_at` somehow didn't move, and the
+        // old plain text leaves the table. A locked note is indexed by
+        // title only: its body is an envelope (or, before the lock, text).
+        "SELECT id, updated_at * 2 + (content LIKE '$lockedPrefix%') "
+        'AS updated_at, title, content AS body, '
+        "CASE WHEN content LIKE '$lockedPrefix%' THEN 'locked' END AS aux "
+        'FROM notes',
         (row) => (
           title: row.read<String>('title'),
-          body: notePlainTextPreview(row.read<String>('body')),
+          body: row.read<String?>('aux') == 'locked'
+              ? ''
+              : notePlainTextPreview(row.read<String>('body')),
         ),
       );
       await _sync(
@@ -167,7 +181,8 @@ class SearchIndex {
           .get();
       for (final row in rows) {
         final aux = row.read<String?>('aux');
-        final split = aux?.split('|');
+        final locked = kind == SearchKind.note && aux == 'locked';
+        final split = locked ? null : aux?.split('|');
         final body = row.read<String>('body');
         hits.add(
           SearchHit(
@@ -176,7 +191,12 @@ class SearchIndex {
             title: row.read<String>('marked_title'),
             // A match in the title alone leaves the body snippet unmarked;
             // that's fine — it still shows the start of the text.
-            snippet: body.isEmpty ? '' : row.read<String>('snip'),
+            snippet: locked
+                ? 'Locked'
+                : body.isEmpty
+                ? ''
+                : row.read<String>('snip'),
+            locked: locked,
             paperId: split?.first,
             page: split == null ? null : int.tryParse(split.last),
           ),
@@ -201,14 +221,16 @@ class SearchIndex {
 
     final hits = <SearchHit>[];
     for (final n in await _db.select(_db.notes).get()) {
-      final body = notePlainTextPreview(n.content);
+      final locked = isLockedContent(n.content);
+      final body = locked ? '' : notePlainTextPreview(n.content);
       if (matches('${n.title} $body')) {
         hits.add(
           SearchHit(
             kind: SearchKind.note,
             id: n.id,
             title: n.title,
-            snippet: body,
+            snippet: locked ? 'Locked' : body,
+            locked: locked,
           ),
         );
       }

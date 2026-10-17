@@ -6,9 +6,11 @@ import 'package:uuid/uuid.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/projects_table.dart' show ChapterStatus;
+import '../lock/note_lock_service.dart';
 import '../notes/note_content.dart';
 import '../notes/note_stats.dart';
 import '../notes/note_versions.dart';
+import 'readable_content.dart';
 
 export '../../data/tables/projects_table.dart' show ChapterStatus;
 
@@ -20,9 +22,13 @@ class Chapter {
     required this.wordTarget,
     required this.words,
     required this.position,
+    this.locked = false,
   });
 
   final Note note;
+
+  /// A locked chapter whose key isn't unlocked: [words] is 0 and unknown.
+  final bool locked;
   final ChapterStatus? status;
   final int? wordTarget;
   final int words;
@@ -81,18 +87,31 @@ final projectNotesProvider = StreamProvider.autoDispose
 final projectChaptersProvider = StreamProvider.autoDispose
     .family<List<Chapter>, String>((ref, id) {
       final db = ref.watch(databaseProvider);
-      return _rows(db, id).watch().map((rows) {
+      // Watching the service re-counts when notes lock or unlock.
+      final lock = ref.watch(noteLockServiceProvider);
+      return _rows(db, id).watch().asyncMap((rows) async {
         rows.sort(compareChapterRows);
-        return [
-          for (final r in rows)
+        final chapters = <Chapter>[];
+        for (final r in rows) {
+          final content = await readableNoteContent(
+            lock,
+            r.note.id,
+            r.note.content,
+          );
+          chapters.add(
             Chapter(
               note: r.note,
               status: r.link.status,
               wordTarget: r.link.wordTarget,
-              words: noteStats(decodeNoteContent(r.note.content)).words,
+              words: content == null
+                  ? 0
+                  : noteStats(decodeNoteContent(content)).words,
               position: r.link.position,
+              locked: content == null,
             ),
-        ];
+          );
+        }
+        return chapters;
       });
     });
 

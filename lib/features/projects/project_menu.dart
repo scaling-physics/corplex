@@ -5,6 +5,8 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../export/export_actions.dart';
 import '../export/export_model.dart';
+import '../export/unlock_for_export.dart';
+import '../lock/note_lock_service.dart';
 import 'abbreviations.dart' show abbreviationBlocks;
 import 'chapters.dart';
 import 'chapters_section.dart' show pickProjectDueDate;
@@ -12,6 +14,7 @@ import 'matrix_screen.dart';
 import 'project_bibliography.dart';
 import 'project_page.dart';
 import 'projects_providers.dart';
+import 'readable_content.dart';
 
 /// Long-press menu on a project chip: rename or delete. Deleting removes
 /// only the grouping; its papers and notes are untouched.
@@ -107,7 +110,7 @@ Future<void> showProjectMenu(
     return;
   }
   if (action == 'export') {
-    await exportProject(context, db, project);
+    await exportProject(context, ref, project);
     return;
   }
   if (action == 'bibliography') {
@@ -144,11 +147,17 @@ Future<void> showProjectMenu(
 
 /// Exports every note in [project] as one document in chapter order, under
 /// one reference list.
+///
+/// Locked chapters are decrypted for the export (the reader is asked to
+/// unlock first); declining cancels it rather than silently leaving
+/// chapters out.
 Future<void> exportProject(
   BuildContext context,
-  AppDatabase db,
+  WidgetRef ref,
   Project project,
 ) async {
+  final db = ref.read(databaseProvider);
+  final lock = ref.read(noteLockServiceProvider);
   final notes = await orderedProjectNotes(db, project.id);
   if (!context.mounted) return;
   if (notes.isEmpty) {
@@ -157,12 +166,38 @@ Future<void> exportProject(
     );
     return;
   }
+  if (notes.any(
+    (n) => isLockedContent(n.content) && !lock.canRead(n.content),
+  )) {
+    final ok = await requestUnlock(
+      context,
+      lock,
+      reason: 'Some chapters are locked. Unlock them to include them.',
+    );
+    if (!ok || !context.mounted) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Export cancelled: chapters are locked.'),
+          ),
+        );
+      }
+      return;
+    }
+  }
+  final contents = <String>[];
+  for (final n in notes) {
+    final text = await readableNoteContent(lock, n.id, n.content);
+    // Still unreadable (damaged, or locked again meanwhile): title only.
+    contents.add(text ?? '');
+  }
+  if (!context.mounted) return;
   await exportNotes(
     context,
     db,
-    [for (final n in notes) ExportNote(n.title, n.content)],
+    [for (final (i, n) in notes.indexed) ExportNote(n.title, contents[i])],
     title: project.name,
-    extraFrontMatter: abbreviationBlocks([for (final n in notes) n.content]),
+    extraFrontMatter: abbreviationBlocks(contents),
   );
 }
 

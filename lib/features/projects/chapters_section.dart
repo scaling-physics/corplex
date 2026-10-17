@@ -213,7 +213,9 @@ class _ChapterRow extends ConsumerWidget {
     final muted = theme.textTheme.labelMedium?.copyWith(
       color: scheme.onSurfaceVariant,
     );
-    final words = c.wordTarget == null
+    final words = c.locked
+        ? 'Locked'
+        : c.wordTarget == null
         ? '${formatCount(c.words)} words'
         : '${formatCount(c.words)} / ${formatCount(c.wordTarget!)}';
 

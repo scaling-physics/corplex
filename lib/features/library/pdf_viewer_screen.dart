@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
-import 'package:flutter/gestures.dart' show DragStartBehavior;
+import 'package:flutter/gestures.dart'
+    show DragStartBehavior, PanGestureRecognizer, PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -11,7 +12,10 @@ import 'package:pdfrx/pdfrx.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/context_menu.dart';
 import '../../theme/haptics.dart';
+import '../platform/mac_window.dart';
+import 'viewer_keys.dart';
 import '../notes/note_editor_screen.dart';
 import 'annotations_providers.dart';
 import 'flight.dart';
@@ -236,7 +240,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
       duration: AppMotion.of(context, AppMotion.short),
       curve: focus ? AppMotion.exit : AppMotion.enter,
     );
-    final phone = MediaQuery.sizeOf(context).shortestSide < 600;
+    // Never on a desktop window, however short: it has no system bars.
+    final phone =
+        !isDesktop(context) && MediaQuery.sizeOf(context).shortestSide < 600;
     if (focus && phone) {
       _immersive = true;
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -357,6 +363,34 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     } catch (_) {
       _jumpTo(m.page);
     }
+  }
+
+  /// Zoom a step; nothing to do before the document has loaded.
+  void _zoom(
+    Future<void> Function({bool loop, Offset? zoomCenter, Duration duration})
+    step,
+  ) {
+    try {
+      step();
+    } catch (_) {}
+  }
+
+  /// ⌘0: the page fills the window's width again.
+  void _fitWidth() {
+    try {
+      final rect = _controller.visibleRect;
+      _controller.setZoom(rect.center, _controller.coverScale);
+    } catch (_) {}
+  }
+
+  void _stepPage(int delta) {
+    final count = _pageCount;
+    if (count == null) return;
+    final target = ((_controller.pageNumber ?? _page.value) + delta).clamp(
+      1,
+      count,
+    );
+    _jumpTo(target);
   }
 
   Future<void> _jumpTo(int page) async {
@@ -502,6 +536,11 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
       onPageChanged: _onPageChanged,
       onViewerReady: _onViewerReady,
       onGeneralTap: _onGeneralTap,
+      // On a desktop the page takes the keys (arrows, Page Up/Down, Space,
+      // Home/End, ⌘+/⌘−) from the start, without a click first.
+      keyHandlerParams: PdfViewerKeyHandlerParams(
+        autofocus: isDesktop(context),
+      ),
       textSelectionParams: PdfTextSelectionParams(
         enabled: !_inkMode,
         buildSelectionHandle: (context, anchor, state) => SelectionHandle(
@@ -655,274 +694,350 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     // easy to start by accident when dragging the box) cancels the
     // snapshot instead of leaving the paper. In focus mode back brings the
     // chrome back first.
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _openSearch,
-        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
-            _openSearch,
-        if (_search != null)
-          const SingleActivator(LogicalKeyboardKey.escape): _closeSearch,
+    return MenuCommandHandler(
+      // The menu bar's Find, Zoom and Actual Size act on this document
+      // whatever holds focus inside the viewer (pdfrx, the Find field).
+      commands: {
+        MenuCommand.find: _openSearch,
+        MenuCommand.findNext: () =>
+            _search == null ? _openSearch() : _findStep(1),
+        MenuCommand.findPrevious: _search == null ? null : () => _findStep(-1),
+        MenuCommand.zoomIn: () => _zoom(_controller.zoomUp),
+        MenuCommand.zoomOut: () => _zoom(_controller.zoomDown),
+        MenuCommand.actualSize: _fitWidth,
       },
-      child: Focus(
-        autofocus: true,
-        child: PopScope(
-          canPop: !_snapping && !_focus && !_stripOpen && _search == null,
-          onPopInvokedWithResult: (didPop, _) {
-            if (didPop) return;
-            if (_search != null) {
-              _closeSearch();
-            } else if (_snapping) {
-              setState(() => _snapping = false);
-            } else if (_stripOpen) {
-              setState(() => _stripOpen = false);
-            } else {
-              _setFocus(false);
-            }
+      child: CallbackShortcuts(
+        bindings: {
+          if (_search != null) ...{
+            const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () =>
+                _findStep(1),
+            const SingleActivator(
+              LogicalKeyboardKey.keyG,
+              meta: true,
+              shift: true,
+            ): () =>
+                _findStep(-1),
           },
-          // Only the bars follow the animation; the body is built once.
-          child: AnimatedBuilder(
-            animation: _chrome,
-            child: body,
-            builder: (context, body) {
-              final t = _chrome.value;
-              final inset = MediaQuery.paddingOf(context).top;
-              return Scaffold(
-                appBar: t <= 0
-                    ? null
-                    : PreferredSize(
-                        preferredSize: Size.fromHeight(kToolbarHeight * t),
-                        child: ClipRect(
-                          child: OverflowBox(
-                            alignment: Alignment.bottomCenter,
-                            minHeight: 0,
-                            maxHeight: kToolbarHeight + inset,
+          const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+              _openSearch,
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+              _openSearch,
+          if (_search != null)
+            const SingleActivator(LogicalKeyboardKey.escape): _closeSearch
+          else if (_focus)
+            const SingleActivator(LogicalKeyboardKey.escape): () =>
+                _setFocus(false),
+          if (isDesktop(context))
+            ...viewerKeyBindings(
+              ViewerKeyActions(
+                zoomIn: () => _zoom(_controller.zoomUp),
+                zoomOut: () => _zoom(_controller.zoomDown),
+                fit: _fitWidth,
+                nextPage: () => _stepPage(1),
+                previousPage: () => _stepPage(-1),
+                firstPage: () => _jumpTo(1),
+                lastPage: () => _jumpTo(_pageCount ?? 1),
+              ),
+              enabled: () => !_findFocus.hasFocus && _search == null,
+            ),
+        },
+        child: Focus(
+          autofocus: !isDesktop(context) || widget.viewerBuilder != null,
+          child: PopScope(
+            canPop: !_snapping && !_focus && !_stripOpen && _search == null,
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) return;
+              if (_search != null) {
+                _closeSearch();
+              } else if (_snapping) {
+                setState(() => _snapping = false);
+              } else if (_stripOpen) {
+                setState(() => _stripOpen = false);
+              } else {
+                _setFocus(false);
+              }
+            },
+            // Only the bars follow the animation; the body is built once.
+            child: AnimatedBuilder(
+              animation: _chrome,
+              child: body,
+              builder: (context, body) {
+                final t = _chrome.value;
+                final inset = MediaQuery.paddingOf(context).top;
+                final barHeight =
+                    Theme.of(context).appBarTheme.toolbarHeight ??
+                    kToolbarHeight;
+                return Scaffold(
+                  appBar: t <= 0
+                      // Focus mode on a Mac still leaves the title bar band
+                      // empty: clicks there drag the window.
+                      ? (isMac(context)
+                            ? PreferredSize(
+                                preferredSize: Size.zero,
+                                child: SizedBox(
+                                  height: inset,
+                                  width: double.infinity,
+                                ),
+                              )
+                            : null)
+                      : PreferredSize(
+                          preferredSize: Size.fromHeight(barHeight * t),
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.bottomCenter,
+                              minHeight: 0,
+                              maxHeight: barHeight + inset,
+                              child: Opacity(
+                                opacity: t,
+                                child: AppBar(
+                                  title: _search == null
+                                      ? null
+                                      : ConstrainedBox(
+                                          // Not stretched across a 27" window.
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 520,
+                                          ),
+                                          child: FindField(
+                                            search: _search!,
+                                            controller: _findField,
+                                            focusNode: _findFocus,
+                                            onChanged: _onFindChanged,
+                                            onStep: _findStep,
+                                          ),
+                                        ),
+                                  actions: _search != null
+                                      ? [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.keyboard_arrow_up,
+                                            ),
+                                            tooltip: 'Previous match',
+                                            onPressed: () => _findStep(-1),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.keyboard_arrow_down,
+                                            ),
+                                            tooltip: 'Next match',
+                                            onPressed: () => _findStep(1),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.close),
+                                            tooltip: 'Close search',
+                                            onPressed: _closeSearch,
+                                          ),
+                                        ]
+                                      : [
+                                          IconButton(
+                                            icon: const Icon(Icons.search),
+                                            tooltip: 'Find in document',
+                                            onPressed: _openSearch,
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.format_quote_outlined,
+                                            ),
+                                            tooltip: 'Highlights',
+                                            onPressed: _showHighlightsList,
+                                          ),
+                                          IconButton(
+                                            isSelected: _inkMode,
+                                            icon: const Icon(
+                                              Icons.draw_outlined,
+                                            ),
+                                            selectedIcon: const Icon(
+                                              Icons.draw,
+                                            ),
+                                            tooltip: _inkMode
+                                                ? 'Stop drawing'
+                                                : 'Draw on the page',
+                                            onPressed: () {
+                                              AppHaptics.selection();
+                                              setState(
+                                                () => _inkMode = !_inkMode,
+                                              );
+                                            },
+                                          ),
+                                          PopupMenuButton<String>(
+                                            tooltip: 'More',
+                                            onSelected: (v) {
+                                              if (v == 'snapshot') {
+                                                setState(
+                                                  () => _snapping = true,
+                                                );
+                                              }
+                                              if (v == 'find') _openSearch();
+                                              if (v == 'focus') _setFocus(true);
+                                              if (v == 'ocr') _recogniseText();
+                                              if (v == 'pages') {
+                                                setState(
+                                                  () => _stripOpen = true,
+                                                );
+                                              }
+                                              if (v == 'contents') {
+                                                _showContents();
+                                              }
+                                              if (v.startsWith('read:')) {
+                                                ref
+                                                    .read(
+                                                      appearanceSettingsProvider,
+                                                    )
+                                                    .setReading(
+                                                      ReadingTheme.values
+                                                          .byName(
+                                                            v.substring(5),
+                                                          ),
+                                                    );
+                                              }
+                                            },
+                                            itemBuilder: (_) => [
+                                              if (_pageCount != null &&
+                                                  _pageCount! > 1)
+                                                const PopupMenuItem(
+                                                  value: 'pages',
+                                                  child: ListTile(
+                                                    leading: Icon(
+                                                      Icons
+                                                          .view_carousel_outlined,
+                                                    ),
+                                                    title: Text('Page strip'),
+                                                  ),
+                                                ),
+                                              const PopupMenuItem(
+                                                value: 'find',
+                                                child: ListTile(
+                                                  leading: Icon(Icons.search),
+                                                  title: Text(
+                                                    'Find in document',
+                                                  ),
+                                                ),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'focus',
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    Icons.fullscreen,
+                                                  ),
+                                                  title: Text('Focus'),
+                                                  subtitle: Text(
+                                                    'Tap the page to bring back',
+                                                  ),
+                                                ),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'contents',
+                                                child: ListTile(
+                                                  leading: Icon(Icons.toc),
+                                                  title: Text('Contents'),
+                                                ),
+                                              ),
+                                              if (_lacksText && ocr == null)
+                                                const PopupMenuItem(
+                                                  value: 'ocr',
+                                                  child: ListTile(
+                                                    leading: Icon(
+                                                      Icons
+                                                          .document_scanner_outlined,
+                                                    ),
+                                                    title: Text(
+                                                      'Recognise text',
+                                                    ),
+                                                    subtitle: Text(
+                                                      'Search and highlight a scan',
+                                                    ),
+                                                  ),
+                                                ),
+                                              for (final theme
+                                                  in ReadingTheme.values)
+                                                CheckedPopupMenuItem(
+                                                  value: 'read:${theme.name}',
+                                                  checked:
+                                                      ref
+                                                          .read(
+                                                            appearanceSettingsProvider,
+                                                          )
+                                                          .reading ==
+                                                      theme,
+                                                  child: Text(
+                                                    '${theme.label} page',
+                                                  ),
+                                                ),
+                                              const PopupMenuDivider(),
+                                              PopupMenuItem(
+                                                value: 'snapshot',
+                                                enabled: !_extracting,
+                                                child: const ListTile(
+                                                  leading: Icon(
+                                                    Icons.crop_free,
+                                                  ),
+                                                  title: Text(
+                                                    'Snapshot to a note',
+                                                  ),
+                                                  subtitle: Text(
+                                                    'For figures and tables',
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                  body: body,
+                  // One palette for both kinds of marking: the ink for new
+                  // strokes, and the color the next text highlight gets.
+                  bottomNavigationBar: t <= 0
+                      ? null
+                      : ClipRect(
+                          child: Align(
+                            heightFactor: t,
+                            alignment: Alignment.topCenter,
                             child: Opacity(
                               opacity: t,
-                              child: AppBar(
-                                title: _search == null
-                                    ? null
-                                    : FindField(
-                                        search: _search!,
-                                        controller: _findField,
-                                        focusNode: _findFocus,
-                                        onChanged: _onFindChanged,
-                                        onStep: _findStep,
-                                      ),
-                                actions: _search != null
-                                    ? [
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.keyboard_arrow_up,
-                                          ),
-                                          tooltip: 'Previous match',
-                                          onPressed: () => _findStep(-1),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.keyboard_arrow_down,
-                                          ),
-                                          tooltip: 'Next match',
-                                          onPressed: () => _findStep(1),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.close),
-                                          tooltip: 'Close search',
-                                          onPressed: _closeSearch,
-                                        ),
-                                      ]
-                                    : [
-                                        IconButton(
-                                          icon: const Icon(Icons.search),
-                                          tooltip: 'Find in document',
-                                          onPressed: _openSearch,
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.format_quote_outlined,
-                                          ),
-                                          tooltip: 'Highlights',
-                                          onPressed: _showHighlightsList,
-                                        ),
-                                        IconButton(
-                                          isSelected: _inkMode,
-                                          icon: const Icon(Icons.draw_outlined),
-                                          selectedIcon: const Icon(Icons.draw),
-                                          tooltip: _inkMode
-                                              ? 'Stop drawing'
-                                              : 'Draw on the page',
-                                          onPressed: () {
-                                            AppHaptics.selection();
-                                            setState(
-                                              () => _inkMode = !_inkMode,
-                                            );
-                                          },
-                                        ),
-                                        PopupMenuButton<String>(
-                                          tooltip: 'More',
-                                          onSelected: (v) {
-                                            if (v == 'snapshot') {
-                                              setState(() => _snapping = true);
-                                            }
-                                            if (v == 'find') _openSearch();
-                                            if (v == 'focus') _setFocus(true);
-                                            if (v == 'ocr') _recogniseText();
-                                            if (v == 'pages') {
-                                              setState(() => _stripOpen = true);
-                                            }
-                                            if (v == 'contents') {
-                                              _showContents();
-                                            }
-                                            if (v.startsWith('read:')) {
-                                              ref
-                                                  .read(
-                                                    appearanceSettingsProvider,
-                                                  )
-                                                  .setReading(
-                                                    ReadingTheme.values.byName(
-                                                      v.substring(5),
-                                                    ),
-                                                  );
-                                            }
-                                          },
-                                          itemBuilder: (_) => [
-                                            if (_pageCount != null &&
-                                                _pageCount! > 1)
-                                              const PopupMenuItem(
-                                                value: 'pages',
-                                                child: ListTile(
-                                                  leading: Icon(
-                                                    Icons
-                                                        .view_carousel_outlined,
-                                                  ),
-                                                  title: Text('Page strip'),
-                                                ),
-                                              ),
-                                            const PopupMenuItem(
-                                              value: 'find',
-                                              child: ListTile(
-                                                leading: Icon(Icons.search),
-                                                title: Text('Find in document'),
-                                              ),
+                              child: SafeArea(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      for (final ink in highlightInks)
+                                        _InkSwatchTap(
+                                          onTap: () =>
+                                              setState(() => _color = ink),
+                                          child: AnimatedContainer(
+                                            duration: AppMotion.short,
+                                            margin: const EdgeInsets.symmetric(
+                                              horizontal: 8,
                                             ),
-                                            const PopupMenuItem(
-                                              value: 'focus',
-                                              child: ListTile(
-                                                leading: Icon(Icons.fullscreen),
-                                                title: Text('Focus'),
-                                                subtitle: Text(
-                                                  'Tap the page to bring back',
-                                                ),
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              color: ink,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: ink == _color
+                                                    ? c.primary
+                                                    : c.outlineVariant,
+                                                width: ink == _color ? 3 : 1,
                                               ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'contents',
-                                              child: ListTile(
-                                                leading: Icon(Icons.toc),
-                                                title: Text('Contents'),
-                                              ),
-                                            ),
-                                            if (_lacksText && ocr == null)
-                                              const PopupMenuItem(
-                                                value: 'ocr',
-                                                child: ListTile(
-                                                  leading: Icon(
-                                                    Icons
-                                                        .document_scanner_outlined,
-                                                  ),
-                                                  title: Text('Recognise text'),
-                                                  subtitle: Text(
-                                                    'Search and highlight a scan',
-                                                  ),
-                                                ),
-                                              ),
-                                            for (final theme
-                                                in ReadingTheme.values)
-                                              CheckedPopupMenuItem(
-                                                value: 'read:${theme.name}',
-                                                checked:
-                                                    ref
-                                                        .read(
-                                                          appearanceSettingsProvider,
-                                                        )
-                                                        .reading ==
-                                                    theme,
-                                                child: Text(
-                                                  '${theme.label} page',
-                                                ),
-                                              ),
-                                            const PopupMenuDivider(),
-                                            PopupMenuItem(
-                                              value: 'snapshot',
-                                              enabled: !_extracting,
-                                              child: const ListTile(
-                                                leading: Icon(Icons.crop_free),
-                                                title: Text(
-                                                  'Snapshot to a note',
-                                                ),
-                                                subtitle: Text(
-                                                  'For figures and tables',
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                body: body,
-                // One palette for both kinds of marking: the ink for new
-                // strokes, and the color the next text highlight gets.
-                bottomNavigationBar: t <= 0
-                    ? null
-                    : ClipRect(
-                        child: Align(
-                          heightFactor: t,
-                          alignment: Alignment.topCenter,
-                          child: Opacity(
-                            opacity: t,
-                            child: SafeArea(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    for (final ink in highlightInks)
-                                      GestureDetector(
-                                        onTap: () =>
-                                            setState(() => _color = ink),
-                                        child: AnimatedContainer(
-                                          duration: AppMotion.short,
-                                          margin: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                          ),
-                                          width: 28,
-                                          height: 28,
-                                          decoration: BoxDecoration(
-                                            color: ink,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: ink == _color
-                                                  ? c.primary
-                                                  : c.outlineVariant,
-                                              width: ink == _color ? 3 : 1,
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -1136,6 +1251,12 @@ class _PageOverlayState extends ConsumerState<PageOverlay>
     return started;
   }
 
+  void _openHighlight(String id) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => HighlightSheet(highlightId: id),
+  );
+
   Offset _normalize(Offset local) => Offset(
     local.dx / widget.pageRect.width,
     local.dy / widget.pageRect.height,
@@ -1216,24 +1337,27 @@ class _PageOverlayState extends ConsumerState<PageOverlay>
                   height: r.height * size.height,
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
-                    onTap: () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) => HighlightSheet(highlightId: highlight.id),
-                    ),
+                    onTap: () => _openHighlight(highlight.id),
+                    // A right-click is the desktop's long-press: the same
+                    // actions, as a menu at the pointer.
+                    onSecondaryTapUp: isDesktop(context)
+                        ? (d) => showContextMenuAt(
+                            context,
+                            d.globalPosition,
+                            highlightContextActions(
+                              context,
+                              ref,
+                              highlight,
+                              onComment: () => _openHighlight(highlight.id),
+                            ),
+                          )
+                        : null,
                   ),
                 ),
           IgnorePointer(
             ignoring: !widget.inkMode,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              // Start the stroke where the pen touched down, not where the
-              // drag was recognised a few pixels later.
-              dragStartBehavior: DragStartBehavior.down,
-              onPanStart: (d) => _live.start(_normalize(d.localPosition)),
-              onPanUpdate: (d) => _live.add(_normalize(d.localPosition)),
-              onPanEnd: (_) => _commitStroke(),
-              onPanCancel: _live.clear,
+            child: _inkGestures(
+              context,
               child: Stack(
                 children: [
                   CustomPaint(size: size, painter: _InkPainter(_strokes)),
@@ -1249,6 +1373,53 @@ class _PageOverlayState extends ConsumerState<PageOverlay>
           ),
         ],
       ),
+    );
+  }
+
+  /// Captures strokes. A mouse drag draws like a pen; on a desktop a
+  /// trackpad's two-finger scroll is left to the reader (it would
+  /// otherwise count as a drag and draw).
+  Widget _inkGestures(BuildContext context, {required Widget child}) {
+    void start(DragStartDetails d) => _live.start(_normalize(d.localPosition));
+    void update(DragUpdateDetails d) => _live.add(_normalize(d.localPosition));
+    if (!isDesktop(context)) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // Start the stroke where the pen touched down, not where the
+        // drag was recognised a few pixels later.
+        dragStartBehavior: DragStartBehavior.down,
+        onPanStart: start,
+        onPanUpdate: update,
+        onPanEnd: (_) => _commitStroke(),
+        onPanCancel: _live.clear,
+        child: child,
+      );
+    }
+    return RawGestureDetector(
+      behavior: HitTestBehavior.opaque,
+      gestures: {
+        PanGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+              () => PanGestureRecognizer(
+                supportedDevices: const {
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.stylus,
+                  PointerDeviceKind.invertedStylus,
+                  PointerDeviceKind.unknown,
+                },
+              ),
+              (r) => r
+                ..dragStartBehavior = DragStartBehavior.down
+                ..onStart = start
+                ..onUpdate = update
+                ..onEnd = (_) {
+                  _commitStroke();
+                }
+                ..onCancel = _live.clear,
+            ),
+      },
+      child: child,
     );
   }
 
@@ -1820,4 +1991,63 @@ class FindField extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A colour swatch in the viewer's bottom bar: a hand cursor and a label
+/// with a mouse.
+class _InkSwatchTap extends StatelessWidget {
+  const _InkSwatchTap({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tap = GestureDetector(onTap: onTap, child: child);
+    if (!isDesktop(context)) return tap;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Tooltip(message: 'Highlight colour', child: tap),
+    );
+  }
+}
+
+/// A highlight's right-click menu: recolour, comment, copy, delete.
+List<ContextMenuAction?> highlightContextActions(
+  BuildContext context,
+  WidgetRef ref,
+  Highlight highlight, {
+  required VoidCallback onComment,
+}) {
+  final db = ref.read(databaseProvider);
+  final current = highlight.colorHex.toLowerCase();
+  const names = ['Butter', 'Sage', 'Rose', 'Mist'];
+  return [
+    for (final (i, ink) in highlightInks.indexed)
+      ContextMenuAction(
+        label: '${names[i]} highlight',
+        icon: colorToHex(ink) == current
+            ? Icons.check_circle
+            : Icons.circle_outlined,
+        onSelected: () => updateHighlight(db, highlight.id, color: ink),
+      ),
+    null,
+    ContextMenuAction(
+      label: highlight.comment == null ? 'Add a comment…' : 'Edit comment…',
+      icon: Icons.comment_outlined,
+      onSelected: onComment,
+    ),
+    ContextMenuAction(
+      label: 'Copy',
+      icon: Icons.copy_outlined,
+      onSelected: () => Clipboard.setData(ClipboardData(text: highlight.quote)),
+    ),
+    null,
+    ContextMenuAction(
+      label: 'Delete highlight',
+      icon: Icons.delete_outline,
+      destructive: true,
+      onSelected: () => deleteHighlight(db, highlight.id),
+    ),
+  ];
 }

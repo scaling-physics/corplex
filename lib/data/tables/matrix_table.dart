@@ -33,7 +33,8 @@ class MatrixCells extends Table {
       text().references(MatrixColumns, #id, onDelete: KeyAction.cascade)();
   TextColumn get paperId =>
       text().references(Papers, #id, onDelete: KeyAction.cascade)();
-  TextColumn get text_ => text().named('text').withDefault(const Constant(''))();
+  TextColumn get text_ =>
+      text().named('text').withDefault(const Constant(''))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now())();
 

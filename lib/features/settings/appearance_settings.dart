@@ -112,6 +112,7 @@ class AppearanceSettings extends ChangeNotifier {
     this.themeMode = ThemeMode.system,
     this.reading = ReadingTheme.paper,
     this.typewriter = false,
+    this.interfaceScale = 1.0,
   });
 
   ThemeMode themeMode;
@@ -120,9 +121,18 @@ class AppearanceSettings extends ChangeNotifier {
   /// Note editor: keep the line being typed at a steady height.
   bool typewriter;
 
+  /// Desktop: the whole interface's size, as a factor (View → Interface
+  /// Size, or Settings). A big low-density display — a 38" 3840×1600
+  /// ultrawide at 1× — reads better a step or two up. Applied by
+  /// `MacWindowFrame`; one of [interfaceScales].
+  double interfaceScale;
+
+  static const interfaceScales = [0.9, 1.0, 1.1, 1.25, 1.4, 1.6];
+
   static const _modeKey = 'appearance.themeMode';
   static const _readingKey = 'appearance.reading';
   static const _typewriterKey = 'appearance.typewriter';
+  static const _scaleKey = 'appearance.interfaceScale';
 
   static Future<AppearanceSettings> load() async {
     try {
@@ -137,6 +147,7 @@ class AppearanceSettings extends ChangeNotifier {
           orElse: () => ReadingTheme.paper,
         ),
         typewriter: prefs.getBool(_typewriterKey) ?? false,
+        interfaceScale: _nearestScale(prefs.getDouble(_scaleKey) ?? 1.0),
       );
     } catch (_) {
       return AppearanceSettings();
@@ -162,6 +173,30 @@ class AppearanceSettings extends ChangeNotifier {
       await (await SharedPreferences.getInstance()).setBool(_typewriterKey, on);
     } catch (_) {}
   }
+
+  Future<void> setInterfaceScale(double scale) async {
+    interfaceScale = _nearestScale(scale);
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setDouble(
+        _scaleKey,
+        interfaceScale,
+      );
+    } catch (_) {}
+  }
+
+  /// One step up (+1) or down (-1) [interfaceScales]; 0 resets to 100%.
+  Future<void> stepInterfaceScale(int direction) {
+    if (direction == 0) return setInterfaceScale(1.0);
+    final i = interfaceScales.indexOf(interfaceScale) + direction;
+    return setInterfaceScale(
+      interfaceScales[i.clamp(0, interfaceScales.length - 1)],
+    );
+  }
+
+  static double _nearestScale(double value) => interfaceScales.reduce(
+    (a, b) => (a - value).abs() <= (b - value).abs() ? a : b,
+  );
 
   Future<void> _save(String key, String value) async {
     try {

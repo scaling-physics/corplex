@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../lock/note_crypto.dart' show isLockedContent, isRedactedBase;
+
 /// Three-way merging, for when the same row was edited on two devices
 /// between syncs. [base] is the version both edits started from (the last
 /// one this device synced), so each side's *changes* can be told apart
@@ -27,6 +29,19 @@ Map<String, Object?> mergeRow({
           local[c],
           remote[c],
           both: () {
+            // A locked body is an opaque envelope: line-merging it (or
+            // mixing it with plain text) would corrupt it, so the later
+            // edit wins whole. Same for saved versions.
+            if (_isLockedField(base[c], local[c], remote[c])) {
+              // Exactly one side locked: the lock wins whatever the
+              // timestamps, so a concurrent edit can't undo it.
+              final lockedHere = _locked(local[c]);
+              final lockedThere = _locked(remote[c]);
+              if (lockedHere != lockedThere) {
+                return lockedHere ? local[c] : remote[c];
+              }
+              return localIsLater ? local[c] : remote[c];
+            }
             if (table == 'notes' && c == 'content') {
               final merged = mergeNoteContent(
                 base[c] as String?,
@@ -41,6 +56,13 @@ Map<String, Object?> mergeRow({
       },
   };
 }
+
+bool _locked(Object? v) => v is String && isLockedContent(v);
+
+bool _isLockedField(Object? a, Object? b, Object? c) =>
+    (a is String && (isLockedContent(a) || isRedactedBase(a))) ||
+    (b is String && isLockedContent(b)) ||
+    (c is String && isLockedContent(c));
 
 Object? _mergeField(
   Object? base,

@@ -82,6 +82,10 @@ class _SwipeToTrashState extends State<SwipeToTrash> {
 
   @override
   Widget build(BuildContext context) {
+    // With a mouse, click-dragging a card sideways is how you'd select
+    // text or start a drag, not how you delete; desktop lists trash from
+    // the right-click menu and the Delete key instead.
+    if (isDesktopPlatform(Theme.of(context).platform)) return widget.child;
     return Dismissible(
       key: widget.dismissKey,
       background: _background(Alignment.centerLeft),

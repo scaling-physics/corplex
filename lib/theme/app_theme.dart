@@ -1,5 +1,15 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+
+/// Desktop (pointer-first) platforms: compact density, hover, right-click
+/// menus, a menu bar — and no swipe gestures for a mouse.
+bool isDesktopPlatform(TargetPlatform platform) => switch (platform) {
+  TargetPlatform.macOS ||
+  TargetPlatform.windows ||
+  TargetPlatform.linux => true,
+  _ => false,
+};
 
 /// Corplex's visual language: calm, paper-like surfaces with sage green as
 /// the one accent, so the reading and writing content stays the loudest
@@ -88,27 +98,38 @@ class AppTheme {
     surfaceTint: Colors.transparent,
   );
 
-  static ThemeData get light => _build(_light);
+  static ThemeData get light => _build(_light, desktop: _desktop);
 
-  static ThemeData get dark => _build(_dark);
+  static ThemeData get dark => _build(_dark, desktop: _desktop);
 
-  static ThemeData _build(ColorScheme c) {
+  /// Pointer-first platforms (macOS above all) get a denser variant of the
+  /// same theme: Mac-sized controls, radii and headings, and no touch
+  /// affordances like sheet drag handles. Read at build time, so a test can
+  /// switch it with `debugDefaultTargetPlatformOverride`.
+  static bool get _desktop => isDesktopPlatform(defaultTargetPlatform);
+
+  static ThemeData _build(ColorScheme c, {required bool desktop}) {
     final base = ThemeData(colorScheme: c, useMaterial3: true);
-    final text = _textTheme(base.textTheme, c);
-    const radius = Radius.circular(16);
+    final text = _textTheme(base.textTheme, c, desktop: desktop);
+    final radius = Radius.circular(desktop ? 12 : 16);
 
     return base.copyWith(
       scaffoldBackgroundColor: c.surface,
       textTheme: text,
       splashFactory: InkRipple.splashFactory,
-      visualDensity: VisualDensity.standard,
+      visualDensity: desktop ? VisualDensity.compact : VisualDensity.standard,
+      materialTapTargetSize: desktop
+          ? MaterialTapTargetSize.shrinkWrap
+          : MaterialTapTargetSize.padded,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           // Android: Material 3's soft fade + slide, with predictive back.
           TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-          // Apple platforms: native slide with edge-swipe to go back.
+          // iOS: native slide with edge-swipe to go back.
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          // A Mac has no edge swipe-back, and a sliding page across a
+          // big window is a lot of motion: a short fade instead.
+          TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(),
         },
       ),
       appBarTheme: AppBarTheme(
@@ -118,7 +139,8 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: text.titleLarge,
+        toolbarHeight: desktop ? 52 : null,
+        titleTextStyle: desktop ? text.titleMedium : text.titleLarge,
         iconTheme: IconThemeData(color: c.onSurfaceVariant),
         actionsIconTheme: IconThemeData(color: c.onSurfaceVariant),
       ),
@@ -158,9 +180,7 @@ class AppTheme {
         focusElevation: 2,
         hoverElevation: 2,
         highlightElevation: 2,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(radius),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(radius)),
         extendedTextStyle: text.labelLarge?.copyWith(
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
@@ -177,15 +197,15 @@ class AppTheme {
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: const BorderRadius.all(radius),
+          borderRadius: BorderRadius.all(radius),
           side: BorderSide(color: c.outlineVariant.withValues(alpha: 0.7)),
         ),
       ),
       listTileTheme: ListTileThemeData(
         iconColor: c.onSurfaceVariant,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(desktop ? 8 : 12)),
         ),
       ),
       chipTheme: ChipThemeData(
@@ -221,15 +241,15 @@ class AppTheme {
         hintStyle: WidgetStatePropertyAll(
           text.bodyLarge?.copyWith(color: c.onSurfaceVariant),
         ),
-        constraints: const BoxConstraints(minHeight: 48),
+        constraints: BoxConstraints(minHeight: desktop ? 36 : 48),
       ),
       inputDecorationTheme: InputDecorationThemeData(
         filled: true,
         fillColor: c.surfaceContainerHigh,
         hintStyle: TextStyle(color: c.onSurfaceVariant),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: desktop ? 12 : 16,
+          vertical: desktop ? 10 : 14,
         ),
         // Underline-style (Material's filled field), not outline: an
         // outline border floats a field's label onto its top edge, half
@@ -249,7 +269,7 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 48),
+          minimumSize: Size(64, desktop ? 34 : 48),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(14)),
           ),
@@ -274,17 +294,22 @@ class AppTheme {
         backgroundColor: c.surfaceContainerLow,
         modalBackgroundColor: c.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
-        showDragHandle: true,
+        // A drag handle is a touch affordance; on a Mac the sheet closes
+        // with a click outside or Escape.
+        showDragHandle: !desktop,
         dragHandleColor: c.outline.withValues(alpha: 0.5),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        constraints: desktop ? const BoxConstraints(maxWidth: 560) : null,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(desktop ? 16 : 28),
+          ),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: c.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(24)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(desktop ? 14 : 24)),
         ),
         titleTextStyle: text.titleLarge,
       ),
@@ -309,6 +334,13 @@ class AppTheme {
         textStyle: text.bodySmall?.copyWith(color: c.onInverseSurface),
         waitDuration: const Duration(milliseconds: 400),
       ),
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStatePropertyAll(desktop ? 7 : 4),
+        radius: const Radius.circular(8),
+        thumbColor: WidgetStatePropertyAll(
+          c.onSurfaceVariant.withValues(alpha: 0.35),
+        ),
+      ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: c.primary),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: c.primary,
@@ -319,8 +351,16 @@ class AppTheme {
   }
 
   /// System fonts (nothing to download, so it works offline), tuned for
-  /// long reading: slightly tighter headings, airier body text.
-  static TextTheme _textTheme(TextTheme base, ColorScheme c) {
+  /// long reading: slightly tighter headings, airier body text. On desktop
+  /// the display, headline and title sizes step down (a Mac window is read
+  /// from further away than a phone, but its UI type is smaller), while
+  /// body text stays a comfortable reading size.
+  static TextTheme _textTheme(
+    TextTheme base,
+    ColorScheme c, {
+    required bool desktop,
+  }) {
+    if (desktop) base = _desktopSizes(base);
     TextStyle? heading(TextStyle? s) =>
         s?.copyWith(fontWeight: FontWeight.w600, letterSpacing: -0.3);
     return base
@@ -342,6 +382,27 @@ class AppTheme {
           bodyMedium: base.bodyMedium?.copyWith(height: 1.45),
         )
         .apply(bodyColor: c.onSurface, displayColor: c.onSurface);
+  }
+
+  static TextTheme _desktopSizes(TextTheme t) {
+    TextStyle? size(TextStyle? s, double px) => s?.copyWith(fontSize: px);
+    return t.copyWith(
+      displayLarge: size(t.displayLarge, 48),
+      displayMedium: size(t.displayMedium, 38),
+      displaySmall: size(t.displaySmall, 30),
+      headlineLarge: size(t.headlineLarge, 26),
+      headlineMedium: size(t.headlineMedium, 22),
+      headlineSmall: size(t.headlineSmall, 19),
+      titleLarge: size(t.titleLarge, 17),
+      titleMedium: size(t.titleMedium, 14),
+      titleSmall: size(t.titleSmall, 13),
+      bodyLarge: size(t.bodyLarge, 15),
+      bodyMedium: size(t.bodyMedium, 13.5),
+      bodySmall: size(t.bodySmall, 12),
+      labelLarge: size(t.labelLarge, 13),
+      labelMedium: size(t.labelMedium, 12),
+      labelSmall: size(t.labelSmall, 11),
+    );
   }
 }
 

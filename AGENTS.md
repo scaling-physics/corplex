@@ -4,8 +4,8 @@ Guidance for AI coding agents (and humans) working in this repository.
 
 ## Project
 
-Corplex is a notes and literature review app for iPadOS, iOS, and Android, built
-from a single Flutter codebase. It combines rich-text note taking, PDF import
+Corplex is a notes and literature review app for iPadOS, iOS, Android and
+macOS, built from a single Flutter codebase. It combines rich-text note taking, PDF import
 and annotation, and citation management, so a researcher can read a paper,
 annotate it, pull highlights into notes, and generate citations without
 leaving the app.
@@ -33,7 +33,8 @@ read → annotate → note → cite loop, reconsider it before building it.
 
 ## Tech stack
 
-- **Framework**: Flutter (Dart) — one codebase for iPadOS, iOS, and Android.
+- **Framework**: Flutter (Dart) — one codebase for iPadOS, iOS, Android and
+  macOS (see "macOS app" below).
 - **Data**: Offline-first. All data lives in a local on-device SQLite
   database via `drift` (chosen over raw `sqflite` for type-safe schema,
   compile-time query checking, and reactive `Stream` queries) and the app
@@ -479,6 +480,166 @@ the default screens until the user opts in by using the feature.
   Markdown or tab-separated text. Project exports get an "Abbreviations"
   front-matter section (`abbreviationBlocks`, via `extraFrontMatter` in
   `project_menu.dart`).
+
+### Locked notes (built; biometrics untested on real hardware)
+Decided with the user: **real encryption** (a forgotten password loses the
+locked notes — said plainly when the password is set), **one notes
+password** for all locked notes, optional Face ID / Touch ID / fingerprint,
+and **titles stay plain** (list shows the title, a lock and "Locked").
+- **Crypto** (`features/lock/note_crypto.dart`, pure): a random 256-bit
+  notes key; bodies AES-256-GCM with the note id as associated data, stored
+  in `notes.content` / `note_versions.content` as
+  `corplex-locked:v1:<keyId>:<b64>` — **check `isLockedContent` before
+  parsing any content**. The password → PBKDF2-HMAC-SHA256, 600k, salted →
+  wraps the notes key; only the wrapped key is stored and synced
+  (`NoteKeys`, schema v17, server file `20261008000000_note_keys.sql`,
+  **apply it before schema-v17 data syncs**). The KDF input is base64 of
+  the password's UTF-8 (`kdfInput`, recorded as `pbkdf2-sha256-b64utf8`):
+  Android derives natively (cryptography_flutter, javax.crypto) and must
+  match Dart byte for byte for non-ASCII passwords —
+  `integration_test/kdf_parity_test.dart` checks it on a device (passed on
+  the emulator). Elsewhere PBKDF2 is pure Dart in `Isolate.run` (~1.8 s on
+  an M-series Mac); tests pass `inlineKdf: true` (isolates don't run under
+  the fake clock) and `NoteCrypto(iterations: 1000)`.
+- **Service** (`note_lock_service.dart`, `noteLockServiceProvider`): keys in
+  memory only; locks on app pause, after 5 min idle (`touch()`), or "Lock
+  now" / File → Close All Locked Notes. `lockNote`/`removeLock` convert a
+  note and its versions in one transaction. The newest `NoteKeys` row is the
+  current key (a new key's `createdAt` is forced past the newest: the column
+  has one-second resolution). "Reset password" adds a new key; notes under
+  the old one stay locked until it's entered. The database runs with
+  `PRAGMA secure_delete = ON`.
+- **Sync**: a locked body is never line-merged; if exactly one side is
+  locked the **lock wins regardless of timestamps**, and a plain edit it
+  beats is saved as a new note "<title> (edit made before it was locked)".
+  `lockNote` and the engine **redact** the merge base instead of deleting it
+  (`corplex-base-sha256:<hex>`, `redactedBody`): deleting it skipped the
+  merge, so an older lock could lose to a newer plain edit and silently
+  unlock the note.
+- **Editor** (`notes/note_editor_screen.dart`): `NoteEditorScreen` is a gate
+  — `NoteLockScreen` when `canRead` is false, else `_NoteEditorBody`, which
+  decrypts on load/absorb and encrypts every save (echo detection on
+  decrypted bodies; saves serialised; 150 ms debounce when locked). The save
+  path writes plain text only with a conditional UPDATE that can't match a
+  locked row, so a lock from elsewhere can never be overwritten in the
+  clear; if the key is gone, typing is held in memory (`LockedEditRescue`)
+  and saved encrypted on the next unlock. `decodeNoteContent` returns an
+  empty document for an envelope, so nothing shows ciphertext as text.
+  Unlock prompts: `ensureNotesUnlocked` (for locking — may set a password),
+  `requestNotesUnlock` (read-only uses; `export/unlock_for_export.dart`'s
+  `requestUnlock`/`readableForAction` wrap it).
+- **Rest of the app** reads bodies via `readableNoteContent` /
+  `unlockedContents` (`projects/readable_content.dart`) or `decryptBody`:
+  search indexes locked notes by title only (the stamp's low bit marks
+  locked, so locking evicts old plain text); the Map shows them without
+  content edges; projects use decrypted chapters while unlocked and show
+  "Locked" otherwise; project export asks to unlock (declining cancels);
+  the Markdown vault always writes a `locked: true` placeholder and skips
+  their attachments; versions compare/restore need the key; Quote to note
+  decrypts, appends and re-encrypts. Backups and trash carry envelopes, and
+  backups include `note_keys`.
+- **Not encrypted**: titles, attachment *files* (images, audio, PDFs — the
+  lock dialog says so), links between notes and papers, and the hint.
+- **Biometrics** (`lock/biometric_store.dart`, `PluginBiometricKeyStore`;
+  inert `NoBiometrics` default under test): stores the unlocked keys in the
+  keychain/keystore (this device only, never iCloud), released after a
+  `local_auth` prompt that also accepts the device passcode. The gate is
+  app-level (prompt, then read), not a keychain access-control flag. macOS
+  uses the legacy file keychain (an ad-hoc signed app has no team id; the
+  data-protection keychain fails with -34018) — expect a "Corplex wants to
+  use the keychain" prompt after a rebuild changes the ad-hoc signature.
+  Android: `MainActivity : AudioServiceFragmentActivity` (local_auth needs a
+  FragmentActivity), AppCompat parents for LaunchTheme/NormalTheme,
+  `USE_BIOMETRIC`; iOS: `NSFaceIDUsageDescription`.
+
+### macOS app (built; checked in widget tests and a release launch, not by hand on a Mac)
+- **Build**: `tool/macos/make_dmg.sh` → `build/dmg/Corplex-<version>.dmg`
+  (drag-to-Applications; `--no-build` packages the existing build). Without
+  a Developer ID it is ad-hoc signed: fine on the Mac that built it, blocked
+  by Gatekeeper elsewhere until right-click → Open; set
+  `CODESIGN_IDENTITY` to sign (then notarise). Icon: `tool/branding/macos_icon.py`
+  (Apple's 824/1024 squircle grid — macOS boxes full-bleed icons in a grey
+  tile). Sandbox entitlements: network client, user-selected and Downloads
+  read-write, audio input. Deployment target 12.0 (`#available` for newer
+  Vision/Speech APIs).
+- **Everything is keyed on the theme's platform** (`isMac(context)` /
+  `isDesktop(context)` in `features/platform/mac_window.dart`,
+  `isDesktopPlatform` in `app_theme.dart`), so iOS/Android are unchanged and
+  Mac tests run with `variant: macOnly` (`test/support/mac_screenshot.dart`;
+  flutter_quill reads `defaultTargetPlatform` lazily, so a Mac editor test
+  *must* use the variant). The desktop theme is denser (compact density,
+  shrink-wrapped targets, 52 pt app bars, smaller headings, body 15/13.5,
+  radius 12, no sheet drag handles, fade page transitions); swipe-to-trash
+  is off for a mouse.
+- **Window** (`macos/Runner/MainFlutterWindow.swift`): transparent title bar
+  with full-size content, min 720×520, first size proportional to the
+  screen (~1320×860 on a laptop, ~2100×1180 on a 38" ultrawide), frame
+  remembered. `MacWindowFrame` (`MaterialApp.builder`) treats the title bar
+  like a status bar: its 28 pt join the top of `MediaQuery.padding`, so
+  every AppBar/SafeArea clears the traffic lights; never put controls in
+  that band (it drags the window). Full screen collapses it
+  (`macFullScreenProvider`).
+- **Interface size** (Settings, View → Interface Size, ⌥⌘+/⌥⌘−/⌥⌘0;
+  `AppearanceSettings.interfaceScale`, per device, 90–160%): `MacWindowFrame`
+  lays the app out at 1/scale and draws it scaled (a `FittedBox`, so text
+  stays sharp and hit testing works), with MediaQuery size and
+  devicePixelRatio adjusted. Note text zoom (⌘+/⌘− in a note,
+  `noteZoomProvider`) is separate and multiplies with it.
+- **Layout**: `HomeShell._macScaffold` + `home/mac_sidebar.dart` — a source
+  list (`MacSidebar`: primary action, Notes/Library/Search, Projects only
+  once some exist, Trash/Settings), toggled by ⌃⌘S
+  (`macSidebarVisibleProvider`, `MacSidebarSlot`; slot = 232 + 1 pt divider,
+  change both). ≥ 900 pt: sidebar | list (drag `ColumnDivider`, 280–520,
+  `mac.listWidth`; the pane keeps ≥ 360) | pane. Lists are Notes-style
+  `MacListRow`s (`theme/mac_list_row.dart`; no `onDoubleTap` — it delays
+  single clicks ~300 ms). Panes **fill their width like Notes**:
+  `macPanePadding` gives 24/40 pt margins, but beyond `macMaxMeasure`
+  (1,600 pt — a 38" ultrawide's note pane is > 3,000) the content centres
+  at that width. Note editor: one 52 pt toolbar (format controls left,
+  actions right, `_DesktopFormatBar` in `AppBar.title`), a centred edit date,
+  `_desktopStyles`; `/` commands open as a dialog. Paper screen: two
+  columns at ≥ 1000 pt (shared `e0…eN` widget lists). Settings and the `/`
+  sheet are dialogs on desktop.
+- **Menu bar & keyboard**: the native menus (File, Edit → Find, Format with
+  Apple Notes' shortcuts, View, Go → Back ⌘[, Help → Keyboard Shortcuts ⌘/)
+  send `MenuCommand`s on `corplex/window`. **Key equivalents reach Flutter
+  first**; only keys Flutter leaves unhandled reach the menu. A command is
+  then offered to the nearest `MenuCommandHandler` above the primary focus
+  (`dispatchMenuCommand`, a responder chain — not `Actions`, which stops at
+  a disabled action) and only then to `HomeShell._onCommand`. So never bind
+  a menu key in Flutter *and* handle its command elsewhere (double fire);
+  on Mac the shell leaves ⌘N/⌘O/⌘1/⌘2 to the menu and keeps ⌘F (the PDF
+  viewer's Find must win). The note editor's `_desktopShortcuts` overrides
+  flutter_quill's clashing macOS keys (⌘K → note link, ⇧⌘B → Body, ⌘'
+  quote; ⌘0–6, ⌘F, ⌘G, ⌘M, ⌘` pass through via `DoNothingAction(consumesKey:
+  false)`). The viewer's `MenuCommandHandler` (Find/Next/Previous/zoom)
+  sits above its Focus. Lists: ↑/↓ select and open in the pane, Return
+  opens (note body / PDF), Tab moves sidebar → list → pane
+  (`FocusTraversalGroup`s; the editor takes Tab itself). ⌘⌫: notes via the
+  list's `MenuCommandHandler`, papers via `_TrashKey` (a `HardwareKeyboard`
+  handler, so it also works from the pane — no-op when a text field has
+  focus or the tab is offscreen), Move to Trash in the menu via the shell.
+  `keyboard_shortcuts.dart`'s `shortcutSections` must match the Swift menus.
+- **Pointer**: right-click menus via `ContextMenuRegion`
+  (`theme/context_menu.dart`) on cards, rows, chips and highlights
+  (`highlightContextActions`); mouse draws in sketches
+  (`InkInputPolicy.mouseAlwaysDraws`) and PDF ink; trackpad two-finger
+  scroll scrolls. Split reader is resizable (`ResizableSplit`,
+  `splitFractionProvider`). Share sheets anchor with `shareOrigin(context)`
+  (`platform/share_origin.dart`) — without it macOS opens the picker in
+  the window corner.
+- **Native channels** (`registerNativeChannels` in `AppDelegate.swift`):
+  `corplex/ocr` (Vision) and `corplex/speech` (on-device
+  `SFSpeechURLRecognitionRequest`), same contracts as iOS, created lazily.
+  No share extension, quick actions or home widget on macOS: `main()`
+  installs `NoShareIntentSource`/`ChannelMacWindow` there and leaves the
+  inert seams. `ChannelMacWindow` must only be installed on macOS.
+- **Looking at it without a screen**: `MAC_SCREENSHOTS=<dir> flutter test
+  test/mac` renders the whole app at `macWindowSizes` (13"/16" laptops,
+  27", 38" ultrawide at 1× and HiDPI, minimum) with real fonts.
+- **Untested on a real Mac session**: the menu bar and key routing order,
+  title-bar dragging, OCR/speech output and permission prompts, recording,
+  share-sheet anchoring, pdfrx scrolling/pinch/selection.
 
 ### Exploratory (needs a decision before any work)
 - AI assistance (summarize a paper, ask questions across the library). This

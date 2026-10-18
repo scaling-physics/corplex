@@ -133,3 +133,22 @@ Future<void> removeNoteFromProject(
 }) => (db.delete(
   db.projectNotes,
 )..where((r) => r.projectId.equals(projectId) & r.noteId.equals(noteId))).go();
+
+/// How many notes each project holds, for the Mac sidebar's counts. Live.
+final projectNoteCountsProvider = StreamProvider.autoDispose<Map<String, int>>((
+  ref,
+) {
+  final db = ref.watch(databaseProvider);
+  return db
+      .customSelect(
+        'SELECT project_id AS id, COUNT(*) AS n FROM project_notes '
+        'GROUP BY project_id',
+        readsFrom: {db.projectNotes},
+      )
+      .watch()
+      .map(
+        (rows) => {
+          for (final r in rows) r.read<String>('id'): r.read<int>('n'),
+        },
+      );
+});

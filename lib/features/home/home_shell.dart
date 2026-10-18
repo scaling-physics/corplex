@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
 import '../spell/spell_checker.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,6 +29,10 @@ import '../sync/transfer_settings.dart';
 import '../attachments/attachments_browser.dart';
 import '../notes/note_file_actions.dart';
 import '../notes/notes_screen.dart';
+import '../projects/projects_providers.dart';
+import '../notes/tags_providers.dart';
+import '../notes/folders_providers.dart';
+import '../notes/notes_providers.dart';
 import '../review/review_prompt.dart';
 import '../search/search_screen.dart';
 import '../trash/trash_screen.dart';
@@ -334,11 +340,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final c = theme.colorScheme;
     final width = MediaQuery.sizeOf(context).width;
     final sidebarOn = ref.watch(macSidebarVisibleProvider);
+    // Like Notes, the list is titled by the folder, project or tag shown.
+    final title = _index == 0
+        ? notesFilterTitle(
+            ref.watch(notesFilterProvider),
+            folders: ref.watch(foldersListProvider).value ?? const [],
+            projects: ref.watch(projectsListProvider).value ?? const [],
+            tags: ref.watch(tagsListProvider).value ?? const [],
+          )
+        : _titles[_index];
     final lists = Scaffold(
       appBar: AppBar(
         toolbarHeight: 52,
         titleSpacing: 18,
-        title: Text(_titles[_index], style: theme.textTheme.titleLarge),
+        title: Text(
+          title,
+          key: const ValueKey('mac-list-title'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge,
+        ),
       ),
       body: _tabs(),
     );

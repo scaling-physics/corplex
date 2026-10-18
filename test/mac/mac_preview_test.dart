@@ -26,6 +26,20 @@ void main() {
     EditableText.debugDeterministicCursor = true;
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
     db = AppDatabase.inMemoryForTesting();
+    // Folders, a project and a tag, so the sidebar shows its sections.
+    for (final (id, name) in [('lab', 'Lab book'), ('lit', 'Literature')]) {
+      await db
+          .into(db.folders)
+          .insert(FoldersCompanion.insert(id: Value(id), name: name));
+    }
+    await db
+        .into(db.projects)
+        .insert(
+          ProjectsCompanion.insert(id: const Value('th'), name: 'Thesis'),
+        );
+    await db
+        .into(db.tags)
+        .insert(TagsCompanion.insert(id: const Value('t'), name: 'mPFC'));
     for (final (id, title) in [
       ('n1', 'Predictive coding in visual cortex'),
       ('n2', 'Chapter 2 — methods draft'),

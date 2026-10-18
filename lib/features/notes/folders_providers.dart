@@ -33,3 +33,27 @@ Future<void> setNoteFolder(
 Future<void> deleteFolder(AppDatabase db, String folderId) {
   return (db.delete(db.folders)..where((f) => f.id.equals(folderId))).go();
 }
+
+Future<void> renameFolder(AppDatabase db, String folderId, String name) =>
+    (db.update(db.folders)..where((f) => f.id.equals(folderId))).write(
+      FoldersCompanion(name: Value(name)),
+    );
+
+/// How many notes each folder holds (key null: notes in no folder), for the
+/// Mac sidebar's counts. Live.
+final folderNoteCountsProvider = StreamProvider.autoDispose<Map<String?, int>>((
+  ref,
+) {
+  final db = ref.watch(databaseProvider);
+  return db
+      .customSelect(
+        'SELECT folder_id AS id, COUNT(*) AS n FROM notes GROUP BY folder_id',
+        readsFrom: {db.notes},
+      )
+      .watch()
+      .map(
+        (rows) => {
+          for (final r in rows) r.read<String?>('id'): r.read<int>('n'),
+        },
+      );
+});

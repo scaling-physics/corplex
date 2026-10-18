@@ -688,8 +688,19 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   devicePixelRatio adjusted. Note text zoom (⌘+/⌘− in a note,
   `noteZoomProvider`) is separate and multiplies with it.
 - **Layout**: `HomeShell._macScaffold` + `home/mac_sidebar.dart` — a source
-  list (`MacSidebar`: primary action, Notes/Library/Search, Projects only
-  once some exist, Trash/Settings), toggled by ⌃⌘S
+  list laid out like Apple Notes (`MacSidebar`: primary action,
+  Library/Search/Attachments, then foldable sections — Notes (All Notes and
+  every folder, with live counts from `folderNoteCountsProvider`), Projects
+  (`projectNoteCountsProvider`) and Tags, each only once one exists — and
+  New Folder, Trash, Settings at the bottom). Choosing a folder, project or
+  tag sets `notesFilterProvider` and the list column's title
+  (`notesFilterTitle`); right-click renames/deletes a folder, opens a
+  project's page or its menu, deletes a tag; dragging a note row
+  (`Draggable<DraggedNote>`) onto a row files it there (All Notes =
+  unfiled). The Notes filter chip row is hidden on desktop while the
+  sidebar shows. Folded sections: `macSidebarCollapsedProvider`, per
+  session. The Notes space has no separate "Notes" row any more: All
+  Notes is it. toggled by ⌃⌘S
   (`macSidebarVisibleProvider`, `MacSidebarSlot`; slot = 232 + 1 pt divider,
   change both). ≥ 900 pt: sidebar | list (drag `ColumnDivider`, 280–520,
   `mac.listWidth`; the pane keeps ≥ 360) | pane. Lists are Notes-style

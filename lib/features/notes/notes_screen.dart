@@ -14,6 +14,7 @@ import 'note_content.dart';
 import 'note_file_actions.dart' show duplicateMenuAction;
 import 'note_lock_actions.dart';
 import '../home/adaptive.dart';
+import '../home/mac_sidebar.dart' show DraggedNote, macSidebarVisibleProvider;
 import '../home/open_card.dart';
 import 'note_editor_screen.dart'
     show NoteEditorScreen, noteBodyFocusRequestProvider;
@@ -137,10 +138,14 @@ class NotesScreen extends ConsumerWidget {
     final tagsAsync = ref.watch(tagsListProvider);
     final folders = foldersAsync.value ?? const <Folder>[];
     final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
+    // On a Mac the sidebar lists folders, projects and tags, as in Notes.
+    final sidebarFilters =
+        isDesktop(context) && ref.watch(macSidebarVisibleProvider);
     final showFilterBar =
-        folders.isNotEmpty ||
-        (tagsAsync.value?.isNotEmpty ?? false) ||
-        projects.isNotEmpty;
+        !sidebarFilters &&
+        (folders.isNotEmpty ||
+            (tagsAsync.value?.isNotEmpty ?? false) ||
+            projects.isNotEmpty);
     final filter = ref.watch(notesFilterProvider);
     final folderNames = {for (final f in folders) f.id: f.name};
 
@@ -500,7 +505,7 @@ class _FilterBar extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: GestureDetector(
-                onLongPress: () => _confirmDeleteFolder(context, ref, folder),
+                onLongPress: () => confirmDeleteFolder(context, ref, folder),
                 onSecondaryTapUp: isDesktop(context)
                     ? (d) => showContextMenuAt(context, d.globalPosition, [
                         ContextMenuAction(
@@ -508,7 +513,7 @@ class _FilterBar extends ConsumerWidget {
                           icon: Icons.delete_outline,
                           destructive: true,
                           onSelected: () =>
-                              _confirmDeleteFolder(context, ref, folder),
+                              confirmDeleteFolder(context, ref, folder),
                         ),
                       ])
                     : null,
@@ -527,15 +532,14 @@ class _FilterBar extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: GestureDetector(
-                onLongPress: () => _confirmDeleteTag(context, ref, tag),
+                onLongPress: () => confirmDeleteTag(context, ref, tag),
                 onSecondaryTapUp: isDesktop(context)
                     ? (d) => showContextMenuAt(context, d.globalPosition, [
                         ContextMenuAction(
                           label: 'Delete tag…',
                           icon: Icons.delete_outline,
                           destructive: true,
-                          onSelected: () =>
-                              _confirmDeleteTag(context, ref, tag),
+                          onSelected: () => confirmDeleteTag(context, ref, tag),
                         ),
                       ])
                     : null,
@@ -555,141 +559,145 @@ class _FilterBar extends ConsumerWidget {
             child: ActionChip(
               avatar: const Icon(Icons.add, size: 18),
               label: const Text('Folder or tag'),
-              onPressed: () => _showCreateSheet(context, ref),
+              onPressed: () => showCreateFolderOrTagSheet(context, ref),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Future<void> _confirmDeleteFolder(
-    BuildContext context,
-    WidgetRef ref,
-    Folder folder,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete "${folder.name}"?'),
-        content: const Text('Notes inside will be unfiled, not deleted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      final db = ref.read(databaseProvider);
-      if (ref.read(notesFilterProvider) case FolderFilter(folderId: final id)
-          when id == folder.id) {
-        ref.read(notesFilterProvider.notifier).state = const AllNotes();
-      }
-      await deleteFolder(db, folder.id);
-    }
-  }
-
-  Future<void> _confirmDeleteTag(
-    BuildContext context,
-    WidgetRef ref,
-    Tag tag,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete "#${tag.name}"?'),
-        content: const Text('This removes the tag from every note.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      final db = ref.read(databaseProvider);
-      if (ref.read(notesFilterProvider) case TagFilter(tagId: final id)
-          when id == tag.id) {
-        ref.read(notesFilterProvider.notifier).state = const AllNotes();
-      }
-      await deleteTag(db, tag.id);
-    }
-  }
-
-  Future<void> _showCreateSheet(BuildContext context, WidgetRef ref) async {
-    final kind = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.folder_outlined),
-              title: const Text('New folder'),
-              onTap: () => Navigator.pop(context, 'folder'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.tag),
-              title: const Text('New tag'),
-              onTap: () => Navigator.pop(context, 'tag'),
-            ),
-          ],
+/// Asks to delete [folder]; its notes are unfiled, not deleted.
+Future<void> confirmDeleteFolder(
+  BuildContext context,
+  WidgetRef ref,
+  Folder folder,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Delete "${folder.name}"?'),
+      content: const Text('Notes inside will be unfiled, not deleted.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
         ),
-      ),
-    );
-    if (kind == null || !context.mounted) return;
-
-    final name = await _promptForName(context, kind);
-    if (name == null || name.trim().isEmpty) return;
-
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
     final db = ref.read(databaseProvider);
-    if (kind == 'folder') {
-      final id = await createFolder(db, name.trim());
-      ref.read(notesFilterProvider.notifier).state = FolderFilter(id);
-    } else {
-      final id = await findOrCreateTag(db, name.trim());
-      ref.read(notesFilterProvider.notifier).state = TagFilter(id);
+    if (ref.read(notesFilterProvider) case FolderFilter(folderId: final id)
+        when id == folder.id) {
+      ref.read(notesFilterProvider.notifier).state = const AllNotes();
     }
+    await deleteFolder(db, folder.id);
   }
+}
 
-  Future<String?> _promptForName(BuildContext context, String kind) {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(kind == 'folder' ? 'New folder' : 'New tag'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: kind == 'folder' ? 'Folder name' : 'Tag name',
-          ),
-          onSubmitted: (value) => Navigator.pop(context, value),
+Future<void> confirmDeleteTag(
+  BuildContext context,
+  WidgetRef ref,
+  Tag tag,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Delete "#${tag.name}"?'),
+      content: const Text('This removes the tag from every note.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    final db = ref.read(databaseProvider);
+    if (ref.read(notesFilterProvider) case TagFilter(tagId: final id)
+        when id == tag.id) {
+      ref.read(notesFilterProvider.notifier).state = const AllNotes();
+    }
+    await deleteTag(db, tag.id);
+  }
+}
+
+Future<void> showCreateFolderOrTagSheet(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final kind = await showModalBottomSheet<String>(
+    context: context,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.folder_outlined),
+            title: const Text('New folder'),
+            onTap: () => Navigator.pop(context, 'folder'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Create'),
+          ListTile(
+            leading: const Icon(Icons.tag),
+            title: const Text('New tag'),
+            onTap: () => Navigator.pop(context, 'tag'),
           ),
         ],
       ),
-    );
+    ),
+  );
+  if (kind == null || !context.mounted) return;
+
+  final name = await promptForName(context, kind);
+  if (name == null || name.trim().isEmpty) return;
+
+  final db = ref.read(databaseProvider);
+  if (kind == 'folder') {
+    final id = await createFolder(db, name.trim());
+    ref.read(notesFilterProvider.notifier).state = FolderFilter(id);
+  } else {
+    final id = await findOrCreateTag(db, name.trim());
+    ref.read(notesFilterProvider.notifier).state = TagFilter(id);
   }
+}
+
+Future<String?> promptForName(BuildContext context, String kind) {
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(kind == 'folder' ? 'New folder' : 'New tag'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: kind == 'folder' ? 'Folder name' : 'Tag name',
+        ),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, controller.text),
+          child: const Text('Create'),
+        ),
+      ],
+    ),
+  );
 }
 
 /// The Notes list on a Mac: Apple Notes-style rows, focusable, ↑/↓ moves the
@@ -886,12 +894,22 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
                 ),
               ),
             );
+            // Drag a note onto a folder, project or tag in the sidebar.
+            final draggable = Draggable<DraggedNote>(
+              data: DraggedNote(note.id, note.title),
+              dragAnchorStrategy: pointerDragAnchorStrategy,
+              feedback: _DragChip(
+                title: note.title.isEmpty ? 'Untitled' : note.title,
+              ),
+              childWhenDragging: Opacity(opacity: 0.5, child: row),
+              child: row,
+            );
             return ListItemMotion(
               key: ValueKey(note.id),
               id: note.id,
               index: index,
               child: headers[index] == null
-                  ? row
+                  ? draggable
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -900,11 +918,53 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
                           first: index == 0,
                           mac: true,
                         ),
-                        row,
+                        draggable,
                       ],
                     ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// What follows the pointer while a note is dragged to the sidebar.
+class _DragChip extends StatelessWidget {
+  const _DragChip({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(8),
+      color: theme.colorScheme.surfaceContainerHigh,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 240),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.description_outlined,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -15,6 +15,7 @@ const shortcutSections = <(String, List<ShortcutEntry>)>[
     [
       ShortcutEntry('New note', ['⌘', 'N']),
       ShortcutEntry('Import PDF', ['⌘', 'O']),
+      ShortcutEntry('Quick note from anywhere', ['⌃', '⌥', 'N']),
       ShortcutEntry('Duplicate note', ['⌘', 'D']),
       ShortcutEntry('Print', ['⌘', 'P']),
       ShortcutEntry('Move to Trash', ['⌘', '⌫']),
@@ -33,6 +34,8 @@ const shortcutSections = <(String, List<ShortcutEntry>)>[
       ShortcutEntry('Italic', ['⌘', 'I']),
       ShortcutEntry('Underline', ['⌘', 'U']),
       ShortcutEntry('Strikethrough', ['⇧', '⌘', 'X']),
+      ShortcutEntry('Highlight', ['⇧', '⌘', 'E']),
+      ShortcutEntry('Monospaced', ['⇧', '⌘', 'M']),
       ShortcutEntry('Title', ['⇧', '⌘', 'T']),
       ShortcutEntry('Heading', ['⇧', '⌘', 'H']),
       ShortcutEntry('Subheading', ['⇧', '⌘', 'J']),
@@ -61,6 +64,7 @@ const shortcutSections = <(String, List<ShortcutEntry>)>[
     [
       ShortcutEntry('Notes', ['⌘', '1']),
       ShortcutEntry('Library', ['⌘', '2']),
+      ShortcutEntry('Attachments', ['⌘', '3']),
       ShortcutEntry('Search', ['⇧', '⌘', 'F']),
       ShortcutEntry('Show or hide the sidebar', ['⌃', '⌘', 'S']),
       ShortcutEntry('Back', ['⌘', '[']),

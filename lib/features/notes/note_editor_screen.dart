@@ -35,6 +35,8 @@ import '../export/export_model.dart';
 import '../ink/sketch_embed.dart';
 import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
+import '../spell/note_spell.dart';
+import '../spell/spell_checker.dart';
 import '../trash/trash_actions.dart';
 import '../settings/appearance_settings.dart';
 import '../library/metadata_lookup.dart';
@@ -54,6 +56,7 @@ import '../home/adaptive.dart' show readablePadding, readableWidth;
 import '../platform/mac_window.dart'
     show MenuCommand, MenuCommandHandler, isDesktop, isMac, macPanePadding;
 import 'note_find.dart';
+import 'note_highlight.dart';
 import 'note_zoom.dart';
 import 'cite_paper_sheet.dart';
 import 'citation_embed.dart';
@@ -180,6 +183,24 @@ class _NoteEditorBody extends ConsumerStatefulWidget {
 class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   final _titleController = TextEditingController();
   late final QuillController _quillController;
+
+  NoteSpell? _spellHelper;
+
+  /// Spell check for the body, rebuilding the editor as results arrive.
+  /// Call from build only: it follows the setting and the platform checker.
+  NoteSpell _spellNow() {
+    final spell = _spellHelper ??=
+        NoteSpell(
+          controller: _quillController,
+          checker: () => ref.read(spellCheckerProvider),
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
+    spell.enabled =
+        ref.watch(appearanceSettingsProvider.select((s) => s.spellCheck)) &&
+        ref.watch(spellCheckerProvider).available;
+    return spell;
+  }
 
   /// Find in note (⌘F / ⋮ → Find in note) is open; [_findStep] moves it
   /// to the next or previous match (⌘G / ⇧⌘G).
@@ -1248,6 +1269,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   @override
   void dispose() {
     _findStep.dispose();
+    _spellHelper?.dispose();
     widget.handle?.appendQuote = null;
     _lock.removeListener(_onLockChanged);
     if (_flushRegistry[widget.noteId] == _save) {
@@ -1748,12 +1770,15 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                       scrollController: _bodyScroll,
                       config: QuillEditorConfig(
                         editorKey: _editorKey,
+                        textSpanBuilder: _spellNow().spanBuilder,
+                        contextMenuBuilder: _spellNow().contextMenu,
                         scrollable: false,
                         padding: EdgeInsets.zero,
                         placeholder: 'Start writing…',
                         customStyles: desktop
                             ? _desktopStyles(context, zoom)
-                            : null,
+                            : _mobileStyles(context),
+                        customStyleBuilder: noteStyleFor,
                         customShortcuts: desktop ? _desktopShortcuts : null,
                         customActions: desktop
                             ? {
@@ -1922,6 +1947,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.numberedList: () => _toggle(Attribute.ol),
     MenuCommand.checklist: () => _toggle(Attribute.unchecked),
     MenuCommand.blockQuote: () => _toggle(Attribute.blockQuote),
+    MenuCommand.monospaced: () => _toggle(Attribute.codeBlock),
+    MenuCommand.highlight: _toggleHighlight,
     MenuCommand.linkNote: () => _linkNote(context),
     MenuCommand.citePaper: () => _citePaper(context),
     MenuCommand.find: _openFind,
@@ -1953,6 +1980,19 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _quillController.formatSelection(
       on && sameValue ? Attribute.clone(attribute, null) : attribute,
     );
+    _bodyFocus.requestFocus();
+  }
+
+  /// Format → Highlight: the last-used colour (yellow to begin with) on the
+  /// selection, or off again if the selection already has it.
+  void _toggleHighlight() {
+    if (!_loaded) return;
+    final on = selectionHighlight(_quillController) != null;
+    if (on) {
+      removeHighlight(_quillController);
+    } else {
+      _quillController.formatSelection(lastHighlight.attribute);
+    }
     _bodyFocus.requestFocus();
   }
 
@@ -2024,7 +2064,9 @@ final Map<ShortcutActivator, Intent> _desktopShortcuts = {
   ])
     SingleActivator(key, meta: true): const _PassKeyIntent(),
   const SingleActivator(LogicalKeyboardKey.keyM, meta: true, shift: true):
-      const _PassKeyIntent(),
+      const _NoteCommandIntent(MenuCommand.monospaced),
+  const SingleActivator(LogicalKeyboardKey.keyE, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.highlight),
 };
 
 /// A note's non-image attachment: audio plays in the player bar, a
@@ -2238,6 +2280,42 @@ DefaultStyles _desktopStyles(BuildContext context, double zoom) {
         border: Border(left: BorderSide(width: 3, color: c.primary)),
       ),
     ),
+    code: _codeBlockStyle(context, base.fontSize! * 0.9, base.height),
+  );
+}
+
+/// Phones and tablets keep Quill's defaults except for the monospaced block,
+/// which follows the theme.
+DefaultStyles _mobileStyles(BuildContext context) =>
+    DefaultStyles(code: _codeBlockStyle(context, 14.5, 1.45));
+
+/// A monospaced paragraph: monospace type on a soft surface, rounded.
+DefaultTextBlockStyle _codeBlockStyle(
+  BuildContext context,
+  double size,
+  double? height,
+) {
+  final c = Theme.of(context).colorScheme;
+  return DefaultTextBlockStyle(
+    TextStyle(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const [
+        'SF Mono',
+        'Roboto Mono',
+        'Consolas',
+        'monospace',
+      ],
+      fontSize: size,
+      height: height,
+      color: c.onSurface,
+    ),
+    const HorizontalSpacing(0, 0),
+    const VerticalSpacing(6, 6),
+    VerticalSpacing.zero,
+    BoxDecoration(
+      color: c.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+    ),
   );
 }
 
@@ -2300,6 +2378,7 @@ class _DesktopFormatBar extends StatelessWidget {
               tooltip: 'Checklist $shift${cmd}L',
             ),
           ),
+          _HighlightButton(controller: controller, onDone: onDone),
           _TextStyleButton(controller: controller, onDone: onDone, size: 30),
         ],
       ),
@@ -2338,13 +2417,45 @@ class _FormatBar extends StatelessWidget {
   }
 }
 
+/// The Mac format bar's highlighter: a menu of five colours (and Remove).
+class _HighlightButton extends StatelessWidget {
+  const _HighlightButton({required this.controller, required this.onDone});
+
+  final QuillController controller;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final cmd = isMac(context) ? '\u2318' : 'Ctrl+';
+    final shift = isMac(context) ? '\u21e7' : 'Shift+';
+    return PopupMenuButton<Object>(
+      tooltip: 'Highlight $shift${cmd}E',
+      onSelected: (choice) {
+        chooseHighlight(controller, choice);
+        onDone();
+      },
+      itemBuilder: (_) => highlightMenuItems(context, controller),
+      child: SizedBox.square(
+        dimension: 30,
+        child: Icon(
+          Icons.border_color_outlined,
+          size: 16,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
 enum _TextStyle {
   title('Title', Icons.title),
   heading('Heading', Icons.text_fields),
   subheading('Subheading', Icons.short_text),
   body('Body text', Icons.notes),
   quote('Quote', Icons.format_quote),
-  strike('Strikethrough', Icons.format_strikethrough);
+  strike('Strikethrough', Icons.format_strikethrough),
+  monospaced('Monospaced', Icons.code),
+  highlight('Highlight', Icons.border_color_outlined);
 
   const _TextStyle(this.label, this.icon);
 
@@ -2373,12 +2484,38 @@ class _TextStyleButton extends StatelessWidget {
       _TextStyle.body => header == null,
       _TextStyle.quote => attrs.containsKey(Attribute.blockQuote.key),
       _TextStyle.strike => attrs.containsKey(Attribute.strikeThrough.key),
+      _TextStyle.monospaced => attrs.containsKey(Attribute.codeBlock.key),
+      _TextStyle.highlight => attrs.containsKey(Attribute.background.key),
     };
+  }
+
+  Future<void> _chooseHighlight(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final choice = await showMenu<Object>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        topLeft.dy,
+        overlay.size.width - topLeft.dx - box.size.width,
+        overlay.size.height - topLeft.dy - box.size.height,
+      ),
+      items: highlightMenuItems(context, controller),
+    );
+    if (choice == null) return;
+    chooseHighlight(controller, choice);
+    onDone();
   }
 
   void _apply(_TextStyle style) {
     final attrs = controller.getSelectionStyle().attributes;
     controller.formatSelection(switch (style) {
+      _TextStyle.highlight => Attribute.background,
+      _TextStyle.monospaced =>
+        _isOn(style, attrs)
+            ? Attribute.clone(Attribute.codeBlock, null)
+            : Attribute.codeBlock,
       _TextStyle.title => Attribute.h1,
       _TextStyle.heading => Attribute.h2,
       _TextStyle.subheading => Attribute.h3,
@@ -2399,12 +2536,15 @@ class _TextStyleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<_TextStyle>(
       tooltip: 'Text style',
-      onSelected: _apply,
+      onSelected: (style) => style == _TextStyle.highlight
+          ? _chooseHighlight(context)
+          : _apply(style),
       itemBuilder: (_) {
         final attrs = controller.getSelectionStyle().attributes;
         return [
           for (final style in _TextStyle.values) ...[
-            if (style == _TextStyle.quote) const PopupMenuDivider(),
+            if (style == _TextStyle.quote || style == _TextStyle.monospaced)
+              const PopupMenuDivider(),
             CheckedPopupMenuItem(
               value: style,
               checked: _isOn(style, attrs),

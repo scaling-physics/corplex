@@ -24,6 +24,7 @@ List<int> exportToDocx(ExportDoc doc) {
       BlockKind.quote => _para('Quote', b.runs),
       BlockKind.paragraph => _para(null, b.runs),
       BlockKind.caption => _para('Caption', b.runs),
+      BlockKind.code => _para(null, b.runs, code: true),
       // Word can't take LaTeX directly; the source goes in as monospace
       // text, centred (Word's equation box accepts pasted LaTeX).
       BlockKind.displayMath => _para(
@@ -61,23 +62,29 @@ String _para(
   List<Run> runs, {
   bool centered = false,
   bool wrap = true,
+  bool code = false,
 }) {
-  final pPr = style == null && !centered
+  final pPr = style == null && !centered && !code
       ? ''
       : '<w:pPr>${style == null ? '' : '<w:pStyle w:val="$style"/>'}'
+            '${code ? '<w:shd w:val="clear" w:color="auto" w:fill="F0EDE8"/>'
+                      '<w:spacing w:after="0" w:line="240" w:lineRule="auto"/>' : ''}'
             '${centered ? '<w:jc w:val="center"/>' : ''}</w:pPr>';
-  return '<w:p>$pPr${runs.map((r) => _run(r.math && wrap ? Run('\$${r.text}\$', math: true, bold: r.bold) : r)).join()}</w:p>';
+  return '<w:p>$pPr${runs.map((r) => _run(r.math && wrap ? Run('\$${r.text}\$', math: true, bold: r.bold) : r, mono: code)).join()}</w:p>';
 }
 
-String _run(Run r) {
+String _run(Run r, {bool mono = false}) {
   if (r.text.isEmpty) return '';
   final text = r.math || r.link == null ? r.text : '${r.text} (${r.link})';
   final props = [
-    if (r.math)
+    if (r.math || mono)
       '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/>',
     if (r.bold) '<w:b/>',
     if (r.italic) '<w:i/>',
     if (r.strike) '<w:strike/>',
+    if (mono) '<w:sz w:val="20"/>',
+    if (r.highlight != null)
+      '<w:shd w:val="clear" w:color="auto" w:fill="${r.highlight}"/>',
   ].join();
   final rPr = props.isEmpty ? '' : '<w:rPr>$props</w:rPr>';
   // A tab in the text (list markers) needs its own element.

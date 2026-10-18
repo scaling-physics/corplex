@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import '../capture/quick_capture.dart';
 import '../settings/appearance_settings.dart';
 
 export '../../theme/app_theme.dart' show isDesktopPlatform;
@@ -71,6 +72,8 @@ enum MenuCommand {
   italic,
   underline,
   strikethrough,
+  highlight,
+  monospaced,
   title,
   heading,
   subheading,
@@ -84,6 +87,7 @@ enum MenuCommand {
   // View
   showNotes,
   showLibrary,
+  showAttachments,
   search,
   toggleSidebar,
   zoomIn,
@@ -137,6 +141,13 @@ bool dispatchMenuCommand(MenuCommand command, {BuildContext? from}) {
 /// it's full screen (where the title bar strip goes away).
 abstract class MacWindow {
   Stream<MenuCommand> get menuCommands;
+
+  /// Quick Note hotkey, Dock menu and Services captures.
+  Stream<QuickCapture> get captures;
+
+  /// Registers (or releases) the global Quick Note hotkey ⌃⌥N. True only
+  /// when it is now registered; false when off or taken by another app.
+  Future<bool> setQuickNoteHotKey(bool enabled);
   ValueListenable<bool> get fullScreen;
   Future<void> startDrag();
   Future<void> zoom();
@@ -154,6 +165,10 @@ class InertMacWindow implements MacWindow {
 
   @override
   Stream<MenuCommand> get menuCommands => const Stream.empty();
+  @override
+  Stream<QuickCapture> get captures => const Stream.empty();
+  @override
+  Future<bool> setQuickNoteHotKey(bool enabled) async => false;
   @override
   ValueListenable<bool> get fullScreen => _fullScreen;
   @override
@@ -175,17 +190,50 @@ class ChannelMacWindow implements MacWindow {
           }
         case 'fullScreen':
           _fullScreen.value = call.arguments == true;
+        case 'capture':
+          final capture = quickCaptureFromMessage(call.arguments);
+          if (capture == null) break;
+          // Before anyone listens (a cold start through Services) keep it.
+          if (_captures.hasListener) {
+            _captures.add(capture);
+          } else {
+            _pending.add(capture);
+          }
       }
       return null;
     });
+    // Native holds captures until told Dart is listening.
+    _channel.invokeMethod<void>('captureReady').catchError((_) {});
   }
 
   static const _channel = MethodChannel('corplex/window');
   final _commands = StreamController<MenuCommand>.broadcast();
   final _fullScreen = ValueNotifier(false);
+  final _pending = <QuickCapture>[];
+  late final StreamController<QuickCapture> _captures =
+      StreamController<QuickCapture>.broadcast(
+        onListen: () {
+          final queued = List.of(_pending);
+          _pending.clear();
+          // After onListen returns, so the new listener receives them.
+          scheduleMicrotask(() => queued.forEach(_captures.add));
+        },
+      );
 
   @override
   Stream<MenuCommand> get menuCommands => _commands.stream;
+  @override
+  Stream<QuickCapture> get captures => _captures.stream;
+  @override
+  Future<bool> setQuickNoteHotKey(bool enabled) async {
+    try {
+      return await _channel.invokeMethod<bool>('setQuickNoteHotKey', enabled) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   ValueListenable<bool> get fullScreen => _fullScreen;
   @override

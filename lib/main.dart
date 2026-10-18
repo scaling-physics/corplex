@@ -11,6 +11,7 @@ import 'features/platform/quick_action_source.dart';
 import 'features/platform/widget_data.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
+import 'features/spell/spell_checker.dart';
 import 'features/sync/supabase_setup.dart';
 import 'features/sync/transfer_settings.dart';
 
@@ -40,6 +41,9 @@ Future<void> main() async {
           homeWidgetBridgeProvider.overrideWithValue(PluginHomeWidgetBridge()),
         ],
         biometricKeyStoreProvider.overrideWithValue(PluginBiometricKeyStore()),
+        // macOS and iOS have a system checker; Android keeps the inert one.
+        if (mac || defaultTargetPlatform == TargetPlatform.iOS)
+          spellCheckerProvider.overrideWithValue(ChannelSpellChecker()),
         ...overrides,
       ],
       child: const CorplexApp(),

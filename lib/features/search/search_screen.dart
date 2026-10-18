@@ -8,7 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
+import '../attachments/attachments_browser.dart';
 import '../graph/graph_screen.dart';
+import '../platform/mac_window.dart' show isDesktop;
 import '../library/paper_detail_screen.dart';
 import '../library/pdf_viewer_screen.dart';
 import '../notes/note_editor_screen.dart';
@@ -114,6 +116,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           style: theme.textTheme.titleMedium,
         ),
         actions: [
+          if (!isDesktop(context))
+            IconButton(
+              icon: const Icon(Icons.attach_file),
+              tooltip: 'Attachments',
+              onPressed: () => showAttachmentsBrowser(context),
+            ),
           IconButton(
             icon: const Icon(Icons.hub_outlined),
             tooltip: 'Map',

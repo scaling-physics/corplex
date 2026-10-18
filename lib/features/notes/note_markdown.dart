@@ -4,6 +4,7 @@ import '../projects/figures.dart';
 import 'figure_markers.dart';
 import 'math_markers.dart';
 import 'note_content.dart';
+import 'note_highlight.dart' show highlightHex;
 import 'note_links.dart';
 
 /// Converts a note to Markdown for sharing or export: headings, bold,
@@ -25,6 +26,9 @@ String noteToMarkdown({
       buildFigureIndex([FigureNote(noteId: '', title: title, content: stored)]);
   final delta = decodeNoteContent(stored).toDelta();
   final lines = <String>[];
+  // Raw (unformatted) text of each line that is a code-block line, else null.
+  final codeOf = <String?>[];
+  var raw = StringBuffer();
   var line = StringBuffer();
   var ordinal = 0;
 
@@ -40,6 +44,7 @@ String noteToMarkdown({
         line.write(displayMathMarker(tex));
       } else {
         line.write(data.containsKey('sketch') ? '[Sketch]' : '');
+        raw.write(data.containsKey('sketch') ? '[Sketch]' : '');
       }
       continue;
     }
@@ -55,19 +60,41 @@ String noteToMarkdown({
         }
       }
       part = index.resolve(part);
-      if (part.isNotEmpty) line.write(_inline(part, attrs));
+      if (part.isNotEmpty) {
+        line.write(_inline(part, attrs));
+        raw.write(part);
+      }
       if (i < parts.length - 1) {
         // A newline: its attributes are the line's block style.
         final list = attrs['list'];
         ordinal = list == 'ordered' ? ordinal + 1 : 0;
+        final isCode =
+            attrs['code-block'] != null && attrs['code-block'] != false;
         lines.add(_block(line.toString(), attrs, ordinal));
+        codeOf.add(isCode ? raw.toString() : null);
         line = StringBuffer();
+        raw = StringBuffer();
       }
     }
   }
-  if (line.isNotEmpty) lines.add(line.toString());
+  if (line.isNotEmpty) {
+    lines.add(line.toString());
+    codeOf.add(null);
+  }
 
-  final body = lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  // Consecutive code-block lines share one fence.
+  final fenced = <String>[];
+  for (var i = 0; i < lines.length; i++) {
+    if (codeOf[i] == null) {
+      fenced.add(lines[i]);
+      continue;
+    }
+    final open = i == 0 || codeOf[i - 1] == null;
+    final close = i == lines.length - 1 || codeOf[i + 1] == null;
+    fenced.add('${open ? '```\n' : ''}${codeOf[i]}${close ? '\n```' : ''}');
+  }
+
+  final body = fenced.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
   final heading = title.trim().isEmpty ? '' : '# ${title.trim()}\n\n';
   return '$heading$body\n';
 }
@@ -83,6 +110,7 @@ String _inline(String text, Map<String, dynamic> attrs) {
   if (attrs['bold'] == true) out = '**$out**';
   if (attrs['italic'] == true) out = '*$out*';
   if (attrs['strike'] == true) out = '~~$out~~';
+  if (highlightHex(attrs['background']) != null) out = '==$out==';
   if (link != null && !internal) out = '[$out]($link)';
   return out;
 }

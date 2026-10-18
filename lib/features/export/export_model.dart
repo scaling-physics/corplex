@@ -7,6 +7,7 @@ import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../audio/audio_link.dart';
 import '../notes/note_content.dart';
+import '../notes/note_highlight.dart' show highlightHex;
 import '../notes/figure_markers.dart';
 import '../notes/math_markers.dart';
 import '../projects/figures.dart';
@@ -30,6 +31,9 @@ enum BlockKind {
 
   /// A display equation: one run whose text is the LaTeX source.
   displayMath,
+
+  /// One line of a monospaced (code) block; consecutive lines form a block.
+  code,
 }
 
 class Run {
@@ -40,7 +44,11 @@ class Run {
     this.strike = false,
     this.link,
     this.math = false,
+    this.highlight,
   });
+
+  /// The highlight colour as `RRGGBB` (no `#`), or null.
+  final String? highlight;
 
   /// The text, or the LaTeX source when [math] is set.
   final String text;
@@ -316,6 +324,7 @@ ExportBlock _line(
             bold: first.bold,
             italic: first.italic,
             strike: first.strike,
+            highlight: first.highlight,
             link: first.link,
           ),
         ...runs.skip(1),
@@ -342,11 +351,15 @@ Run _run(
     bold: attrs['bold'] == true,
     italic: attrs['italic'] == true,
     strike: attrs['strike'] == true,
+    highlight: highlightHex(attrs['background']),
     link: link != null && !internal ? link : null,
   );
 }
 
 BlockKind _kind(Map<String, dynamic> attrs) {
+  if (attrs['code-block'] != null && attrs['code-block'] != false) {
+    return BlockKind.code;
+  }
   return switch (attrs['header']) {
     1 => BlockKind.heading1,
     2 => BlockKind.heading2,

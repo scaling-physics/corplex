@@ -21,8 +21,20 @@ import 'package:corplex/features/trash/trash_screen.dart';
 import '../../support/fake_audio_engine.dart';
 import '../../support/mac_screenshot.dart';
 
+import 'package:corplex/features/capture/quick_capture.dart';
+
 class _FakeWindow implements MacWindow {
   final commands = StreamController<MenuCommand>.broadcast();
+  final captureController = StreamController<QuickCapture>.broadcast();
+  final hotKeyCalls = <bool>[];
+  @override
+  Stream<QuickCapture> get captures => captureController.stream;
+  @override
+  Future<bool> setQuickNoteHotKey(bool enabled) async {
+    hotKeyCalls.add(enabled);
+    return enabled;
+  }
+
   final _full = ValueNotifier(false);
   @override
   Stream<MenuCommand> get menuCommands => commands.stream;

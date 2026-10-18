@@ -525,9 +525,63 @@ the default screens until the user opts in by using the feature.
   (`MacWindow.printPdf` → `printPdf` on `corplex/window`; needs the
   `com.apple.security.print` entitlement). Both act on the focused editor,
   else on the note open in the pane (`HomeShell._onCommand`).
-- **Not done: spell check.** flutter_quill has no spell-check hook and
-  Flutter has no macOS spell-check service, so it means drawing underlines
-  in the editor ourselves (NSSpellChecker over a channel).
+- **Spell check** (`features/spell/`): the `corplex/spell` channel
+  (NSSpellChecker in macOS `AppDelegate.swift`, UITextChecker in iOS
+  `AppDelegate.swift`, none on Android) behind the `SpellChecker` seam;
+  the default provider is inert and `main()` installs `ChannelSpellChecker`
+  on macOS/iOS. `NoteSpell` plugs into the body editor's `textSpanBuilder`
+  (red wavy underline merged with the leaf's own decoration, recognizer
+  kept) and `contextMenuBuilder` (up to 5 guesses, Learn / Ignore Spelling;
+  a guess is one `replaceText`). Results are cached per paragraph text
+  (LRU), checked 400 ms after the last request, embeds counted as one
+  space so offsets match. Skips the caret's word, links, code, words with
+  digits, ALL-CAPS and URLs. Settings → "Check spelling while typing"
+  (`AppearanceSettings.spellCheck`, hidden without a checker); off means
+  no channel calls. Titles aren't checked.
+- **Highlight and Monospaced** (`notes/note_highlight.dart`): a highlight
+  is Quill's `background` attribute holding one of five pastel hexes
+  (`NoteHighlight`), so it syncs and merges as part of the Delta; text on
+  a highlight is drawn in dark ink via `customStyleBuilder: noteStyleFor`
+  in both schemes. Mac: highlighter menu in the format bar, Format →
+  Highlight ⇧⌘E toggles the last-used colour (per session); phones: **Aa**
+  → Highlight. Monospaced is Quill's `codeBlock` (⇧⌘M, **Aa**), styled from
+  the theme. `_desktopShortcuts` routes ⇧⌘E/⇧⌘M to the editor. Exports:
+  Markdown `==text==` and fenced blocks (also share and vault via
+  `note_markdown.dart`); DOCX `w:shd` fill (Word's named highlights lack
+  pink/purple) and Consolas; PDF background and Courier, falling back to
+  Roboto for a line with non-Latin-1 characters (`BlockKind.code`,
+  `Run.highlight`). Citations inside a code block are still resolved.
+- **Attachments browser** (`features/attachments/`): Mac sidebar →
+  Attachments, View → Attachments ⌘3, or Search → Attachments (phones and
+  tablets). `allAttachmentsProvider` is a live join, newest first; it
+  leaves out attachments of locked notes until their key is unlocked
+  (the files aren't encrypted, so the browser must not show them). Filter
+  chips and the search box appear only when useful; images are a
+  thumbnail grid (tap to zoom), other kinds rows: tap plays audio, opens a
+  link, shares a file (there is no in-app file viewer). Right-click /
+  long-press: Show in note/paper (`openNoteFromPage`/`openPaperFromPage`),
+  Share, Copy name. Attachments on both a note and a paper list under the
+  note.
+- **Quick capture (macOS)** (`features/capture/`, native in
+  `MainFlutterWindow.swift`): a global ⌃⌥N (Carbon `RegisterEventHotKey`,
+  no Accessibility permission) registered only while the per-device
+  `AppearanceSettings.quickNoteHotKey` is on (default on; `HomeShell`
+  sends `setQuickNoteHotKey` at startup and on change; false if the key is
+  taken). Services → "New Corplex Note" (`NSServices` in Info.plist; the
+  window is `NSApp.servicesProvider`) and the Dock menu's New Note
+  (`AppDelegate.applicationDockMenu`) arrive as `MacWindow.captures`
+  (`NewNoteCapture` / `TextCapture`); text is classified like a share
+  (DOI → paper, link → link note, else note). A cold start through
+  Services delivers text before Dart listens: native queues captures until
+  Dart sends `captureReady`, and `ChannelMacWindow` buffers until
+  `HomeShell` subscribes. New Services entries may need a logout or
+  `/System/Library/CoreServices/pbs -update` to appear. No Mac share
+  extension (no team id / App Group with ad-hoc signing).
+- **Not done**: collapsible headings (flutter_quill can restyle a line but
+  not hide one — needs a fork) and a note in its own window (Flutter's
+  multi-window API is private and debug-only in 3.47; a second engine
+  would mean a second database connection whose streams don't see the
+  first's writes).
 
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the

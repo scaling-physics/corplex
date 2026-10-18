@@ -113,6 +113,8 @@ class AppearanceSettings extends ChangeNotifier {
     this.reading = ReadingTheme.paper,
     this.typewriter = false,
     this.interfaceScale = 1.0,
+    this.quickNoteHotKey = true,
+    this.spellCheck = true,
   });
 
   ThemeMode themeMode;
@@ -121,18 +123,27 @@ class AppearanceSettings extends ChangeNotifier {
   /// Note editor: keep the line being typed at a steady height.
   bool typewriter;
 
+  /// Note editor: underline misspelled words and offer corrections
+  /// (macOS and iOS; Android has no checker).
+  bool spellCheck;
+
   /// Desktop: the whole interface's size, as a factor (View → Interface
   /// Size, or Settings). A big low-density display — a 38" 3840×1600
   /// ultrawide at 1× — reads better a step or two up. Applied by
   /// `MacWindowFrame`; one of [interfaceScales].
   double interfaceScale;
 
+  /// Mac: the global ⌃⌥N Quick Note shortcut is registered.
+  bool quickNoteHotKey;
+
   static const interfaceScales = [0.9, 1.0, 1.1, 1.25, 1.4, 1.6];
 
   static const _modeKey = 'appearance.themeMode';
   static const _readingKey = 'appearance.reading';
   static const _typewriterKey = 'appearance.typewriter';
+  static const _spellKey = 'appearance.spellCheck';
   static const _scaleKey = 'appearance.interfaceScale';
+  static const _quickNoteKey = 'appearance.quickNoteHotKey';
 
   static Future<AppearanceSettings> load() async {
     try {
@@ -148,6 +159,8 @@ class AppearanceSettings extends ChangeNotifier {
         ),
         typewriter: prefs.getBool(_typewriterKey) ?? false,
         interfaceScale: _nearestScale(prefs.getDouble(_scaleKey) ?? 1.0),
+        spellCheck: prefs.getBool(_spellKey) ?? true,
+        quickNoteHotKey: prefs.getBool(_quickNoteKey) ?? true,
       );
     } catch (_) {
       return AppearanceSettings();
@@ -171,6 +184,22 @@ class AppearanceSettings extends ChangeNotifier {
     notifyListeners();
     try {
       await (await SharedPreferences.getInstance()).setBool(_typewriterKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setQuickNoteHotKey(bool on) async {
+    quickNoteHotKey = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_quickNoteKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setSpellCheck(bool on) async {
+    spellCheck = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_spellKey, on);
     } catch (_) {}
   }
 

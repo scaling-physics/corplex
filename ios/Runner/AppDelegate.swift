@@ -14,6 +14,56 @@ import Vision
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registerOcrChannel(engineBridge.applicationRegistrar.messenger())
+    registerSpellChannel(engineBridge.applicationRegistrar.messenger())
+  }
+
+  /// Spell check for the note editor (`corplex/spell`): `UITextChecker`,
+  /// in the first preferred language it supports. Offsets are UTF-16, like
+  /// Dart strings. Created per call, never at registration.
+  private func registerSpellChannel(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "corplex/spell", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      let args = call.arguments as? [String: Any] ?? [:]
+      let available = UITextChecker.availableLanguages
+      let language =
+        Locale.preferredLanguages
+        .map { $0.replacingOccurrences(of: "-", with: "_") }
+        .first { code in available.contains { code.hasPrefix($0) || $0.hasPrefix(code) } }
+        .flatMap { code in available.first { code.hasPrefix($0) || $0.hasPrefix(code) } }
+        ?? "en_US"
+      switch call.method {
+      case "check":
+        let checker = UITextChecker()
+        let texts = args["texts"] as? [String] ?? []
+        result(
+          texts.map { text -> [[Int]] in
+            let length = (text as NSString).length
+            var found: [[Int]] = []
+            var at = 0
+            while at < length {
+              let r = checker.rangeOfMisspelledWord(
+                in: text, range: NSRange(location: 0, length: length), startingAt: at,
+                wrap: false, language: language)
+              if r.location == NSNotFound || r.length == 0 { break }
+              found.append([r.location, r.length])
+              at = r.location + r.length
+            }
+            return found
+          })
+      case "guesses":
+        let word = args["word"] as? String ?? ""
+        let length = (word as NSString).length
+        result(
+          UITextChecker().guesses(
+            forWordRange: NSRange(location: 0, length: length), in: word, language: language)
+            ?? [])
+      case "learn":
+        if let word = args["word"] as? String { UITextChecker.learnWord(word) }
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 
   /// On-device OCR (`corplex/ocr`): Apple Vision, accurate level with

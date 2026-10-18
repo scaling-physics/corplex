@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/database.dart';
 import '../../theme/app_theme.dart';
+import '../attachments/attachments_browser.dart';
 import '../projects/project_page.dart';
 import '../projects/projects_providers.dart';
 import '../sync/sync_ring.dart';
@@ -224,6 +225,12 @@ class MacSidebar extends ConsumerWidget {
             label: 'Search',
             selected: false,
             onTap: onSearch,
+          ),
+          _SidebarRow(
+            icon: Icons.attach_file,
+            label: 'Attachments',
+            selected: false,
+            onTap: () => showAttachmentsBrowser(context),
           ),
           if (projects.isNotEmpty) ...[
             Padding(

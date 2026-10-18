@@ -1,6 +1,7 @@
 import Cocoa
 import FlutterMacOS
 import PDFKit
+import Carbon.HIToolbox
 
 /// The one Corplex window. Content runs under a transparent title bar (the
 /// Flutter side leaves a `macTitleBarHeight` strip at the top of each
@@ -10,6 +11,13 @@ import PDFKit
 /// the `corplex/window` channel (`lib/features/platform/mac_window.dart`).
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var channel: FlutterMethodChannel?
+
+  /// Captures (Quick Note hotkey, Services, Dock menu) that arrived before
+  /// Dart said it was listening: a cold start through the Services menu
+  /// delivers the text before the first frame. Each is a method name and
+  /// its argument for the `corplex/window` channel.
+  private var pendingCaptures: [(String, Any?)] = []
+  private var dartReady = false
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -50,6 +58,15 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         result(nil)
       case "isFullScreen":
         result(self.styleMask.contains(.fullScreen))
+      case "captureReady":
+        // Dart is listening: hand over anything that arrived before.
+        self.dartReady = true
+        let queued = self.pendingCaptures
+        self.pendingCaptures = []
+        for (method, argument) in queued { self.channel?.invokeMethod(method, arguments: argument) }
+        result(nil)
+      case "setQuickNoteHotKey":
+        result(QuickNoteHotKey.shared.set(enabled: call.arguments as? Bool ?? false))
       case "printPdf":
         // File → Print…: the note rendered by the PDF exporter, through
         // the standard print panel as a sheet on this window.
@@ -69,8 +86,54 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     self.channel = channel
     buildMenus()
 
+    // Services → "New Corplex Note" (the NSServices entry in Info.plist
+    // names `newCorplexNote`), and the hotkey's callback.
+    NSApp.servicesProvider = self
+    NSUpdateDynamicServices()
+    QuickNoteHotKey.shared.onPress = { [weak self] in self?.capture("capture", "newNote") }
+
     super.awakeFromNib()
   }
+
+  // MARK: Quick capture
+
+  /// Brings the app and this window forward (from the background, the Dock
+  /// or a minimised state).
+  func bringForward() {
+    NSApp.activate(ignoringOtherApps: true)
+    if isMiniaturized { deminiaturize(nil) }
+    makeKeyAndOrderFront(nil)
+  }
+
+  /// Activates Corplex and tells Dart, or queues the message until Dart is
+  /// listening.
+  func capture(_ method: String, _ argument: Any?) {
+    bringForward()
+    if dartReady {
+      channel?.invokeMethod(method, arguments: argument)
+    } else {
+      pendingCaptures.append((method, argument))
+    }
+  }
+
+  /// The Services entry: the selected text in any app becomes a note (or a
+  /// paper or link, by what it looks like) through the same path as the
+  /// share sheet.
+  @objc func newCorplexNote(
+    _ pboard: NSPasteboard, userData: String,
+    error: AutoreleasingUnsafeMutablePointer<NSString>
+  ) {
+    let text =
+      pboard.string(forType: .string)
+      ?? pboard.string(forType: NSPasteboard.PasteboardType("public.utf8-plain-text"))
+    guard let text = text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      error.pointee = "There was no text to save." as NSString
+      return
+    }
+    capture("capture", ["text": text])
+  }
+
+  @objc func dockNewNote(_ sender: Any?) { capture("capture", "newNote") }
 
   // MARK: Full screen (the title bar strip collapses there)
 
@@ -180,6 +243,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Heading", "heading", key: "h", modifiers: shift),
         item("Subheading", "subheading", key: "j", modifiers: shift),
         item("Body", "body", key: "b", modifiers: shift),
+        item("Monospaced", "monospaced", key: "m", modifiers: shift),
         .separator(),
         item("Bulleted List", "bulletList", key: "7", modifiers: shift),
         item("Numbered List", "numberedList", key: "9", modifiers: shift),
@@ -190,6 +254,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Italic", "italic", key: "i"),
         item("Underline", "underline", key: "u"),
         item("Strikethrough", "strikethrough", key: "x", modifiers: shift),
+        item("Highlight", "highlight", key: "e", modifiers: shift),
         .separator(),
         item("Link to Note…", "linkNote", key: "k"),
         item("Cite Paper…", "citePaper", key: "k", modifiers: shift),
@@ -202,6 +267,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       let entries = [
         item("Notes", "showNotes", key: "1"),
         item("Library", "showLibrary", key: "2"),
+        item("Attachments", "showAttachments", key: "3"),
         item("Search", "search", key: "f", modifiers: shift),
         .separator(),
         item("Toggle Sidebar", "toggleSidebar", key: "s", modifiers: [.command, .control]),
@@ -231,5 +297,45 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       menu.addItem(item("Keyboard Shortcuts", "keyboardShortcuts", key: "/"))
       help.submenu = menu
     }
+  }
+}
+
+/// The global Quick Note hotkey, ⌃⌥N. Carbon's `RegisterEventHotKey` needs
+/// no Accessibility permission and works in the sandbox. Registered only
+/// while Dart asks (the per-device setting).
+final class QuickNoteHotKey {
+  static let shared = QuickNoteHotKey()
+
+  var onPress: (() -> Void)?
+  private var hotKey: EventHotKeyRef?
+  private var handler: EventHandlerRef?
+
+  /// Registers or unregisters the hotkey. False if it's wanted but taken.
+  func set(enabled: Bool) -> Bool {
+    if !enabled {
+      if let hotKey = hotKey { UnregisterEventHotKey(hotKey) }
+      hotKey = nil
+      return false
+    }
+    if hotKey != nil { return true }
+    if handler == nil {
+      var spec = EventTypeSpec(
+        eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+      let status = InstallEventHandler(
+        GetApplicationEventTarget(),
+        { _, _, _ in
+          DispatchQueue.main.async { QuickNoteHotKey.shared.onPress?() }
+          return noErr
+        }, 1, &spec, nil, &handler)
+      if status != noErr { return false }
+    }
+    let id = EventHotKeyID(signature: OSType(0x43504C58), id: 1)  // 'CPLX'
+    var ref: EventHotKeyRef?
+    let status = RegisterEventHotKey(
+      UInt32(kVK_ANSI_N), UInt32(controlKey | optionKey), id,
+      GetApplicationEventTarget(), 0, &ref)
+    guard status == noErr else { return false }
+    hotKey = ref
+    return true
   }
 }

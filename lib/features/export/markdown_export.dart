@@ -5,7 +5,21 @@ import 'export_model.dart';
 String exportToMarkdown(ExportDoc doc) {
   final out = StringBuffer();
   BlockKind? previous;
+  final code = <String>[];
+  void flushCode() {
+    if (code.isEmpty) return;
+    if (out.isNotEmpty) out.write('\n\n');
+    out.write('```\n${code.join('\n')}\n```');
+    code.clear();
+    previous = BlockKind.code;
+  }
+
   for (final b in doc.blocks) {
+    if (b.kind == BlockKind.code) {
+      code.add(b.text);
+      continue;
+    }
+    flushCode();
     final text = b.runs.map(_inline).join();
     final line = switch (b.kind) {
       BlockKind.heading1 => '## $text',
@@ -16,6 +30,7 @@ String exportToMarkdown(ExportDoc doc) {
       BlockKind.quote => '> $text',
       BlockKind.paragraph || BlockKind.caption => text,
       BlockKind.displayMath => '\$\$\n${b.text}\n\$\$',
+      BlockKind.code => text,
     };
     // Markdown paragraphs are separated by a blank line; list items stick
     // together. Empty lines in the note are just that blank line.
@@ -30,6 +45,7 @@ String exportToMarkdown(ExportDoc doc) {
     out.write(line);
     previous = b.kind;
   }
+  flushCode();
   final body = out.toString().trim();
   final heading = doc.title.trim().isEmpty ? '' : '# ${doc.title.trim()}\n\n';
   return '$heading$body\n';
@@ -42,6 +58,7 @@ String _inline(Run r) {
   if (r.bold) out = '**$out**';
   if (r.italic) out = '*$out*';
   if (r.strike) out = '~~$out~~';
+  if (r.highlight != null) out = '==$out==';
   if (r.link != null) out = '[$out](${r.link})';
   return out;
 }

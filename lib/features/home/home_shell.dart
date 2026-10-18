@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../spell/spell_checker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +10,8 @@ import '../auth/sign_in_screen.dart';
 import '../../data/database_provider.dart';
 import '../../data/trash.dart';
 import '../audio/audio_player_bar.dart';
+import '../capture/quick_capture.dart';
+import '../capture/quick_capture_actions.dart';
 import '../library/library_screen.dart';
 import '../ocr/ocr_service.dart';
 import '../settings/appearance_settings.dart';
@@ -21,6 +24,7 @@ import 'mac_sidebar.dart';
 import '../sync/sync_ring.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
+import '../attachments/attachments_browser.dart';
 import '../notes/note_file_actions.dart';
 import '../notes/notes_screen.dart';
 import '../review/review_prompt.dart';
@@ -44,6 +48,7 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
   StreamSubscription<MenuCommand>? _menu;
+  StreamSubscription<QuickCapture>? _captures;
 
   @override
   void initState() {
@@ -51,6 +56,19 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // The native menu bar (macOS). A plain stream subscription rather than
     // a provider listener: the same command twice in a row must fire twice.
     _menu = ref.read(macWindowProvider).menuCommands.listen(_onCommand);
+    // Quick capture: the global hotkey, the Dock menu and Services. The
+    // hotkey is registered while the setting is on (inert off the Mac).
+    final window = ref.read(macWindowProvider);
+    _captures = window.captures.listen(_onCapture);
+    window.setQuickNoteHotKey(
+      ref.read(appearanceSettingsProvider).quickNoteHotKey,
+    );
+    ref.listenManual(
+      appearanceSettingsProvider.select((s) => s.quickNoteHotKey),
+      (previous, on) {
+        if (previous != on) window.setQuickNoteHotKey(on);
+      },
+    );
     // Housekeeping: items that have sat in the trash past the retention
     // period go for good. Never worth failing startup over.
     purgeTrash(ref.read(databaseProvider)).catchError((_) => 0);
@@ -62,6 +80,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void dispose() {
     _menu?.cancel();
+    _captures?.cancel();
     super.dispose();
   }
 
@@ -69,6 +88,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void _home() {
     if (!mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  void _onCapture(QuickCapture capture) {
+    if (!mounted) return;
+    _home();
+    setState(() => _index = 0);
+    handleQuickCapture(context, ref, capture);
   }
 
   void _onCommand(MenuCommand command) {
@@ -96,6 +122,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         setState(() => _index = 1);
       case MenuCommand.search:
         _openSearch();
+      case MenuCommand.showAttachments:
+        _home();
+        showAttachmentsBrowser(context);
       case MenuCommand.toggleSidebar:
         final visible = ref.read(macSidebarVisibleProvider.notifier);
         visible.state = !visible.state;
@@ -115,6 +144,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.italic:
       case MenuCommand.underline:
       case MenuCommand.strikethrough:
+      case MenuCommand.highlight:
+      case MenuCommand.monospaced:
       case MenuCommand.title:
       case MenuCommand.heading:
       case MenuCommand.subheading:
@@ -601,6 +632,33 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 );
               },
             ),
+          if (isMac(context))
+            Consumer(
+              builder: (context, ref, _) {
+                final settings = ref.watch(appearanceSettingsProvider);
+                return SwitchListTile(
+                  secondary: const Icon(Icons.keyboard_command_key),
+                  title: const Text('Quick note shortcut (⌃⌥N)'),
+                  subtitle: const Text('Start a note from any app'),
+                  value: settings.quickNoteHotKey,
+                  onChanged: settings.setQuickNoteHotKey,
+                );
+              },
+            ),
+          Consumer(
+            builder: (context, ref, _) {
+              final settings = ref.watch(appearanceSettingsProvider);
+              if (!ref.watch(spellCheckerProvider).available) {
+                return const SizedBox.shrink();
+              }
+              return SwitchListTile(
+                secondary: const Icon(Icons.spellcheck),
+                title: const Text('Check spelling while typing'),
+                value: settings.spellCheck,
+                onChanged: settings.setSpellCheck,
+              );
+            },
+          ),
           const NotesPasswordSettings(),
           Consumer(
             builder: (context, ref, _) {

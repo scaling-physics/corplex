@@ -70,11 +70,13 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     }
     return pw.TextSpan(
       text: r.link == null ? r.text : '${r.text} (${r.link})',
-      style: style(
-        size,
-        isBold: forceBold || r.bold,
-        isItalic: r.italic,
-      ).copyWith(decoration: r.strike ? pw.TextDecoration.lineThrough : null),
+      style: style(size, isBold: forceBold || r.bold, isItalic: r.italic)
+          .copyWith(
+            decoration: r.strike ? pw.TextDecoration.lineThrough : null,
+            background: r.highlight == null
+                ? null
+                : pw.BoxDecoration(color: PdfColor.fromHex(r.highlight!)),
+          ),
     );
   }
 
@@ -97,6 +99,23 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
       );
     }
 
+    if (b.kind == BlockKind.code) {
+      // The built-in Courier only covers Latin-1; a line with anything else
+      // falls back to Roboto rather than failing the whole export.
+      final latin1 = b.text.runes.every((r) => r < 0x100);
+      final text = b.text.replaceAll('\t', '    ');
+      return pw.Container(
+        width: double.infinity,
+        color: PdfColor.fromHex('F0EDE8'),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        child: pw.Text(
+          text.isEmpty ? ' ' : text,
+          style: latin1
+              ? pw.TextStyle(font: pw.Font.courier(), fontSize: 10)
+              : style(10),
+        ),
+      );
+    }
     if (b.kind == BlockKind.displayMath) {
       final src = b.runs.isEmpty ? '' : b.runs.first.text;
       final img = maths['D$src'];
@@ -135,7 +154,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
         child: rich(11, after: 0),
       ),
       BlockKind.caption => rich(10, before: 2, after: 10),
-      BlockKind.displayMath => pw.SizedBox(),
+      BlockKind.displayMath || BlockKind.code => pw.SizedBox(),
       BlockKind.paragraph =>
         b.runs.every((r) => r.text.isEmpty) ? pw.SizedBox(height: 6) : rich(11),
     };

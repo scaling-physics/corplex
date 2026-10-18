@@ -12,6 +12,20 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
   }
+
+  /// Right-click the Dock icon → New Note (quick capture, like the ⌃⌥N
+  /// hotkey).
+  override func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+    guard let window = NSApp.windows.compactMap({ $0 as? MainFlutterWindow }).first else {
+      return nil
+    }
+    let menu = NSMenu()
+    let item = NSMenuItem(
+      title: "New Note", action: #selector(MainFlutterWindow.dockNewNote(_:)), keyEquivalent: "")
+    item.target = window
+    menu.addItem(item)
+    return menu
+  }
 }
 
 /// App-specific platform channels (OCR, speech), registered by
@@ -20,9 +34,11 @@ class AppDelegate: FlutterAppDelegate {
 func registerNativeChannels(_ messenger: FlutterBinaryMessenger) {
   registerOcrChannel(messenger)
   registerSpeechChannel(messenger)
+  registerSpellChannel(messenger)
 }
 
 private var ocrChannel: FlutterMethodChannel?
+private var spellChannel: FlutterMethodChannel?
 private var speechChannel: FlutterMethodChannel?
 private var speechRecognizer: SFSpeechRecognizer?
 private var speechTask: SFSpeechRecognitionTask?
@@ -138,6 +154,50 @@ private func runRecognition(path: String, result: @escaping FlutterResult) {
       } else {
         result(["status": "unavailable"])
       }
+    }
+  }
+}
+
+/// Spell check for the note editor (`corplex/spell`): `NSSpellChecker`,
+/// which uses the system language settings and the user's learned words.
+/// Offsets are UTF-16, like Dart strings. The checker is touched only on a
+/// call, never at registration.
+private func registerSpellChannel(_ messenger: FlutterBinaryMessenger) {
+  let channel = FlutterMethodChannel(name: "corplex/spell", binaryMessenger: messenger)
+  spellChannel = channel
+  channel.setMethodCallHandler { call, result in
+    let args = call.arguments as? [String: Any] ?? [:]
+    let checker = NSSpellChecker.shared
+    switch call.method {
+    case "check":
+      let texts = args["texts"] as? [String] ?? []
+      result(
+        texts.map { text -> [[Int]] in
+          let ns = text as NSString
+          var found: [[Int]] = []
+          var at = 0
+          while at < ns.length {
+            let r = checker.checkSpelling(
+              of: text, startingAt: at, language: nil, wrap: false,
+              inSpellDocumentWithTag: 0, wordCount: nil)
+            if r.location == NSNotFound || r.length == 0 { break }
+            found.append([r.location, r.length])
+            at = r.location + r.length
+          }
+          return found
+        })
+    case "guesses":
+      let word = args["word"] as? String ?? ""
+      let ns = word as NSString
+      result(
+        checker.guesses(
+          forWordRange: NSRange(location: 0, length: ns.length), in: word, language: nil,
+          inSpellDocumentWithTag: 0) ?? [])
+    case "learn":
+      if let word = args["word"] as? String { checker.learnWord(word) }
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
     }
   }
 }

@@ -167,6 +167,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         .separator(),
         item("Bulleted List", "bulletList", key: "7", modifiers: shift),
         item("Numbered List", "numberedList", key: "9", modifiers: shift),
+        item("Checklist", "checklist", key: "l", modifiers: shift),
         item("Block Quote", "blockQuote", key: "'"),
         .separator(),
         item("Bold", "bold", key: "b"),

@@ -20,6 +20,9 @@ class Notes extends Table {
   TextColumn get folderId =>
       text().nullable().references(Folders, #id, onDelete: KeyAction.setNull)();
 
+  /// Pinned notes sit at the top of the Notes list (schema v18, synced).
+  BoolColumn get pinned => boolean().withDefault(const Constant(false))();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 

@@ -37,6 +37,7 @@ const shortcutSections = <(String, List<ShortcutEntry>)>[
       ShortcutEntry('Body', ['⇧', '⌘', 'B']),
       ShortcutEntry('Bulleted list', ['⇧', '⌘', '7']),
       ShortcutEntry('Numbered list', ['⇧', '⌘', '9']),
+      ShortcutEntry('Checklist', ['⇧', '⌘', 'L']),
       ShortcutEntry('Block quote', ['⌘', '\'']),
       ShortcutEntry('Link to a note', ['⌘', 'K']),
       ShortcutEntry('Cite a paper', ['⇧', '⌘', 'K']),

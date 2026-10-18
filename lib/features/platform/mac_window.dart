@@ -75,6 +75,7 @@ enum MenuCommand {
   body,
   bulletList,
   numberedList,
+  checklist,
   blockQuote,
   linkNote,
   citePaper,

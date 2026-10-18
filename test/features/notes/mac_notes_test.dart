@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:corplex/features/notes/note_find.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:corplex/data/database.dart';
@@ -376,6 +377,29 @@ void main() {
     expect(dispatchMenuCommand(MenuCommand.actualSize), isTrue);
     await tester.pumpAndSettle();
     expect(body(), closeTo(15.5, 0.01));
+    await _dispose(tester);
+  }, variant: macOnly);
+
+  testWidgets('⌘F in a note opens Find in note, ⌘G steps, Esc closes', (
+    tester,
+  ) async {
+    useMacWindow(tester, macWindowSizes['laptop13']!);
+    await tester.pumpWidget(_app(db, const NoteEditorScreen(noteId: 'n2')));
+    await tester.pumpAndSettle();
+    tester
+        .widget<QuillEditor>(find.byType(QuillEditor))
+        .focusNode
+        .requestFocus();
+    await tester.pump();
+    expect(find.byType(NoteFindBar), findsNothing);
+    expect(dispatchMenuCommand(MenuCommand.find), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteFindBar), findsOneWidget);
+    // Focus is now in the find field, still inside the editor's handler.
+    expect(dispatchMenuCommand(MenuCommand.findNext), isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteFindBar), findsNothing);
     await _dispose(tester);
   }, variant: macOnly);
 

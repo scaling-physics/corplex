@@ -120,6 +120,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.body:
       case MenuCommand.bulletList:
       case MenuCommand.numberedList:
+      case MenuCommand.checklist:
       case MenuCommand.blockQuote:
       case MenuCommand.linkNote:
       case MenuCommand.citePaper:

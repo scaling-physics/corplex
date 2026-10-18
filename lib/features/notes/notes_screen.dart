@@ -246,6 +246,14 @@ class _NoteCard extends ConsumerWidget {
             Text.rich(
               TextSpan(
                 children: [
+                  if (note.pinned)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(Icons.push_pin, size: 15, color: c.primary),
+                      ),
+                    ),
                   TextSpan(text: note.title.isEmpty ? 'Untitled' : note.title),
                   if (locked)
                     WidgetSpan(
@@ -324,6 +332,7 @@ class _NoteCard extends ConsumerWidget {
           onSelected: () => showProjectPickerSheet(context, noteId: note.id),
         ),
         lockMenuAction(context, ref, note),
+        pinMenuAction(ref, note),
         null,
         ContextMenuAction(
           label: 'Move to trash',
@@ -710,6 +719,7 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
                           showProjectPickerSheet(context, noteId: note.id),
                     ),
                     lockMenuAction(context, ref, note),
+                    pinMenuAction(ref, note),
                     null,
                     ContextMenuAction(
                       label: 'Move to trash',
@@ -734,6 +744,18 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
                     title: Text.rich(
                       TextSpan(
                         children: [
+                          if (note.pinned)
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 5),
+                                child: Icon(
+                                  Icons.push_pin,
+                                  size: 12,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
                           TextSpan(
                             text: note.title.isEmpty ? 'Untitled' : note.title,
                           ),

@@ -70,7 +70,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -262,6 +262,14 @@ class AppDatabase extends _$AppDatabase {
         // envelope, so no other table changes.
         if (!await _hasTable('note_keys')) {
           await m.createTable(noteKeys);
+        }
+        await _createSyncSchema(markExisting: false);
+      }
+      if (from < 18) {
+        // v18: pinned notes. A synced column, so the sync triggers are
+        // rebuilt to watch it.
+        if (!await _hasColumn('notes', 'pinned')) {
+          await m.addColumn(notes, notes.pinned);
         }
         await _createSyncSchema(markExisting: false);
       }

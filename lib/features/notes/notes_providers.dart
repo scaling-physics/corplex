@@ -7,9 +7,11 @@ import '../../data/database_provider.dart';
 
 final notesListProvider = StreamProvider.autoDispose<List<Note>>((ref) {
   final db = ref.watch(databaseProvider);
-  return (db.select(
-    db.notes,
-  )..orderBy([(n) => OrderingTerm.desc(n.updatedAt)])).watch();
+  return (db.select(db.notes)..orderBy([
+        (n) => OrderingTerm.desc(n.pinned),
+        (n) => OrderingTerm.desc(n.updatedAt),
+      ]))
+      .watch();
 });
 
 final noteByIdProvider = StreamProvider.autoDispose.family<Note?, String>((
@@ -58,13 +60,18 @@ final visibleNotesProvider = StreamProvider.autoDispose<List<Note>>((ref) {
 
   switch (filter) {
     case AllNotes():
-      return (db.select(
-        db.notes,
-      )..orderBy([(n) => OrderingTerm.desc(n.updatedAt)])).watch();
+      return (db.select(db.notes)..orderBy([
+            (n) => OrderingTerm.desc(n.pinned),
+            (n) => OrderingTerm.desc(n.updatedAt),
+          ]))
+          .watch();
     case FolderFilter(:final folderId):
       return (db.select(db.notes)
             ..where((n) => n.folderId.equals(folderId))
-            ..orderBy([(n) => OrderingTerm.desc(n.updatedAt)]))
+            ..orderBy([
+              (n) => OrderingTerm.desc(n.pinned),
+              (n) => OrderingTerm.desc(n.updatedAt),
+            ]))
           .watch();
     case ProjectFilter(:final projectId):
       final query =
@@ -75,7 +82,10 @@ final visibleNotesProvider = StreamProvider.autoDispose<List<Note>>((ref) {
               ),
             ])
             ..where(db.projectNotes.projectId.equals(projectId))
-            ..orderBy([OrderingTerm.desc(db.notes.updatedAt)]);
+            ..orderBy([
+              OrderingTerm.desc(db.notes.pinned),
+              OrderingTerm.desc(db.notes.updatedAt),
+            ]);
       return query.watch().map(
         (rows) => rows.map((row) => row.readTable(db.notes)).toList(),
       );
@@ -85,9 +95,18 @@ final visibleNotesProvider = StreamProvider.autoDispose<List<Note>>((ref) {
               innerJoin(db.noteTags, db.noteTags.noteId.equalsExp(db.notes.id)),
             ])
             ..where(db.noteTags.tagId.equals(tagId))
-            ..orderBy([OrderingTerm.desc(db.notes.updatedAt)]);
+            ..orderBy([
+              OrderingTerm.desc(db.notes.pinned),
+              OrderingTerm.desc(db.notes.updatedAt),
+            ]);
       return query.watch().map(
         (rows) => rows.map((row) => row.readTable(db.notes)).toList(),
       );
   }
 });
+
+/// Pins [noteId] to the top of the Notes list, or unpins it.
+Future<void> setNotePinned(AppDatabase db, String noteId, bool pinned) =>
+    (db.update(db.notes)..where((n) => n.id.equals(noteId))).write(
+      NotesCompanion(pinned: Value(pinned)),
+    );

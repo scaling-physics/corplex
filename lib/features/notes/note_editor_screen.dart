@@ -53,6 +53,7 @@ import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
 import '../platform/mac_window.dart'
     show MenuCommand, MenuCommandHandler, isDesktop, isMac, macPanePadding;
+import 'note_find.dart';
 import 'note_zoom.dart';
 import 'cite_paper_sheet.dart';
 import 'citation_embed.dart';
@@ -177,6 +178,15 @@ class _NoteEditorBody extends ConsumerStatefulWidget {
 class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   final _titleController = TextEditingController();
   late final QuillController _quillController;
+
+  /// Find in note (⌘F / ⋮ → Find in note) is open; [_findStep] moves it
+  /// to the next or previous match (⌘G / ⇧⌘G).
+  bool _finding = false;
+  final _findStep = ValueNotifier<void Function(int)?>(null);
+
+  void _openFind() => setState(() => _finding = true);
+
+  void _closeFind() => setState(() => _finding = false);
   Timer? _debounce;
   bool _loaded = false;
   // Captured up front: dispose() must be able to flush a pending save, and
@@ -945,6 +955,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           await insertSketch(context, _quillController);
         case _Command.heading:
           _quillController.formatSelection(Attribute.h2);
+        case _Command.checklist:
+          _quillController.formatSelection(Attribute.unchecked);
         case _Command.template:
           _insertTemplate();
         case _Command.bibliography:
@@ -1223,6 +1235,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
 
   @override
   void dispose() {
+    _findStep.dispose();
     widget.handle?.appendQuote = null;
     _lock.removeListener(_onLockChanged);
     if (_flushRegistry[widget.noteId] == _save) {
@@ -1342,6 +1355,13 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     ),
               'lock' => _lockNote(),
               'unlock' => _removeLock(),
+              'pin' => setNotePinned(
+                ref.read(databaseProvider),
+                widget.noteId,
+                !(ref.read(noteByIdProvider(widget.noteId)).value?.pinned ??
+                    false),
+              ),
+              'find' => _openFind(),
               'trash' => _moveToTrash(),
               _ => null,
             },
@@ -1433,6 +1453,30 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     leading: Icon(Icons.lock_outline),
                     title: Text('Lock note'),
                     subtitle: Text('Needs your notes password to open'),
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'find',
+                child: ListTile(
+                  leading: Icon(Icons.search),
+                  title: Text('Find in note'),
+                ),
+              ),
+              if (ref.read(noteByIdProvider(widget.noteId)).value?.pinned ??
+                  false)
+                const PopupMenuItem(
+                  value: 'pin',
+                  child: ListTile(
+                    leading: Icon(Icons.push_pin),
+                    title: Text('Unpin'),
+                  ),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'pin',
+                  child: ListTile(
+                    leading: Icon(Icons.push_pin_outlined),
+                    title: Text('Pin to top'),
                   ),
                 ),
               const PopupMenuItem(
@@ -1738,7 +1782,18 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       bottomNavigationBar: !_loaded
           ? null
           : desktop
-          ? AudioPlayerBar(onMark: _insertTimestamp)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_finding)
+                  NoteFindBar(
+                    controller: _quillController,
+                    step: _findStep,
+                    onClose: _closeFind,
+                  ),
+                AudioPlayerBar(onMark: _insertTimestamp),
+              ],
+            )
           : Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -1746,6 +1801,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_finding)
+                    NoteFindBar(
+                      controller: _quillController,
+                      step: _findStep,
+                      onClose: _closeFind,
+                    ),
                   AudioPlayerBar(onMark: _insertTimestamp),
                   Container(
                     decoration: BoxDecoration(
@@ -1825,9 +1886,15 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.body: () => _setHeader(Attribute.header),
     MenuCommand.bulletList: () => _toggle(Attribute.ul),
     MenuCommand.numberedList: () => _toggle(Attribute.ol),
+    MenuCommand.checklist: () => _toggle(Attribute.unchecked),
     MenuCommand.blockQuote: () => _toggle(Attribute.blockQuote),
     MenuCommand.linkNote: () => _linkNote(context),
     MenuCommand.citePaper: () => _citePaper(context),
+    MenuCommand.find: _openFind,
+    MenuCommand.findNext: () =>
+        _finding ? _findStep.value?.call(1) : _openFind(),
+    MenuCommand.findPrevious: () =>
+        _finding ? _findStep.value?.call(-1) : _openFind(),
     MenuCommand.zoomIn: () => ref.read(noteZoomProvider).zoomIn(),
     MenuCommand.zoomOut: () => ref.read(noteZoomProvider).zoomOut(),
     MenuCommand.actualSize: () => ref.read(noteZoomProvider).reset(),
@@ -2188,6 +2255,14 @@ class _DesktopFormatBar extends StatelessWidget {
           toggle(Attribute.underline, 'Underline ${cmd}U'),
           toggle(Attribute.ul, 'Bulleted list $shift${cmd}7'),
           toggle(Attribute.ol, 'Numbered list $shift${cmd}9'),
+          QuillToolbarToggleCheckListButton(
+            controller: controller,
+            options: QuillToolbarToggleCheckListButtonOptions(
+              iconSize: 15,
+              iconButtonFactor: 1.8,
+              tooltip: 'Checklist $shift${cmd}L',
+            ),
+          ),
           _TextStyleButton(controller: controller, onDone: onDone, size: 30),
         ],
       ),
@@ -2343,6 +2418,7 @@ enum _Command {
   link('Link to a note', 'Or type [[', Icons.link),
   draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
   heading('Heading', 'Make this line a heading', Icons.title),
+  checklist('Checklist', 'Tick-box items', Icons.check_box_outlined),
   attach('Attach', 'Audio, an image or a file', Icons.attach_file),
   voice('Voice note', 'Record a thought as you read', Icons.mic_none),
   dictate('Dictate', 'Speak instead of typing', Icons.keyboard_voice_outlined),

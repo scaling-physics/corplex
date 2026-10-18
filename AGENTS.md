@@ -481,6 +481,26 @@ the default screens until the user opts in by using the feature.
   front-matter section (`abbreviationBlocks`, via `extraFrontMatter` in
   `project_menu.dart`).
 
+### 1.10 — Notes parity (built)
+- **Checklists**: Quill's own checked lists (`Attribute.unchecked`). Mac
+  toolbar button and Format → Checklist ⇧⌘L (`MenuCommand.checklist`);
+  phones use `/` → Checklist (the phone format row must fit 360 px, and a
+  sixth button doesn't).
+- **Pinned notes** (`Notes.pinned`, schema v18, synced; server file
+  `20261009000000_pinned_notes.sql`, **apply it before schema-v18 data
+  syncs**): every notes list orders `pinned DESC, updatedAt DESC`;
+  ⋮ / right-click → Pin to top / Unpin (`setNotePinned`); a pin before the
+  title. The first synced boolean: the server column is an `integer` 0/1,
+  like SQLite, because sync copies values through unconverted — a
+  Postgres `boolean` would reject 0/1 on push.
+- **Find in note** (`notes/note_find.dart`, `NoteFindBar`): ⌘F/⌘G/⇧⌘G on a
+  Mac (the editor's `MenuCommandHandler` now takes `find`, so ⌘F in a note
+  no longer opens app search), ⋮ → Find in note everywhere. Case-insensitive
+  matches over `document.toPlainText()`, whose offsets equal document
+  offsets (embeds are one character); Replace / Replace all (back to
+  front). It sits in the editor's bottom bar. It must request focus itself:
+  `autofocus` won't take focus from the editor that still has it.
+
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
 locked notes — said plainly when the password is set), **one notes

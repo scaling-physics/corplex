@@ -92,7 +92,14 @@ const syncTables = [
   SyncTableSpec(
     'notes',
     keys: ['id'],
-    columns: ['title', 'content', 'folder_id', 'created_at', 'updated_at'],
+    columns: [
+      'title',
+      'content',
+      'folder_id',
+      'pinned',
+      'created_at',
+      'updated_at',
+    ],
   ),
   SyncTableSpec(
     'note_versions',

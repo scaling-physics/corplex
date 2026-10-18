@@ -5,6 +5,8 @@ import '../../theme/context_menu.dart';
 import '../../data/database.dart';
 import '../lock/note_lock_service.dart';
 import '../lock/notes_password_dialogs.dart';
+import '../../data/database_provider.dart';
+import 'notes_providers.dart';
 
 /// Saves for the notes open in an editor right now, by note id. An editor
 /// registers while it is open, so something that changes the note behind
@@ -61,3 +63,11 @@ ContextMenuAction lockMenuAction(
         icon: Icons.lock_outline,
         onSelected: () => lockNoteFromList(context, ref, note),
       );
+
+/// The right-click item for [note]: Pin to top, or Unpin.
+ContextMenuAction pinMenuAction(WidgetRef ref, Note note) => ContextMenuAction(
+  label: note.pinned ? 'Unpin' : 'Pin to top',
+  icon: note.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+  onSelected: () =>
+      setNotePinned(ref.read(databaseProvider), note.id, !note.pinned),
+);

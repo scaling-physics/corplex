@@ -137,5 +137,12 @@ Map<String, dynamic> paperToCsl(Paper paper) {
   } else if (venue.isNotEmpty) {
     item['container-title'] = venue;
   }
+  // The paper's own link, unless the arXiv rule above already chose one.
+  final url = (paper.url ?? '').trim();
+  if (url.isNotEmpty && item['URL'] == null) item['URL'] = url;
+  final pmid = (paper.pmid ?? '').trim();
+  if (pmid.isNotEmpty) item['PMID'] = pmid;
+  final abstract = (paper.abstract ?? '').trim();
+  if (abstract.isNotEmpty) item['abstract'] = abstract;
   return item;
 }

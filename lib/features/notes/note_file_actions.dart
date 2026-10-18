@@ -1,3 +1,5 @@
+import '../export/export_images.dart';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -176,7 +178,13 @@ Future<void> printNote(
     );
     final doc = await buildStyledExportDoc(
       db,
-      [ExportNote(note.title, content)],
+      [
+        ExportNote(
+          note.title,
+          content,
+          images: await noteExportImages(db, noteId),
+        ),
+      ],
       title: note.title,
       style: CitationStyle.apa,
       figures: figures,

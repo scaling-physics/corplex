@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import '../ink/ink_model.dart';
 import '../ink/sketch_render.dart';
 import '../notes/note_table.dart';
+import 'export_images.dart' show ExportPhoto;
 import 'export_model.dart';
 
 /// Pixel width drawings are rendered at for Word.
@@ -40,7 +41,7 @@ List<int> exportToDocx(
   Map<ExportBlock, Uint8List> images = const {},
 }) {
   final body = StringBuffer();
-  final media = <Uint8List>[];
+  final media = <({Uint8List bytes, String ext})>[];
   if (doc.title.trim().isNotEmpty) {
     body.write(_para('Title', [Run(doc.title.trim())]));
   }
@@ -62,6 +63,7 @@ List<int> exportToDocx(
       // text, centred (Word's equation box accepts pasted LaTeX).
       BlockKind.image => _image(b, images[b], media),
       BlockKind.table => _table(b.table!),
+      BlockKind.photo => _photo(b.photo!, media),
       BlockKind.displayMath => _para(
         null,
         [Run('\$\$ ${b.text} \$\$', math: true)],
@@ -75,14 +77,17 @@ List<int> exportToDocx(
     ..addFile(
       ArchiveFile.string(
         '[Content_Types].xml',
-        _contentTypes(hasPng: media.isNotEmpty),
+        _contentTypes(
+          hasPng: media.any((m) => m.ext == 'png'),
+          hasJpeg: media.any((m) => m.ext == 'jpg'),
+        ),
       ),
     )
     ..addFile(ArchiveFile.string('_rels/.rels', _rootRels))
     ..addFile(
       ArchiveFile.string(
         'word/_rels/document.xml.rels',
-        _documentRels(media.length),
+        _documentRels([for (final m in media) m.ext]),
       ),
     )
     ..addFile(ArchiveFile.string('word/styles.xml', _styles))
@@ -100,7 +105,10 @@ List<int> exportToDocx(
     );
   for (var i = 0; i < media.length; i++) {
     archive.addFile(
-      ArchiveFile.bytes('word/media/image${i + 1}.png', media[i]),
+      ArchiveFile.bytes(
+        'word/media/image${i + 1}.${media[i].ext}',
+        media[i].bytes,
+      ),
     );
   }
   return ZipEncoder().encode(archive);
@@ -124,9 +132,13 @@ String _attr(String s) => _escape(s).replaceAll('"', '&quot;');
 
 /// An inline picture for a drawing, full text width. Registers the PNG in
 /// [media]; its relationship id is `rId${index + 2}` (rId1 is the styles).
-String _image(ExportBlock b, Uint8List? png, List<Uint8List> media) {
+String _image(
+  ExportBlock b,
+  Uint8List? png,
+  List<({Uint8List bytes, String ext})> media,
+) {
   if (png == null) return _para(null, [const Run('[Sketch]')]);
-  media.add(png);
+  media.add((bytes: png, ext: 'png'));
   final n = media.length;
   final sketch = b.sketch!;
   final heightPx = (docxSketchPixels * sketch.aspect).ceil();
@@ -154,6 +166,39 @@ String _image(ExportBlock b, Uint8List? png, List<Uint8List> media) {
       '</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
       '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>'
       '</w:p>';
+}
+
+/// An attached image, full text width (kept under one page's height), with
+/// its caption in the Caption style underneath.
+String _photo(ExportPhoto photo, List<({Uint8List bytes, String ext})> media) {
+  media.add((bytes: photo.bytes, ext: photo.ext));
+  final n = media.length;
+  var cx = _textWidthEmu;
+  var cy = (cx * photo.aspect).round();
+  if (cy > _maxImageHeightEmu) {
+    cx = (cx * _maxImageHeightEmu / cy).round();
+    cy = _maxImageHeightEmu;
+  }
+  final alt = _attr(photo.caption ?? photo.name);
+  final pic =
+      '<w:p><w:pPr><w:keepNext/><w:jc w:val="center"/></w:pPr><w:r><w:drawing>'
+      '<wp:inline distT="0" distB="0" distL="0" distR="0">'
+      '<wp:extent cx="$cx" cy="$cy"/>'
+      '<wp:docPr id="$n" name="Image $n" descr="$alt"/>'
+      '<wp:cNvGraphicFramePr>'
+      '<a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
+      '<a:graphic><a:graphicData uri="$_nsPic">'
+      '<pic:pic><pic:nvPicPr><pic:cNvPr id="$n" name="image$n.${photo.ext}"/>'
+      '<pic:cNvPicPr/></pic:nvPicPr>'
+      '<pic:blipFill><a:blip r:embed="rId${n + 1}"/>'
+      '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="$cx" cy="$cy"/>'
+      '</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+      '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>'
+      '</w:p>';
+  return photo.caption == null
+      ? pic
+      : '$pic${_para('Caption', [Run(photo.caption!)], centered: true)}';
 }
 
 /// A bordered table; a header row is bold, shaded and repeats across pages.
@@ -245,12 +290,13 @@ String _escape(String s) => s
     // Control characters aren't allowed in XML 1.0.
     .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'), '');
 
-String _contentTypes({required bool hasPng}) =>
+String _contentTypes({required bool hasPng, bool hasJpeg = false}) =>
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
     '<Default Extension="xml" ContentType="application/xml"/>'
     '${hasPng ? '<Default Extension="png" ContentType="image/png"/>' : ''}'
+    '${hasJpeg ? '<Default Extension="jpg" ContentType="image/jpeg"/>' : ''}'
     '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
     '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
     '</Types>';
@@ -262,11 +308,11 @@ const _rootRels =
     '</Relationships>';
 
 /// Ties document.xml to its styles part and its pictures (`rId2…`).
-String _documentRels(int images) =>
+String _documentRels(List<String> images) =>
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
-    '${[for (var i = 1; i <= images; i++) '<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image$i.png"/>'].join()}'
+    '${[for (var i = 1; i <= images.length; i++) '<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image$i.${images[i - 1]}"/>'].join()}'
     '</Relationships>';
 
 const _styles =

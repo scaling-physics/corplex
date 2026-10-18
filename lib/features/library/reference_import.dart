@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'authors.dart';
 import 'bibtex.dart';
+import 'pubmed.dart' show pubmedIdFromUrl;
 
 /// Reads reference-manager exports: BibTeX, RIS (Zotero, Mendeley, EndNote,
 /// most publishers) and CSL JSON (Zotero's "CSL JSON"). The format is
@@ -88,6 +89,27 @@ PaperMetadata? _fromRis(Map<String, List<String>> r) {
       : int.tryParse(RegExp(r'\d{4}').firstMatch(date)?.group(0) ?? '');
 
   final doi = first(['DO', 'DI']);
+  final ur = first(['UR', 'L1', 'L2']);
+  // AN / C1 / M1 / ID hold a PubMed id in PubMed's own export; elsewhere an
+  // accession number, so only a plain run of digits counts.
+  String? pmid;
+  for (final tag in const ['AN', 'C1', 'M1', 'N1']) {
+    for (final v in r[tag] ?? const <String>[]) {
+      final m =
+          RegExp(
+            r'^(?:pmid[:\s]*)?(\d{1,9})$',
+            caseSensitive: false,
+          ).firstMatch(v.trim()) ??
+          RegExp(r'\bpmid[:\s]*(\d{1,9})', caseSensitive: false).firstMatch(v);
+      if (m != null) {
+        pmid = m.group(1);
+        break;
+      }
+    }
+    if (pmid != null) break;
+  }
+  pmid ??= pubmedIdFromUrl(ur);
+  final abstract = first(['AB', 'N2']);
   return PaperMetadata(
     title: title,
     authors: authorsToStored(AuthorList(authors)),
@@ -96,7 +118,21 @@ PaperMetadata? _fromRis(Map<String, List<String>> r) {
     doi: doi == null || doi.isEmpty
         ? _doiFromUrl(first(['UR']))
         : _normDoi(doi),
+    pmid: pmid,
+    url: _linkOrNull(ur),
+    abstract: abstract == null || abstract.trim().isEmpty ? null : abstract,
   );
+}
+
+/// A web link worth keeping: not just the DOI's own resolver address.
+String? _linkOrNull(String? url) {
+  final u = url?.trim();
+  if (u == null || u.isEmpty) return null;
+  if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(u)) return null;
+  if (RegExp(r'^https?://(dx\.)?doi\.org/', caseSensitive: false).hasMatch(u)) {
+    return null;
+  }
+  return u;
 }
 
 String? _doiFromUrl(String? url) {
@@ -140,6 +176,8 @@ List<PaperMetadata>? parseCslJson(String source) {
       year = int.tryParse('${parts.first}');
     }
     final doi = item['DOI']?.toString();
+    final pmidRaw = item['PMID']?.toString().trim() ?? '';
+    final abstract = item['abstract']?.toString().trim() ?? '';
     final venue = (item['container-title'] ?? item['publisher'])?.toString();
     results.add(
       PaperMetadata(
@@ -148,6 +186,9 @@ List<PaperMetadata>? parseCslJson(String source) {
         year: year,
         venue: venue == null || venue.isEmpty ? null : venue,
         doi: doi == null || doi.isEmpty ? null : _normDoi(doi),
+        pmid: RegExp(r'^\d{1,9}$').hasMatch(pmidRaw) ? pmidRaw : null,
+        url: _linkOrNull(item['URL']?.toString()),
+        abstract: abstract.isEmpty ? null : abstract,
       ),
     );
   }

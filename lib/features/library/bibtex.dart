@@ -11,6 +11,9 @@ class PaperMetadata {
     this.year,
     this.venue,
     this.doi,
+    this.pmid,
+    this.url,
+    this.abstract,
   });
 
   final String title;
@@ -20,6 +23,28 @@ class PaperMetadata {
   final int? year;
   final String? venue;
   final String? doi;
+
+  /// PubMed id (digits), a link to the paper's page, and its abstract as
+  /// plain text — each optional and only ever filled into an empty field.
+  final String? pmid;
+  final String? url;
+  final String? abstract;
+
+  /// This record, with anything it lacks taken from [other].
+  PaperMetadata withFallback(PaperMetadata? other) {
+    if (other == null) return this;
+    String? pick(String? a, String? b) => (a ?? '').trim().isEmpty ? b : a;
+    return PaperMetadata(
+      title: title,
+      authors: authors.isEmpty ? other.authors : authors,
+      year: year ?? other.year,
+      venue: pick(venue, other.venue),
+      doi: pick(doi, other.doi),
+      pmid: pick(pmid, other.pmid),
+      url: pick(url, other.url),
+      abstract: pick(abstract, other.abstract),
+    );
+  }
 }
 
 /// Parses a BibTeX file into [PaperMetadata], one per entry that has a
@@ -94,11 +119,48 @@ List<PaperMetadata> parseBibtex(String source) {
           ),
         ),
         doi: _nonEmpty(_normalizeDoi(fields['doi'] ?? fields['url'] ?? '')),
+        pmid: _pmidFromBibtex(fields),
+        url: _urlFromBibtex(fields),
+        abstract: _nonEmpty(_cleanParagraphs(fields['abstract'] ?? '')),
       ),
     );
   }
   return results;
 }
+
+/// `pmid = {123}`, or the PubMed id of `eprint` when `archiveprefix`/
+/// `eprinttype` says pubmed.
+String? _pmidFromBibtex(Map<String, String> f) {
+  final direct = RegExp(r'\d{1,9}')
+      .firstMatch(_clean(f['pmid'] ?? ''))
+      ?.group(0);
+  if (direct != null) return direct;
+  final kind = (f['archiveprefix'] ?? f['eprinttype'] ?? '').toLowerCase();
+  if (kind == 'pubmed') {
+    return RegExp(r'\d{1,9}').firstMatch(_clean(f['eprint'] ?? ''))?.group(0);
+  }
+  return null;
+}
+
+/// The `url` field, unless it is only a doi.org link (the DOI says that).
+String? _urlFromBibtex(Map<String, String> f) {
+  final raw = _clean(f['url'] ?? '').replaceAll(RegExp(r'\s'), '');
+  if (raw.isEmpty) return null;
+  if (RegExp(
+    r'^https?://(dx\.)?doi\.org/',
+    caseSensitive: false,
+  ).hasMatch(raw)) {
+    return null;
+  }
+  return raw;
+}
+
+/// Like [_clean] but keeps blank-line paragraph breaks.
+String _cleanParagraphs(String value) => value
+    .split(RegExp(r'\n\s*\n'))
+    .map(_clean)
+    .where((p) => p.isNotEmpty)
+    .join('\n\n');
 
 String? _nonEmpty(String s) => s.isEmpty ? null : s;
 

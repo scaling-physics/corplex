@@ -107,6 +107,7 @@ LatexProject buildLatexProject(
   };
 
   final figures = <String, Uint8List>{};
+  var photoCount = 0;
   final body = StringBuffer();
   String? env;
   void close() {
@@ -224,6 +225,22 @@ LatexProject buildLatexProject(
             : null;
         body.writeln('${figureEnv(image(b), cap, above: false)}\n');
         if (cap != null) i = j;
+      case BlockKind.photo:
+        close();
+        final photo = b.photo!;
+        final path = 'figures/image-${photoCount + 1}.${photo.ext}';
+        photoCount++;
+        figures[path] = photo.bytes;
+        final inc =
+            '\\includegraphics[width=\\linewidth,height=0.7\\textheight,'
+            'keepaspectratio]{$path}';
+        body.writeln(
+          photo.caption == null
+              ? '\\begin{center}\n$inc\n\\end{center}\n'
+              : '\\begin{figure}[htbp]\n\\centering\n$inc\n'
+                    '\\caption{${latexEscape(photo.caption!)}}\n'
+                    '\\end{figure}\n',
+        );
       case BlockKind.table:
         close();
         final j = next(i);

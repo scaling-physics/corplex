@@ -9,6 +9,7 @@ import '../ink/ink_model.dart';
 import '../ink/ink_tools.dart' show sketchPaperColor;
 import '../notes/math_render.dart';
 import '../notes/note_table.dart';
+import 'export_images.dart' show ExportPhoto;
 import 'export_model.dart';
 
 /// Loads a bundled font file's bytes. Injectable so tests can read from
@@ -161,6 +162,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     }
     if (b.kind == BlockKind.image) return sketchWidget(b.sketch!);
     if (b.kind == BlockKind.table) return tableWidget(b.table!);
+    if (b.kind == BlockKind.photo) return photoWidget(b.photo!, style(9));
     return switch (b.kind) {
       BlockKind.heading1 => rich(20, isBold: true, before: 14, after: 6),
       BlockKind.heading2 => rich(16, isBold: true, before: 10, after: 4),
@@ -186,6 +188,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
       BlockKind.displayMath ||
       BlockKind.code ||
       BlockKind.image ||
+      BlockKind.photo ||
       BlockKind.table => pw.SizedBox(),
       BlockKind.paragraph =>
         b.runs.every((r) => r.text.isEmpty) ? pw.SizedBox(height: 6) : rich(11),
@@ -213,6 +216,38 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
 // A4 text width with the 56 pt margins used above.
 const _textWidth = 595.28 - 112;
 const _maxSketchHeight = 660.0;
+
+// About 70% of an A4 page's height.
+const _maxPhotoHeight = 590.0;
+
+/// An attached image at full text width (narrower only if it would be taller
+/// than ~70% of a page), with its caption underneath when it has one.
+pw.Widget photoWidget(ExportPhoto photo, pw.TextStyle captionStyle) {
+  var width = _textWidth;
+  var height = width * photo.aspect;
+  if (height > _maxPhotoHeight) {
+    width = width * _maxPhotoHeight / height;
+    height = _maxPhotoHeight;
+  }
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 8),
+    child: pw.Column(
+      children: [
+        pw.Image(
+          pw.MemoryImage(photo.bytes),
+          width: width,
+          height: height,
+          fit: pw.BoxFit.contain,
+        ),
+        if (photo.caption != null)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 4),
+            child: pw.Text(photo.caption!, style: captionStyle),
+          ),
+      ],
+    ),
+  );
+}
 
 /// A drawing as vector paths (no rasterising) on the sketch paper colour,
 /// as wide as the text (narrower only if it would be taller than a page).

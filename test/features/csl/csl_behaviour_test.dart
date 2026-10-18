@@ -254,6 +254,19 @@ void main() {
       ]);
     });
 
+    test('link, PMID and abstract reach the item', () {
+      final item = paperToCsl(
+        _paper('1', 'T', 'A B', 2018, venue: 'J').copyWith(
+          url: const Value('https://example.org/p'),
+          pmid: const Value('77'),
+          abstract: const Value('Abs.'),
+        ),
+      );
+      expect(item['URL'], 'https://example.org/p');
+      expect(item['PMID'], '77');
+      expect(item['abstract'], 'Abs.');
+    });
+
     test('an arXiv preprint carries its id and link', () {
       final item = paperToCsl(
         _paper(

@@ -1,3 +1,5 @@
+import '../export/export_images.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -1388,11 +1390,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       liveContent: content,
       lock: _lock,
     );
+    final images = await noteExportImages(_db, widget.noteId);
     if (!context.mounted) return;
     await exportNotes(
       context,
       _db,
-      [ExportNote(_titleController.text, content)],
+      [ExportNote(_titleController.text, content, images: images)],
       title: _titleController.text,
       figures: figures,
     );

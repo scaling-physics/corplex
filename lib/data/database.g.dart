@@ -950,6 +950,35 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _pmidMeta = const VerificationMeta('pmid');
+  @override
+  late final GeneratedColumn<String> pmid = GeneratedColumn<String>(
+    'pmid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _abstractMeta = const VerificationMeta(
+    'abstract',
+  );
+  @override
+  late final GeneratedColumn<String> abstract = GeneratedColumn<String>(
+    'abstract',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -994,6 +1023,9 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
     techniques,
     sampleSize,
     paradigm,
+    pmid,
+    url,
+    abstract,
     createdAt,
     updatedAt,
   ];
@@ -1113,6 +1145,24 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         paradigm.isAcceptableOrUnknown(data['paradigm']!, _paradigmMeta),
       );
     }
+    if (data.containsKey('pmid')) {
+      context.handle(
+        _pmidMeta,
+        pmid.isAcceptableOrUnknown(data['pmid']!, _pmidMeta),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    if (data.containsKey('abstract')) {
+      context.handle(
+        _abstractMeta,
+        abstract.isAcceptableOrUnknown(data['abstract']!, _abstractMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1208,6 +1258,18 @@ class $PapersTable extends Papers with TableInfo<$PapersTable, Paper> {
         DriftSqlType.string,
         data['${effectivePrefix}paradigm'],
       ),
+      pmid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pmid'],
+      ),
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+      abstract: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}abstract'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1282,6 +1344,15 @@ class Paper extends DataClass implements Insertable<Paper> {
 
   /// Task or paradigm, free text, e.g. `fear conditioning`.
   final String? paradigm;
+
+  /// PubMed id (digits only), from a lookup or an import (schema v20).
+  final String? pmid;
+
+  /// The paper's web page (publisher, preprint server, repository).
+  final String? url;
+
+  /// The abstract, plain text, from a lookup or an import.
+  final String? abstract;
   final DateTime createdAt;
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).
@@ -1305,6 +1376,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     this.techniques,
     this.sampleSize,
     this.paradigm,
+    this.pmid,
+    this.url,
+    this.abstract,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1361,6 +1435,15 @@ class Paper extends DataClass implements Insertable<Paper> {
     if (!nullToAbsent || paradigm != null) {
       map['paradigm'] = Variable<String>(paradigm);
     }
+    if (!nullToAbsent || pmid != null) {
+      map['pmid'] = Variable<String>(pmid);
+    }
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    if (!nullToAbsent || abstract != null) {
+      map['abstract'] = Variable<String>(abstract);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1412,6 +1495,11 @@ class Paper extends DataClass implements Insertable<Paper> {
       paradigm: paradigm == null && nullToAbsent
           ? const Value.absent()
           : Value(paradigm),
+      pmid: pmid == null && nullToAbsent ? const Value.absent() : Value(pmid),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      abstract: abstract == null && nullToAbsent
+          ? const Value.absent()
+          : Value(abstract),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1443,6 +1531,9 @@ class Paper extends DataClass implements Insertable<Paper> {
       techniques: serializer.fromJson<String?>(json['techniques']),
       sampleSize: serializer.fromJson<int?>(json['sampleSize']),
       paradigm: serializer.fromJson<String?>(json['paradigm']),
+      pmid: serializer.fromJson<String?>(json['pmid']),
+      url: serializer.fromJson<String?>(json['url']),
+      abstract: serializer.fromJson<String?>(json['abstract']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1471,6 +1562,9 @@ class Paper extends DataClass implements Insertable<Paper> {
       'techniques': serializer.toJson<String?>(techniques),
       'sampleSize': serializer.toJson<int?>(sampleSize),
       'paradigm': serializer.toJson<String?>(paradigm),
+      'pmid': serializer.toJson<String?>(pmid),
+      'url': serializer.toJson<String?>(url),
+      'abstract': serializer.toJson<String?>(abstract),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1495,6 +1589,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     Value<String?> techniques = const Value.absent(),
     Value<int?> sampleSize = const Value.absent(),
     Value<String?> paradigm = const Value.absent(),
+    Value<String?> pmid = const Value.absent(),
+    Value<String?> url = const Value.absent(),
+    Value<String?> abstract = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Paper(
@@ -1518,6 +1615,9 @@ class Paper extends DataClass implements Insertable<Paper> {
     techniques: techniques.present ? techniques.value : this.techniques,
     sampleSize: sampleSize.present ? sampleSize.value : this.sampleSize,
     paradigm: paradigm.present ? paradigm.value : this.paradigm,
+    pmid: pmid.present ? pmid.value : this.pmid,
+    url: url.present ? url.value : this.url,
+    abstract: abstract.present ? abstract.value : this.abstract,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1551,6 +1651,9 @@ class Paper extends DataClass implements Insertable<Paper> {
           ? data.sampleSize.value
           : this.sampleSize,
       paradigm: data.paradigm.present ? data.paradigm.value : this.paradigm,
+      pmid: data.pmid.present ? data.pmid.value : this.pmid,
+      url: data.url.present ? data.url.value : this.url,
+      abstract: data.abstract.present ? data.abstract.value : this.abstract,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1577,6 +1680,9 @@ class Paper extends DataClass implements Insertable<Paper> {
           ..write('techniques: $techniques, ')
           ..write('sampleSize: $sampleSize, ')
           ..write('paradigm: $paradigm, ')
+          ..write('pmid: $pmid, ')
+          ..write('url: $url, ')
+          ..write('abstract: $abstract, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1584,7 +1690,7 @@ class Paper extends DataClass implements Insertable<Paper> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     title,
     authors,
@@ -1603,9 +1709,12 @@ class Paper extends DataClass implements Insertable<Paper> {
     techniques,
     sampleSize,
     paradigm,
+    pmid,
+    url,
+    abstract,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1628,6 +1737,9 @@ class Paper extends DataClass implements Insertable<Paper> {
           other.techniques == this.techniques &&
           other.sampleSize == this.sampleSize &&
           other.paradigm == this.paradigm &&
+          other.pmid == this.pmid &&
+          other.url == this.url &&
+          other.abstract == this.abstract &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1651,6 +1763,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
   final Value<String?> techniques;
   final Value<int?> sampleSize;
   final Value<String?> paradigm;
+  final Value<String?> pmid;
+  final Value<String?> url;
+  final Value<String?> abstract;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1673,6 +1788,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.techniques = const Value.absent(),
     this.sampleSize = const Value.absent(),
     this.paradigm = const Value.absent(),
+    this.pmid = const Value.absent(),
+    this.url = const Value.absent(),
+    this.abstract = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1696,6 +1814,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     this.techniques = const Value.absent(),
     this.sampleSize = const Value.absent(),
     this.paradigm = const Value.absent(),
+    this.pmid = const Value.absent(),
+    this.url = const Value.absent(),
+    this.abstract = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1719,6 +1840,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Expression<String>? techniques,
     Expression<int>? sampleSize,
     Expression<String>? paradigm,
+    Expression<String>? pmid,
+    Expression<String>? url,
+    Expression<String>? abstract,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1742,6 +1866,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       if (techniques != null) 'techniques': techniques,
       if (sampleSize != null) 'sample_size': sampleSize,
       if (paradigm != null) 'paradigm': paradigm,
+      if (pmid != null) 'pmid': pmid,
+      if (url != null) 'url': url,
+      if (abstract != null) 'abstract': abstract,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1767,6 +1894,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     Value<String?>? techniques,
     Value<int?>? sampleSize,
     Value<String?>? paradigm,
+    Value<String?>? pmid,
+    Value<String?>? url,
+    Value<String?>? abstract,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1790,6 +1920,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
       techniques: techniques ?? this.techniques,
       sampleSize: sampleSize ?? this.sampleSize,
       paradigm: paradigm ?? this.paradigm,
+      pmid: pmid ?? this.pmid,
+      url: url ?? this.url,
+      abstract: abstract ?? this.abstract,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1855,6 +1988,15 @@ class PapersCompanion extends UpdateCompanion<Paper> {
     if (paradigm.present) {
       map['paradigm'] = Variable<String>(paradigm.value);
     }
+    if (pmid.present) {
+      map['pmid'] = Variable<String>(pmid.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    if (abstract.present) {
+      map['abstract'] = Variable<String>(abstract.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1888,6 +2030,9 @@ class PapersCompanion extends UpdateCompanion<Paper> {
           ..write('techniques: $techniques, ')
           ..write('sampleSize: $sampleSize, ')
           ..write('paradigm: $paradigm, ')
+          ..write('pmid: $pmid, ')
+          ..write('url: $url, ')
+          ..write('abstract: $abstract, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -10204,6 +10349,9 @@ typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
   Value<String?> techniques,
   Value<int?> sampleSize,
   Value<String?> paradigm,
+  Value<String?> pmid,
+  Value<String?> url,
+  Value<String?> abstract,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -10227,6 +10375,9 @@ typedef $$PapersTableUpdateCompanionBuilder = PapersCompanion Function({
   Value<String?> techniques,
   Value<int?> sampleSize,
   Value<String?> paradigm,
+  Value<String?> pmid,
+  Value<String?> url,
+  Value<String?> abstract,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -10479,6 +10630,21 @@ class $$PapersTableFilterComposer
 
   ColumnFilters<String> get paradigm => $composableBuilder(
     column: $table.paradigm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pmid => $composableBuilder(
+    column: $table.pmid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get abstract => $composableBuilder(
+    column: $table.abstract,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10792,6 +10958,21 @@ class $$PapersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pmid => $composableBuilder(
+    column: $table.pmid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get abstract => $composableBuilder(
+    column: $table.abstract,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -10876,6 +11057,15 @@ class $$PapersTableAnnotationComposer
 
   GeneratedColumn<String> get paradigm =>
       $composableBuilder(column: $table.paradigm, builder: (column) => column);
+
+  GeneratedColumn<String> get pmid =>
+      $composableBuilder(column: $table.pmid, builder: (column) => column);
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get abstract =>
+      $composableBuilder(column: $table.abstract, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -11139,6 +11329,9 @@ class $$PapersTableTableManager
                 Value<String?> techniques = const Value.absent(),
                 Value<int?> sampleSize = const Value.absent(),
                 Value<String?> paradigm = const Value.absent(),
+                Value<String?> pmid = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> abstract = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -11161,6 +11354,9 @@ class $$PapersTableTableManager
                 techniques: techniques,
                 sampleSize: sampleSize,
                 paradigm: paradigm,
+                pmid: pmid,
+                url: url,
+                abstract: abstract,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -11185,6 +11381,9 @@ class $$PapersTableTableManager
                 Value<String?> techniques = const Value.absent(),
                 Value<int?> sampleSize = const Value.absent(),
                 Value<String?> paradigm = const Value.absent(),
+                Value<String?> pmid = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> abstract = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -11207,6 +11406,9 @@ class $$PapersTableTableManager
                 techniques: techniques,
                 sampleSize: sampleSize,
                 paradigm: paradigm,
+                pmid: pmid,
+                url: url,
+                abstract: abstract,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

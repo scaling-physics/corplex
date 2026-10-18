@@ -34,6 +34,8 @@ String exportToMarkdown(ExportDoc doc) {
       BlockKind.code => text,
       BlockKind.image => sketchMarkdown(b.sketch!),
       BlockKind.table => tableMarkdown(b.table!),
+      // A single text can't carry files: say which image was left out.
+      BlockKind.photo => '*[Image not included: ${b.photo!.name}]*',
     };
     // Markdown paragraphs are separated by a blank line; list items stick
     // together. Empty lines in the note are just that blank line.

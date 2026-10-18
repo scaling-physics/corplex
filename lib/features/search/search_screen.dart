@@ -57,7 +57,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<List<SearchHit>> _find(String query) async {
     final pdf = ref.read(pdfTextIndexProvider);
     // Papers' text may not be indexed yet (or since a restart): carry on.
-    pdf.kick();
+    pdf.kickIfIncomplete();
     final hits = await ref.read(searchIndexProvider).search(query);
     return [...hits, ...await pdf.search(query)];
   }

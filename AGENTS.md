@@ -626,8 +626,8 @@ the default screens until the user opts in by using the feature.
   environments with `\label`/`\ref`, `tabularx`, `report` + `\chapter` for
   projects, bib style from the citation style; built from `buildExportDoc`
   (`Run.source` keeps raw markers). Checked: DOCX opens in macOS's reader;
-  LaTeX not compiled here (no TeX installed). Note image attachments are not
-  exported.
+  LaTeX not compiled here (no TeX installed). Note image attachments are
+  exported since 1.14.
 - **Search inside PDFs** (`search/pdf_text_index.dart`): local FTS5
   `pdf_pages_index` (one row per page) + `pdf_index_state` (stamp =
   path|size|mtime, `done_pages`), raw SQL, derived, not synced, dropped from
@@ -642,8 +642,8 @@ the default screens until the user opts in by using the feature.
 - **PubMed** (`library/pubmed.dart`): `parseIdentifier` knows labelled PMIDs
   and PMC ids (never a bare number); E-utilities `esummary` and the PMC ID
   converter (`pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/`), https,
-  `tool=corplex`; a DOI in the result goes to Crossref. The PMID isn't
-  stored (no column). **Retractions** (`library/retraction*.dart`): Crossref
+  `tool=corplex`; a DOI in the result goes to Crossref. The PMID is stored
+  since 1.14 (`Papers.pmid`). **Retractions** (`library/retraction*.dart`): Crossref
   `works?filter=updates:<doi>` (retraction, withdrawal, expression of
   concern, correction), cached per DOI in `<cache>/retractions` (30 days,
   stale offline; no cache folder → no request), checked when a paper opens
@@ -680,6 +680,63 @@ the default screens until the user opts in by using the feature.
   rows show "N open comments". Locked notes: `quote`/`body` are encrypted
   envelopes (`lockNote`/`removeLock` convert them; read via
   `CommentStore.view`). Comments travel with trash.
+
+### 1.14 — Performance, photos in exports, paper links (built; emulator-checked)
+- **Performance** (`docs/performance.md`, `test/perf/`,
+  `integration_test/perf_test.dart`): measured on 1,500 papers, 3,000
+  notes, 20,000 highlights and a 300-page PDF. `flutter test test/perf`
+  prints `PERF` lines; on a device `flutter drive
+  --driver=integration_test/perf_driver.dart
+  --target=integration_test/perf_test.dart -d <device> --profile` prints
+  `PERFDEV` lines (a Mac window must be on screen for the UI groups).
+  `SearchIndex` now diffs against a plain local `search_state` table (kind,
+  ref, stamp, FTS rowid) inside SQLite and re-reads only changed rows, in
+  batches of 40 with a yield; a dirty flag from drift's `tableUpdates`
+  skips the comparison when nothing was written (so **writes to notes,
+  papers or highlights must go through drift or `notifyUpdates`**, as the
+  sync engine's raw SQL does). If `search_index` or `search_state` is
+  missing (backups drop the index) it rebuilds. First build went from 80 s
+  to 1.3 s on a Mac, minutes to ~12 s on the emulator. Local indexes are
+  `performanceIndexStatements` (`CREATE INDEX IF NOT EXISTS` in
+  `beforeOpen`, no schema bump; a test checks they're used and don't touch
+  the sync triggers). `PdfTextIndex.kickIfIncomplete()` for frequent
+  callers, `kick()` at startup (after 4 s); pages written 8 per batch.
+  `notePlainTextPreview` is an LRU; `paperCoverProvider` is `autoDispose`
+  with a 120-entry memory cache. Known gap: the Notes list still loads full
+  note bodies (37 ms on a Mac at 3,000 notes); fixing it needs a stored
+  preview column.
+- **Photos in exports** (`export/export_images.dart`): `ExportNote.images`
+  (`noteExportImages`: the note's image attachments with a local file, in
+  attachment order) become `BlockKind.photo` blocks after the note body —
+  the end of each chapter in a project export, before References. Files
+  are sniffed by magic bytes; PNG/JPEG go in as they are, anything else is
+  re-encoded to PNG via `dart:ui`; missing or undecodable files are
+  skipped. Caption = attachment title unless it is camera-style
+  (`isCameraStyleName`: `IMG_1234`, "Pasted image", timestamps). PDF/Print
+  full text width, ≤ 70% of the page height; DOCX media parts (`jpg`
+  default content type); LaTeX `figures/image-N.<ext>` in a `figure`;
+  Markdown export writes "*[Image not included: name]*"; the vault already
+  embedded them (`![[…]]`). Marked-up images export the composite. Locked
+  notes export images only when the body was readable. "Share as
+  Markdown" still leaves images out. HEIC/WebP/GIF conversion is untested
+  (`dart:ui` decoding is unreliable under `flutter test`).
+- **Paper links** (schema v20, server file
+  `20261011000000_paper_links.sql`, **apply it before schema-v20 data
+  syncs**): `Papers.pmid`, `url` and `abstract`, synced. Every metadata
+  source fills them only into empty fields (`PaperMetadata`,
+  `fillMissingMetadata`): Crossref (link = doi.org; JATS abstract →
+  plain text with paragraph breaks, `plainTextFromMarkup`), PubMed
+  (`esummary` + `efetch` abstract with section labels; an `efetch`
+  failure just means no abstract), arXiv (`abs` link, summary), Zotero
+  (`url`, `abstractNote`, `PMID:` in `extra`), BibTeX, RIS and CSL JSON
+  import (a `url` that is only the doi.org link is dropped). A PMC lookup
+  via Crossref keeps the PMID but fetches no PubMed abstract. The paper
+  screen shows Abstract (4 lines, More/Less, editable), PubMed ID and Link
+  (each with an open button) only once they have a value, and a section
+  stays once shown. BibTeX export writes `pmid`/`url`/`abstract`; CSL
+  items get `URL`, `PMID`, `abstract`; search indexes the abstract in the
+  paper's body column (below titles in rank). OpenAlex abstracts aren't
+  used.
 
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
@@ -864,8 +921,9 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   them), and an Android **release** build that checks the notification
   drawables survived resource shrinking — release-only failures are
   otherwise invisible to the tests.
-- Integration tests on real devices; a performance pass with 1,000+ papers
-  and large PDFs.
+- Integration tests on real devices. The performance pass with 1,000+
+  papers and large PDFs is done (1.14, `docs/performance.md`); rerun it
+  after changing search, list queries or indexes.
 - App Store / Play Store release setup; privacy-respecting crash reporting.
 
 ## Visual design

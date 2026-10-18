@@ -351,6 +351,9 @@ class ZoteroImporter {
                   year: Value(meta.year),
                   venue: Value(meta.venue),
                   doi: Value(meta.doi),
+                  pmid: Value(meta.pmid),
+                  url: Value(meta.url),
+                  abstract: Value(meta.abstract),
                 ),
               );
           summary.papers++;

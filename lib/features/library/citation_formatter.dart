@@ -266,6 +266,12 @@ String _formatHand(Paper paper, String hand) {
       if (venue.isNotEmpty) lines.add('  journal={$venue},');
       if (paper.year != null) lines.add('  year={$year},');
       if ((paper.doi ?? '').isNotEmpty) lines.add('  doi={${paper.doi}},');
+      if ((paper.pmid ?? '').isNotEmpty) lines.add('  pmid={${paper.pmid}},');
+      if ((paper.url ?? '').isNotEmpty) lines.add('  url={${paper.url}},');
+      final abstract = (paper.abstract ?? '')
+          .replaceAll(RegExp(r'[{}\\]'), '')
+          .trim();
+      if (abstract.isNotEmpty) lines.add('  abstract={$abstract},');
       lines.add('}');
       return lines.join('\n');
   }

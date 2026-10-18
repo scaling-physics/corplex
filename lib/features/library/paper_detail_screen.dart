@@ -69,6 +69,16 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   final _yearController = TextEditingController();
   final _venueController = TextEditingController();
   final _doiController = TextEditingController();
+  final _pmidController = TextEditingController();
+  final _urlController = TextEditingController();
+  final _abstractController = TextEditingController();
+
+  /// PMID, link and abstract only appear once a paper has one (a lookup, an
+  /// import or a sync fills them) and then stay, so clearing a field while
+  /// editing doesn't make it vanish under the cursor.
+  bool _showPmid = false;
+  bool _showUrl = false;
+  bool _showAbstract = false;
   final _authorsFocus = FocusNode();
 
   /// Long author lists show as a short summary until tapped.
@@ -117,6 +127,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _yearController.addListener(_scheduleSave);
     _venueController.addListener(_scheduleSave);
     _doiController.addListener(_scheduleSave);
+    _pmidController.addListener(_scheduleSave);
+    _urlController.addListener(_scheduleSave);
+    _abstractController.addListener(_scheduleSave);
     _authorsFocus.addListener(() {
       if (_authorsFocus.hasFocus != _editingAuthors) {
         setState(() => _editingAuthors = _authorsFocus.hasFocus);
@@ -177,6 +190,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     _yearController: paper.year?.toString() ?? '',
     _venueController: paper.venue ?? '',
     _doiController: paper.doi ?? '',
+    _pmidController: paper.pmid ?? '',
+    _urlController: paper.url ?? '',
+    _abstractController: paper.abstract ?? '',
   };
 
   void _showPaper(Paper paper) {
@@ -217,7 +233,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     // An arXiv paper's id often sits in the venue ("arXiv:1706.03762").
     final id =
         parseIdentifier(_doiController.text) ??
-        parseIdentifier(_venueController.text);
+        parseIdentifier(_venueController.text) ??
+        (RegExp(r'^\d{1,9}$').hasMatch(_pmidController.text.trim())
+            ? PaperIdentifier(IdentifierKind.pmid, _pmidController.text.trim())
+            : null);
     final messenger = ScaffoldMessenger.of(context);
     if (id == null) {
       messenger.showSnackBar(
@@ -261,6 +280,12 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     }
   }
 
+  Future<void> _open(String link, {bool enabled = true}) async {
+    final uri = Uri.tryParse(link);
+    if (!enabled || uri == null || !uri.hasScheme) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   void _scheduleSave() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _save);
@@ -285,13 +310,21 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
               ? null
               : _doiController.text.trim(),
         ),
+        pmid: Value(_nullIfBlank(_pmidController.text)),
+        url: Value(_nullIfBlank(_urlController.text)),
+        abstract: Value(_nullIfBlank(_abstractController.text)),
       ),
     );
   }
 
+  static String? _nullIfBlank(String s) => s.trim().isEmpty ? null : s.trim();
+
   @override
   void dispose() {
     _debounce?.cancel();
+    _pmidController.dispose();
+    _urlController.dispose();
+    _abstractController.dispose();
     _scroll.dispose();
     _collapse.dispose();
     _titleController.dispose();
@@ -311,10 +344,14 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     final paperAsync = ref.watch(paperByIdProvider(widget.paperId));
     ref.listen(paperByIdProvider(widget.paperId), (_, next) {
       _absorbOutsideChanges(next.value);
+      if (!_showAbstract || !_showPmid || !_showUrl) setState(() {});
     });
     final notesAsync = ref.watch(notesForPaperProvider(widget.paperId));
 
     final paper = paperAsync.value;
+    _showPmid |= _pmidController.text.trim().isNotEmpty;
+    _showUrl |= _urlController.text.trim().isNotEmpty;
+    _showAbstract |= _abstractController.text.trim().isNotEmpty;
     final hasMarks =
         ref.watch(paperHasMarksProvider(widget.paperId)).value ?? false;
     return Scaffold(
@@ -506,6 +543,41 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                         labelText: 'DOI, arXiv or PubMed ID',
                       ),
                     ),
+                    if (_showPmid) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _pmidController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'PubMed ID',
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            tooltip: 'Open in PubMed',
+                            onPressed: () => _open(
+                              'https://pubmed.ncbi.nlm.nih.gov/'
+                              '${_pmidController.text.trim()}/',
+                              enabled: RegExp(r'^\d{1,9}$')
+                                  .hasMatch(_pmidController.text.trim()),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_showUrl) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _urlController,
+                        keyboardType: TextInputType.url,
+                        decoration: InputDecoration(
+                          labelText: 'Link',
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            tooltip: 'Open link',
+                            onPressed: () => _open(_urlController.text.trim()),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     TextField(
                       controller: _venueController,
@@ -527,6 +599,13 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                 ),
               ),
             ),
+          ];
+          final e7b = <Widget>[
+            if (_showAbstract)
+              _Section(
+                title: 'Abstract',
+                child: _AbstractBox(controller: _abstractController),
+              ),
           ];
           final e8 = <Widget>[
             if (paperAsync.value case final paper?)
@@ -699,6 +778,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                                         ...e2,
                                         ...e3,
                                         ...e4,
+                                        ...e7b,
                                         ...e7,
                                         ...e8,
                                       ],
@@ -727,6 +807,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                               ...e2,
                               ...e3,
                               ...e4,
+                              ...e7b,
                               ...e5,
                               ...e6,
                               ...e7,
@@ -1143,6 +1224,89 @@ class _HighlightsSection extends ConsumerWidget {
 }
 
 /// A titled group on the paper screen: small header, content in a card.
+/// The abstract: four lines and "More" until opened, then editable text.
+class _AbstractBox extends StatefulWidget {
+  const _AbstractBox({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  State<_AbstractBox> createState() => _AbstractBoxState();
+}
+
+class _AbstractBoxState extends State<_AbstractBox> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium;
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: _open
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: widget.controller,
+                  style: style,
+                  minLines: 3,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => setState(() => _open = false),
+                    child: const Text('Less'),
+                  ),
+                ),
+              ],
+            )
+          : ValueListenableBuilder(
+              valueListenable: widget.controller,
+              builder: (context, value, _) => LayoutBuilder(
+                builder: (context, box) {
+                  final painter = TextPainter(
+                    text: TextSpan(text: value.text, style: style),
+                    textDirection: Directionality.of(context),
+                    textScaler: MediaQuery.textScalerOf(context),
+                    maxLines: 4,
+                  )..layout(maxWidth: box.maxWidth);
+                  final overflows = painter.didExceedMaxLines;
+                  painter.dispose();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        value.text,
+                        style: style,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () => setState(() => _open = true),
+                          child: Text(overflows ? 'More' : 'Edit'),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+    );
+  }
+}
+
 class _Section extends StatelessWidget {
   const _Section({required this.title, required this.child, this.trailing});
 

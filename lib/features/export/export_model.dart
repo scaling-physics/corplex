@@ -14,6 +14,7 @@ import '../projects/figures.dart';
 import '../notes/note_links.dart';
 import '../notes/note_table.dart';
 import '../ink/ink_model.dart';
+import 'export_images.dart';
 
 /// A note (or several) flattened to what every output format needs:
 /// headings, paragraphs, lists, quotes and styled runs of text. The
@@ -42,6 +43,9 @@ enum BlockKind {
 
   /// A table: [ExportBlock.table].
   table,
+
+  /// A photo attached to a note: [ExportBlock.photo].
+  photo,
 }
 
 class Run {
@@ -86,6 +90,7 @@ class ExportBlock {
     this.sketch,
     this.table,
     this.figure,
+    this.photo,
     this.chapterTitle = false,
   });
 
@@ -96,6 +101,7 @@ class ExportBlock {
       ordinal = 0,
       table = null,
       figure = null,
+      photo = null,
       chapterTitle = false;
 
   /// A table block.
@@ -105,10 +111,24 @@ class ExportBlock {
       ordinal = 0,
       sketch = null,
       figure = null,
+      photo = null,
+      chapterTitle = false;
+
+  /// A block for an image attached to a note.
+  const ExportBlock.photo(ExportPhoto this.photo)
+    : kind = BlockKind.photo,
+      runs = const [],
+      ordinal = 0,
+      sketch = null,
+      table = null,
+      figure = null,
       chapterTitle = false;
 
   final BlockKind kind;
   final List<Run> runs;
+
+  /// The image of a [BlockKind.photo] block.
+  final ExportPhoto? photo;
 
   /// The drawing of a [BlockKind.image] block.
   final Sketch? sketch;
@@ -150,10 +170,14 @@ class ExportDoc {
 
 /// One note to export: its title and Quill content.
 class ExportNote {
-  const ExportNote(this.title, this.content);
+  const ExportNote(this.title, this.content, {this.images = const []});
 
   final String title;
   final String content;
+
+  /// The note's image attachments, placed as figures after its body. Only
+  /// honoured when the body is readable (see [withoutLockedBodies]).
+  final List<ExportImage> images;
 }
 
 /// [notes] with any still-locked body emptied: a caller that couldn't
@@ -258,9 +282,10 @@ Future<ExportDoc> buildExportDoc(
       blocks.add(
         ExportBlock(BlockKind.heading1, [Run(heading)], chapterTitle: true),
       );
-      blocks.addAll(_withoutReferences(own));
-    } else {
-      blocks.addAll(_withoutReferences(own));
+    }
+    blocks.addAll(_withoutReferences(own));
+    for (final photo in await loadExportPhotos(notes[i].images)) {
+      blocks.add(ExportBlock.photo(photo));
     }
   }
   final cited = resolver.cited;

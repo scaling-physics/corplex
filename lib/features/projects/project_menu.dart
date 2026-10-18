@@ -1,3 +1,5 @@
+import '../export/export_images.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -191,11 +193,19 @@ Future<void> exportProject(
     // Still unreadable (damaged, or locked again meanwhile): title only.
     contents.add(text ?? '');
   }
+  final images = [
+    for (final (i, n) in notes.indexed)
+      // Pictures only with a readable body.
+      contents[i].isEmpty ? <ExportImage>[] : await noteExportImages(db, n.id),
+  ];
   if (!context.mounted) return;
   await exportNotes(
     context,
     db,
-    [for (final (i, n) in notes.indexed) ExportNote(n.title, contents[i])],
+    [
+      for (final (i, n) in notes.indexed)
+        ExportNote(n.title, contents[i], images: images[i]),
+    ],
     title: project.name,
     extraFrontMatter: abbreviationBlocks(contents),
   );

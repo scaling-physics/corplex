@@ -6,10 +6,12 @@ import '../notes/note_table.dart';
 /// the handwriting recognised in its drawings and the cells of its tables.
 /// Locked notes never come here (they are indexed by title only).
 String noteSearchText(String content) {
-  final base = notePlainTextPreview(content);
+  // Decode once: this runs for every changed note when the index builds.
+  final document = decodeNoteContent(content);
+  final base = previewOfDocument(document);
   final extra = <String>[];
   try {
-    for (final op in decodeNoteContent(content).toDelta().toList()) {
+    for (final op in document.toDelta().toList()) {
       final data = op.data;
       if (data is! Map) continue;
       final sketch = data['sketch'];

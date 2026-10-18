@@ -37,6 +37,37 @@ PaperIdentifier? parsePubmedIdentifier(String input) {
   return null;
 }
 
+/// The PubMed id in a `pubmed.ncbi.nlm.nih.gov/<id>` style link.
+String? pubmedIdFromUrl(String? url) =>
+    url == null ? null : _pmidUrl.firstMatch(url)?.group(1);
+
+/// The abstract of an `efetch` XML answer as plain text: one paragraph per
+/// `<AbstractText>`, labelled sections ("Background: …") keep their label.
+/// Null when the record has no abstract.
+String? parsePubmedAbstract(String xml) {
+  final paragraphs = <String>[];
+  for (final m in RegExp(
+    r'<AbstractText([^>]*)>(.*?)</AbstractText>',
+    dotAll: true,
+  ).allMatches(xml)) {
+    final text = plainTextFromMarkup(m.group(2)!).replaceAll('\n', ' ').trim();
+    if (text.isEmpty) continue;
+    final label = RegExp(r'Label="([^"]*)"')
+        .firstMatch(m.group(1)!)
+        ?.group(1)
+        ?.trim();
+    paragraphs.add(
+      label == null || label.isEmpty || label.toUpperCase() == 'UNLABELLED'
+          ? text
+          : '${_titleCase(label)}: $text',
+    );
+  }
+  return paragraphs.isEmpty ? null : paragraphs.join('\n\n');
+}
+
+String _titleCase(String s) =>
+    s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase();
+
 // ----------------------------------------------------------------- records
 
 class PubmedRecord {
@@ -107,6 +138,11 @@ PubmedRecord? parsePubmedSummary(Map<String, dynamic> json, String pmid) {
       year: year,
       venue: venue.isEmpty ? null : venue,
       doi: doi,
+      pmid: pmid,
+      // The DOI's own address, else PubMed's page.
+      url: doi != null && doi.isNotEmpty
+          ? 'https://doi.org/$doi'
+          : 'https://pubmed.ncbi.nlm.nih.gov/$pmid/',
     ),
   );
 }
@@ -153,6 +189,21 @@ class PubmedClient {
     } catch (_) {
       throw const LookupFailed();
     }
+  }
+
+  /// The abstract, from `efetch`; null when there is none. Callers treat a
+  /// failure as "no abstract" — the summary is what matters.
+  Future<String?> abstractOf(String pmid) async {
+    final response = await _get(
+      Uri.https('eutils.ncbi.nlm.nih.gov', '/entrez/eutils/efetch.fcgi', {
+        'db': 'pubmed',
+        'id': pmid,
+        'retmode': 'xml',
+        'tool': 'corplex',
+      }),
+    );
+    if (response.statusCode != 200) throw const LookupFailed();
+    return parsePubmedAbstract(utf8.decode(response.bodyBytes));
   }
 
   Future<PmcIds?> convertPmc(String pmcid) async {

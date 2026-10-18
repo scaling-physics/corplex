@@ -175,4 +175,18 @@ void main() {
     expect((await index.search('optogenetics')).single.id, 'p1');
     expect((await index.search('CA1')).single.kind, SearchKind.paper);
   });
+
+  test('a paper is found by a word in its abstract', () async {
+    await db
+        .into(db.papers)
+        .insert(
+          PapersCompanion.insert(
+            id: const Value('p9'),
+            title: 'Sleep and memory',
+            abstract: const Value('Hippocampal replay consolidates engrams.'),
+          ),
+        );
+    final hits = await index.search('engrams');
+    expect(hits.map((h) => h.id), contains('p9'));
+  });
 }

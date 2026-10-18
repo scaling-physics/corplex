@@ -115,7 +115,21 @@ class MetadataLookup {
   Future<PaperMetadata?> pubmed(String pmid) async {
     final record = await _pubmed.summary(pmid);
     if (record == null) return null;
-    return _preferCrossref(record.metadata);
+    String? abstract;
+    try {
+      abstract = await _pubmed.abstractOf(pmid);
+    } on LookupFailed {
+      // Optional.
+    }
+    final base = record.metadata.withFallback(
+      abstract == null
+          ? null
+          : PaperMetadata(title: record.metadata.title, abstract: abstract),
+    );
+    final better = await _preferCrossref(base);
+    // Crossref doesn't know the PubMed id (and its abstract is often
+    // missing); PubMed's own copy fills those.
+    return better?.withFallback(base);
   }
 
   /// PMC id -> PMID/DOI through NCBI's ID converter, then as above.
@@ -124,7 +138,12 @@ class MetadataLookup {
     if (ids == null) return null;
     if (ids.doi != null) {
       final meta = await _tryCrossref(ids.doi!);
-      if (meta != null) return meta;
+      if (meta != null) {
+        if (ids.pmid == null) return meta;
+        return meta.withFallback(
+          PaperMetadata(title: meta.title, pmid: ids.pmid),
+        );
+      }
     }
     if (ids.pmid != null) return pubmed(ids.pmid!);
     return null;
@@ -270,8 +289,73 @@ PaperMetadata? parseCrossref(Map<String, dynamic> json) {
     venue:
         _first(message['container-title']) ?? message['publisher'] as String?,
     doi: message['DOI'] as String?,
+    url: _crossrefUrl(message),
+    abstract: _crossrefAbstract(message['abstract']),
   );
 }
+
+/// The DOI's resolver address (Crossref's own `URL` is the same, over
+/// plain http and sometimes `dx.doi.org`).
+String? _crossrefUrl(Map<String, dynamic> message) {
+  final doi = message['DOI'];
+  if (doi is String && doi.trim().isNotEmpty) {
+    return 'https://doi.org/${doi.trim()}';
+  }
+  final url = message['URL'];
+  return url is String && url.trim().isNotEmpty
+      ? url.trim().replaceFirst(RegExp(r'^http:'), 'https:')
+      : null;
+}
+
+/// Crossref abstracts are JATS XML (`<jats:p>…</jats:p>`): plain text with
+/// paragraph breaks kept, and the leading "Abstract" heading dropped.
+String? _crossrefAbstract(Object? raw) {
+  if (raw is! String) return null;
+  var text = plainTextFromMarkup(raw);
+  text = text.replaceFirst(
+    RegExp(r'^\s*abstract\s*[:.]?\s*(\n|$)', caseSensitive: false),
+    '',
+  );
+  text = text.trim();
+  return text.isEmpty ? null : text;
+}
+
+/// Markup (JATS, HTML, PubMed's inline tags) to plain text: block-level
+/// closers become paragraph breaks, other tags vanish, entities decode,
+/// and runs of space collapse.
+String plainTextFromMarkup(String markup) {
+  var s = markup
+      .replaceAll(
+        RegExp(
+          r'</(?:jats:)?(?:p|title|sec|abstract|list-item|li|div)>|<br\s*/?>',
+          caseSensitive: false,
+        ),
+        '\n\n',
+      )
+      .replaceAll(RegExp(r'<[^>]+>'), '');
+  s = _decodeEntities(s);
+  final paragraphs = s
+      .split(RegExp(r'\n\s*\n'))
+      .map((p) => p.replaceAll(RegExp(r'\s+'), ' ').trim())
+      .where((p) => p.isNotEmpty);
+  return paragraphs.join('\n\n');
+}
+
+String _decodeEntities(String s) => s
+    .replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (m) {
+      final c = int.tryParse(m.group(1)!, radix: 16);
+      return c == null ? m.group(0)! : String.fromCharCode(c);
+    })
+    .replaceAllMapped(RegExp(r'&#(\d+);'), (m) {
+      final c = int.tryParse(m.group(1)!);
+      return c == null ? m.group(0)! : String.fromCharCode(c);
+    })
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll('&nbsp;', ' ')
+    .replaceAll('&amp;', '&');
 
 String? _first(Object? value) =>
     value is List && value.isNotEmpty ? '${value.first}' : null;
@@ -317,7 +401,15 @@ PaperMetadata? parseArxiv(String atom, String id) {
     // registers for every preprint — so the paper always has one to cite
     // and the DOI field isn't left empty.
     doi: tag('arxiv:doi') ?? '10.48550/arXiv.$id',
+    url: 'https://arxiv.org/abs/$id',
+    abstract: _arxivSummary(tag('summary')),
   );
+}
+
+String? _arxivSummary(String? summary) {
+  if (summary == null) return null;
+  final text = _unescape(summary).replaceAll(RegExp(r'\s+'), ' ').trim();
+  return text.isEmpty ? null : text;
 }
 
 String _unescape(String s) => s
@@ -383,6 +475,9 @@ Future<({String? id, Paper? existing})> addPaperFromMetadata(
           year: Value(meta.year),
           venue: Value(meta.venue),
           doi: Value(meta.doi),
+          pmid: Value(meta.pmid),
+          url: Value(meta.url),
+          abstract: Value(meta.abstract),
         ),
       );
   return (id: id, existing: null);
@@ -416,12 +511,24 @@ Future<bool> fillMissingMetadata(
     doi: (paper.doi ?? '').trim().isEmpty && meta.doi != null
         ? Value(meta.doi)
         : const Value.absent(),
+    pmid: _empty(paper.pmid) && !_empty(meta.pmid)
+        ? Value(meta.pmid)
+        : const Value.absent(),
+    url: _empty(paper.url) && !_empty(meta.url)
+        ? Value(meta.url)
+        : const Value.absent(),
+    abstract: _empty(paper.abstract) && !_empty(meta.abstract)
+        ? Value(meta.abstract)
+        : const Value.absent(),
   );
   if (companion.title == const Value<String>.absent() &&
       companion.authors == const Value<String>.absent() &&
       companion.year == const Value<int?>.absent() &&
       companion.venue == const Value<String?>.absent() &&
-      companion.doi == const Value<String?>.absent()) {
+      companion.doi == const Value<String?>.absent() &&
+      companion.pmid == const Value<String?>.absent() &&
+      companion.url == const Value<String?>.absent() &&
+      companion.abstract == const Value<String?>.absent()) {
     return false;
   }
   await (db.update(
@@ -429,3 +536,5 @@ Future<bool> fillMissingMetadata(
   )..where((p) => p.id.equals(paperId))).write(companion);
   return true;
 }
+
+bool _empty(String? s) => (s ?? '').trim().isEmpty;

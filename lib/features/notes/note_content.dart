@@ -29,16 +29,54 @@ String encodeNoteContent(Document document) =>
 /// the object-replacement character.
 /// Figure/table markers read as words: a caption's `{#fig:x}` is dropped,
 /// a reference `{@fig:x}` reads "Figure" (numbers need the project).
-String notePlainTextPreview(String content) => decodeNoteContent(content)
+String notePlainTextPreview(String content) {
+  if (content.isEmpty) return '';
+  final cached = _previews.remove(content);
+  if (cached != null) {
+    _previews[content] = cached; // most recently used goes last
+    return cached;
+  }
+  final preview = previewOfDocument(decodeNoteContent(content));
+  _remember(content, preview);
+  return preview;
+}
+
+/// [notePlainTextPreview] for a document already decoded.
+String previewOfDocument(Document document) => document
     .toPlainText()
     .replaceAll('\uFFFC', '')
-    .replaceAll(RegExp(r'\{#(?:fig|tbl):[A-Za-z0-9_-]+\}'), '')
+    .replaceAll(_captionMarker, '')
     .replaceAllMapped(
-      RegExp(r'\{@(fig|tbl):[A-Za-z0-9_-]+\}'),
+      _referenceMarker,
       (m) => m[1] == 'fig' ? 'Figure' : 'Table',
     )
-    .replaceAll(RegExp(r'\s+'), ' ')
+    .replaceAll(_whitespace, ' ')
     .trim();
+
+final _captionMarker = RegExp(r'\{#(?:fig|tbl):[A-Za-z0-9_-]+\}');
+final _referenceMarker = RegExp(r'\{@(fig|tbl):[A-Za-z0-9_-]+\}');
+final _whitespace = RegExp(r'\s+');
+
+// List rows rebuild on every scroll, rebuild and sync; decoding a note's
+// Quill JSON for its one-line subtitle each time is what made a 3,000-note
+// list stutter. Keyed by the body itself (strings compare by value, and the
+// key shares the instance the note row already holds), least recently used
+// out first, bounded by count and by total characters retained.
+final _previews = <String, String>{};
+var _previewChars = 0;
+const _previewEntries = 600;
+const _previewCharBudget = 4000000;
+
+void _remember(String content, String preview) {
+  _previews[content] = preview;
+  _previewChars += content.length;
+  while (_previews.length > _previewEntries ||
+      _previewChars > _previewCharBudget) {
+    final oldest = _previews.keys.first;
+    _previews.remove(oldest);
+    _previewChars -= oldest.length;
+  }
+}
 
 /// Appends a quoted passage to [content]: the quote as a block quote, then
 /// "— p. 12" linked to [pageLink] (so tapping it reopens the PDF there),

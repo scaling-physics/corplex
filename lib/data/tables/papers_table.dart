@@ -58,6 +58,15 @@ class Papers extends Table {
   /// Task or paradigm, free text, e.g. `fear conditioning`.
   TextColumn get paradigm => text().nullable()();
 
+  /// PubMed id (digits only), from a lookup or an import (schema v20).
+  TextColumn get pmid => text().nullable()();
+
+  /// The paper's web page (publisher, preprint server, repository).
+  TextColumn get url => text().nullable()();
+
+  /// The abstract, plain text, from a lookup or an import.
+  TextColumn get abstract => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   /// Bumped on every edit; sync uses it for last-write-wins (see sync_schema.dart).

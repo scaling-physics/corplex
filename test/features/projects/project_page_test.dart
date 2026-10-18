@@ -216,7 +216,13 @@ void main() {
     await setProjectDueDate(
       db,
       id,
-      DateTime.now().add(const Duration(days: 40)),
+      // Calendar days: adding a 40 × 24 h Duration lands on the day before
+      // when it crosses a daylight-saving change just after midnight.
+      DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day + 40,
+      ),
     );
     await tester.pumpWidget(app(ProjectScreen(projectId: id)));
     await tester.pumpAndSettle();

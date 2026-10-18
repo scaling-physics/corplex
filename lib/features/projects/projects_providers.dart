@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -150,5 +151,7 @@ final projectNoteCountsProvider = StreamProvider.autoDispose<Map<String, int>>((
         (rows) => {
           for (final r in rows) r.read<String>('id'): r.read<int>('n'),
         },
-      );
+      )
+      // A save in an open note re-runs the counts; same counts, no rebuild.
+      .distinct(mapEquals);
 });

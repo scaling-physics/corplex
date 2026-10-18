@@ -1,4 +1,6 @@
-import 'package:drift/drift.dart' show OrderingTerm, innerJoin;
+import 'dart:async';
+
+import 'package:drift/drift.dart' show TableUpdateQuery;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,25 +21,58 @@ typedef HighlightWithPaper = ({Highlight highlight, Paper paper});
 /// Every highlight in the library, grouped by paper (alphabetical, pages in
 /// order), newest edit wins nothing here — it's a reading list of passages.
 final allHighlightsProvider =
-    StreamProvider.autoDispose<List<HighlightWithPaper>>((ref) {
+    StreamProvider.autoDispose<List<HighlightWithPaper>>((ref) async* {
       final db = ref.watch(databaseProvider);
-      final query =
-          db.select(db.highlights).join([
-            innerJoin(db.papers, db.papers.id.equalsExp(db.highlights.paperId)),
-          ])..orderBy([
-            OrderingTerm.asc(db.papers.title),
-            OrderingTerm.asc(db.highlights.pageNumber),
-            OrderingTerm.asc(db.highlights.createdAt),
-          ]);
-      return query.watch().map(
-        (rows) => [
-          for (final r in rows)
-            (
-              highlight: r.readTable(db.highlights),
-              paper: r.readTable(db.papers),
-            ),
-        ],
-      );
+      // Two plain selects joined here, not a SQL join: a join repeats the
+      // paper (title, authors, abstract...) on every one of 20,000 rows.
+      Future<List<HighlightWithPaper>> load() async {
+        final papers = {
+          for (final p in await db.select(db.papers).get()) p.id: p,
+        };
+        final highlights = await db.select(db.highlights).get();
+        final entries = [
+          for (final h in highlights)
+            if (papers[h.paperId] case final paper?)
+              (highlight: h, paper: paper),
+        ];
+        entries.sort((a, b) {
+          final byTitle = a.paper.title.compareTo(b.paper.title);
+          if (byTitle != 0) return byTitle;
+          final byPage = a.highlight.pageNumber.compareTo(
+            b.highlight.pageNumber,
+          );
+          if (byPage != 0) return byPage;
+          return a.highlight.createdAt.compareTo(b.highlight.createdAt);
+        });
+        return entries;
+      }
+
+      var stale = false;
+      var closed = false;
+      Completer<void>? wake;
+      final sub = db
+          .tableUpdates(
+            TableUpdateQuery.onAllTables([db.highlights, db.papers]),
+          )
+          .listen((_) {
+            stale = true;
+            wake?.complete();
+          });
+      ref.onDispose(() {
+        closed = true;
+        sub.cancel();
+        wake?.complete();
+      });
+      while (!closed) {
+        // Writes that land while a reload runs mark it stale: reload again.
+        stale = false;
+        yield await load();
+        if (!stale && !closed) {
+          wake = Completer<void>();
+          await wake.future;
+          wake = null;
+        }
+      }
     });
 
 /// Keeps the entries whose quote, comment or paper title contain [query].

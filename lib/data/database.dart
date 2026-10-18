@@ -72,13 +72,16 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
       await _createSyncSchema();
+    },
+    beforeOpen: (details) async {
+      await _createPerformanceIndexes();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -283,8 +286,34 @@ class AppDatabase extends _$AppDatabase {
         }
         await _createSyncSchema(markExisting: false);
       }
+      if (from < 20) {
+        // v20: a paper's PubMed id, web link and abstract. Synced columns,
+        // so the sync triggers are rebuilt to watch them.
+        for (final (name, column) in [
+          ('pmid', papers.pmid),
+          ('url', papers.url),
+          ('abstract', papers.abstract),
+        ]) {
+          if (!await _hasColumn('papers', name)) {
+            await m.addColumn(papers, column);
+          }
+        }
+        await _createSyncSchema(markExisting: false);
+      }
     },
   );
+
+  /// Local-only indexes for the lookups the UI and the cascades make. They
+  /// are not part of the synced schema and need no schema bump:
+  /// `IF NOT EXISTS` makes them idempotent, so existing installs gain them
+  /// the next time the database opens (and they ride along in backups
+  /// harmlessly). Foreign-key columns matter twice: every `ON DELETE
+  /// CASCADE`/`SET NULL` otherwise scans the child table.
+  Future<void> _createPerformanceIndexes() async {
+    for (final statement in performanceIndexStatements) {
+      await customStatement(statement);
+    }
+  }
 
   Future<bool> _hasTable(String table) async {
     final rows = await customSelect(
@@ -342,3 +371,26 @@ LazyDatabase _openConnection() {
     );
   });
 }
+
+/// See [AppDatabase._createPerformanceIndexes]. Composite indexes put the
+/// equality column first, then the one the query sorts or filters by.
+const performanceIndexStatements = <String>[
+  // Notes list: folder filter, and the folder's ON DELETE SET NULL.
+  'CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes (folder_id)',
+  // Every notes list orders pinned first, newest edit first.
+  'CREATE INDEX IF NOT EXISTS idx_notes_order ON notes (pinned DESC, updated_at DESC)',
+  'CREATE INDEX IF NOT EXISTS idx_papers_created ON papers (created_at DESC)',
+  // Join tables: the primary key covers the first column only.
+  'CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags (tag_id)',
+  'CREATE INDEX IF NOT EXISTS idx_project_notes_note ON project_notes (note_id)',
+  'CREATE INDEX IF NOT EXISTS idx_project_papers_paper ON project_papers (paper_id)',
+  'CREATE INDEX IF NOT EXISTS idx_note_paper_refs_paper ON note_paper_refs (paper_id)',
+  'CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments (note_id)',
+  'CREATE INDEX IF NOT EXISTS idx_attachments_paper ON attachments (paper_id)',
+  // The viewer asks for one page's marks at a time.
+  'CREATE INDEX IF NOT EXISTS idx_highlights_paper_page ON highlights (paper_id, page_number)',
+  'CREATE INDEX IF NOT EXISTS idx_annotations_paper_page ON annotations (paper_id, page_number)',
+  'CREATE INDEX IF NOT EXISTS idx_note_versions_note ON note_versions (note_id, created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS idx_note_comments_note ON note_comments (note_id)',
+  'CREATE INDEX IF NOT EXISTS idx_matrix_cells_paper ON matrix_cells (paper_id)',
+];

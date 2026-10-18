@@ -72,7 +72,37 @@ PaperMetadata? paperFromZoteroItem(Map<String, dynamic> item) {
     year: yearFromZoteroDate(_s(d, 'date')),
     venue: venue,
     doi: _doiOf(d),
+    pmid: _pmidOf(d),
+    url: _linkOf(d),
+    abstract: _s(d, 'abstractNote'),
   );
+}
+
+/// `PMID: 123` on a line of Zotero's "Extra" field (how Zotero's PubMed
+/// translators and Better BibTeX keep it).
+String? _pmidOf(Map<String, dynamic> d) {
+  final m = RegExp(
+    r'^PMID:\s*(\d{1,9})\b',
+    multiLine: true,
+    caseSensitive: false,
+  ).firstMatch(_s(d, 'extra') ?? '');
+  return m?.group(1);
+}
+
+/// The item's web address, unless it is just the DOI's resolver link.
+String? _linkOf(Map<String, dynamic> d) {
+  final url = _s(d, 'url');
+  if (url == null ||
+      !RegExp(r'^https?://', caseSensitive: false).hasMatch(url)) {
+    return null;
+  }
+  if (RegExp(
+    r'^https?://(dx\.)?doi\.org/',
+    caseSensitive: false,
+  ).hasMatch(url)) {
+    return null;
+  }
+  return url;
 }
 
 int? yearFromZoteroDate(String? date) {

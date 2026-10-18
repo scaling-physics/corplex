@@ -230,7 +230,13 @@ Future<ExportDoc> buildStyledExportDoc(
       final t = textOf(op);
       if (t != null) op['insert'] = plan.replace(t);
     }
-    rewritten.add(ExportNote(notes[i].title, jsonEncode(deltas[i])));
+    rewritten.add(
+      ExportNote(
+        notes[i].title,
+        jsonEncode(deltas[i]),
+        images: notes[i].images,
+      ),
+    );
   }
   final doc = await buildExportDoc(
     db,

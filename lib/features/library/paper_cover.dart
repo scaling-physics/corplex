@@ -23,18 +23,58 @@ typedef CoverRenderer = Future<Uint8List?> Function(String pdfPath);
 
 final coverRendererProvider = Provider<CoverRenderer>((ref) => _cachedCover);
 
-/// A paper's cover, keyed by paper id and local PDF path. Kept for the
-/// session once loaded, so scrolling back up the Library doesn't flash.
-final paperCoverProvider =
-    FutureProvider.family<Uint8List?, ({String paperId, String pdfPath})>(
-      (ref, key) => ref.watch(coverRendererProvider)(key.pdfPath),
-    );
+/// A paper's cover, keyed by paper id and local PDF path. Lives only while
+/// something shows it: with 1,500 papers, keeping every cover ever scrolled
+/// past (360 px PNGs) was hundreds of megabytes. Scrolling back is instant
+/// anyway: the most recent covers sit in a small in-memory cache
+/// ([peekCover]) and the rest on disk.
+final paperCoverProvider = FutureProvider.autoDispose
+    .family<Uint8List?, ({String paperId, String pdfPath})>((ref, key) {
+      // Scrolled away before its turn: the queue skips the render.
+      var wanted = true;
+      ref.onDispose(() => wanted = false);
+      return runZoned(
+        () => ref.watch(coverRendererProvider)(key.pdfPath),
+        zoneValues: {_wantedKey: () => wanted},
+      );
+    });
+
+const _wantedKey = #corplexCoverWanted;
+
+/// The cover for [pdfPath] if it was rendered or loaded recently, without
+/// waiting for a future.
+Uint8List? peekCover(String pdfPath) {
+  final bytes = _recent.remove(pdfPath);
+  if (bytes != null) _recent[pdfPath] = bytes;
+  return bytes;
+}
+
+// Most recently used last. Bounded by count: a cover is up to ~100 KB.
+final _recent = <String, Uint8List>{};
+const _recentCovers = 120;
+
+void _remember(String pdfPath, Uint8List bytes) {
+  _recent.remove(pdfPath);
+  _recent[pdfPath] = bytes;
+  while (_recent.length > _recentCovers) {
+    _recent.remove(_recent.keys.first);
+  }
+}
 
 // One render at a time: a Library scroll shouldn't open fifty PDFs at once.
 Future<void> _queue = Future.value();
 
 Future<Uint8List?> _cachedCover(String pdfPath) {
-  final result = _queue.then((_) => _loadOrRender(pdfPath));
+  final recent = peekCover(pdfPath);
+  if (recent != null) return Future.value(recent);
+  final wanted = Zone.current[_wantedKey] as bool Function()?;
+  final result = _queue.then((_) async {
+    // A fast scroll queues hundreds of covers; skip the ones already gone.
+    if (wanted != null && !wanted()) return null;
+    final bytes = await _loadOrRender(pdfPath);
+    if (bytes != null) _remember(pdfPath, bytes);
+    return bytes;
+  });
   _queue = result.then((_) {}, onError: (_) {});
   return result;
 }
@@ -122,8 +162,14 @@ class PaperCover extends ConsumerWidget {
     final bytes = path == null
         ? null
         : ref
-              .watch(paperCoverProvider((paperId: paperId, pdfPath: path)))
-              .value;
+                  .watch(paperCoverProvider((paperId: paperId, pdfPath: path)))
+                  .value ??
+              peekCover(path);
+    // Decode at the size it's shown (the PNG is 360 px wide): a 48 px list
+    // thumbnail otherwise holds a full-size bitmap in the image cache.
+    final decodeWidth = (width * MediaQuery.devicePixelRatioOf(context))
+        .ceil()
+        .clamp(1, coverPixelWidth);
     final placeholder = ColoredBox(
       color: c.surfaceContainerHighest,
       child: Center(
@@ -149,6 +195,7 @@ class PaperCover extends ConsumerWidget {
               : Image.memory(
                   bytes,
                   width: width,
+                  cacheWidth: decodeWidth,
                   fit: BoxFit.fitWidth,
                   gaplessPlayback: true,
                   frameBuilder: (context, child, frame, sync) => sync

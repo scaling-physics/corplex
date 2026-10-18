@@ -78,6 +78,19 @@ class PdfTextIndex {
   /// Fire and forget.
   void kick() => unawaited(run());
 
+  /// Like [kick], for callers that fire often (every search): starts a pass
+  /// only if some paper isn't fully indexed. One cheap query, instead of a
+  /// pass that checks every PDF file on disk. A PDF replaced on disk is
+  /// noticed by the next full [kick] (app start).
+  void kickIfIncomplete() {
+    if (_running != null) return;
+    unawaited(
+      incomplete.then((needed) {
+        if (needed) kick();
+      }, onError: (Object _) {}),
+    );
+  }
+
   Future<void> _runGuarded() async {
     try {
       if (!await available) return;
@@ -88,38 +101,69 @@ class PdfTextIndex {
   }
 
   Future<void> _pass() async {
-    await _db.customStatement(
-      'DELETE FROM pdf_pages_index WHERE paper_id NOT IN '
-      '(SELECT id FROM papers WHERE pdf_path IS NOT NULL)',
-    );
-    await _db.customStatement(
-      'DELETE FROM pdf_index_state WHERE paper_id NOT IN '
-      '(SELECT id FROM papers WHERE pdf_path IS NOT NULL)',
-    );
-    final papers = await (_db.select(
-      _db.papers,
-    )..where((p) => p.pdfPath.isNotNull())).get();
+    // Forget papers that lost their PDF. The state table is small and
+    // plain; the page index is FTS5, where a paper_id filter is a full scan,
+    // so only touch it when something is actually gone.
+    final orphans = await _db
+        .customSelect(
+          'SELECT paper_id FROM pdf_index_state WHERE paper_id NOT IN '
+          '(SELECT id FROM papers WHERE pdf_path IS NOT NULL)',
+        )
+        .get();
+    if (orphans.isNotEmpty) {
+      final ids = [for (final o in orphans) o.read<String>('paper_id')];
+      final marks = List.filled(ids.length, '?').join(',');
+      await _db.customStatement(
+        'DELETE FROM pdf_pages_index WHERE paper_id IN ($marks)',
+        ids,
+      );
+      await _db.customStatement(
+        'DELETE FROM pdf_index_state WHERE paper_id IN ($marks)',
+        ids,
+      );
+    }
+    final papers = await _db
+        .customSelect(
+          'SELECT id, pdf_path FROM papers WHERE pdf_path IS NOT NULL',
+        )
+        .get();
+    // One query for every paper's progress, not one per paper.
+    final states = {
+      for (final r
+          in await _db
+              .customSelect(
+                'SELECT paper_id, stamp, page_count, done_pages '
+                'FROM pdf_index_state',
+              )
+              .get())
+        r.read<String>('paper_id'): (
+          stamp: r.read<String>('stamp'),
+          pageCount: r.read<int>('page_count'),
+          done: r.read<int>('done_pages'),
+        ),
+    };
     for (final paper in papers) {
       if (_disposed) return;
-      await _indexPaper(paper.id, paper.pdfPath!);
+      await _indexPaper(
+        paper.read<String>('id'),
+        paper.read<String>('pdf_path'),
+        states[paper.read<String>('id')],
+      );
     }
   }
 
-  Future<void> _indexPaper(String id, String path) async {
+  Future<void> _indexPaper(
+    String id,
+    String path,
+    ({String stamp, int pageCount, int done})? state,
+  ) async {
     final stamp = await _stamp(path);
     if (stamp == null) return;
-    final state = await _db
-        .customSelect(
-          'SELECT stamp, page_count, done_pages FROM pdf_index_state '
-          'WHERE paper_id = ?',
-          variables: [Variable.withString(id)],
-        )
-        .getSingleOrNull();
     var done = 0;
     int? pageCount;
-    if (state != null && state.read<String>('stamp') == stamp) {
-      done = state.read<int>('done_pages');
-      pageCount = state.read<int>('page_count');
+    if (state != null && state.stamp == stamp) {
+      done = state.done;
+      pageCount = state.pageCount;
       if (done >= pageCount) return;
     } else {
       await _forget(id);
@@ -138,6 +182,30 @@ class PdfTextIndex {
         '(paper_id, stamp, page_count, done_pages) VALUES (?, ?, ?, ?)',
         [id, stamp, count, done],
       );
+      // Pages are written a few at a time in one transaction (with the
+      // progress marker), not as two statements per page.
+      final pending = <(int, String)>[];
+      Future<void> flush(int donePages) async {
+        if (pending.isEmpty) return;
+        final batch = List.of(pending);
+        pending.clear();
+        // One message to the database isolate, one transaction.
+        await _db.batch((b) {
+          for (final (page, text) in batch) {
+            b.customStatement(
+              'INSERT INTO pdf_pages_index (paper_id, page, text) '
+              'VALUES (?, ?, ?)',
+              [id, page, text],
+            );
+          }
+          b.customStatement(
+            'UPDATE pdf_index_state SET done_pages = ? WHERE paper_id = ?',
+            [donePages, id],
+          );
+        });
+      }
+
+      var written = done;
       for (var i = done; i < count; i++) {
         if (_disposed) return;
         var text = await pages.text(i);
@@ -146,22 +214,25 @@ class PdfTextIndex {
           if (ocr == null) {
             // A scan whose page isn't recognised yet: wait for OCR rather
             // than recording the page as empty.
-            if (await _ocrPending(id)) return;
+            if (await _ocrPending(id)) {
+              await flush(written);
+              return;
+            }
           } else {
             text = ocr;
           }
         }
-        if (text.trim().isNotEmpty) {
+        if (text.trim().isNotEmpty) pending.add((i + 1, text));
+        written = i + 1;
+        if (pending.length >= 8 || written == count) {
+          await flush(written);
+        } else if (pending.isEmpty && written % 8 == 0) {
+          // Blank pages only: still record progress now and then.
           await _db.customStatement(
-            'INSERT INTO pdf_pages_index (paper_id, page, text) '
-            'VALUES (?, ?, ?)',
-            [id, i + 1, text],
+            'UPDATE pdf_index_state SET done_pages = ? WHERE paper_id = ?',
+            [written, id],
           );
         }
-        await _db.customStatement(
-          'UPDATE pdf_index_state SET done_pages = ? WHERE paper_id = ?',
-          [i + 1, id],
-        );
         // Give the UI thread a turn between pages.
         await Future<void>.delayed(const Duration(milliseconds: 1));
       }
@@ -270,5 +341,10 @@ final pdfTextIndexProvider = Provider<PdfTextIndex>((ref) {
 /// Read once at launch (e.g. from `HomeShell`): indexes papers' text in the
 /// background and resumes unfinished work. Does nothing with no PDFs.
 final pdfIndexStartupProvider = Provider<void>((ref) {
-  ref.read(pdfTextIndexProvider).kick();
+  // Not during startup: the first screen's queries and frames come first.
+  final timer = Timer(startupIndexDelay, ref.read(pdfTextIndexProvider).kick);
+  ref.onDispose(timer.cancel);
 });
+
+/// How long after launch background PDF indexing waits to begin.
+const startupIndexDelay = Duration(seconds: 4);

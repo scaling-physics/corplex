@@ -15,6 +15,7 @@ import '../audio/audio_player_bar.dart';
 import '../capture/quick_capture.dart';
 import '../capture/quick_capture_actions.dart';
 import '../library/library_screen.dart';
+import '../search/pdf_text_index.dart' show pdfIndexStartupProvider;
 import '../ocr/ocr_service.dart';
 import '../settings/appearance_settings.dart';
 import '../library/library_actions.dart';
@@ -81,6 +82,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Scanned papers whose text recognition was cut short carry on. With
     // none (every test, every fresh install) this is one empty query.
     ref.read(ocrStartupProvider);
+    // Papers' full text for search is indexed quietly in the background.
+    ref.read(pdfIndexStartupProvider);
   }
 
   @override
@@ -160,6 +163,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.numberedList:
       case MenuCommand.checklist:
       case MenuCommand.blockQuote:
+      case MenuCommand.insertTable:
+      case MenuCommand.addComment:
       case MenuCommand.linkNote:
       case MenuCommand.citePaper:
       case MenuCommand.lockAllNotes:

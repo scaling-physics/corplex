@@ -101,7 +101,10 @@ OpenAlexWork? parseOpenAlexWork(Map<String, dynamic> j) {
 String? normalizeCitationDoi(String? raw) {
   if (raw == null || raw.trim().isEmpty) return null;
   final id = parseIdentifier(raw);
-  if (id == null) return null;
+  if (id == null ||
+      (id.kind != IdentifierKind.doi && id.kind != IdentifierKind.arxiv)) {
+    return null;
+  }
   final value = id.kind == IdentifierKind.arxiv
       ? '10.48550/arxiv.${id.value}'
       : id.value;

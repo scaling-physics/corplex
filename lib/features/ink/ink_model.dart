@@ -68,6 +68,31 @@ class InkStroke {
     return false;
   }
 
+  InkStroke copyWith({Color? color, List<InkPoint>? points}) => InkStroke(
+    tool: tool,
+    color: color ?? this.color,
+    width: width,
+    points: points ?? this.points,
+  );
+
+  /// This stroke moved by [by] (canvas-width units).
+  InkStroke translated(Offset by) => copyWith(
+    points: [for (final p in points) InkPoint(p.x + by.dx, p.y + by.dy, p.p)],
+  );
+
+  /// The box around the stroke's points, grown by half its width.
+  Rect get bounds {
+    if (points.isEmpty) return Rect.zero;
+    var l = points.first.x, r = l, t = points.first.y, b = t;
+    for (final p in points) {
+      l = math.min(l, p.x);
+      r = math.max(r, p.x);
+      t = math.min(t, p.y);
+      b = math.max(b, p.y);
+    }
+    return Rect.fromLTRB(l, t, r, b).inflate(width / 2);
+  }
+
   /// Lowest point reached, so the canvas can grow to fit.
   double get bottom => points.fold(0, (m, p) => math.max(m, p.y));
 
@@ -96,15 +121,22 @@ class InkPoint {
 }
 
 /// A drawing embedded in a note: its strokes plus its height as a fraction
-/// of its width (the canvas grows downward as you draw near the bottom).
+/// of its width (the canvas grows downward as you draw near the bottom),
+/// and the handwriting recognised in it ([text], derived on the device;
+/// null until recognised or after the strokes change).
 class Sketch {
-  const Sketch({this.strokes = const [], this.aspect = defaultAspect});
+  const Sketch({
+    this.strokes = const [],
+    this.aspect = defaultAspect,
+    this.text,
+  });
 
   factory Sketch.decode(String data) {
     try {
       final json = jsonDecode(data) as Map<String, Object?>;
       return Sketch(
         aspect: (json['a'] as num?)?.toDouble() ?? defaultAspect,
+        text: json['t'] as String?,
         strokes: [
           for (final s in (json['s'] as List? ?? const []))
             InkStroke.fromJson((s as Map).cast<String, Object?>()),
@@ -122,16 +154,27 @@ class Sketch {
   final List<InkStroke> strokes;
   final double aspect;
 
+  /// Recognised handwriting, kept in the note (key `t`) so search, export
+  /// and other devices see it without recognising again.
+  final String? text;
+
   bool get isEmpty => strokes.isEmpty;
 
   String encode() => jsonEncode({
     'v': 1,
     'a': InkStroke._round(aspect),
     's': [for (final s in strokes) s.toJson()],
+    if (text case final t? when t.isNotEmpty) 't': t,
   });
 
-  Sketch copyWith({List<InkStroke>? strokes, double? aspect}) =>
-      Sketch(strokes: strokes ?? this.strokes, aspect: aspect ?? this.aspect);
+  /// A copy. Changing [strokes] drops the recognised [text] (it no longer
+  /// matches) unless a new one is given.
+  Sketch copyWith({List<InkStroke>? strokes, double? aspect, String? text}) =>
+      Sketch(
+        strokes: strokes ?? this.strokes,
+        aspect: aspect ?? this.aspect,
+        text: text ?? (strokes == null ? this.text : null),
+      );
 }
 
 /// Pen pressure normalized to 0..1. Fingers and mice report a fixed or

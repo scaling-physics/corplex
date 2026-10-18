@@ -1,3 +1,4 @@
+import '../notes/note_markdown.dart' show sketchMarkdown, tableMarkdown;
 import 'export_model.dart';
 
 /// Markdown for [doc]: the title as `#`, note headings shifted down one
@@ -31,6 +32,8 @@ String exportToMarkdown(ExportDoc doc) {
       BlockKind.paragraph || BlockKind.caption => text,
       BlockKind.displayMath => '\$\$\n${b.text}\n\$\$',
       BlockKind.code => text,
+      BlockKind.image => sketchMarkdown(b.sketch!),
+      BlockKind.table => tableMarkdown(b.table!),
     };
     // Markdown paragraphs are separated by a blank line; list items stick
     // together. Empty lines in the note are just that blank line.

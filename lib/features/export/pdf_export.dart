@@ -1,10 +1,14 @@
 import 'dart:typed_data';
+import 'dart:ui' show Color;
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../ink/ink_model.dart';
+import '../ink/ink_tools.dart' show sketchPaperColor;
 import '../notes/math_render.dart';
+import '../notes/note_table.dart';
 import 'export_model.dart';
 
 /// Loads a bundled font file's bytes. Injectable so tests can read from
@@ -80,6 +84,29 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     );
   }
 
+  pw.Widget tableWidget(NoteTable t) {
+    pw.Widget cell(String text, bool head) => pw.Padding(
+      padding: const pw.EdgeInsets.all(4),
+      child: pw.Text(text, style: style(10, isBold: head)),
+    );
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 4, bottom: 10),
+      child: pw.Table(
+        border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.5),
+        children: [
+          for (final (i, row) in t.rows.indexed)
+            pw.TableRow(
+              repeat: t.header && i == 0,
+              decoration: t.header && i == 0
+                  ? pw.BoxDecoration(color: PdfColor.fromHex('EFEBE4'))
+                  : null,
+              children: [for (final c in row) cell(c, t.header && i == 0)],
+            ),
+        ],
+      ),
+    );
+  }
+
   pw.Widget block(ExportBlock b) {
     pw.Widget rich(
       double size, {
@@ -132,6 +159,8 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
         ),
       );
     }
+    if (b.kind == BlockKind.image) return sketchWidget(b.sketch!);
+    if (b.kind == BlockKind.table) return tableWidget(b.table!);
     return switch (b.kind) {
       BlockKind.heading1 => rich(20, isBold: true, before: 14, after: 6),
       BlockKind.heading2 => rich(16, isBold: true, before: 10, after: 4),
@@ -154,7 +183,10 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
         child: rich(11, after: 0),
       ),
       BlockKind.caption => rich(10, before: 2, after: 10),
-      BlockKind.displayMath || BlockKind.code => pw.SizedBox(),
+      BlockKind.displayMath ||
+      BlockKind.code ||
+      BlockKind.image ||
+      BlockKind.table => pw.SizedBox(),
       BlockKind.paragraph =>
         b.runs.every((r) => r.text.isEmpty) ? pw.SizedBox(height: 6) : rich(11),
     };
@@ -176,4 +208,83 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     ),
   );
   return pdf.save();
+}
+
+// A4 text width with the 56 pt margins used above.
+const _textWidth = 595.28 - 112;
+const _maxSketchHeight = 660.0;
+
+/// A drawing as vector paths (no rasterising) on the sketch paper colour,
+/// as wide as the text (narrower only if it would be taller than a page).
+/// Pen strokes use their average pressure for width, like the SVG export.
+pw.Widget sketchWidget(Sketch sketch) {
+  var width = _textWidth;
+  var height = width * sketch.aspect;
+  if (height > _maxSketchHeight) {
+    width = width * _maxSketchHeight / height;
+    height = _maxSketchHeight;
+  }
+  PdfColor col(Color c) => PdfColor(c.r, c.g, c.b);
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 6),
+    child: pw.Center(
+      child: pw.SizedBox(
+        width: width,
+        height: height,
+        child: pw.CustomPaint(
+          size: PdfPoint(width, height),
+          painter: (canvas, size) {
+            canvas
+              ..setFillColor(col(sketchPaperColor))
+              ..drawRect(0, 0, size.x, size.y)
+              ..fillPath();
+            final ordered = [
+              ...sketch.strokes.where((s) => s.tool == InkTool.highlighter),
+              ...sketch.strokes.where((s) => s.tool == InkTool.pen),
+            ];
+            double px(InkPoint p) => p.x * width;
+            double py(InkPoint p) => size.y - p.y * width;
+            for (final s in ordered) {
+              if (s.points.isEmpty) continue;
+              final hl = s.tool == InkTool.highlighter;
+              final pressure = hl
+                  ? 0.5
+                  : s.points.fold<double>(0, (a, p) => a + p.p) /
+                        s.points.length;
+              final w = hl
+                  ? s.width * width
+                  : s.width * width * (0.45 + 0.9 * pressure);
+              canvas
+                ..saveContext()
+                ..setGraphicState(
+                  PdfGraphicState(
+                    opacity: hl ? 0.5 : 1,
+                    strokeOpacity: hl ? 0.5 : 1,
+                  ),
+                );
+              if (s.points.length == 1) {
+                final p = s.points.single;
+                canvas
+                  ..setFillColor(col(s.color))
+                  ..drawEllipse(px(p), py(p), w / 2, w / 2)
+                  ..fillPath();
+              } else {
+                canvas
+                  ..setStrokeColor(col(s.color))
+                  ..setLineWidth(w)
+                  ..setLineCap(PdfLineCap.round)
+                  ..setLineJoin(PdfLineJoin.round)
+                  ..moveTo(px(s.points.first), py(s.points.first));
+                for (final p in s.points.skip(1)) {
+                  canvas.lineTo(px(p), py(p));
+                }
+                canvas.strokePath();
+              }
+              canvas.restoreContext();
+            }
+          },
+        ),
+      ),
+    ),
+  );
 }

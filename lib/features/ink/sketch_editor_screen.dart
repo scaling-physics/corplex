@@ -61,7 +61,8 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
   }
 
   void _beginChange() {
-    _undo.add(_sketch);
+    // A lasso gesture can begin many times without changing anything.
+    if (_undo.isEmpty || !identical(_undo.last, _sketch)) _undo.add(_sketch);
     _redo.clear();
   }
 
@@ -193,6 +194,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
                           color: _tools.color,
                           width: _tools.width,
                           erasing: _tools.erasing,
+                          lasso: _tools.lassoing,
                           onGestureStart: _beginChange,
                           onChanged: (s) => setState(() => _sketch = s),
                           onPolicyChanged: () => setState(() {}),

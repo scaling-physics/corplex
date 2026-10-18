@@ -583,6 +583,104 @@ the default screens until the user opts in by using the feature.
   would mean a second database connection whose streams don't see the
   first's writes).
 
+### 1.13 — Drawings, papers and thesis tools (built; emulator-checked)
+- **Pen tools** (`lib/features/ink/`): *shapes* — holding the pen still
+  500 ms (`shapeHoldDelay`) at the end of a stroke snaps it via the pure
+  `recognizeShape` (`shape_recognizer.dart`: line (level/plumb within 5°),
+  ellipse, rectangle, triangle, arrow), in `InkCanvas` and in `InkCatcher`
+  strokes that open a drawing. *Lasso* — `InkToolKind.lasso` selects strokes
+  with > 50% of their points inside the loop; the selection lives in the
+  canvas, clears when another drawing is chosen; move / Copy / Duplicate /
+  Colour / Delete are single writes, Paste via `inkClipboard`.
+  *Handwriting* — `InkSession` reads drawings written this session 2 s after
+  the pen idles (or when put away) through `inkOcrEngineProvider` (inert by
+  default; `main()` installs the on-device OCR, `renderSketchPng` on white),
+  storing `Sketch.text` (JSON `t`) via a history-ignoring write only if the
+  strokes are unchanged; changing strokes drops it. ⋯ → Convert to text
+  replaces the drawing with its text (one undo). Shared rendering:
+  `sketch_render.dart` (`renderSketchPng`, `sketchToSvg`).
+- **Mark up images** (`features/markup/`): the full-screen image view (note
+  and paper attachments, Attachments browser) has Mark up; an `InkCanvas`
+  over the fitted image (image-width units). Done writes a native-resolution
+  composite PNG and repoints the same attachment row (`storage_key` cleared);
+  a sidecar `<composite>.markup.json` keeps the original's path and the
+  strokes, so marks stay editable on this device (other devices get the
+  composite only). Trash purge deletes the sidecar and original with the
+  composite (`purgeTrash`).
+- **Tables** (`notes/table_embed.dart`, `note_table.dart`): a block embed
+  `table` holding `NoteTable.encode()` on its own line (`/` → Table, Aa →
+  Table, Format → Table ⌥⌘T). `_EditableTable` owns a controller/focus node
+  per cell so writes (`replaceText`, `ignoreFocus`) never recreate them;
+  300 ms debounce, flushed on leaving a cell; `didUpdateWidget` absorbs undo
+  and sync. Tab/Return/arrows move between cells (Tab in the last cell adds
+  a row); the editor's formatting keys do nothing in a cell. Structure menu
+  (handle, right-click, long-press). Word count includes cells.
+- **Exports** (`features/export/`): `ExportDoc` has `image` and `table`
+  blocks. PDF draws drawings as vector paths; DOCX embeds PNGs
+  (`exportToDocxWithImages`, `descr` = handwriting) and `<w:tbl>`; Markdown
+  share inlines an SVG data URI (alt = handwriting); the vault writes
+  `Attachments/<note>-sketch-N.svg`; tables are pipe tables / `pw.Table`.
+  **LaTeX (Overleaf)** (`latex_export.dart`, `ExportFormat.latex`, a zip of
+  `main.tex`, `references.bib`, `figures/*.png`): natbib with
+  `\citep[p.~42]{key}` / `\citealp` for mixed locators, `figure`/`table`
+  environments with `\label`/`\ref`, `tabularx`, `report` + `\chapter` for
+  projects, bib style from the citation style; built from `buildExportDoc`
+  (`Run.source` keeps raw markers). Checked: DOCX opens in macOS's reader;
+  LaTeX not compiled here (no TeX installed). Note image attachments are not
+  exported.
+- **Search inside PDFs** (`search/pdf_text_index.dart`): local FTS5
+  `pdf_pages_index` (one row per page) + `pdf_index_state` (stamp =
+  path|size|mtime, `done_pages`), raw SQL, derived, not synced, dropped from
+  backups. Text from `PdfPages.text`, `ocr_pages` for scanned pages (waits
+  while OCR runs). Background, a page at a time with a yield
+  (`pdfIndexStartupProvider`, also kicked by Search); resumes, re-indexes
+  changed PDFs, drops deleted papers. Results under "In papers" (page +
+  snippet, 3 pages per paper); tapping opens the PDF at the page with Find
+  started on the query (`PdfViewerScreen.initialQuery`). `noteSearchText`
+  adds drawing handwriting and table cells to note search (locked notes
+  stay title-only).
+- **PubMed** (`library/pubmed.dart`): `parseIdentifier` knows labelled PMIDs
+  and PMC ids (never a bare number); E-utilities `esummary` and the PMC ID
+  converter (`pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/`), https,
+  `tool=corplex`; a DOI in the result goes to Crossref. The PMID isn't
+  stored (no column). **Retractions** (`library/retraction*.dart`): Crossref
+  `works?filter=updates:<doi>` (retraction, withdrawal, expression of
+  concern, correction), cached per DOI in `<cache>/retractions` (30 days,
+  stale offline; no cache folder → no request), checked when a paper opens
+  and after import; `RetractionNotice` on the paper screen,
+  `RetractionMarker` (cache only) on Library rows for retractions.
+- **Zotero import** (`features/zotero/`, Library ⋮): user ID + API key in
+  secure storage on this device only; collections (nested) or everything;
+  Web API v3 (paged, `Backoff`/`Retry-After`, 50 MB file cap). Items →
+  papers (`findDuplicate`; existing papers only gain missing fields),
+  collections → projects ("Parent / Child"), PDFs downloaded, highlight /
+  underline annotations → `Highlights` (rects to page fractions via the
+  `PageSizeReader` seam, y flipped), child notes → "Zotero notes: <title>".
+  Re-imports don't duplicate; each paper commits in one transaction. Not
+  run against the real API.
+- **Read aloud** (`features/read_aloud/`, PDF viewer ⋮): `cleanPagesForListening`
+  (repeated headers/footers, page numbers, hyphenation, nothing after the
+  last References heading), `splitSentences`, `ReadAloudController` queues
+  3 sentences on the `Speaker` seam (inert default; `main()` installs
+  `ChannelSpeaker`, channel `corplex/speak`: AVSpeechSynthesizer on
+  iOS/macOS with a spoken-audio session on iOS, Android `TextToSpeech`
+  created lazily — the manifest needs the `TTS_SERVICE` `<queries>` entry).
+  The viewer follows the spoken page unless the reader scrolls away ("Back
+  to reading"). Android pause restarts the sentence. **Not `flutter_tts`**:
+  it has no Swift Package Manager support. Smoke test speaks a sentence.
+- **Comments** (`features/comments/`, table `note_comments`, schema v19,
+  synced; server file `20261010000000_note_comments.sql`, **apply it before
+  schema-v19 data syncs**): a comment keeps the passage's `quote` and an
+  editor-document `anchor` hint; `locateQuote` re-finds it (exact nearest
+  the anchor, else case-insensitive, else "Passage changed" — kept).
+  Add from the selection menu, Format → Add Comment ⌥⌘K or the panel's +.
+  `CommentMarks.wrap` tints open comments by composing with
+  `NoteSpell.spanBuilder` (document untouched); tapping a passage opens a
+  popover. ⋮ → Comments: side panel ≥ 900 pt, sheet below. Project chapter
+  rows show "N open comments". Locked notes: `quote`/`body` are encrypted
+  envelopes (`lockNote`/`removeLock` convert them; read via
+  `CommentStore.view`). Comments travel with trash.
+
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
 locked notes — said plainly when the password is set), **one notes

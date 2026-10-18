@@ -7193,6 +7193,560 @@ class NoteKeysCompanion extends UpdateCompanion<NoteKeyRow> {
   }
 }
 
+class $NoteCommentsTable extends NoteComments
+    with TableInfo<$NoteCommentsTable, NoteComment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NoteCommentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES notes (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _quoteMeta = const VerificationMeta('quote');
+  @override
+  late final GeneratedColumn<String> quote = GeneratedColumn<String>(
+    'quote',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _anchorMeta = const VerificationMeta('anchor');
+  @override
+  late final GeneratedColumn<int> anchor = GeneratedColumn<int>(
+    'anchor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+    'author',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resolvedMeta = const VerificationMeta(
+    'resolved',
+  );
+  @override
+  late final GeneratedColumn<bool> resolved = GeneratedColumn<bool>(
+    'resolved',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("resolved" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    noteId,
+    quote,
+    anchor,
+    body,
+    author,
+    resolved,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_comments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NoteComment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('quote')) {
+      context.handle(
+        _quoteMeta,
+        quote.isAcceptableOrUnknown(data['quote']!, _quoteMeta),
+      );
+    }
+    if (data.containsKey('anchor')) {
+      context.handle(
+        _anchorMeta,
+        anchor.isAcceptableOrUnknown(data['anchor']!, _anchorMeta),
+      );
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    }
+    if (data.containsKey('author')) {
+      context.handle(
+        _authorMeta,
+        author.isAcceptableOrUnknown(data['author']!, _authorMeta),
+      );
+    }
+    if (data.containsKey('resolved')) {
+      context.handle(
+        _resolvedMeta,
+        resolved.isAcceptableOrUnknown(data['resolved']!, _resolvedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NoteComment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NoteComment(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      quote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quote'],
+      )!,
+      anchor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}anchor'],
+      )!,
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      )!,
+      author: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author'],
+      ),
+      resolved: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}resolved'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NoteCommentsTable createAlias(String alias) {
+    return $NoteCommentsTable(attachedDatabase, alias);
+  }
+}
+
+class NoteComment extends DataClass implements Insertable<NoteComment> {
+  final String id;
+  final String noteId;
+
+  /// The commented passage as it read when the comment was made.
+  final String quote;
+
+  /// Where the passage started (editor-document offset); a hint for finding
+  /// [quote] again, which wins when they disagree.
+  final int anchor;
+
+  /// The comment itself.
+  final String body;
+
+  /// Who made it, if the writer noted that ("Supervisor", a name).
+  final String? author;
+
+  /// Addressed. Synced as an integer 0/1 (see Notes.pinned).
+  final bool resolved;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const NoteComment({
+    required this.id,
+    required this.noteId,
+    required this.quote,
+    required this.anchor,
+    required this.body,
+    this.author,
+    required this.resolved,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['note_id'] = Variable<String>(noteId);
+    map['quote'] = Variable<String>(quote);
+    map['anchor'] = Variable<int>(anchor);
+    map['body'] = Variable<String>(body);
+    if (!nullToAbsent || author != null) {
+      map['author'] = Variable<String>(author);
+    }
+    map['resolved'] = Variable<bool>(resolved);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  NoteCommentsCompanion toCompanion(bool nullToAbsent) {
+    return NoteCommentsCompanion(
+      id: Value(id),
+      noteId: Value(noteId),
+      quote: Value(quote),
+      anchor: Value(anchor),
+      body: Value(body),
+      author: author == null && nullToAbsent
+          ? const Value.absent()
+          : Value(author),
+      resolved: Value(resolved),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory NoteComment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NoteComment(
+      id: serializer.fromJson<String>(json['id']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      quote: serializer.fromJson<String>(json['quote']),
+      anchor: serializer.fromJson<int>(json['anchor']),
+      body: serializer.fromJson<String>(json['body']),
+      author: serializer.fromJson<String?>(json['author']),
+      resolved: serializer.fromJson<bool>(json['resolved']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'noteId': serializer.toJson<String>(noteId),
+      'quote': serializer.toJson<String>(quote),
+      'anchor': serializer.toJson<int>(anchor),
+      'body': serializer.toJson<String>(body),
+      'author': serializer.toJson<String?>(author),
+      'resolved': serializer.toJson<bool>(resolved),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  NoteComment copyWith({
+    String? id,
+    String? noteId,
+    String? quote,
+    int? anchor,
+    String? body,
+    Value<String?> author = const Value.absent(),
+    bool? resolved,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => NoteComment(
+    id: id ?? this.id,
+    noteId: noteId ?? this.noteId,
+    quote: quote ?? this.quote,
+    anchor: anchor ?? this.anchor,
+    body: body ?? this.body,
+    author: author.present ? author.value : this.author,
+    resolved: resolved ?? this.resolved,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  NoteComment copyWithCompanion(NoteCommentsCompanion data) {
+    return NoteComment(
+      id: data.id.present ? data.id.value : this.id,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      quote: data.quote.present ? data.quote.value : this.quote,
+      anchor: data.anchor.present ? data.anchor.value : this.anchor,
+      body: data.body.present ? data.body.value : this.body,
+      author: data.author.present ? data.author.value : this.author,
+      resolved: data.resolved.present ? data.resolved.value : this.resolved,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteComment(')
+          ..write('id: $id, ')
+          ..write('noteId: $noteId, ')
+          ..write('quote: $quote, ')
+          ..write('anchor: $anchor, ')
+          ..write('body: $body, ')
+          ..write('author: $author, ')
+          ..write('resolved: $resolved, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    noteId,
+    quote,
+    anchor,
+    body,
+    author,
+    resolved,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NoteComment &&
+          other.id == this.id &&
+          other.noteId == this.noteId &&
+          other.quote == this.quote &&
+          other.anchor == this.anchor &&
+          other.body == this.body &&
+          other.author == this.author &&
+          other.resolved == this.resolved &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class NoteCommentsCompanion extends UpdateCompanion<NoteComment> {
+  final Value<String> id;
+  final Value<String> noteId;
+  final Value<String> quote;
+  final Value<int> anchor;
+  final Value<String> body;
+  final Value<String?> author;
+  final Value<bool> resolved;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const NoteCommentsCompanion({
+    this.id = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.quote = const Value.absent(),
+    this.anchor = const Value.absent(),
+    this.body = const Value.absent(),
+    this.author = const Value.absent(),
+    this.resolved = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NoteCommentsCompanion.insert({
+    this.id = const Value.absent(),
+    required String noteId,
+    this.quote = const Value.absent(),
+    this.anchor = const Value.absent(),
+    this.body = const Value.absent(),
+    this.author = const Value.absent(),
+    this.resolved = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : noteId = Value(noteId);
+  static Insertable<NoteComment> custom({
+    Expression<String>? id,
+    Expression<String>? noteId,
+    Expression<String>? quote,
+    Expression<int>? anchor,
+    Expression<String>? body,
+    Expression<String>? author,
+    Expression<bool>? resolved,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (noteId != null) 'note_id': noteId,
+      if (quote != null) 'quote': quote,
+      if (anchor != null) 'anchor': anchor,
+      if (body != null) 'body': body,
+      if (author != null) 'author': author,
+      if (resolved != null) 'resolved': resolved,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NoteCommentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? noteId,
+    Value<String>? quote,
+    Value<int>? anchor,
+    Value<String>? body,
+    Value<String?>? author,
+    Value<bool>? resolved,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return NoteCommentsCompanion(
+      id: id ?? this.id,
+      noteId: noteId ?? this.noteId,
+      quote: quote ?? this.quote,
+      anchor: anchor ?? this.anchor,
+      body: body ?? this.body,
+      author: author ?? this.author,
+      resolved: resolved ?? this.resolved,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (quote.present) {
+      map['quote'] = Variable<String>(quote.value);
+    }
+    if (anchor.present) {
+      map['anchor'] = Variable<int>(anchor.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (resolved.present) {
+      map['resolved'] = Variable<bool>(resolved.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteCommentsCompanion(')
+          ..write('id: $id, ')
+          ..write('noteId: $noteId, ')
+          ..write('quote: $quote, ')
+          ..write('anchor: $anchor, ')
+          ..write('body: $body, ')
+          ..write('author: $author, ')
+          ..write('resolved: $resolved, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TrashItemsTable extends TrashItems
     with TableInfo<$TrashItemsTable, TrashItem> {
   @override
@@ -8268,6 +8822,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MatrixCellsTable matrixCells = $MatrixCellsTable(this);
   late final $NoteVersionsTable noteVersions = $NoteVersionsTable(this);
   late final $NoteKeysTable noteKeys = $NoteKeysTable(this);
+  late final $NoteCommentsTable noteComments = $NoteCommentsTable(this);
   late final $TrashItemsTable trashItems = $TrashItemsTable(this);
   late final $OcrPagesTable ocrPages = $OcrPagesTable(this);
   late final $OcrPapersTable ocrPapers = $OcrPapersTable(this);
@@ -8292,6 +8847,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     matrixCells,
     noteVersions,
     noteKeys,
+    noteComments,
     trashItems,
     ocrPages,
     ocrPapers,
@@ -8416,6 +8972,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('note_versions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'notes',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('note_comments', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -8840,6 +9403,24 @@ final class $$NotesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$NoteCommentsTable, List<NoteComment>>
+  _noteCommentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.noteComments,
+    aliasName: 'notes__id__note_comments__note_id',
+  );
+
+  $$NoteCommentsTableProcessedTableManager get noteCommentsRefs {
+    final manager = $$NoteCommentsTableTableManager(
+      $_db,
+      $_db.noteComments,
+    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_noteCommentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
@@ -9019,6 +9600,31 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
           }) => $$NoteVersionsTableFilterComposer(
             $db: $db,
             $table: $db.noteVersions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> noteCommentsRefs(
+    Expression<bool> Function($$NoteCommentsTableFilterComposer f) f,
+  ) {
+    final $$NoteCommentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.noteComments,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteCommentsTableFilterComposer(
+            $db: $db,
+            $table: $db.noteComments,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9266,6 +9872,31 @@ class $$NotesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> noteCommentsRefs<T extends Object>(
+    Expression<T> Function($$NoteCommentsTableAnnotationComposer a) f,
+  ) {
+    final $$NoteCommentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.noteComments,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteCommentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.noteComments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$NotesTableTableManager
@@ -9288,6 +9919,7 @@ class $$NotesTableTableManager
             bool noteTagsRefs,
             bool projectNotesRefs,
             bool noteVersionsRefs,
+            bool noteCommentsRefs,
           })
         > {
   $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
@@ -9357,6 +9989,7 @@ class $$NotesTableTableManager
                 noteTagsRefs = false,
                 projectNotesRefs = false,
                 noteVersionsRefs = false,
+                noteCommentsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -9366,6 +9999,7 @@ class $$NotesTableTableManager
                     if (noteTagsRefs) db.noteTags,
                     if (projectNotesRefs) db.projectNotes,
                     if (noteVersionsRefs) db.noteVersions,
+                    if (noteCommentsRefs) db.noteComments,
                   ],
                   addJoins:
                       <
@@ -9500,6 +10134,27 @@ class $$NotesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (noteCommentsRefs)
+                        await $_getPrefetchedData<
+                          Note,
+                          $NotesTable,
+                          NoteComment
+                        >(
+                          currentTable: table,
+                          referencedTable: $$NotesTableReferences
+                              ._noteCommentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$NotesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).noteCommentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.noteId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -9527,6 +10182,7 @@ typedef $$NotesTableProcessedTableManager =
         bool noteTagsRefs,
         bool projectNotesRefs,
         bool noteVersionsRefs,
+        bool noteCommentsRefs,
       })
     >;
 typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
@@ -15760,6 +16416,397 @@ typedef $$NoteKeysTableProcessedTableManager =
       NoteKeyRow,
       PrefetchHooks Function()
     >;
+typedef $$NoteCommentsTableCreateCompanionBuilder =
+    NoteCommentsCompanion Function({
+      Value<String> id,
+      required String noteId,
+      Value<String> quote,
+      Value<int> anchor,
+      Value<String> body,
+      Value<String?> author,
+      Value<bool> resolved,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$NoteCommentsTableUpdateCompanionBuilder =
+    NoteCommentsCompanion Function({
+      Value<String> id,
+      Value<String> noteId,
+      Value<String> quote,
+      Value<int> anchor,
+      Value<String> body,
+      Value<String?> author,
+      Value<bool> resolved,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$NoteCommentsTableReferences
+    extends BaseReferences<_$AppDatabase, $NoteCommentsTable, NoteComment> {
+  $$NoteCommentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $NotesTable _noteIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('note_comments__note_id__notes__id');
+
+  $$NotesTableProcessedTableManager get noteId {
+    final $_column = $_itemColumn<String>('note_id')!;
+
+    final manager = $$NotesTableTableManager(
+      $_db,
+      $_db.notes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_noteIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$NoteCommentsTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteCommentsTable> {
+  $$NoteCommentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quote => $composableBuilder(
+    column: $table.quote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get anchor => $composableBuilder(
+    column: $table.anchor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get resolved => $composableBuilder(
+    column: $table.resolved,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$NotesTableFilterComposer get noteId {
+    final $$NotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableFilterComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NoteCommentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteCommentsTable> {
+  $$NoteCommentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quote => $composableBuilder(
+    column: $table.quote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get anchor => $composableBuilder(
+    column: $table.anchor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get resolved => $composableBuilder(
+    column: $table.resolved,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$NotesTableOrderingComposer get noteId {
+    final $$NotesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableOrderingComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NoteCommentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteCommentsTable> {
+  $$NoteCommentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get quote =>
+      $composableBuilder(column: $table.quote, builder: (column) => column);
+
+  GeneratedColumn<int> get anchor =>
+      $composableBuilder(column: $table.anchor, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<bool> get resolved =>
+      $composableBuilder(column: $table.resolved, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$NotesTableAnnotationComposer get noteId {
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NoteCommentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NoteCommentsTable,
+          NoteComment,
+          $$NoteCommentsTableFilterComposer,
+          $$NoteCommentsTableOrderingComposer,
+          $$NoteCommentsTableAnnotationComposer,
+          $$NoteCommentsTableCreateCompanionBuilder,
+          $$NoteCommentsTableUpdateCompanionBuilder,
+          (NoteComment, $$NoteCommentsTableReferences),
+          NoteComment,
+          PrefetchHooks Function({bool noteId})
+        > {
+  $$NoteCommentsTableTableManager(_$AppDatabase db, $NoteCommentsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NoteCommentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NoteCommentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NoteCommentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<String> quote = const Value.absent(),
+                Value<int> anchor = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<bool> resolved = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteCommentsCompanion(
+                id: id,
+                noteId: noteId,
+                quote: quote,
+                anchor: anchor,
+                body: body,
+                author: author,
+                resolved: resolved,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String noteId,
+                Value<String> quote = const Value.absent(),
+                Value<int> anchor = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<bool> resolved = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteCommentsCompanion.insert(
+                id: id,
+                noteId: noteId,
+                quote: quote,
+                anchor: anchor,
+                body: body,
+                author: author,
+                resolved: resolved,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$NoteCommentsTable, NoteComment>(table),
+                  $$NoteCommentsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({noteId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (noteId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.noteId,
+                        referencedTable: $$NoteCommentsTableReferences
+                            ._noteIdTable(db),
+                        referencedColumn: $$NoteCommentsTableReferences
+                            ._noteIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$NoteCommentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NoteCommentsTable,
+      NoteComment,
+      $$NoteCommentsTableFilterComposer,
+      $$NoteCommentsTableOrderingComposer,
+      $$NoteCommentsTableAnnotationComposer,
+      $$NoteCommentsTableCreateCompanionBuilder,
+      $$NoteCommentsTableUpdateCompanionBuilder,
+      (NoteComment, $$NoteCommentsTableReferences),
+      NoteComment,
+      PrefetchHooks Function({bool noteId})
+    >;
 typedef $$TrashItemsTableCreateCompanionBuilder = TrashItemsCompanion Function({
   Value<String> id,
   required TrashKind kind,
@@ -16611,6 +17658,8 @@ class $AppDatabaseManager {
       $$NoteVersionsTableTableManager(_db, _db.noteVersions);
   $$NoteKeysTableTableManager get noteKeys =>
       $$NoteKeysTableTableManager(_db, _db.noteKeys);
+  $$NoteCommentsTableTableManager get noteComments =>
+      $$NoteCommentsTableTableManager(_db, _db.noteComments);
   $$TrashItemsTableTableManager get trashItems =>
       $$TrashItemsTableTableManager(_db, _db.trashItems);
   $$OcrPagesTableTableManager get ocrPages =>

@@ -15,6 +15,7 @@ import '../../data/local_files.dart';
 import '../home/adaptive.dart';
 import '../home/open_card.dart';
 import 'paper_cover.dart';
+import 'retraction_notice.dart';
 import 'paper_detail_screen.dart';
 import '../../data/tables/papers_table.dart';
 import '../projects/project_menu.dart';
@@ -26,6 +27,7 @@ import '../platform/mac_window.dart';
 import '../projects/project_picker_sheet.dart';
 import 'citation_formatter.dart';
 import 'pdf_viewer_screen.dart';
+import '../zotero/zotero_dialog.dart';
 
 import 'package:flutter/services.dart';
 
@@ -135,6 +137,7 @@ class LibraryScreen extends ConsumerWidget {
                     'doi' => addPaperByIdentifier(context, ref),
                     'import' => importBibtexFile(context, ref),
                     'export' => exportLibraryBibtex(context, ref),
+                    'zotero' => importFromZotero(context, ref),
                     'highlights' => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const AllHighlightsScreen(),
@@ -166,6 +169,13 @@ class LibraryScreen extends ConsumerWidget {
                         subtitle: Text(
                           'BibTeX, RIS or CSL JSON (Zotero, Mendeley)',
                         ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'zotero',
+                      child: ListTile(
+                        leading: Icon(Icons.sync_alt),
+                        title: Text('Import from Zotero…'),
                       ),
                     ),
                     PopupMenuItem(
@@ -473,11 +483,23 @@ class _PaperCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    paper.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          paper.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ),
+                      if (paper.doi != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, top: 3),
+                          child: RetractionMarker(doi: paper.doi),
+                        ),
+                    ],
                   ),
                   if (byline.isNotEmpty || paper.rating != null) ...[
                     const SizedBox(height: 2),
@@ -641,6 +663,7 @@ class _MacPaperListState extends ConsumerState<_MacPaperList> {
                     borderRadius: const BorderRadius.all(Radius.circular(3)),
                   ),
                   title: Text(paper.title),
+                  trailing: RetractionMarker(doi: paper.doi, size: 14),
                   subtitle: detail.isEmpty ? null : Text(detail, maxLines: 1),
                   selected: paper.id == selectedId,
                   listFocused: _focus.hasFocus,

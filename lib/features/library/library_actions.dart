@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
@@ -16,6 +17,7 @@ import '../home/adaptive.dart';
 import 'bibtex.dart';
 import 'reference_import.dart';
 import 'metadata_lookup.dart';
+import 'retraction.dart';
 import '../ocr/ocr_service.dart';
 import '../ocr/pdf_pages.dart';
 import 'paper_detail_screen.dart';
@@ -51,7 +53,7 @@ Future<void> addPaperByIdentifier(BuildContext context, WidgetRef ref) async {
         controller: controller,
         autofocus: true,
         decoration: const InputDecoration(
-          hintText: '10.1038/nature14539 or arXiv:1706.03762',
+          hintText: '10.1038/nature14539, arXiv:1706.03762 or PMID: 9500320',
         ),
         keyboardType: TextInputType.url,
         onSubmitted: (v) => Navigator.pop(context, v),
@@ -72,7 +74,7 @@ Future<void> addPaperByIdentifier(BuildContext context, WidgetRef ref) async {
 
   final id = parseIdentifier(input);
   if (id == null) {
-    _say(context, 'That doesn\'t look like a DOI or arXiv ID.');
+    _say(context, 'That doesn\'t look like a DOI, arXiv or PubMed ID.');
     return;
   }
   await addPaperFromIdentifier(context, ref, id);
@@ -187,6 +189,7 @@ Future<void> enrichImportedPaper(
   final db = ref.read(databaseProvider);
   final ocr = ref.read(ocrServiceProvider);
   final open = ref.read(pdfPagesOpenerProvider);
+  final retractions = ref.read(retractionServiceProvider);
   try {
     final start = await readPdfStart(
       pdfPath,
@@ -209,6 +212,10 @@ Future<void> enrichImportedPaper(
         ? await lookup.lookup(id)
         : await lookup.searchByFirstPage(start.firstPage);
     if (meta == null) return;
+    // Once, quietly: is the paper retracted? (Cached; shown on its screen.)
+    if (meta.doi case final doi? when doi.isNotEmpty) {
+      unawaited(checkNoticesInBackground(retractions, doi));
+    }
 
     final duplicate = await findDuplicate(db, meta, excludePaperId: paperId);
     // The imported title is just the file name; replace it — but not a

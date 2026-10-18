@@ -16,6 +16,7 @@ import '../projects/figures.dart';
 import '../notes/note_content.dart';
 import 'docx_export.dart';
 import 'export_model.dart';
+import 'latex_export.dart';
 import 'markdown_export.dart';
 import 'pdf_export.dart';
 import '../platform/share_origin.dart';
@@ -23,7 +24,8 @@ import '../platform/share_origin.dart';
 enum ExportFormat {
   markdown('Markdown', 'md', Icons.tag),
   word('Word document', 'docx', Icons.description_outlined),
-  pdf('PDF', 'pdf', Icons.picture_as_pdf_outlined);
+  pdf('PDF', 'pdf', Icons.picture_as_pdf_outlined),
+  latex('LaTeX (Overleaf)', 'zip', Icons.functions);
 
   const ExportFormat(this.label, this.extension, this.icon);
 
@@ -55,9 +57,11 @@ Future<File> writeExport(
     case ExportFormat.markdown:
       await file.writeAsString(exportToMarkdown(doc));
     case ExportFormat.word:
-      await file.writeAsBytes(exportToDocx(doc));
+      await file.writeAsBytes(await exportToDocxWithImages(doc));
     case ExportFormat.pdf:
       await file.writeAsBytes(await exportToPdf(doc, loadFont: loadFont));
+    case ExportFormat.latex:
+      await file.writeAsBytes(await exportToLatexZip(doc));
   }
   return file;
 }
@@ -147,14 +151,25 @@ Future<void> exportNotes(
 }) async {
   final choice = await showExportSheet(context);
   if (choice == null || !context.mounted) return;
-  final doc = await buildStyledExportDoc(
-    db,
-    notes,
-    title: title,
-    style: choice.style,
-    figures: figures,
-    extraFrontMatter: extraFrontMatter,
-  );
+  // LaTeX keeps citations as \citep{key} for BibTeX, so it needs the
+  // markers, not the CSL-formatted text.
+  final doc = choice.format == ExportFormat.latex
+      ? await buildExportDoc(
+          db,
+          notes,
+          title: title,
+          style: choice.style,
+          figures: figures,
+          extraFrontMatter: extraFrontMatter,
+        )
+      : await buildStyledExportDoc(
+          db,
+          notes,
+          title: title,
+          style: choice.style,
+          figures: figures,
+          extraFrontMatter: extraFrontMatter,
+        );
   if (!context.mounted) return;
   await shareExport(context, doc, choice.format);
 }

@@ -1,12 +1,17 @@
 import 'dart:math' as math;
 
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../../theme/haptics.dart';
+import 'ink_canvas.dart' show shapeHoldDelay;
 import 'ink_model.dart';
 import 'ink_painter.dart';
 import 'ink_session.dart';
+import 'shape_recognizer.dart';
 
 /// How far below a drawing a pen can start and still add to it (logical
 /// pixels), like writing on past the end of a drawing in Apple Notes.
@@ -133,8 +138,14 @@ class _InkCatcherState extends State<InkCatcher> {
   final _stroke = ValueNotifier<List<InkPoint>>(const []);
   final _editorBox = GlobalKey();
 
+  // Hold to snap (pixels here).
+  Timer? _holdTimer;
+  Offset? _holdAnchor;
+  bool _snapped = false;
+
   @override
   void dispose() {
+    _holdTimer?.cancel();
     _stroke.dispose();
     super.dispose();
   }
@@ -146,21 +157,54 @@ class _InkCatcherState extends State<InkCatcher> {
 
   void _start(PointerEvent down) {
     widget.session.onInkStart?.call();
+    // With the selection tool a pen on the text selects nothing and draws
+    // nothing: lassoing happens on a drawing.
+    if (widget.session.lassoing) return;
     final at = _box.globalToLocal(down.position);
+    _snapped = false;
+    _holdAnchor = at;
     _stroke.value = [InkPoint(at.dx, at.dy, _pressure(down))];
+    _restartHold();
   }
 
   void _update(PointerEvent e) {
     final points = _stroke.value;
-    if (points.isEmpty) return;
+    if (points.isEmpty || _snapped) return;
     final at = _box.globalToLocal(e.position);
+    if ((at - _holdAnchor!).distance > 3) {
+      _holdAnchor = at;
+      _restartHold();
+    }
     if ((points.last.offset - at).distance < 0.6) return;
     _stroke.value = [...points, InkPoint(at.dx, at.dy, _pressure(e))];
   }
 
-  void _cancel() => _stroke.value = const [];
+  void _restartHold() {
+    _holdTimer?.cancel();
+    _holdTimer = Timer(shapeHoldDelay, _snapToShape);
+  }
+
+  /// Held still at the end: a line, circle, box, triangle or arrow becomes
+  /// the clean shape (drawn on in a new drawing like any stroke).
+  void _snapToShape() {
+    final points = _stroke.value;
+    if (points.isEmpty || _snapped) return;
+    final width = _box.size.width;
+    final shape = recognizeShape(points, minLength: 0.08 * width);
+    if (shape == null) return;
+    _snapped = true;
+    _stroke.value = shape;
+    AppHaptics.threshold();
+  }
+
+  void _cancel() {
+    _holdTimer?.cancel();
+    _stroke.value = const [];
+  }
 
   void _end() {
+    _holdTimer?.cancel();
+    _snapped = false;
     final points = _stroke.value;
     _stroke.value = const [];
     if (points.isEmpty) return;

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../comments/comments_data.dart';
 import 'abbreviations_section.dart';
 import 'chapters.dart';
 import 'coverage.dart';
@@ -290,6 +291,23 @@ class _ChapterRow extends ConsumerWidget {
                         ),
                       ),
                       Text(words, style: muted),
+                      if (ref.watch(openCommentCountsProvider).value?[c.note.id]
+                          case final n? when n > 0)
+                        InkWell(
+                          key: ValueKey('comments-${c.note.id}'),
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: () {
+                            ref
+                                    .read(pendingCommentsPanelProvider.notifier)
+                                    .state =
+                                c.note.id;
+                            openNoteFromPage(context, ref, c.note.id);
+                          },
+                          child: Text(
+                            openCommentsLabel(n),
+                            style: muted?.copyWith(color: scheme.tertiary),
+                          ),
+                        ),
                     ],
                   ),
                   if (c.progress != null) ...[

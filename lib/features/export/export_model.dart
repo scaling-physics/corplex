@@ -12,6 +12,8 @@ import '../notes/figure_markers.dart';
 import '../notes/math_markers.dart';
 import '../projects/figures.dart';
 import '../notes/note_links.dart';
+import '../notes/note_table.dart';
+import '../ink/ink_model.dart';
 
 /// A note (or several) flattened to what every output format needs:
 /// headings, paragraphs, lists, quotes and styled runs of text. The
@@ -34,6 +36,12 @@ enum BlockKind {
 
   /// One line of a monospaced (code) block; consecutive lines form a block.
   code,
+
+  /// A drawing: [ExportBlock.sketch].
+  image,
+
+  /// A table: [ExportBlock.table].
+  table,
 }
 
 class Run {
@@ -45,7 +53,14 @@ class Run {
     this.link,
     this.math = false,
     this.highlight,
+    this.source,
   });
+
+  /// The text as stored, before citations and figure references were
+  /// replaced by their printed form (`[@key, p. 4]`, `{@fig:x}`). The LaTeX
+  /// export turns those into `\citep` / `\ref` instead. Null when [text]
+  /// is already the source.
+  final String? source;
 
   /// The highlight colour as `RRGGBB` (no `#`), or null.
   final String? highlight;
@@ -64,10 +79,48 @@ class Run {
 }
 
 class ExportBlock {
-  const ExportBlock(this.kind, this.runs, {this.ordinal = 0});
+  const ExportBlock(
+    this.kind,
+    this.runs, {
+    this.ordinal = 0,
+    this.sketch,
+    this.table,
+    this.figure,
+    this.chapterTitle = false,
+  });
+
+  /// An image block for a drawing.
+  const ExportBlock.sketch(Sketch this.sketch)
+    : kind = BlockKind.image,
+      runs = const [],
+      ordinal = 0,
+      table = null,
+      figure = null,
+      chapterTitle = false;
+
+  /// A table block.
+  const ExportBlock.table(NoteTable this.table)
+    : kind = BlockKind.table,
+      runs = const [],
+      ordinal = 0,
+      sketch = null,
+      figure = null,
+      chapterTitle = false;
 
   final BlockKind kind;
   final List<Run> runs;
+
+  /// The drawing of a [BlockKind.image] block.
+  final Sketch? sketch;
+
+  /// The table of a [BlockKind.table] block.
+  final NoteTable? table;
+
+  /// For a [BlockKind.caption]: the figure or table it defines.
+  final FigureMarker? figure;
+
+  /// A heading that opens one note of a multi-note (project) export.
+  final bool chapterTitle;
 
   /// 1-based position within a numbered list.
   final int ordinal;
@@ -76,10 +129,23 @@ class ExportBlock {
 }
 
 class ExportDoc {
-  const ExportDoc(this.title, this.blocks);
+  const ExportDoc(
+    this.title,
+    this.blocks, {
+    this.papers = const [],
+    this.citationStyle,
+    this.figureListLength = 0,
+  });
 
   final String title;
   final List<ExportBlock> blocks;
+
+  /// The papers cited in [blocks] (for a bibliography file).
+  final List<Paper> papers;
+  final CitationStyle? citationStyle;
+
+  /// How many leading blocks are the generated lists of figures and tables.
+  final int figureListLength;
 }
 
 /// One note to export: its title and Quill content.
@@ -98,6 +164,9 @@ List<ExportNote> withoutLockedBodies(List<ExportNote> notes) => [
 ];
 
 const _references = 'References';
+
+/// The sketch embed's key (see `sketchEmbedType` in the ink code).
+const sketchEmbedKey = 'sketch';
 
 /// The "List of figures" / "List of tables" that open a project export
 /// (nothing for a kind with no entries), then [extra] blocks (e.g. a list
@@ -169,14 +238,16 @@ Future<ExportDoc> buildExportDoc(
   }, style);
 
   final blocks = <ExportBlock>[];
+  var figureListLength = 0;
   if (notes.length > 1) {
-    blocks.addAll(
-      exportFrontMatter(
-        index,
-        text: (c) => resolver.replace(index.resolve(c)),
-        extra: extraFrontMatter,
-      ),
+    final lists = exportFrontMatter(
+      index,
+      text: (c) => resolver.replace(index.resolve(c)),
     );
+    figureListLength = lists.length;
+    blocks
+      ..addAll(lists)
+      ..addAll(extraFrontMatter);
   }
   for (var i = 0; i < notes.length; i++) {
     final own = _blocks(deltas[i], resolver, index);
@@ -184,7 +255,9 @@ Future<ExportDoc> buildExportDoc(
       final heading = notes[i].title.trim().isEmpty
           ? 'Untitled'
           : notes[i].title.trim();
-      blocks.add(ExportBlock(BlockKind.heading1, [Run(heading)]));
+      blocks.add(
+        ExportBlock(BlockKind.heading1, [Run(heading)], chapterTitle: true),
+      );
       blocks.addAll(_withoutReferences(own));
     } else {
       blocks.addAll(_withoutReferences(own));
@@ -197,7 +270,13 @@ Future<ExportDoc> buildExportDoc(
       blocks.add(ExportBlock(BlockKind.paragraph, [Run(ref)]));
     }
   }
-  return ExportDoc(title, blocks);
+  return ExportDoc(
+    title,
+    blocks,
+    papers: cited,
+    citationStyle: style,
+    figureListLength: figureListLength,
+  );
 }
 
 String _plain(Delta d) => [
@@ -236,8 +315,20 @@ List<ExportBlock> _blocks(
           runs = [];
         }
         blocks.add(ExportBlock(BlockKind.displayMath, [Run(tex, math: true)]));
+      } else if (data[sketchEmbedKey] case final String json) {
+        if (runs.isNotEmpty) {
+          blocks.add(ExportBlock(BlockKind.paragraph, runs));
+          runs = [];
+        }
+        blocks.add(ExportBlock.sketch(Sketch.decode(json)));
+      } else if (data[tableEmbedType] case final String json) {
+        if (runs.isNotEmpty) {
+          blocks.add(ExportBlock(BlockKind.paragraph, runs));
+          runs = [];
+        }
+        blocks.add(ExportBlock.table(NoteTable.decode(json)));
       } else {
-        runs.add(Run(data.containsKey('sketch') ? '[Sketch]' : ''));
+        runs.add(const Run(''));
       }
       continue;
     }
@@ -311,6 +402,8 @@ ExportBlock _line(
   if (kind == BlockKind.paragraph && runs.isNotEmpty) {
     final first = runs.first;
     final marker = findFigureMarkers(first.text).firstOrNull;
+    final raw = first.source ?? first.text;
+    final rawMarker = findFigureMarkers(raw).firstOrNull;
     if (!first.math &&
         marker != null &&
         marker.isDefinition &&
@@ -321,6 +414,9 @@ ExportBlock _line(
         if (rest.isNotEmpty)
           Run(
             rest,
+            source: rawMarker != null && rawMarker.start == 0
+                ? raw.substring(rawMarker.end)
+                : null,
             bold: first.bold,
             italic: first.italic,
             strike: first.strike,
@@ -328,7 +424,7 @@ ExportBlock _line(
             link: first.link,
           ),
         ...runs.skip(1),
-      ]);
+      ], figure: marker);
     }
   }
   return ExportBlock(kind, runs, ordinal: ordinal);
@@ -348,6 +444,7 @@ Run _run(
           parseAudioTimestampLink(link) != null);
   return Run(
     resolver.replace(figures.resolve(text)),
+    source: text,
     bold: attrs['bold'] == true,
     italic: attrs['italic'] == true,
     strike: attrs['strike'] == true,

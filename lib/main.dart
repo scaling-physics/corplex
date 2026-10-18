@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'features/ocr/ocr_engine.dart';
+import 'features/ink/handwriting.dart';
 import 'features/audio/audio_playback.dart';
 import 'features/lock/biometric_store.dart';
 import 'features/lock/note_lock_service.dart';
 import 'features/platform/mac_window.dart';
 import 'features/platform/quick_action_source.dart';
 import 'features/platform/widget_data.dart';
+import 'features/read_aloud/speaker.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
 import 'features/spell/spell_checker.dart';
@@ -41,6 +44,11 @@ Future<void> main() async {
           homeWidgetBridgeProvider.overrideWithValue(PluginHomeWidgetBridge()),
         ],
         biometricKeyStoreProvider.overrideWithValue(PluginBiometricKeyStore()),
+        speakerProvider.overrideWithValue(ChannelSpeaker()),
+        // Handwriting in drawings is read with the on-device OCR.
+        inkOcrEngineProvider.overrideWith(
+          (ref) => ref.watch(ocrEngineProvider),
+        ),
         // macOS and iOS have a system checker; Android keeps the inert one.
         if (mac || defaultTargetPlatform == TargetPlatform.iOS)
           spellCheckerProvider.overrideWithValue(ChannelSpellChecker()),

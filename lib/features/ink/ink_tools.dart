@@ -25,7 +25,7 @@ const highlighterInks = [
 const penWidths = [0.004, 0.007, 0.012];
 const highlighterWidth = 0.03;
 
-enum InkToolKind { pen, highlighter, eraser }
+enum InkToolKind { pen, highlighter, eraser, lasso }
 
 /// The chosen tool, inks and thickness, shared by the inline drawings in a
 /// note and the full-screen sketch editor. Follows Apple Pencil double-tap
@@ -43,6 +43,7 @@ class InkTools extends ChangeNotifier {
   int get penWidth => _penWidth;
 
   bool get erasing => _tool == InkToolKind.eraser;
+  bool get lassoing => _tool == InkToolKind.lasso;
   InkTool get inkTool =>
       _tool == InkToolKind.highlighter ? InkTool.highlighter : InkTool.pen;
   Color get color => _tool == InkToolKind.highlighter
@@ -65,7 +66,7 @@ class InkTools extends ChangeNotifier {
       _highlighterInk = i;
     } else {
       _penInk = i;
-      if (_tool == InkToolKind.eraser) setTool(InkToolKind.pen);
+      if (_tool != InkToolKind.pen) setTool(InkToolKind.pen);
     }
     notifyListeners();
   }
@@ -172,10 +173,17 @@ class InkPalette extends StatelessWidget {
                       Icons.cleaning_services_outlined,
                       'Eraser',
                     ),
+                    toolButton(
+                      InkToolKind.lasso,
+                      Icons.highlight_alt_outlined,
+                      'Select',
+                    ),
                     AnimatedSize(
                       duration: AppMotion.medium,
                       curve: AppMotion.standard,
-                      child: tool == InkToolKind.eraser
+                      child:
+                          tool == InkToolKind.eraser ||
+                              tool == InkToolKind.lasso
                           ? const SizedBox.shrink()
                           : Row(
                               mainAxisSize: MainAxisSize.min,

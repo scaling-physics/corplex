@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,6 +50,11 @@ Future<String> trashNote(AppDatabase db, String noteId) =>
         'versions': _json(
           await (db.select(
             db.noteVersions,
+          )..where((r) => r.noteId.equals(noteId))).get(),
+        ),
+        'comments': _json(
+          await (db.select(
+            db.noteComments,
           )..where((r) => r.noteId.equals(noteId))).get(),
         ),
       };
@@ -190,6 +197,16 @@ Future<void> restoreFromTrash(
             }),
           );
     }
+    for (final r in list('comments')) {
+      await db
+          .into(db.noteComments)
+          .insertOnConflictUpdate(
+            NoteComment.fromJson({
+              ...r,
+              'updatedAt': now.millisecondsSinceEpoch,
+            }),
+          );
+    }
     for (final r in list('tags')) {
       if (await exists('tags', 'id', r['tagId'])) {
         await db
@@ -310,6 +327,19 @@ Future<int> purgeTrash(
         if (paper['pdfPath'] case final String path) path,
     ];
     await (db.delete(db.trashItems)..where((t) => t.id.equals(item.id))).go();
+    // A marked-up image (features/markup) keeps its untouched original and
+    // its strokes in a sidecar `<name>.markup.json` beside the composite;
+    // they go with it.
+    for (final path in [...paths]) {
+      final sidecar = File('${p.withoutExtension(path)}.markup.json');
+      try {
+        if (!sidecar.existsSync()) continue;
+        final original =
+            (jsonDecode(sidecar.readAsStringSync()) as Map)['original'];
+        if (original is String) paths.add(original);
+        paths.add(sidecar.path);
+      } catch (_) {}
+    }
     for (final path in paths) {
       // A file another row (or another trash entry) still points at stays.
       final used = await db

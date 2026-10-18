@@ -3,6 +3,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 
 import '../library/citations.dart';
 import 'citation_embed.dart';
+import 'note_table.dart';
 
 /// Reading speed for the estimate, in words per minute.
 const wordsPerMinute = 230;
@@ -41,11 +42,21 @@ NoteStats noteStats(Document document) {
     return n == 0 ? m.group(0)! : ' ';
   });
   final lines = prose.split('\n');
+  final wordPattern = RegExp(r'\S*[\p{L}\p{N}]\S*', unicode: true);
+  // Words in table cells count too.
+  var tableWords = 0;
+  for (final op in document.toDelta().toList()) {
+    final data = op.data;
+    if (data is Map && data[tableEmbedType] is String) {
+      tableWords += wordPattern
+          .allMatches(
+            NoteTable.decode(data[tableEmbedType] as String).plainText,
+          )
+          .length;
+    }
+  }
   return NoteStats(
-    words: RegExp(
-      r'\S*[\p{L}\p{N}]\S*',
-      unicode: true,
-    ).allMatches(prose).length,
+    words: wordPattern.allMatches(prose).length + tableWords,
     characters: lines.fold(0, (sum, l) => sum + l.runes.length),
     paragraphs: lines.where((l) => l.trim().isNotEmpty).length,
     citations: citations,

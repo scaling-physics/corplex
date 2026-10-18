@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import '../audio/audio_link.dart';
+import '../ink/ink_model.dart';
+import '../ink/sketch_render.dart' show sketchToSvg;
 import '../library/highlights.dart';
 import '../projects/figures.dart';
 import 'figure_markers.dart';
@@ -6,18 +10,20 @@ import 'math_markers.dart';
 import 'note_content.dart';
 import 'note_highlight.dart' show highlightHex;
 import 'note_links.dart';
+import 'note_table.dart';
 
 /// Converts a note to Markdown for sharing or export: headings, bold,
 /// italic, strikethrough, lists, quotes and links. Corplex's own links
 /// (other notes, paper pages, audio timestamps) only mean something inside
-/// the app, so they're written as their plain text; sketches become a
-/// "[Sketch]" placeholder. Figure and table captions become
+/// the app, so they're written as their plain text; sketches become an
+/// image (see [sketchMarkdown]) and tables pipe tables. Figure and table captions become
 /// "**Figure 2.** caption" and references "Figure 2", numbered within this
 /// note alone (a project's chapter numbers need the other notes).
 String noteToMarkdown({
   required String title,
   required String content,
   FigureIndex? figures,
+  String Function(Sketch sketch)? sketchLink,
 }) {
   // The editor's form (figure chips) is turned back to markers first.
   final stored = figureEmbedsToText(content);
@@ -42,9 +48,12 @@ String noteToMarkdown({
         line.write(inlineMathMarker(tex));
       } else if (data[mathBlockType] case final String tex) {
         line.write(displayMathMarker(tex));
-      } else {
-        line.write(data.containsKey('sketch') ? '[Sketch]' : '');
-        raw.write(data.containsKey('sketch') ? '[Sketch]' : '');
+      } else if (data['sketch'] case final String json) {
+        // On a line of its own, with blank lines around it.
+        final sketch = Sketch.decode(json);
+        line.write('\n${(sketchLink ?? sketchMarkdown)(sketch)}\n');
+      } else if (data[tableEmbedType] case final String json) {
+        line.write('\n${tableMarkdown(NoteTable.decode(json))}\n');
       }
       continue;
     }
@@ -121,4 +130,43 @@ String _block(String text, Map<String, dynamic> attrs, int ordinal) {
   if (attrs['list'] == 'ordered') return '$ordinal. $text';
   if (attrs['blockquote'] == true) return '> $text';
   return text;
+}
+
+/// A drawing as a Markdown image with the SVG inlined as a data URI. A single
+/// text can't carry files, and "[Sketch]" would lose the drawing. Typora,
+/// Obsidian, VS Code and GitHub-style previews draw data-URI SVGs; a viewer
+/// that doesn't just shows the alt text, which is the recognised
+/// handwriting when there is any.
+String sketchMarkdown(Sketch sketch) {
+  final svg = base64Encode(utf8.encode(sketchToSvg(sketch)));
+  return '![${sketchAlt(sketch)}](data:image/svg+xml;base64,$svg)';
+}
+
+/// Alt text for a drawing: its recognised handwriting, else "Sketch".
+String sketchAlt(Sketch sketch) {
+  final t = (sketch.text ?? '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(RegExp(r'[\[\]]'), '')
+      .trim();
+  return t.isEmpty ? 'Sketch' : t;
+}
+
+/// A table as a Markdown pipe table. Pipe tables need a header row, so a
+/// table without one gets an empty header.
+String tableMarkdown(NoteTable table) {
+  String cell(String c) => c
+      .replaceAll('\\', '\\\\')
+      .replaceAll('|', r'\|')
+      .replaceAll(RegExp(r'\r?\n'), '<br>');
+  String row(List<String> cells) => '| ${cells.map(cell).join(' | ')} |';
+  final cols = table.columns;
+  final header = table.header
+      ? table.rows.first
+      : [for (var i = 0; i < cols; i++) ''];
+  final body = table.header ? table.rows.skip(1) : table.rows;
+  return [
+    row(header),
+    '| ${List.filled(cols, '---').join(' | ')} |',
+    for (final r in body) row(r),
+  ].join('\n');
 }

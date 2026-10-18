@@ -6,7 +6,9 @@ import 'package:flutter_quill/quill_delta.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/haptics.dart';
+import '../ocr/ocr_engine.dart';
 import '../platform/mac_window.dart' show isDesktop;
+import 'handwriting.dart';
 import 'ink_canvas.dart';
 import 'ink_model.dart';
 import 'ink_tools.dart';
@@ -60,7 +62,24 @@ class InkSession extends InkTools {
   /// invisible until something else redraws the note.
   VoidCallback? onQuietEdit;
 
+  /// Reads handwriting in drawings, or null (the default under tests, and
+  /// where there is no engine): then nothing is recognised. Set by the
+  /// drawings from `inkOcrEngineProvider`.
+  OcrEngine? ocr;
+
+  /// How long after the last stroke recognition starts, and how a drawing
+  /// is turned into an image for it (tests change both).
+  Duration recognitionDelay = const Duration(seconds: 2);
+  SketchRenderer renderForOcr = renderForRecognition;
+
   StreamSubscription<PencilAction>? _pencilTaps;
+  Timer? _idle;
+  bool _recognizing = false;
+  bool _disposed = false;
+
+  /// Drawings (by [strokesKey]) written in this session and not yet read.
+  /// Drawings that were only looked at are never recognised or rewritten.
+  final _pending = <String>{};
   int? _active;
   final drawings = <InlineDrawing>{};
 
@@ -74,6 +93,8 @@ class InkSession extends InkTools {
 
   @override
   void dispose() {
+    _disposed = true;
+    _idle?.cancel();
     _pencilTaps?.cancel();
     super.dispose();
   }
@@ -88,6 +109,8 @@ class InkSession extends InkTools {
       _active = offset - 1;
     }
     notifyListeners();
+    // The drawing put away is read now.
+    if (previous != null) unawaited(_recognizeNext());
   }
 
   /// Puts the tools away (tapping into the text, Done). A drawing left
@@ -98,6 +121,7 @@ class InkSession extends InkTools {
     _active = null;
     _removeIfEmpty(previous);
     notifyListeners();
+    unawaited(_recognizeNext());
   }
 
   /// Writes [sketch] into the drawing at [offset]. False (nothing written)
@@ -111,6 +135,119 @@ class InkSession extends InkTools {
       null,
       ignoreFocus: true,
     );
+    onQuietEdit?.call();
+    // Handwriting is read once the pen has been idle for a while.
+    if (ocr != null && sketch.text == null && !sketch.isEmpty) {
+      _pending.add(strokesKey(sketch));
+      _idle?.cancel();
+      _idle = Timer(recognitionDelay, () => unawaited(_recognizeNext()));
+    }
+    return true;
+  }
+
+  /// Stores recognised text in a drawing without making an undo step (so ⌘Z
+  /// still takes back the last stroke, not an invisible text change).
+  void _writeText(int offset, Sketch sketch) {
+    final history = controller.document.history;
+    final before = history.ignoreChange;
+    history.ignoreChange = true;
+    try {
+      final index = sketchOffsetNear(controller.document, offset);
+      if (index != null) {
+        controller.replaceText(
+          index,
+          1,
+          CustomBlockEmbed(sketchEmbedType, sketch.encode()),
+          null,
+          ignoreFocus: true,
+        );
+        onQuietEdit?.call();
+      }
+    } finally {
+      history.ignoreChange = before;
+    }
+  }
+
+  /// Reads the next drawing written in this session that hasn't been read,
+  /// one at a time, never blocking drawing. The result is kept only if the
+  /// strokes are still the ones that were read.
+  Future<void> _recognizeNext() async {
+    final engine = ocr;
+    if (engine == null || _recognizing || _disposed || _pending.isEmpty) {
+      return;
+    }
+    _idle?.cancel();
+    for (final d in drawingsIn(controller.document)) {
+      if (d.sketch.isEmpty || d.sketch.text != null) continue;
+      final key = strokesKey(d.sketch);
+      if (!_pending.contains(key)) continue;
+      _recognizing = true;
+      var text = '';
+      try {
+        text = await recognizeHandwriting(
+          engine,
+          d.sketch,
+          render: renderForOcr,
+        );
+      } catch (_) {
+        // No engine here, or it failed: the drawing stays as it is.
+      }
+      _recognizing = false;
+      if (_disposed) return;
+      _pending.remove(key);
+      text = text.trim();
+      if (text.isNotEmpty) {
+        for (final now in drawingsIn(controller.document)) {
+          if (now.sketch.text == null && strokesKey(now.sketch) == key) {
+            _writeText(now.offset, now.sketch.copyWith(text: text));
+            break;
+          }
+        }
+      }
+      return _recognizeNext();
+    }
+    _pending.clear(); // nothing left that matches
+  }
+
+  /// Replaces the chosen drawing with the text written in it ("Convert to
+  /// text"), as one undoable edit. Reads the drawing first if that hasn't
+  /// happened yet. Returns false (and says so) if there was no handwriting.
+  Future<bool> convertToText(BuildContext context) async {
+    final engine = ocr;
+    final offset = _active;
+    if (engine == null || offset == null) return false;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final sketch = sketchAt(controller.document, offset);
+    if (sketch == null || sketch.isEmpty) return false;
+    var text = sketch.text ?? '';
+    if (text.trim().isEmpty) {
+      try {
+        text = await recognizeHandwriting(engine, sketch, render: renderForOcr);
+      } catch (_) {
+        text = '';
+      }
+    }
+    if (_disposed) return false;
+    text = text.trim();
+    if (text.isEmpty) {
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('No handwriting found')),
+      );
+      return false;
+    }
+    // Strokes changed (or the drawing moved) while reading: find it again.
+    final key = strokesKey(sketch);
+    int? at;
+    for (final d in drawingsIn(controller.document)) {
+      if (strokesKey(d.sketch) == key) {
+        at = d.offset;
+        break;
+      }
+    }
+    if (at == null) return false;
+    _active = null;
+    notifyListeners();
+    controller.replaceText(at, 1, text, null, ignoreFocus: true);
     onQuietEdit?.call();
     return true;
   }
@@ -304,6 +441,8 @@ class InlineInkToolbar extends StatelessWidget {
                           switch (v) {
                             case 'expand':
                               session.expand(context);
+                            case 'convert':
+                              session.convertToText(context);
                             case 'fingers':
                               inkPolicy.fingerDrawsOverride = !fingersDraw;
                               session.refresh();
@@ -317,6 +456,14 @@ class InlineInkToolbar extends StatelessWidget {
                               title: Text('Expand'),
                             ),
                           ),
+                          if (session.ocr != null)
+                            const PopupMenuItem(
+                              value: 'convert',
+                              child: ListTile(
+                                leading: Icon(Icons.text_fields),
+                                title: Text('Convert to text'),
+                              ),
+                            ),
                           if (!desktop)
                             PopupMenuItem(
                               value: 'fingers',

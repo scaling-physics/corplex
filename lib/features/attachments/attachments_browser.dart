@@ -12,6 +12,7 @@ import '../../theme/mac_list_row.dart';
 import '../../theme/motion_widgets.dart';
 import '../audio/audio_playback.dart';
 import '../home/adaptive.dart' show ReadableColumn;
+import '../markup/image_markup_screen.dart';
 import '../platform/mac_window.dart';
 import '../platform/share_origin.dart';
 import '../projects/open_from_page.dart';
@@ -54,12 +55,21 @@ class _AttachmentsBrowserScreenState
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
             fullscreenDialog: true,
-            builder: (_) => _ImageViewer(
-              entry: e,
-              onShow: () {
-                Navigator.of(context).pop();
-                _show(e);
-              },
+            builder: (_) => AttachmentImageViewer(
+              attachment: a,
+              title: e.label,
+              actions: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _show(e);
+                  },
+                  icon: const Icon(Icons.north_west, size: 18),
+                  label: Text(
+                    e.noteId != null ? 'Show in note' : 'Show in paper',
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -96,6 +106,12 @@ class _AttachmentsBrowserScreenState
       icon: Icons.north_west,
       onSelected: () => _show(e),
     ),
+    if (e.kind == AttachmentKind.image && e.attachment.path != null)
+      ContextMenuAction(
+        label: 'Mark up',
+        icon: Icons.edit_outlined,
+        onSelected: () => openImageMarkup(context, e.attachment),
+      ),
     ContextMenuAction(
       label: 'Share',
       icon: Icons.ios_share,
@@ -345,41 +361,6 @@ class _Row extends StatelessWidget {
       behavior: HitTestBehavior.deferToChild,
       onSecondaryTapUp: (d) => onMenu(d.globalPosition),
       child: child,
-    );
-  }
-}
-
-class _ImageViewer extends StatelessWidget {
-  const _ImageViewer({required this.entry, required this.onShow});
-
-  final AttachmentEntry entry;
-  final VoidCallback onShow;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(entry.label, overflow: TextOverflow.ellipsis),
-        actions: [
-          TextButton.icon(
-            onPressed: onShow,
-            icon: const Icon(Icons.north_west, size: 18),
-            label: Text(
-              entry.noteId != null ? 'Show in note' : 'Show in paper',
-            ),
-          ),
-        ],
-      ),
-      body: InteractiveViewer(
-        maxScale: 6,
-        child: Center(
-          child: Image.file(
-            File(entry.attachment.path!),
-            errorBuilder: (_, _, _) =>
-                const Icon(Icons.broken_image_outlined, size: 48),
-          ),
-        ),
-      ),
     );
   }
 }

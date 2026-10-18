@@ -27,6 +27,9 @@ import '../ocr/ocr_engine.dart';
 import '../ocr/ocr_service.dart';
 import 'ocr_search.dart';
 import 'ocr_selection.dart';
+import '../read_aloud/read_aloud_bar.dart';
+import '../read_aloud/read_aloud_controller.dart';
+import '../read_aloud/speaker.dart';
 import 'quote_to_note.dart';
 import 'reading_progress.dart';
 import 'snapshot.dart';
@@ -48,6 +51,7 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
     required this.paperId,
     required this.pdfPath,
     this.initialPage,
+    this.initialQuery,
     this.viewerBuilder,
     this.searchSourceBuilder,
     this.onSearchReveal,
@@ -59,6 +63,10 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
 
   /// Page to open at; defaults to 1.
   final int? initialPage;
+
+  /// Opens Find with this text once the document is ready (a search
+  /// result inside the paper's text).
+  final String? initialQuery;
 
   /// Replaces the PDF viewer itself (tests have no PDF engine).
   @visibleForTesting
@@ -126,6 +134,15 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
   bool _focus = false;
   bool _immersive = false;
   bool _stripOpen = false;
+
+  /// Read aloud; non-null while the reading bar is showing.
+  ReadAloudController? _read;
+
+  /// Whether the viewer follows the speech from page to page. Turns off when
+  /// the reader scrolls to another page; "Back to reading" turns it on.
+  bool _readFollow = true;
+  DateTime _readJumpAt = DateTime.fromMillisecondsSinceEpoch(0);
+  int _readShown = 0;
 
   /// Find in document; non-null while the search bar is open.
   DocumentSearch? _search;
@@ -200,8 +217,87 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     }
   }
 
+  /// ⋮ → "Read aloud": reads from the current page onward.
+  Future<void> _toggleReadAloud() async {
+    if (_read != null) {
+      _closeReadAloud();
+      return;
+    }
+    final speaker = ref.read(speakerProvider);
+    final count = _pageCount ?? widget.textProbe?.pageCount;
+    if (count == null) return;
+    if (!speaker.available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Reading aloud isn't available here")),
+      );
+      return;
+    }
+    final service = ref.read(ocrServiceProvider);
+    Future<String> pageText(int page) async {
+      final probe = widget.textProbe;
+      final String text;
+      if (probe != null) {
+        text = await probe.text(page);
+      } else if (_document case final doc?) {
+        text = (await doc.pages[page - 1].loadStructuredText()).fullText;
+      } else {
+        text = '';
+      }
+      if (!pageLacksTextLayer(text)) return text;
+      // A scan: the recognised text, if it has been read.
+      return (await service.storedPage(widget.paperId, page))?.text ?? text;
+    }
+
+    final start =
+        (_controller.isReady ? _controller.pageNumber : null) ?? _page.value;
+    final read = ReadAloudController(
+      speaker: speaker,
+      pageCount: count,
+      pageText: pageText,
+      startPage: start,
+    )..addListener(_onReadChanged);
+    setState(() {
+      _read = read;
+      _readFollow = true;
+      _readShown = start;
+      _stripOpen = false;
+    });
+    read.start();
+  }
+
+  void _closeReadAloud() {
+    final read = _read;
+    if (read == null) return;
+    setState(() => _read = null);
+    // Let the bar's listener go before the notifier does.
+    WidgetsBinding.instance.addPostFrameCallback((_) => read.dispose());
+  }
+
+  void _onReadChanged() {
+    final read = _read;
+    if (read == null || !mounted) return;
+    final page = read.page;
+    if (page == _readShown) return;
+    _readShown = page;
+    if (_readFollow) {
+      _readJumpAt = DateTime.now();
+      _jumpTo(page);
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _backToReading() {
+    final read = _read;
+    if (read == null) return;
+    setState(() => _readFollow = true);
+    _readJumpAt = DateTime.now();
+    _jumpTo(read.page);
+  }
+
   @override
   void dispose() {
+    _read?.dispose();
     _findDebounce?.cancel();
     _search?.dispose();
     _findField.dispose();
@@ -225,6 +321,12 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     });
     savePageCountIfChanged(_db, widget.paperId, count);
     _checkTextLayer();
+    final query = widget.initialQuery?.trim() ?? '';
+    if (query.isNotEmpty && _search == null) {
+      _openSearch();
+      _findField.text = query;
+      _onFindChanged(query);
+    }
   }
 
   /// Hides (or brings back) everything but the page. On a phone the
@@ -402,6 +504,15 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
   void _onPageChanged(int? page) {
     if (page == null) return;
     _page.value = page;
+    if (_read case final read?) {
+      final settling =
+          DateTime.now().difference(_readJumpAt) < const Duration(seconds: 1);
+      if (page == read.page) {
+        if (!_readFollow) setState(() => _readFollow = true);
+      } else if (_readFollow && !settling) {
+        setState(() => _readFollow = false);
+      }
+    }
     _checkTextLayer();
     _pendingPage = page;
     _pageSave?.cancel();
@@ -662,6 +773,20 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
               ),
             ),
           ),
+        if (_read case final read?)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 52,
+            child: Center(
+              child: ReadAloudBar(
+                controller: read,
+                onClose: _closeReadAloud,
+                away: !_readFollow,
+                onBackToReading: _backToReading,
+              ),
+            ),
+          ),
         if (pageCount != null && document != null)
           Positioned(
             left: 0,
@@ -867,6 +992,9 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                                 );
                                               }
                                               if (v == 'find') _openSearch();
+                                              if (v == 'readaloud') {
+                                                _toggleReadAloud();
+                                              }
                                               if (v == 'focus') _setFocus(true);
                                               if (v == 'ocr') _recogniseText();
                                               if (v == 'pages') {
@@ -921,6 +1049,22 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                                   title: Text('Focus'),
                                                   subtitle: Text(
                                                     'Tap the page to bring back',
+                                                  ),
+                                                ),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'readaloud',
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    _read == null
+                                                        ? Icons
+                                                              .record_voice_over_outlined
+                                                        : Icons.voice_over_off,
+                                                  ),
+                                                  title: Text(
+                                                    _read == null
+                                                        ? 'Read aloud'
+                                                        : 'Stop reading aloud',
                                                   ),
                                                 ),
                                               ),

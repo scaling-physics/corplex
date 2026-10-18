@@ -7,16 +7,18 @@ import 'package:http/http.dart' as http;
 import '../../data/database.dart';
 import 'authors.dart';
 import 'bibtex.dart';
+import 'pubmed.dart';
 
 /// What kind of identifier a string is, and its normalized form.
-enum IdentifierKind { doi, arxiv }
+enum IdentifierKind { doi, arxiv, pmid, pmc }
 
 class PaperIdentifier {
   const PaperIdentifier(this.kind, this.value);
 
   final IdentifierKind kind;
 
-  /// Bare DOI (`10.1000/xyz`) or arXiv id (`1706.03762`, `cs/0112017`).
+  /// Bare DOI (`10.1000/xyz`), arXiv id (`1706.03762`, `cs/0112017`),
+  /// PubMed id (digits) or PMC id (`PMC1234567`).
   final String value;
 
   @override
@@ -53,7 +55,7 @@ PaperIdentifier? parseIdentifier(String input) {
   if (_bareArxiv.hasMatch(text)) {
     return PaperIdentifier(IdentifierKind.arxiv, _stripVersion(text));
   }
-  return null;
+  return parsePubmedIdentifier(text);
 }
 
 String _stripVersion(String id) => id.replaceFirst(RegExp(r'v\d+$'), '');
@@ -75,6 +77,10 @@ PaperIdentifier? findIdentifierInText(String text) {
   if (arxiv != null) {
     return PaperIdentifier(IdentifierKind.arxiv, _stripVersion(arxiv));
   }
+  // A labelled PubMed / PMC id ("PMID: 123") beats a stray DOI-looking
+  // string, which could belong to anything cited on the page.
+  final pubmed = parsePubmedIdentifier(text);
+  if (pubmed != null) return pubmed;
   final bare = _doiPattern.firstMatch(text)?.group(0);
   return bare == null
       ? null
@@ -95,10 +101,48 @@ class MetadataLookup {
 
   static const _timeout = Duration(seconds: 12);
 
+  late final PubmedClient _pubmed = PubmedClient(_client);
+
   Future<PaperMetadata?> lookup(PaperIdentifier id) => switch (id.kind) {
     IdentifierKind.doi => crossref(id.value),
     IdentifierKind.arxiv => arxiv(id.value),
+    IdentifierKind.pmid => pubmed(id.value),
+    IdentifierKind.pmc => pmc(id.value),
   };
+
+  /// PubMed id -> E-utilities summary; when it names a DOI, Crossref's
+  /// fuller record is preferred (PubMed's is the fallback).
+  Future<PaperMetadata?> pubmed(String pmid) async {
+    final record = await _pubmed.summary(pmid);
+    if (record == null) return null;
+    return _preferCrossref(record.metadata);
+  }
+
+  /// PMC id -> PMID/DOI through NCBI's ID converter, then as above.
+  Future<PaperMetadata?> pmc(String pmcid) async {
+    final ids = await _pubmed.convertPmc(pmcid);
+    if (ids == null) return null;
+    if (ids.doi != null) {
+      final meta = await _tryCrossref(ids.doi!);
+      if (meta != null) return meta;
+    }
+    if (ids.pmid != null) return pubmed(ids.pmid!);
+    return null;
+  }
+
+  Future<PaperMetadata?> _preferCrossref(PaperMetadata fallback) async {
+    final doi = fallback.doi;
+    if (doi == null || doi.isEmpty) return fallback;
+    return await _tryCrossref(doi) ?? fallback;
+  }
+
+  Future<PaperMetadata?> _tryCrossref(String doi) async {
+    try {
+      return await crossref(doi);
+    } on LookupFailed {
+      return null;
+    }
+  }
 
   Future<PaperMetadata?> crossref(String doi) async {
     final uri = Uri.https(

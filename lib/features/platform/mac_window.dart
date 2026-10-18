@@ -82,6 +82,8 @@ enum MenuCommand {
   numberedList,
   checklist,
   blockQuote,
+  insertTable,
+  addComment,
   linkNote,
   citePaper,
   // View

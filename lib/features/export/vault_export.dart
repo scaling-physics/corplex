@@ -15,6 +15,8 @@ import '../library/study_details.dart';
 import '../lock/note_crypto.dart' show isLockedContent;
 import '../notes/note_content.dart';
 import '../notes/note_links.dart';
+import '../ink/ink_model.dart';
+import '../ink/sketch_render.dart' show sketchToSvg;
 import '../notes/note_markdown.dart';
 
 /// Exports the whole library as a folder of Markdown files that opens as an
@@ -35,7 +37,9 @@ import '../notes/note_markdown.dart';
 /// pandoc users lose nothing: the alias is `@key` and `references.bib` uses
 /// the same keys, so `s/\[\[[^|]*\|(@[^\]]+)\]\]/[\1]/` (or pandoc's
 /// `wikilinks_title_after_pipe`) restores citations. Audio timestamp links
-/// become plain `▸ 12:34` text; sketches stay `[Sketch]`.
+/// become plain `▸ 12:34` text; a drawing is written as
+/// `Attachments/<note>-sketch-N.svg` and embedded with `![[…]]`; a table is a
+/// pipe table.
 const vaultRoot = 'Corplex';
 
 class VaultExportResult {
@@ -193,11 +197,33 @@ Future<VaultExportResult> buildVaultArchive(
         return id == null ? null : paperLink(id, '@$key');
       },
     );
+    // Each drawing becomes `Attachments/<note>-sketch-N.svg`, linked the
+    // way images are.
+    var sketchCount = 0;
+    final noteBase = p.basenameWithoutExtension(noteNames[n.id]!);
+    String sketchLink(Sketch sketch) {
+      var name = '$noteBase-sketch-${++sketchCount}.svg';
+      while (!copied.add(name)) {
+        name = '$noteBase-sketch-${++sketchCount}.svg';
+      }
+      archive.addFile(
+        ArchiveFile.string('$vaultRoot/Attachments/$name', sketchToSvg(sketch)),
+      );
+      // A purely numeric alias would read as a size in Obsidian.
+      final alt = sketchAlt(sketch).replaceAll('|', ' ');
+      final label = RegExp(r'^\d+(x\d+)?$').hasMatch(alt) ? '' : '|$alt';
+      return '![[Attachments/$name$label]]';
+    }
+
     final body = StringBuffer(
       locked
           ? '${n.title.trim().isEmpty ? '' : '# ${n.title.trim()}\n\n'}'
                 '$lockedNotePlaceholder'
-          : noteToMarkdown(title: n.title, content: rewritten).trimRight(),
+          : noteToMarkdown(
+              title: n.title,
+              content: rewritten,
+              sketchLink: sketchLink,
+            ).trimRight(),
     );
 
     // A locked note's attachments are left out too: they'd be plain copies

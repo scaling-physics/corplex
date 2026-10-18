@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import 'handwriting.dart';
 import 'ink_canvas.dart';
 import 'ink_model.dart';
 import 'ink_painter.dart';
@@ -81,6 +83,20 @@ class _InlineSketchState extends State<InlineSketch> implements InlineDrawing {
   void initState() {
     super.initState();
     widget.session.drawings.add(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The handwriting reader (none under tests unless one is provided).
+    try {
+      widget.session.ocr = ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(inkOcrEngineProvider);
+    } catch (_) {
+      widget.session.ocr = null;
+    }
   }
 
   @override
@@ -170,6 +186,8 @@ class _InlineSketchState extends State<InlineSketch> implements InlineDrawing {
                       color: session.color,
                       width: session.width,
                       erasing: session.erasing,
+                      lasso: session.lassoing,
+                      keepSelection: active,
                       othersDraw: active,
                       onGestureStart: _startInk,
                       onChanged: (s) => session.write(offset, s),

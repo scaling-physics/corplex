@@ -21,6 +21,9 @@ import 'package:corplex/features/ocr/ocr_engine.dart';
 import 'package:corplex/features/ocr/ocr_service.dart';
 import 'package:corplex/features/ocr/pdf_pages.dart';
 import 'package:corplex/features/voice/voice_services.dart';
+import 'package:corplex/features/read_aloud/speaker.dart';
+import 'package:corplex/features/ink/ink_model.dart';
+import 'package:corplex/features/ink/sketch_render.dart';
 import 'package:corplex/main.dart' as app;
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -140,9 +143,7 @@ void main() {
     expect(start.id?.value, _doi);
   });
 
-  testWidgets('export with highlights: the result still opens', (
-    tester,
-  ) async {
+  testWidgets('export with highlights: the result still opens', (tester) async {
     final result = writeAnnotatedPdf(
       await _textPdf(),
       highlights: [
@@ -217,5 +218,33 @@ void main() {
       result.archive.files.map((f) => f.name),
       contains(endsWith('Smoke note.md')),
     );
+  });
+
+  testWidgets('read aloud: the system voice speaks a sentence', (tester) async {
+    final speaker = ChannelSpeaker();
+    final finished = await speaker
+        .speak('Place cells fire in one part of the arena.', rate: 1.5)
+        .timeout(const Duration(seconds: 30));
+    expect(finished, isTrue);
+    await speaker.stop();
+  });
+
+  testWidgets('handwriting: a drawing renders and OCR reads it without '
+      'error', (tester) async {
+    const sketch = Sketch(
+      aspect: 0.3,
+      strokes: [
+        InkStroke(
+          tool: InkTool.pen,
+          color: ui.Color(0xFF000000),
+          width: 0.01,
+          points: [InkPoint(0.1, 0.1, 0.5), InkPoint(0.9, 0.2, 0.5)],
+        ),
+      ],
+    );
+    final png = await renderSketchPng(sketch, width: 800);
+    expect(png.take(4), [137, 80, 78, 71]);
+    // A line isn't words; this checks the native path runs on a drawing.
+    await const PlatformOcrEngine().recognize(png);
   });
 }

@@ -16,6 +16,7 @@ import 'tables/matrix_table.dart';
 import 'tables/note_keys_table.dart';
 import 'tables/note_paper_refs_table.dart';
 import 'tables/note_tags_table.dart';
+import 'tables/note_comments_table.dart';
 import 'tables/note_versions_table.dart';
 import 'tables/ocr_table.dart';
 import 'tables/notes_table.dart';
@@ -44,6 +45,7 @@ part 'database.g.dart';
     MatrixCells,
     NoteVersions,
     NoteKeys,
+    NoteComments,
     TrashItems,
     OcrPages,
     OcrPapers,
@@ -70,7 +72,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -270,6 +272,14 @@ class AppDatabase extends _$AppDatabase {
         // rebuilt to watch it.
         if (!await _hasColumn('notes', 'pinned')) {
           await m.addColumn(notes, notes.pinned);
+        }
+        await _createSyncSchema(markExisting: false);
+      }
+      if (from < 19) {
+        // v19: comments on a passage of a note. A new synced table; nothing
+        // to backfill.
+        if (!await _hasTable('note_comments')) {
+          await m.createTable(noteComments);
         }
         await _createSyncSchema(markExisting: false);
       }

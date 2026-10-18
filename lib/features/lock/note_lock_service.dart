@@ -375,6 +375,30 @@ class NoteLockService extends ChangeNotifier {
           ),
         );
       }
+      // Comments quote the text: encrypt their quote and body too.
+      final comments = await (_db.select(
+        _db.noteComments,
+      )..where((c) => c.noteId.equals(noteId))).get();
+      for (final c in comments) {
+        await (_db.update(
+          _db.noteComments,
+        )..where((r) => r.id.equals(c.id))).write(
+          NoteCommentsCompanion(
+            quote: Value(
+              isLockedContent(c.quote)
+                  ? c.quote
+                  : await encryptBody(noteId, c.quote),
+            ),
+            body: Value(
+              isLockedContent(c.body)
+                  ? c.body
+                  : await encryptBody(noteId, c.body),
+            ),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+      }
+      await _redactCommentBase([for (final c in comments) c.id]);
       await _redactMergeBase('notes', [noteId]);
       await _redactMergeBase('note_versions', [for (final v in versions) v.id]);
     });
@@ -409,7 +433,58 @@ class NoteLockService extends ChangeNotifier {
           ),
         );
       }
+      final comments = await (_db.select(
+        _db.noteComments,
+      )..where((c) => c.noteId.equals(noteId))).get();
+      for (final c in comments) {
+        await (_db.update(
+          _db.noteComments,
+        )..where((r) => r.id.equals(c.id))).write(
+          NoteCommentsCompanion(
+            quote: Value(await decryptBody(noteId, c.quote)),
+            body: Value(await decryptBody(noteId, c.body)),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+      }
     });
+  }
+
+  /// Like [_redactMergeBase] for comments, whose text is in `quote` and
+  /// `body` rather than `content`.
+  Future<void> _redactCommentBase(List<String> ids) async {
+    for (final id in ids) {
+      final rows = await _db
+          .customSelect(
+            'SELECT data FROM sync_base WHERE table_name = ? '
+            "AND row_key = json_object('id', ?)",
+            variables: [
+              Variable.withString('note_comments'),
+              Variable.withString(id),
+            ],
+          )
+          .get();
+      if (rows.isEmpty) continue;
+      final data = jsonDecode(rows.single.read<String>('data'));
+      if (data is! Map<String, dynamic>) continue;
+      var changed = false;
+      for (final k in const ['quote', 'body']) {
+        final v = data[k];
+        if (v is String &&
+            v.isNotEmpty &&
+            !isLockedContent(v) &&
+            !isRedactedBase(v)) {
+          data[k] = await redactedBody(v);
+          changed = true;
+        }
+      }
+      if (!changed) continue;
+      await _db.customStatement(
+        'UPDATE sync_base SET data = ? WHERE table_name = ? '
+        "AND row_key = json_object('id', ?)",
+        [jsonEncode(data), 'note_comments', id],
+      );
+    }
   }
 
   /// Replaces the plain body in the sync merge base of these rows (the

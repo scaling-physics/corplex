@@ -249,6 +249,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Numbered List", "numberedList", key: "9", modifiers: shift),
         item("Checklist", "checklist", key: "l", modifiers: shift),
         item("Block Quote", "blockQuote", key: "'"),
+        item("Table", "insertTable", key: "t", modifiers: [.command, .option]),
         .separator(),
         item("Bold", "bold", key: "b"),
         item("Italic", "italic", key: "i"),
@@ -258,6 +259,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         .separator(),
         item("Link to Note…", "linkNote", key: "k"),
         item("Cite Paper…", "citePaper", key: "k", modifiers: shift),
+        item("Add Comment…", "addComment", key: "k", modifiers: [.command, .option]),
       ])
     if let viewIndex = main.items.firstIndex(where: { $0.title == "View" }) {
       main.insertItem(format, at: viewIndex)

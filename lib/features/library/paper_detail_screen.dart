@@ -24,6 +24,7 @@ import '../projects/projects_providers.dart';
 import '../sync/sync_service.dart';
 import 'metadata_lookup.dart';
 import 'citation_network_section.dart';
+import 'retraction_notice.dart';
 import 'openalex.dart' show normalizeCitationDoi;
 import '../../data/tables/papers_table.dart';
 import '../csl/style_picker.dart';
@@ -38,6 +39,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/context_menu.dart';
 import '../../theme/haptics.dart';
 import '../platform/mac_window.dart';
+import '../markup/image_markup_screen.dart';
 import 'paper_cover.dart';
 
 class PaperDetailScreen extends ConsumerStatefulWidget {
@@ -219,7 +221,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     final messenger = ScaffoldMessenger.of(context);
     if (id == null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Enter a DOI or arXiv ID first.')),
+        const SnackBar(content: Text('Enter a DOI, arXiv or PubMed ID first.')),
       );
       return;
     }
@@ -428,7 +430,12 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
               ],
             ),
           ];
-          final e1 = <Widget>[const SizedBox(height: 12)];
+          final e1 = <Widget>[
+            const SizedBox(height: 12),
+            if (paperAsync.value?.doi case final doi?
+                when normalizeCitationDoi(doi) != null)
+              RetractionNotice(doi: doi),
+          ];
           final e2 = <Widget>[
             _PdfButton(paperId: widget.paperId, paper: paperAsync.value),
           ];
@@ -496,7 +503,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                           ? TextInputAction.next
                           : null,
                       decoration: const InputDecoration(
-                        labelText: 'DOI or arXiv ID',
+                        labelText: 'DOI, arXiv or PubMed ID',
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -1245,7 +1252,30 @@ class _AttachmentTile extends ConsumerWidget {
     final playingThis =
         playback != null && playback.current?.id == a.id && playback.playing;
 
-    return ListTile(
+    final markable = a.type == AttachmentType.image && a.path != null && !audio;
+    void viewImage() => Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => AttachmentImageViewer(attachment: a, title: a.label),
+      ),
+    );
+    final markUp = ContextMenuAction(
+      label: 'Mark up',
+      icon: Icons.edit_outlined,
+      onSelected: () => openImageMarkup(context, a),
+    );
+
+    final tile = ListTile(
+      onLongPress: markable
+          ? () {
+              final box = context.findRenderObject() as RenderBox;
+              showContextMenuAt(
+                context,
+                box.localToGlobal(box.size.center(Offset.zero)),
+                [markUp],
+              );
+            }
+          : null,
       leading: Icon(
         playingThis ? Icons.graphic_eq : _icon,
         color: Theme.of(context).colorScheme.primary,
@@ -1262,6 +1292,8 @@ class _AttachmentTile extends ConsumerWidget {
           : null,
       onTap: _inCloudOnly
           ? () => _downloadThenOpen(context, ref, audio: audio)
+          : markable
+          ? viewImage
           : audio
           ? () => playback!.open(a)
           : url != null
@@ -1269,6 +1301,7 @@ class _AttachmentTile extends ConsumerWidget {
                 launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)
           : null,
     );
+    return markable ? ContextMenuRegion(actions: [markUp], child: tile) : tile;
   }
 }
 

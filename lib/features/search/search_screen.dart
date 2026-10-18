@@ -14,6 +14,7 @@ import '../platform/mac_window.dart' show isDesktop;
 import '../library/paper_detail_screen.dart';
 import '../library/pdf_viewer_screen.dart';
 import '../notes/note_editor_screen.dart';
+import 'pdf_text_index.dart';
 import 'search_index.dart';
 
 /// Search across everything: notes, papers and highlighted passages.
@@ -31,6 +32,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
   String _query = '';
   Future<List<SearchHit>>? _results;
+  Future<bool>? _indexing;
 
   @override
   void dispose() {
@@ -44,11 +46,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 180), () {
       setState(() {
         _query = text.trim();
-        _results = _query.isEmpty
+        _results = _query.isEmpty ? null : _find(_query);
+        _indexing = _query.isEmpty
             ? null
-            : ref.read(searchIndexProvider).search(_query);
+            : ref.read(pdfTextIndexProvider).incomplete;
       });
     });
+  }
+
+  Future<List<SearchHit>> _find(String query) async {
+    final pdf = ref.read(pdfTextIndexProvider);
+    // Papers' text may not be indexed yet (or since a restart): carry on.
+    pdf.kick();
+    final hits = await ref.read(searchIndexProvider).search(query);
+    return [...hits, ...await pdf.search(query)];
   }
 
   Future<void> _open(SearchHit hit) async {
@@ -60,7 +71,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       SearchKind.paper => MaterialPageRoute<void>(
         builder: (_) => PaperDetailScreen(paperId: hit.id),
       ),
-      SearchKind.highlight => await _highlightRoute(db, hit),
+      SearchKind.highlight ||
+      SearchKind.pdfText => await _highlightRoute(db, hit),
     };
     if (route != null && mounted) {
       await Navigator.of(context).push(route);
@@ -81,6 +93,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               paperId: paper.id,
               pdfPath: paper.pdfPath!,
               initialPage: hit.page,
+              // A match in the paper's text: show it with Find.
+              initialQuery: hit.kind == SearchKind.pdfText ? _query : null,
             ),
     );
   }
@@ -150,7 +164,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       message: 'Try fewer or different words.',
                     );
                   }
-                  return _ResultsList(hits: hits, onTap: _open);
+                  return _ResultsList(
+                    hits: hits,
+                    onTap: _open,
+                    indexing: _indexing,
+                  );
                 },
               ),
       ),
@@ -159,15 +177,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 }
 
 class _ResultsList extends StatelessWidget {
-  const _ResultsList({required this.hits, required this.onTap});
+  const _ResultsList({required this.hits, required this.onTap, this.indexing});
 
   final List<SearchHit> hits;
   final ValueChanged<SearchHit> onTap;
+
+  /// Whether papers' text is still being indexed (results may be partial).
+  final Future<bool>? indexing;
 
   static const _labels = {
     SearchKind.note: 'Notes',
     SearchKind.paper: 'Papers',
     SearchKind.highlight: 'Highlights',
+    SearchKind.pdfText: 'In papers',
   };
 
   @override
@@ -188,12 +210,30 @@ class _ResultsList extends StatelessWidget {
       for (final (i, hit) in ofKind.indexed) {
         children.add(
           EntranceTransition(
-            key: ValueKey('${hit.kind.name}-${hit.id}'),
+            key: ValueKey('${hit.kind.name}-${hit.id}-${hit.page}'),
             index: i,
             child: _HitTile(hit: hit, onTap: () => onTap(hit)),
           ),
         );
       }
+    }
+    if (indexing != null) {
+      children.add(
+        FutureBuilder<bool>(
+          future: indexing,
+          builder: (context, snapshot) => snapshot.data == true
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Text(
+                    'Indexing papers…',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      );
     }
     return ListView(
       padding: const EdgeInsets.only(bottom: 32),
@@ -239,6 +279,7 @@ class _HitTile extends StatelessWidget {
       SearchKind.note => Icons.edit_note_outlined,
       SearchKind.paper => Icons.article_outlined,
       SearchKind.highlight => Icons.format_quote_outlined,
+      SearchKind.pdfText => Icons.picture_as_pdf_outlined,
     };
     final title = hit.title.replaceAll(RegExp(r'\s+'), ' ').trim();
     return ListTile(

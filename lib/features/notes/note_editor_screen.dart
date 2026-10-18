@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../markup/image_markup_screen.dart';
 import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -26,6 +27,9 @@ import '../lock/note_crypto.dart' show NoteDecryptException, lockedPrefix;
 import '../lock/note_lock_service.dart';
 import '../lock/notes_password_dialogs.dart';
 import '../audio/audio_link.dart';
+import '../comments/comment_views.dart';
+import '../comments/comments_data.dart' show pendingCommentsPanelProvider;
+import '../comments/editor_comments.dart';
 import '../audio/audio_playback.dart';
 import '../audio/audio_player_bar.dart';
 import '../voice/voice_services.dart' show dictationOfferedProvider;
@@ -49,6 +53,7 @@ import 'figure_markers.dart';
 import '../projects/figures.dart';
 import '../projects/todos.dart' show openNoteAtSelection;
 import 'note_stats.dart';
+import 'table_embed.dart';
 import 'note_versions_screen.dart';
 import 'paste_citation.dart';
 import '../../theme/haptics.dart';
@@ -189,6 +194,79 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
 
   NoteSpell? _spellHelper;
 
+  /// Comments on passages: the tint, the popover, the panel.
+  EditorComments? _commentsHelper;
+  EditorComments get _comments => _commentsHelper ??= EditorComments(
+    noteId: widget.noteId,
+    controller: _quillController,
+    ref: ref,
+  );
+
+  /// The comments panel is open beside the note (wide windows; on phones it
+  /// is a bottom sheet and this stays false).
+  bool _commentsOpen = false;
+
+  /// The project page asked for this note's comments panel.
+  void _openCommentsIfAsked() {
+    if (!mounted || !_loaded) return;
+    if (ref.read(pendingCommentsPanelProvider) != widget.noteId) return;
+    ref.read(pendingCommentsPanelProvider.notifier).state = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openComments();
+    });
+  }
+
+  void _openComments() {
+    if (!_loaded) return;
+    if (MediaQuery.sizeOf(context).width >= 900) {
+      setState(() => _commentsOpen = true);
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheet) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(sheet).height * 0.7,
+        ),
+        child: _comments.panel(
+          context: context,
+          showClose: false,
+          onClose: () => Navigator.pop(sheet),
+          afterPick: (_) {
+            Navigator.pop(sheet);
+            _bodyFocus.requestFocus();
+          },
+        ),
+      ),
+    );
+  }
+
+  /// [scaffold], with the comments panel beside it when it is open.
+  Widget _withCommentsPanel(Widget scaffold) {
+    if (!_commentsOpen || !_loaded) return scaffold;
+    return Row(
+      children: [
+        Expanded(child: scaffold),
+        VerticalDivider(
+          width: 1,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+        SizedBox(
+          width: 320,
+          child: SafeArea(
+            child: _comments.panel(
+              context: context,
+              onClose: () => setState(() => _commentsOpen = false),
+              afterPick: (_) => _bodyFocus.requestFocus(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Spell check for the body, rebuilding the editor as results arrive.
   /// Call from build only: it follows the setting and the platform checker.
   NoteSpell _spellNow() {
@@ -284,6 +362,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _flushRegistry = ref.read(openNoteFlushProvider);
     _flushRegistry[widget.noteId] = _save;
     _loadNote();
+    ref.listenManual<String?>(
+      pendingCommentsPanelProvider,
+      (_, _) => _openCommentsIfAsked(),
+    );
     _figures.onOpen = _openFigure;
     ref.listenManual<FigureContext>(
       figureContextProvider(widget.noteId),
@@ -376,6 +458,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _figures.documentChanged(document);
     widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
+    _openCommentsIfAsked();
     if (want != null) _revealInitialSelection();
     _restoreRescued();
   }
@@ -1003,6 +1086,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           await _linkNote(context);
         case _Command.draw:
           _ink?.insertAtCursor();
+        case _Command.insertTable:
+          _insertTable();
         case _Command.heading:
           _quillController.formatSelection(Attribute.h2);
         case _Command.checklist:
@@ -1317,6 +1402,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   void dispose() {
     _findStep.dispose();
     _spellHelper?.dispose();
+    _commentsHelper?.dispose();
     widget.handle?.appendQuote = null;
     _lock.removeListener(_onLockChanged);
     if (_flushRegistry[widget.noteId] == _save) {
@@ -1368,6 +1454,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     ref.listen(noteBodyFocusRequestProvider, (_, _) {
       if (widget.embedded && _loaded) _bodyFocus.requestFocus();
     });
+    if (_loaded) {
+      _comments.sync(ref.watch(commentViewsProvider(widget.noteId)));
+    }
     final scaffold = Scaffold(
       // The toolbar rides on top of the keyboard (see bottomNavigationBar),
       // so the body must not also shrink for it.
@@ -1448,6 +1537,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     false),
               ),
               'find' => _openFind(),
+              'comments' => _openComments(),
               'duplicate' => duplicateNoteAndOpen(context, ref, widget.noteId),
               'print' => printNote(context, ref, widget.noteId),
               'trash' => _moveToTrash(),
@@ -1543,6 +1633,13 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     subtitle: Text('Needs your notes password to open'),
                   ),
                 ),
+              const PopupMenuItem(
+                value: 'comments',
+                child: ListTile(
+                  leading: Icon(Icons.comment_outlined),
+                  title: Text('Comments'),
+                ),
+              ),
               const PopupMenuItem(
                 value: 'find',
                 child: ListTile(
@@ -1813,7 +1910,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                               children: attachments.map((a) {
                                 if (a.type == AttachmentType.image &&
                                     a.path != null) {
-                                  return _ImagePreview(path: a.path!);
+                                  return _ImagePreview(attachment: a);
                                 }
                                 return _AttachmentChip(attachment: a);
                               }).toList(),
@@ -1835,8 +1932,21 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                 scrollController: _bodyScroll,
                                 config: QuillEditorConfig(
                                   editorKey: _editorKey,
-                                  textSpanBuilder: _spellNow().spanBuilder,
-                                  contextMenuBuilder: _spellNow().contextMenu,
+                                  textSpanBuilder: _comments.marks.wrap(
+                                    _spellNow().spanBuilder,
+                                  ),
+                                  contextMenuBuilder: (ctx, state) =>
+                                      _comments.contextMenu(
+                                        ctx,
+                                        state,
+                                        _spellNow().contextMenu,
+                                        innerWins: () =>
+                                            _spellNow()
+                                                .misspellingAtSelection() !=
+                                            null,
+                                      ),
+                                  onTapUp: (details, position) => _comments
+                                      .onTapUp(context, details, position),
                                   scrollable: false,
                                   padding: EdgeInsets.zero,
                                   placeholder: 'Start writing…',
@@ -1870,6 +1980,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                     FigureDefEmbedBuilder(),
                                     FigureRefEmbedBuilder(),
                                     SketchEmbedBuilder(),
+                                    TableEmbedBuilder(),
                                     CitationEmbedBuilder(),
                                     MathInlineEmbedBuilder(),
                                     MathBlockEmbedBuilder(),
@@ -2010,18 +2121,39 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               ),
             ),
     );
-    if (!desktop) return scaffold;
+    final shown = _withCommentsPanel(scaffold);
+    if (!desktop) return shown;
     return MenuCommandHandler(
       commands: _commands,
       child: isMac(context)
-          ? NoteDropTarget(noteId: widget.noteId, child: scaffold)
-          : scaffold,
+          ? NoteDropTarget(noteId: widget.noteId, child: shown)
+          : shown,
     );
   }
 
   /// Menu-bar and shortcut commands the editor takes (Format menu, text
   /// zoom, Move to Trash). Clicking a Format item while editing applies it
   /// at the selection, exactly like the toolbar buttons.
+  /// A 3×3 table at the cursor, its first cell ready to type in.
+  void _insertTable() {
+    insertTableAtCursor(
+      _quillController,
+      onQuiet: () {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  /// ⌥⌘K: comment on the selected passage (or say how to).
+  Future<void> _commentOnSelection() async {
+    if (!_loaded) return;
+    if (!await _comments.addFromSelection(context) && mounted) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('Select the passage to comment on.')),
+      );
+    }
+  }
+
   late final Map<MenuCommand, VoidCallback> _commands = {
     MenuCommand.bold: () => _toggle(Attribute.bold),
     MenuCommand.italic: () => _toggle(Attribute.italic),
@@ -2037,9 +2169,11 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.blockQuote: () => _toggle(Attribute.blockQuote),
     MenuCommand.monospaced: () => _toggle(Attribute.codeBlock),
     MenuCommand.highlight: _toggleHighlight,
+    MenuCommand.insertTable: _insertTable,
     MenuCommand.linkNote: () => _linkNote(context),
     MenuCommand.citePaper: () => _citePaper(context),
     MenuCommand.find: _openFind,
+    MenuCommand.addComment: _commentOnSelection,
     MenuCommand.findNext: () =>
         _finding ? _findStep.value?.call(1) : _openFind(),
     MenuCommand.findPrevious: () =>
@@ -2253,9 +2387,9 @@ class _Backlinks extends ConsumerWidget {
 /// usually wide; a square crop would cut it off). Tap to see it full screen
 /// and zoom in.
 class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.path});
+  const _ImagePreview({required this.attachment});
 
-  final String path;
+  final Attachment attachment;
 
   @override
   Widget build(BuildContext context) {
@@ -2266,7 +2400,7 @@ class _ImagePreview extends StatelessWidget {
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             fullscreenDialog: true,
-            builder: (_) => _ImageViewer(path: path),
+            builder: (_) => AttachmentImageViewer(attachment: attachment),
           ),
         ),
         child: ConstrainedBox(
@@ -2277,7 +2411,7 @@ class _ImagePreview extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.file(
-              File(path),
+              File(attachment.path!),
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => const SizedBox.square(
                 dimension: 96,
@@ -2286,23 +2420,6 @@ class _ImagePreview extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ImageViewer extends StatelessWidget {
-  const _ImageViewer({required this.path});
-
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: InteractiveViewer(
-        maxScale: 6,
-        child: Center(child: Image.file(File(path))),
       ),
     );
   }
@@ -2543,7 +2660,8 @@ enum _TextStyle {
   quote('Quote', Icons.format_quote),
   strike('Strikethrough', Icons.format_strikethrough),
   monospaced('Monospaced', Icons.code),
-  highlight('Highlight', Icons.border_color_outlined);
+  highlight('Highlight', Icons.border_color_outlined),
+  table('Table', Icons.grid_on);
 
   const _TextStyle(this.label, this.icon);
 
@@ -2574,6 +2692,7 @@ class _TextStyleButton extends StatelessWidget {
       _TextStyle.strike => attrs.containsKey(Attribute.strikeThrough.key),
       _TextStyle.monospaced => attrs.containsKey(Attribute.codeBlock.key),
       _TextStyle.highlight => attrs.containsKey(Attribute.background.key),
+      _TextStyle.table => false,
     };
   }
 
@@ -2597,9 +2716,14 @@ class _TextStyleButton extends StatelessWidget {
   }
 
   void _apply(_TextStyle style) {
+    if (style == _TextStyle.table) {
+      // The first cell takes focus, so the editor must not.
+      insertTableAtCursor(controller);
+      return;
+    }
     final attrs = controller.getSelectionStyle().attributes;
     controller.formatSelection(switch (style) {
-      _TextStyle.highlight => Attribute.background,
+      _TextStyle.highlight || _TextStyle.table => Attribute.background,
       _TextStyle.monospaced =>
         _isOn(style, attrs)
             ? Attribute.clone(Attribute.codeBlock, null)
@@ -2631,7 +2755,9 @@ class _TextStyleButton extends StatelessWidget {
         final attrs = controller.getSelectionStyle().attributes;
         return [
           for (final style in _TextStyle.values) ...[
-            if (style == _TextStyle.quote || style == _TextStyle.monospaced)
+            if (style == _TextStyle.quote ||
+                style == _TextStyle.monospaced ||
+                style == _TextStyle.table)
               const PopupMenuDivider(),
             CheckedPopupMenuItem(
               value: style,
@@ -2682,6 +2808,7 @@ enum _Command {
   ),
   link('Link to a note', 'Or type [[', Icons.link),
   draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
+  insertTable('Table', 'Rows and columns, 3 by 3 to start', Icons.grid_on),
   heading('Heading', 'Make this line a heading', Icons.title),
   checklist('Checklist', 'Tick-box items', Icons.check_box_outlined),
   attach('Attach', 'Audio, an image or a file', Icons.attach_file),

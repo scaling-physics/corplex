@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import Vision
@@ -15,6 +16,14 @@ import Vision
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registerOcrChannel(engineBridge.applicationRegistrar.messenger())
     registerSpellChannel(engineBridge.applicationRegistrar.messenger())
+    registerSpeakChannel(engineBridge.applicationRegistrar.messenger())
+  }
+
+  private func registerSpeakChannel(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "corplex/speak", binaryMessenger: messenger)
+    let handler = Speaker(channel)
+    speakHandler = handler
+    channel.setMethodCallHandler { call, result in handler.handle(call, result) }
   }
 
   /// Spell check for the note editor (`corplex/spell`): `UITextChecker`,
@@ -113,5 +122,83 @@ import Vision
         }
       }
     }
+  }
+}
+
+private var speakHandler: Speaker?
+
+/// Read aloud (`corplex/speak`): `AVSpeechSynthesizer`. Utterances queue
+/// natively; each reports `done` (finished true, or false when cut off by
+/// `stop`). The synthesizer is created on the first `speak`, never at
+/// registration.
+private final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
+  private let channel: FlutterMethodChannel
+  private var synthesizer: AVSpeechSynthesizer?
+  private var ids: [AVSpeechUtterance: Int] = [:]
+
+  init(_ channel: FlutterMethodChannel) { self.channel = channel }
+
+  func handle(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    switch call.method {
+    case "speak":
+      guard let args = call.arguments as? [String: Any],
+        let id = args["id"] as? Int, let text = args["text"] as? String
+      else {
+        result(FlutterError(code: "bad_args", message: "Expected id and text", details: nil))
+        return
+      }
+      let multiplier = (args["rate"] as? Double) ?? 1.0
+      let utterance = AVSpeechUtterance(string: text)
+      let rate = Float(multiplier) * AVSpeechUtteranceDefaultSpeechRate
+      utterance.rate = min(max(rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+      if let language = args["language"] as? String,
+        let voice = AVSpeechSynthesisVoice(language: language)
+      {
+        utterance.voice = voice
+      }
+      do {
+          // Spoken audio: plays with the silent switch on.
+          let session = AVAudioSession.sharedInstance()
+          try session.setCategory(.playback, mode: .spokenAudio)
+          try session.setActive(true)
+        } catch {}
+      let synth = synthesizer ?? makeSynthesizer()
+      ids[utterance] = id
+      synth.speak(utterance)
+      result(nil)
+    case "pause":
+      synthesizer?.pauseSpeaking(at: .immediate)
+      result(nil)
+    case "resume":
+      synthesizer?.continueSpeaking()
+      result(nil)
+    case "stop":
+      synthesizer?.stopSpeaking(at: .immediate)
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private func makeSynthesizer() -> AVSpeechSynthesizer {
+    let synth = AVSpeechSynthesizer()
+    synth.delegate = self
+    synthesizer = synth
+    return synth
+  }
+
+  private func report(_ utterance: AVSpeechUtterance, finished: Bool) {
+    guard let id = ids.removeValue(forKey: utterance) else { return }
+    DispatchQueue.main.async {
+      self.channel.invokeMethod("done", arguments: ["id": id, "finished": finished])
+    }
+  }
+
+  func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    report(utterance, finished: true)
+  }
+
+  func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    report(utterance, finished: false)
   }
 }

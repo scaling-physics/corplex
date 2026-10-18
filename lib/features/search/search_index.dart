@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../lock/note_crypto.dart';
-import '../notes/note_content.dart';
+import 'note_search_text.dart';
 
-enum SearchKind { note, paper, highlight }
+enum SearchKind { note, paper, highlight, pdfText }
 
 class SearchHit {
   const SearchHit({
@@ -87,7 +87,7 @@ class SearchIndex {
           title: row.read<String>('title'),
           body: row.read<String?>('aux') == 'locked'
               ? ''
-              : notePlainTextPreview(row.read<String>('body')),
+              : noteSearchText(row.read<String>('body')),
         ),
       );
       await _sync(
@@ -163,6 +163,8 @@ class SearchIndex {
     final match = terms.map((t) => '"$t"*').join(' ');
     final hits = <SearchHit>[];
     for (final kind in SearchKind.values) {
+      // Paper text lives in its own index (PdfTextIndex).
+      if (kind == SearchKind.pdfText) continue;
       final rows = await _db
           .customSelect(
             'SELECT ref, aux, title, '
@@ -222,7 +224,7 @@ class SearchIndex {
     final hits = <SearchHit>[];
     for (final n in await _db.select(_db.notes).get()) {
       final locked = isLockedContent(n.content);
-      final body = locked ? '' : notePlainTextPreview(n.content);
+      final body = locked ? '' : noteSearchText(n.content);
       if (matches('${n.title} $body')) {
         hits.add(
           SearchHit(

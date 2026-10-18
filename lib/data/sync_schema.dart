@@ -114,6 +114,20 @@ const syncTables = [
     ],
   ),
   SyncTableSpec(
+    'note_comments',
+    keys: ['id'],
+    columns: [
+      'note_id',
+      'quote',
+      'anchor',
+      'body',
+      'author',
+      'resolved',
+      'created_at',
+      'updated_at',
+    ],
+  ),
+  SyncTableSpec(
     'note_keys',
     keys: ['id'],
     columns: [

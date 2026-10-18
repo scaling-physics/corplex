@@ -55,6 +55,39 @@ class InkInputPolicy {
   }
 }
 
+/// The app's one palm-rejection policy: once a pen has been used anywhere,
+/// fingers stop drawing for the rest of the session.
+final inkPolicy = InkInputPolicy();
+
+/// Claims a pointer the canvas is drawing or erasing with as soon as it
+/// touches down, so the note's text selection, the page's scrolling and
+/// other gestures under the canvas never act on a pen stroke.
+class InkClaimRecognizer extends OneSequenceGestureRecognizer {
+  InkClaimRecognizer(this.claims) : super(allowedButtonsFilter: (_) => true);
+
+  final bool Function(int pointer) claims;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (!claims(event.pointer)) return;
+    startTrackingPointer(event.pointer, event.transform);
+    resolve(GestureDisposition.accepted);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      stopTrackingPointer(event.pointer);
+    }
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {}
+
+  @override
+  String get debugDescription => 'ink claim';
+}
+
 /// The drawing surface. Reports every finished stroke or erase through
 /// [onChanged]; it doesn't own the sketch, so the editor can keep undo
 /// history.
@@ -70,7 +103,13 @@ class InkCanvas extends StatefulWidget {
     required this.erasing,
     this.onGestureStart,
     this.onPolicyChanged,
+    this.othersDraw = true,
   });
+
+  /// Whether fingers and a mouse may draw here (still subject to [policy]).
+  /// A pen always may. Inline drawings in a note pass false until the
+  /// drawing is chosen, so a finger scrolls past it.
+  final bool othersDraw;
 
   final Sketch sketch;
   final ValueChanged<Sketch> onChanged;
@@ -138,6 +177,10 @@ class _InkCanvasState extends State<InkCanvas> {
     _hover.value = null;
     if (!hadStylus && widget.policy.stylusSeen) widget.onPolicyChanged?.call();
     if (action == InkAction.ignore) return;
+    final pen =
+        e.kind == PointerDeviceKind.stylus ||
+        e.kind == PointerDeviceKind.invertedStylus;
+    if (!pen && !widget.othersDraw) return;
 
     _pointer = e.pointer;
     _action = action;
@@ -194,6 +237,17 @@ class _InkCanvasState extends State<InkCanvas> {
   void _up(PointerEvent e) {
     if (e.pointer != _pointer) return;
     _pointer = null;
+    if (_action == InkAction.erase) {
+      // One write per swipe, however many strokes it crossed.
+      final erased = _erasing;
+      _erasing = null;
+      if (erased != null && !identical(erased, widget.sketch)) {
+        widget.onChanged(erased);
+      } else {
+        setState(() {});
+      }
+      return;
+    }
     if (_action == InkAction.draw) {
       final stroke = _active.value;
       _active.value = null;
@@ -220,8 +274,7 @@ class _InkCanvasState extends State<InkCanvas> {
         .where((s) => !s.hits(at, _eraserRadius))
         .toList();
     if (remaining.length != current.strokes.length) {
-      _erasing = current.copyWith(strokes: remaining);
-      widget.onChanged(_erasing!);
+      setState(() => _erasing = current.copyWith(strokes: remaining));
     }
   }
 
@@ -230,36 +283,47 @@ class _InkCanvasState extends State<InkCanvas> {
     return LayoutBuilder(
       builder: (context, constraints) {
         _canvasWidth = constraints.maxWidth;
-        return MouseRegion(
-          onHover: _hovered,
-          onExit: (_) => _hover.value = null,
-          child: Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: _down,
-            onPointerMove: _move,
-            onPointerUp: _up,
-            onPointerCancel: _up,
-            child: SizedBox(
-              width: constraints.maxWidth,
-              height: constraints.maxWidth * widget.sketch.aspect,
-              child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: InkPainter(strokes: widget.sketch.strokes),
-                  foregroundPainter: _ActiveStrokePainter(_active),
-                  child: ValueListenableBuilder(
-                    valueListenable: _hover,
-                    builder: (context, hover, _) => hover == null
-                        ? const SizedBox.expand()
-                        : CustomPaint(
-                            key: const ValueKey('ink-hover'),
-                            painter: _HoverPainter(
-                              at: hover.at,
-                              radius: hover.erase
-                                  ? _eraserRadius * _canvasWidth
-                                  : widget.width * _canvasWidth / 2,
-                              erase: hover.erase,
+        return RawGestureDetector(
+          gestures: {
+            InkClaimRecognizer:
+                GestureRecognizerFactoryWithHandlers<InkClaimRecognizer>(
+                  () => InkClaimRecognizer((p) => p == _pointer),
+                  (_) {},
+                ),
+          },
+          child: MouseRegion(
+            onHover: _hovered,
+            onExit: (_) => _hover.value = null,
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: _down,
+              onPointerMove: _move,
+              onPointerUp: _up,
+              onPointerCancel: _up,
+              child: SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxWidth * widget.sketch.aspect,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: InkPainter(
+                      strokes: (_erasing ?? widget.sketch).strokes,
+                    ),
+                    foregroundPainter: _ActiveStrokePainter(_active),
+                    child: ValueListenableBuilder(
+                      valueListenable: _hover,
+                      builder: (context, hover, _) => hover == null
+                          ? const SizedBox.expand()
+                          : CustomPaint(
+                              key: const ValueKey('ink-hover'),
+                              painter: _HoverPainter(
+                                at: hover.at,
+                                radius: hover.erase
+                                    ? _eraserRadius * _canvasWidth
+                                    : widget.width * _canvasWidth / 2,
+                                erase: hover.erase,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),

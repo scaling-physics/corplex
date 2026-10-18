@@ -32,6 +32,9 @@ import '../voice/voice_services.dart' show dictationOfferedProvider;
 import '../voice/voice_sheet.dart';
 import '../export/export_actions.dart';
 import '../export/export_model.dart';
+import '../ink/ink_canvas.dart' show inkPolicy;
+import '../ink/ink_catcher.dart';
+import '../ink/ink_session.dart';
 import '../ink/sketch_embed.dart';
 import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
@@ -224,6 +227,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   // every build, so any rebuild (e.g. after an autosave) dropped the body's
   // focus and the keyboard jumped to the title mid-sentence.
   final _bodyFocus = FocusNode();
+
+  /// Pen input: inline drawings, the floating tools (see [InkSession]).
+  InkSession? _ink;
   final _titleFocus = FocusNode();
   final _bodyScroll = ScrollController();
 
@@ -346,6 +352,17 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
         ),
       ),
     );
+    _ink = InkSession(
+      controller: _quillController,
+      // Drawing hides the keyboard, as in Notes.
+      onInkStart: () => _bodyFocus.unfocus(),
+      onQuietEdit: () {
+        if (mounted) setState(() {});
+      },
+    );
+    // Tapping back into the text puts the drawing tools away.
+    _bodyFocus.addListener(_leaveDrawingIfTyping);
+    _quillController.addListener(_leaveDrawingIfTyping);
     if (note != null && mounted) {
       _titleController.text = note.title;
     }
@@ -985,7 +1002,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
         case _Command.link:
           await _linkNote(context);
         case _Command.draw:
-          await insertSketch(context, _quillController);
+          _ink?.insertAtCursor();
         case _Command.heading:
           _quillController.formatSelection(Attribute.h2);
         case _Command.checklist:
@@ -1237,6 +1254,36 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (mounted) setState(() {});
   }
 
+  /// Puts the drawing tools away once the cursor is in the text: the body
+  /// has focus and the selection isn't beside the chosen drawing. (A finger
+  /// tap on a drawing also focuses the editor, with the cursor at the
+  /// drawing — that is choosing it, not leaving it.) Checked after the frame,
+  /// when Quill has settled the selection.
+  void _leaveDrawingIfTyping() {
+    final ink = _ink;
+    if (ink == null || ink.active == null || !_bodyFocus.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final active = ink.active;
+      if (!mounted || active == null || !_bodyFocus.hasFocus) return;
+      final sel = _quillController.selection;
+      final atDrawing =
+          sel.isCollapsed &&
+          (sel.baseOffset == active || sel.baseOffset == active + 1);
+      if (!atDrawing) ink.deactivate();
+    });
+  }
+
+  /// A tap in the blank space under the text: type at the end, as Notes does.
+  void _focusEnd() {
+    if (!_loaded) return;
+    final end = _quillController.document.length - 1;
+    _quillController.updateSelection(
+      TextSelection.collapsed(offset: end),
+      ChangeSource.local,
+    );
+    _bodyFocus.requestFocus();
+  }
+
   Future<void> _showWordCount(BuildContext context) async {
     final stats = noteStats(_quillController.document);
     final linked = await ref.read(
@@ -1281,7 +1328,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _debounce?.cancel();
     _titleController.dispose();
     _figures.dispose();
+    _bodyFocus.removeListener(_leaveDrawingIfTyping);
+    if (_loaded) _quillController.removeListener(_leaveDrawingIfTyping);
     _bodyFocus.dispose();
+    _ink?.dispose();
     _titleFocus.dispose();
     _bodyScroll.dispose();
     _pageScroll.dispose();
@@ -1312,6 +1362,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               .firstOrNull;
 
     final desktop = isDesktop(context);
+    // A mouse or trackpad draws on a chosen drawing on a desktop.
+    inkPolicy.mouseAlwaysDraws = desktop;
     final zoom = desktop ? ref.watch(noteZoomProvider).scale : 1.0;
     ref.listen(noteBodyFocusRequestProvider, (_, _) {
       if (widget.embedded && _loaded) _bodyFocus.requestFocus();
@@ -1331,7 +1383,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
             ? _DesktopFormatBar(
                 controller: _quillController,
                 mac: isMac(context),
-                onDraw: () => insertSketch(context, _quillController),
+                onDraw: () => _ink?.insertAtCursor(),
                 onDone: _bodyFocus.requestFocus,
               )
             : null,
@@ -1541,295 +1593,332 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, box) => !_loaded
-            ? const SizedBox.shrink()
-            : ListView(
-                key: _viewportKey,
-                controller: _pageScroll,
-                // Centred at a readable width on a tablet. In typewriter
-                // mode the end of the note can rise to the caret line.
-                padding: EdgeInsets.fromLTRB(
-                  _sideMargin(box.maxWidth, desktop),
-                  0,
-                  _sideMargin(box.maxWidth, desktop),
-                  ref.watch(appearanceSettingsProvider).typewriter
-                      ? box.maxHeight * 0.6
-                      : 32,
-                ),
-                children: [
-                  if (desktop && noteAsync.value != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 14),
-                      child: Center(
-                        child: Text(
-                          DateFormat("d MMMM y 'at' HH:mm")
-                              .format(noteAsync.value!.updatedAt),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, box) => !_loaded
+                  ? const SizedBox.shrink()
+                  : ListView(
+                      key: _viewportKey,
+                      controller: _pageScroll,
+                      // Centred at a readable width on a tablet. In typewriter
+                      // mode the end of the note can rise to the caret line.
+                      padding: EdgeInsets.fromLTRB(
+                        _sideMargin(box.maxWidth, desktop),
+                        0,
+                        _sideMargin(box.maxWidth, desktop),
+                        ref.watch(appearanceSettingsProvider).typewriter
+                            ? box.maxHeight * 0.6
+                            : 32,
+                      ),
+                      children: [
+                        if (desktop && noteAsync.value != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: Center(
+                              child: Text(
+                                DateFormat("d MMMM y 'at' HH:mm")
+                                    .format(noteAsync.value!.updatedAt),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
                               ),
-                        ),
-                      ),
-                    ),
-                  // Tab goes on into the body, as Return does.
-                  Focus(
-                    canRequestFocus: false,
-                    skipTraversal: true,
-                    onKeyEvent: (_, e) {
-                      if (desktop &&
-                          e is KeyDownEvent &&
-                          e.logicalKey == LogicalKeyboardKey.tab &&
-                          !HardwareKeyboard.instance.isShiftPressed) {
-                        _bodyFocus.requestFocus();
-                        return KeyEventResult.handled;
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _titleController,
-                      focusNode: _titleFocus,
-                      style: desktop
-                          ? Theme.of(context).textTheme.headlineMedium
-                                ?.copyWith(
-                                  fontSize: 32 * zoom,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.4,
-                                )
-                          : Theme.of(context).textTheme.headlineMedium,
-                      textCapitalization: TextCapitalization.sentences,
-                      // A long title wraps rather than scrolling out of
-                      // sight; Return moves on to the body (a title is one
-                      // line of text, even when it wraps).
-                      maxLines: null,
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => _bodyFocus.requestFocus(),
-                      decoration: const InputDecoration(
-                        hintText: 'Title',
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        filled: false,
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                  if (folderName != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: GestureDetector(
-                        onTap: () => showFolderPickerSheet(
-                          context,
-                          ref,
-                          widget.noteId,
-                          folderId,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.folder_outlined,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.secondary,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              folderName,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
+                          ),
+                        // Tab goes on into the body, as Return does.
+                        Focus(
+                          canRequestFocus: false,
+                          skipTraversal: true,
+                          onKeyEvent: (_, e) {
+                            if (desktop &&
+                                e is KeyDownEvent &&
+                                e.logicalKey == LogicalKeyboardKey.tab &&
+                                !HardwareKeyboard.instance.isShiftPressed) {
+                              _bodyFocus.requestFocus();
+                              return KeyEventResult.handled;
+                            }
+                            return KeyEventResult.ignored;
+                          },
+                          child: TextField(
+                            controller: _titleController,
+                            focusNode: _titleFocus,
+                            style: desktop
+                                ? Theme.of(context).textTheme.headlineMedium
+                                      ?.copyWith(
+                                        fontSize: 32 * zoom,
+                                        height: 1.2,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.4,
+                                      )
+                                : Theme.of(context).textTheme.headlineMedium,
+                            textCapitalization: TextCapitalization.sentences,
+                            // A long title wraps rather than scrolling out of
+                            // sight; Return moves on to the body (a title is one
+                            // line of text, even when it wraps).
+                            maxLines: null,
+                            keyboardType: TextInputType.text,
+                            textInputAction: TextInputAction.next,
+                            onSubmitted: (_) => _bodyFocus.requestFocus(),
+                            decoration: const InputDecoration(
+                              hintText: 'Title',
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                        if (folderName != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: GestureDetector(
+                              onTap: () => showFolderPickerSheet(
+                                context,
+                                ref,
+                                widget.noteId,
+                                folderId,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.folder_outlined,
+                                    size: 16,
                                     color: Theme.of(context)
                                         .colorScheme
                                         .secondary,
                                   ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ...switch (tagsAsync.value) {
-                    null || [] => const [],
-                    final tags => [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: -8,
-                        children: tags
-                            .map(
-                              (tag) => InputChip(
-                                avatar: const Icon(Icons.tag, size: 16),
-                                label: Text(tag.name),
-                                onPressed: () => showTagPickerSheet(
-                                  context,
-                                  ref,
-                                  widget.noteId,
-                                ),
-                                onDeleted: () => removeTagFromNote(
-                                  ref.read(databaseProvider),
-                                  noteId: widget.noteId,
-                                  tagId: tag.id,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  },
-                  ...switch (ref
-                      .watch(projectsForNoteProvider(widget.noteId))
-                      .value) {
-                    null || [] => const [],
-                    final projects => [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: -8,
-                        children: [
-                          for (final project in projects)
-                            InputChip(
-                              avatar: const Icon(
-                                Icons.folder_special_outlined,
-                                size: 16,
-                              ),
-                              label: Text(project.name),
-                              onPressed: () => showProjectPickerSheet(
-                                context,
-                                noteId: widget.noteId,
-                              ),
-                              onDeleted: () => removeNoteFromProject(
-                                ref.read(databaseProvider),
-                                projectId: project.id,
-                                noteId: widget.noteId,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  },
-                  ...switch (linkedPapersAsync.value) {
-                    null || [] => const [],
-                    final papers => [
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: -8,
-                        children: papers
-                            .map(
-                              (paper) => InputChip(
-                                avatar: const Icon(
-                                  Icons.article_outlined,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  paper.title,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        PaperDetailScreen(paperId: paper.id),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    folderName,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .secondary,
+                                        ),
                                   ),
-                                ),
-                                onDeleted: () => unlinkPaperFromNote(
-                                  ref.read(databaseProvider),
-                                  noteId: widget.noteId,
-                                  paperId: paper.id,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ...switch (tagsAsync.value) {
+                          null || [] => const [],
+                          final tags => [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: -8,
+                              children: tags
+                                  .map(
+                                    (tag) => InputChip(
+                                      avatar: const Icon(Icons.tag, size: 16),
+                                      label: Text(tag.name),
+                                      onPressed: () => showTagPickerSheet(
+                                        context,
+                                        ref,
+                                        widget.noteId,
+                                      ),
+                                      onDeleted: () => removeTagFromNote(
+                                        ref.read(databaseProvider),
+                                        noteId: widget.noteId,
+                                        tagId: tag.id,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        },
+                        ...switch (ref
+                            .watch(projectsForNoteProvider(widget.noteId))
+                            .value) {
+                          null || [] => const [],
+                          final projects => [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: -8,
+                              children: [
+                                for (final project in projects)
+                                  InputChip(
+                                    avatar: const Icon(
+                                      Icons.folder_special_outlined,
+                                      size: 16,
+                                    ),
+                                    label: Text(project.name),
+                                    onPressed: () => showProjectPickerSheet(
+                                      context,
+                                      noteId: widget.noteId,
+                                    ),
+                                    onDeleted: () => removeNoteFromProject(
+                                      ref.read(databaseProvider),
+                                      projectId: project.id,
+                                      noteId: widget.noteId,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        },
+                        ...switch (linkedPapersAsync.value) {
+                          null || [] => const [],
+                          final papers => [
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: -8,
+                              children: papers
+                                  .map(
+                                    (paper) => InputChip(
+                                      avatar: const Icon(
+                                        Icons.article_outlined,
+                                        size: 16,
+                                      ),
+                                      label: Text(
+                                        paper.title,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: () => Navigator.of(context)
+                                          .push(
+                                            MaterialPageRoute(
+                                              builder: (_) => PaperDetailScreen(
+                                                paperId: paper.id,
+                                              ),
+                                            ),
+                                          ),
+                                      onDeleted: () => unlinkPaperFromNote(
+                                        ref.read(databaseProvider),
+                                        noteId: widget.noteId,
+                                        paperId: paper.id,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        },
+                        ...switch (attachmentsAsync.value) {
+                          null || [] => const [],
+                          final attachments => [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: attachments.map((a) {
+                                if (a.type == AttachmentType.image &&
+                                    a.path != null) {
+                                  return _ImagePreview(path: a.path!);
+                                }
+                                return _AttachmentChip(attachment: a);
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        },
+                        FigureScopeInherited(
+                          scope: _figures,
+                          child: InkSessionScope(
+                            session: _ink!,
+                            child: InkCatcher(
+                              session: _ink!,
+                              editorKey: _editorKey,
+                              onTapBelow: _focusEnd,
+                              child: QuillEditor.basic(
+                                controller: _quillController,
+                                focusNode: _bodyFocus,
+                                scrollController: _bodyScroll,
+                                config: QuillEditorConfig(
+                                  editorKey: _editorKey,
+                                  textSpanBuilder: _spellNow().spanBuilder,
+                                  contextMenuBuilder: _spellNow().contextMenu,
+                                  scrollable: false,
+                                  padding: EdgeInsets.zero,
+                                  placeholder: 'Start writing…',
+                                  customStyles: desktop
+                                      ? _desktopStyles(context, zoom)
+                                      : _mobileStyles(context),
+                                  customStyleBuilder: noteStyleFor,
+                                  customShortcuts: desktop
+                                      ? _desktopShortcuts
+                                      : null,
+                                  customActions: desktop
+                                      ? {
+                                          _NoteCommandIntent:
+                                              CallbackAction<
+                                                _NoteCommandIntent
+                                              >(
+                                                onInvoke: (i) {
+                                                  _commands[i.command]?.call();
+                                                  return null;
+                                                },
+                                              ),
+                                          _PassKeyIntent: DoNothingAction(
+                                            consumesKey: false,
+                                          ),
+                                        }
+                                      : null,
+                                  // ignore: experimental_member_use
+                                  onKeyPressed: desktop ? _onBodyKey : null,
+                                  customLinkPrefixes: const [audioLinkScheme],
+                                  embedBuilders: const [
+                                    FigureDefEmbedBuilder(),
+                                    FigureRefEmbedBuilder(),
+                                    SketchEmbedBuilder(),
+                                    CitationEmbedBuilder(),
+                                    MathInlineEmbedBuilder(),
+                                    MathBlockEmbedBuilder(),
+                                  ],
+                                  // Audio timestamps play on a plain tap; other links
+                                  // keep Quill's default long-press menu.
+                                  customRecognizerBuilder: (attribute, leaf) {
+                                    if (attribute.key != Attribute.link.key) {
+                                      return null;
+                                    }
+                                    final link =
+                                        attribute.value?.toString() ?? '';
+                                    if (parseAudioTimestampLink(link)
+                                        case final t?) {
+                                      return TapGestureRecognizer()
+                                        ..onTap = () =>
+                                            _playFrom(t.attachmentId, t.at);
+                                    }
+                                    if (parsePaperPageLink(link)
+                                        case final p?) {
+                                      return TapGestureRecognizer()
+                                        ..onTap = () =>
+                                            _openPaperAt(p.paperId, p.page);
+                                    }
+                                    if (parseNoteLink(link) case final id?) {
+                                      return TapGestureRecognizer()
+                                        ..onTap = () => _openNote(id);
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
-                            )
-                            .toList(),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  },
-                  ...switch (attachmentsAsync.value) {
-                    null || [] => const [],
-                    final attachments => [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: attachments.map((a) {
-                          if (a.type == AttachmentType.image &&
-                              a.path != null) {
-                            return _ImagePreview(path: a.path!);
-                          }
-                          return _AttachmentChip(attachment: a);
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  },
-                  FigureScopeInherited(
-                    scope: _figures,
-                    child: QuillEditor.basic(
-                      controller: _quillController,
-                      focusNode: _bodyFocus,
-                      scrollController: _bodyScroll,
-                      config: QuillEditorConfig(
-                        editorKey: _editorKey,
-                        textSpanBuilder: _spellNow().spanBuilder,
-                        contextMenuBuilder: _spellNow().contextMenu,
-                        scrollable: false,
-                        padding: EdgeInsets.zero,
-                        placeholder: 'Start writing…',
-                        customStyles: desktop
-                            ? _desktopStyles(context, zoom)
-                            : _mobileStyles(context),
-                        customStyleBuilder: noteStyleFor,
-                        customShortcuts: desktop ? _desktopShortcuts : null,
-                        customActions: desktop
-                            ? {
-                                _NoteCommandIntent:
-                                    CallbackAction<_NoteCommandIntent>(
-                                      onInvoke: (i) {
-                                        _commands[i.command]?.call();
-                                        return null;
-                                      },
-                                    ),
-                                _PassKeyIntent: DoNothingAction(
-                                  consumesKey: false,
-                                ),
-                              }
-                            : null,
-                        // ignore: experimental_member_use
-                        onKeyPressed: desktop ? _onBodyKey : null,
-                        customLinkPrefixes: const [audioLinkScheme],
-                        embedBuilders: const [
-                          FigureDefEmbedBuilder(),
-                          FigureRefEmbedBuilder(),
-                          SketchEmbedBuilder(),
-                          CitationEmbedBuilder(),
-                          MathInlineEmbedBuilder(),
-                          MathBlockEmbedBuilder(),
-                        ],
-                        // Audio timestamps play on a plain tap; other links
-                        // keep Quill's default long-press menu.
-                        customRecognizerBuilder: (attribute, leaf) {
-                          if (attribute.key != Attribute.link.key) return null;
-                          final link = attribute.value?.toString() ?? '';
-                          if (parseAudioTimestampLink(link) case final t?) {
-                            return TapGestureRecognizer()
-                              ..onTap = () => _playFrom(t.attachmentId, t.at);
-                          }
-                          if (parsePaperPageLink(link) case final p?) {
-                            return TapGestureRecognizer()
-                              ..onTap = () => _openPaperAt(p.paperId, p.page);
-                          }
-                          if (parseNoteLink(link) case final id?) {
-                            return TapGestureRecognizer()
-                              ..onTap = () => _openNote(id);
-                          }
-                          return null;
-                        },
-                      ),
+                            ),
+                          ),
+                        ),
+                        _Backlinks(noteId: widget.noteId),
+                      ],
                     ),
-                  ),
-                  _Backlinks(noteId: widget.noteId),
-                ],
-              ),
+            ),
+          ),
+          // While a drawing is chosen: pen, inks, eraser, undo, Done.
+          if (_ink != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Center(child: InlineInkToolbar(session: _ink!)),
+            ),
+        ],
       ),
       // A Scaffold leaves its bottom bar under the keyboard; pad it up by the
       // keyboard's height so formatting and Draw stay in reach while typing.
@@ -1892,8 +1981,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                 IconButton(
                                   icon: const Icon(Icons.draw_outlined),
                                   tooltip: 'Draw',
-                                  onPressed: () =>
-                                      insertSketch(context, _quillController),
+                                  onPressed: () => _ink?.insertAtCursor(),
                                 ),
                                 Container(
                                   width: 1,

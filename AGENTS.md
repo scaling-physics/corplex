@@ -1237,28 +1237,60 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
   router was pushing every opened PDF / `corplex://` link as an unknown
   route. iOS widget links carry a `homeWidget` query item (`widgetLink`
   in `CorplexWidget.swift`) — `home_widget` ignores taps without it.
-- **Pen input** (`lib/features/ink/`): a note can hold any number of
-  sketch blocks between its paragraphs — the "Draw" button (first in the
-  editor's bottom toolbar) inserts one at the cursor and opens
-  `SketchEditorScreen`; tap a sketch to draw on it again. A sketch is a
-  Quill `CustomBlockEmbed('sketch', json)` rendered by
-  `SketchEmbedBuilder`, so it lives in the note's `content` and syncs
-  with it (no new table). **Insert `CustomBlockEmbed` directly**, never
-  `BlockEmbed.custom(...)`, which wraps it as type `custom` that the
-  builder's key won't match. Strokes (`ink_model.dart`) are stored in
-  canvas-width units with per-point pressure, so they render identically
-  at any size; `Sketch.encode` rounds to 4 decimals to keep synced notes
-  small. Apple Pencil and Android pens both arrive as
-  `PointerDeviceKind.stylus` with pressure. **Palm rejection**
-  (`InkInputPolicy`): fingers draw until a stylus is seen, then fingers
-  scroll and never draw (toggle in the editor's app bar); a pen's
-  eraser end (`invertedStylus`) always erases. Eraser removes whole
-  strokes; one gesture = one undo step (`onGestureStart`). The canvas
-  keeps its own working copy while erasing, since pointer moves can
-  outrun parent rebuilds. Sketch paper is light in both themes so ink
-  colors read the same everywhere. Test with real stylus events:
-  `adb shell input stylus swipe …` on the emulator,
-  `startGesture(kind: PointerDeviceKind.stylus)` in widget tests.
+- **Pen input** (`lib/features/ink/`), redesigned in 1.12 to work like
+  Apple Notes: drawings sit **inline** among the paragraphs and are drawn
+  on in place — no separate screen. A drawing is a Quill
+  `CustomBlockEmbed('sketch', json)` on a line of its own, so it lives in
+  the note's `content` and syncs, versions and merges with it (no table).
+  **Insert `CustomBlockEmbed` directly**, never `BlockEmbed.custom(...)`
+  (its type would be `custom`), and **add the newlines yourself**: Quill's
+  `InsertEmbedsRule` only adds them around videos, so `insertDrawing`
+  composes `\n` + embed + `\n` as needed (the old Draw button left a
+  drawing sharing a line with text).
+  * `InkSession` (`ink_session.dart`, one per open note, extends the
+    shared `InkTools` — tool, inks, thickness, Pencil double-tap) writes
+    every stroke straight into the document (`write`, one Quill edit, so
+    the editor's undo/⌘Z take strokes back), inserts drawings
+    (`insertDrawing`, `insertAtCursor` for Draw and `/` → Draw), and
+    tracks the *chosen* drawing (`active`), which shows the floating
+    `InlineInkToolbar` (pen/highlighter/eraser, inks, widths, undo/redo;
+    ⋯ → Expand (full-screen `SketchEditorScreen`) and fingers draw/scroll,
+    pinned beside Done so they stay in reach on a 360 px phone). A chosen
+    drawing left empty is removed with its line. Pen writes pass
+    `ignoreFocus: true` (no keyboard), and **on that path Quill doesn't
+    rebuild the editor** — `onQuietEdit` makes the editor `setState`, or
+    new ink stays invisible.
+  * `InlineSketch` (`sketch_embed.dart`) is the drawing in the note: a
+    pen always draws on it; a finger or mouse only once it's chosen (tap
+    it), so fingers scroll past drawings; a grip under a chosen drawing
+    resizes it (never cutting ink). Without an `InkSessionScope`
+    (read-only views) a drawing is a picture that opens full screen.
+  * `InkCatcher` (`ink_catcher.dart`) wraps the body editor plus 160 pt of
+    blank space under it (a finger tap there types at the end). A pen
+    stroke that starts on the text or in that space opens a new drawing
+    after that line (`RenderEditor.getPositionForOffset`, line bottom via
+    `getLocalRectForCaret`), keeping the stroke where it was drawn when it
+    can; starting within 56 pt below a drawing extends it instead. Its
+    recognizer accepts after 3 px of pen movement — before text selection
+    or scrolling — and lets a still tap through, so a pen tap still places
+    the cursor.
+  * **Gestures**: `InkCanvas` claims a pointer it draws with on touch-down
+    (`InkClaimRecognizer`, eager accept), so Quill's selection and the
+    page's scrolling never see a stroke; it commits an eraser swipe once,
+    at the end. A finger tap on a drawing also reaches Quill, which focuses
+    the editor with the cursor at the drawing — the tools close only when
+    the cursor lands elsewhere (`_leaveDrawingIfTyping`), and the keyboard
+    is hidden after the tap.
+  * Strokes (`ink_model.dart`) are in canvas-width units with per-point
+    pressure, so they render identically at any width; `Sketch.encode`
+    rounds to 4 decimals. **Palm rejection** (`inkPolicy`, app-wide): fingers
+    draw until a stylus is seen, then only the pen draws; a pen's eraser
+    end (`invertedStylus`) or barrel button erases; on desktop a mouse
+    draws on a chosen drawing. Paper is light in both themes (borderless on
+    a light page). Test with real stylus events: `adb shell input stylus
+    swipe …` on the emulator, `startGesture(kind: PointerDeviceKind.stylus)`
+    in widget tests (`test/features/ink/inline_ink_test.dart` checks what's
+    on screen, not just the saved content — reset `inkPolicy` in `setUp`).
 - **Note links & export** (`note_links.dart`, `note_link_sheet.dart`,
   `note_markdown.dart`): a link to another note is a plain Quill link
   `corplex://note/<id>` whose text is the target's title when linked.

@@ -481,7 +481,7 @@ the default screens until the user opts in by using the feature.
   front-matter section (`abbreviationBlocks`, via `extraFrontMatter` in
   `project_menu.dart`).
 
-### 1.10 — Notes parity (built)
+### 1.10–1.11 — Notes parity (built)
 - **Checklists**: Quill's own checked lists (`Attribute.unchecked`). Mac
   toolbar button and Format → Checklist ⇧⌘L (`MenuCommand.checklist`);
   phones use `/` → Checklist (the phone format row must fit 360 px, and a
@@ -500,6 +500,34 @@ the default screens until the user opts in by using the feature.
   offsets (embeds are one character); Replace / Replace all (back to
   front). It sits in the editor's bottom bar. It must request focus itself:
   `autofocus` won't take focus from the editor that still has it.
+- **Paste and drop files** (`notes/note_drop.dart`): pasting files copied
+  in Finder or a picture (screenshot, Preview), or dragging files from
+  Finder onto a note (Mac, `desktop_drop` — a plain channel plugin, not the
+  Rust one), attaches them like the attach sheet: images/audio/other files
+  as the note's attachments, a PDF as a Library paper (`importPdfAt`, with
+  the usual lookup) linked to the note. Paste is Quill's experimental
+  `onClipboardPaste` → `pasteFilesIntoNote`; text on the clipboard wins
+  over a picture (apps put a picture of copied text beside it). The
+  clipboard goes through `NoteClipboard` (`noteClipboardProvider`,
+  quill_native_bridge — Quill's own plugin). Dropped Finder files carry a
+  security-scoped bookmark that is opened before copying.
+- **Date groups**: both notes lists show Notes' headers — Pinned, Today,
+  Yesterday, Previous 7 Days, Previous 30 Days, then month or year
+  (`noteDateSection`, `noteSectionHeaders` in `notes_screen.dart`); the
+  header rides inside the first item of its group, so list indices and
+  `ListItemMotion` are unchanged.
+- **Duplicate and Print** (`notes/note_file_actions.dart`): ⋮ / right-click
+  → Duplicate, File → Duplicate Note ⌘D: same title, folder, tags, linked
+  papers and attachments (files copied; audio timestamp links remapped to
+  the copy's attachments), not pinned, not in projects; a locked body is
+  re-encrypted under the copy's id (needs the notes unlocked). File →
+  Print… ⌘P (Mac): the PDF export (APA) through PDFKit's print panel
+  (`MacWindow.printPdf` → `printPdf` on `corplex/window`; needs the
+  `com.apple.security.print` entitlement). Both act on the focused editor,
+  else on the note open in the pane (`HomeShell._onCommand`).
+- **Not done: spell check.** flutter_quill has no spell-check hook and
+  Flutter has no macOS spell-check service, so it means drawing underlines
+  in the editor ourselves (NSSpellChecker over a channel).
 
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
@@ -620,7 +648,7 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   `_desktopStyles`; `/` commands open as a dialog. Paper screen: two
   columns at ≥ 1000 pt (shared `e0…eN` widget lists). Settings and the `/`
   sheet are dialogs on desktop.
-- **Menu bar & keyboard**: the native menus (File, Edit → Find, Format with
+- **Menu bar & keyboard**: the native menus (File with Duplicate ⌘D / Print ⌘P, Edit → Find, Format with
   Apple Notes' shortcuts, View, Go → Back ⌘[, Help → Keyboard Shortcuts ⌘/)
   send `MenuCommand`s on `corplex/window`. **Key equivalents reach Flutter
   first**; only keys Flutter leaves unhandled reach the menu. A command is

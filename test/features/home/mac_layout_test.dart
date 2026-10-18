@@ -32,6 +32,12 @@ class _FakeWindow implements MacWindow {
   Future<void> startDrag() async {}
   @override
   Future<void> zoom() async {}
+  final printed = <(Uint8List, String)>[];
+  @override
+  Future<bool> printPdf(Uint8List pdf, String title) async {
+    printed.add((pdf, title));
+    return true;
+  }
 }
 
 void main() {
@@ -128,6 +134,37 @@ void main() {
     expect(find.text('Trash'), findsWidgets);
     await send(tester, MenuCommand.showNotes); // pops back home
     expect(find.byKey(const ValueKey('mac-sidebar')), findsOneWidget);
+    await dispose(tester);
+  }, variant: macOnly);
+
+  testWidgets('File → Duplicate Note and Print… act on the open note', (
+    tester,
+  ) async {
+    await show(tester, macWindowSizes['laptop13']!);
+    expect(find.text('Today'), findsOneWidget, reason: 'date group header');
+    await tester.tap(find.text('First note'));
+    await tester.pumpAndSettle();
+
+    await send(tester, MenuCommand.duplicateNote);
+    await tester.runAsync(() async {
+      final titles = [for (final n in await db.select(db.notes).get()) n.title];
+      expect(titles.where((t) => t == 'First note'), hasLength(2));
+    });
+    await tester.pumpAndSettle();
+
+    // Database reads need frames, the PDF renderer real time: alternate.
+    window.commands.add(MenuCommand.printNote);
+    for (var i = 0; i < 60 && window.printed.isEmpty; i++) {
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 40)),
+      );
+    }
+    await tester.pumpAndSettle();
+    expect(window.printed, hasLength(1));
+    final (pdf, title) = window.printed.single;
+    expect(title, 'First note');
+    expect(String.fromCharCodes(pdf.take(4)), '%PDF');
     await dispose(tester);
   }, variant: macOnly);
 

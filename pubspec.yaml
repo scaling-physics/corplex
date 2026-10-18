@@ -70,6 +70,8 @@ dependencies:
   cryptography_flutter: ^2.3.4
   local_auth: ^3.0.2
   flutter_secure_storage: ^11.2.0
+  desktop_drop: ^0.8.0
+  quill_native_bridge: ^11.2.0
 
 dev_dependencies:
   flutter_test:

@@ -21,6 +21,7 @@ import 'mac_sidebar.dart';
 import '../sync/sync_ring.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
+import '../notes/note_file_actions.dart';
 import '../notes/notes_screen.dart';
 import '../review/review_prompt.dart';
 import '../search/search_screen.dart';
@@ -129,6 +130,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.lockNote:
         // The open note's editor handles it; nothing open, nothing to lock.
         break;
+      case MenuCommand.duplicateNote:
+      case MenuCommand.printNote:
+        // The open note's editor takes these when it has focus; from the
+        // list, they act on the note open in the pane.
+        final id = _index == 0 ? ref.read(selectedNoteProvider) : null;
+        if (id == null) break;
+        command == MenuCommand.printNote
+            ? printNote(context, ref, id)
+            : duplicateNoteAndOpen(context, ref, id);
       case MenuCommand.interfaceLarger:
         ref.read(appearanceSettingsProvider).stepInterfaceScale(1);
       case MenuCommand.interfaceSmaller:

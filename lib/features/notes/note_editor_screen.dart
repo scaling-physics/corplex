@@ -73,6 +73,8 @@ import 'folders_providers.dart';
 import 'link_paper_sheet.dart';
 import 'note_attachments_providers.dart';
 import 'note_content.dart';
+import 'note_drop.dart';
+import 'note_file_actions.dart';
 import 'note_lock_actions.dart' show openNoteFlushProvider;
 import 'note_papers_providers.dart';
 import 'notes_providers.dart';
@@ -312,6 +314,16 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _quillController = QuillController(
       document: document,
       selection: _initialSelection(document, want),
+      // Files and pictures on the clipboard become attachments.
+      // ignore: experimental_member_use
+      config: QuillControllerConfig(
+        // ignore: experimental_member_use
+        clipboardConfig: QuillClipboardConfig(
+          // ignore: experimental_member_use
+          onClipboardPaste: () =>
+              pasteFilesIntoNote(context, ref, widget.noteId),
+        ),
+      ),
     );
     if (note != null && mounted) {
       _titleController.text = note.title;
@@ -1362,6 +1374,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     false),
               ),
               'find' => _openFind(),
+              'duplicate' => duplicateNoteAndOpen(context, ref, widget.noteId),
+              'print' => printNote(context, ref, widget.noteId),
               'trash' => _moveToTrash(),
               _ => null,
             },
@@ -1477,6 +1491,21 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                   child: ListTile(
                     leading: Icon(Icons.push_pin_outlined),
                     title: Text('Pin to top'),
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'duplicate',
+                child: ListTile(
+                  leading: Icon(Icons.copy_outlined),
+                  title: Text('Duplicate'),
+                ),
+              ),
+              if (isMac(context))
+                const PopupMenuItem(
+                  value: 'print',
+                  child: ListTile(
+                    leading: Icon(Icons.print_outlined),
+                    title: Text('Print…'),
                   ),
                 ),
               const PopupMenuItem(
@@ -1869,7 +1898,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
             ),
     );
     if (!desktop) return scaffold;
-    return MenuCommandHandler(commands: _commands, child: scaffold);
+    return MenuCommandHandler(
+      commands: _commands,
+      child: isMac(context)
+          ? NoteDropTarget(noteId: widget.noteId, child: scaffold)
+          : scaffold,
+    );
   }
 
   /// Menu-bar and shortcut commands the editor takes (Format menu, text
@@ -1899,6 +1933,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.zoomOut: () => ref.read(noteZoomProvider).zoomOut(),
     MenuCommand.actualSize: () => ref.read(noteZoomProvider).reset(),
     MenuCommand.moveToTrash: () => _moveToTrash(),
+    MenuCommand.duplicateNote: () =>
+        duplicateNoteAndOpen(context, ref, widget.noteId),
+    MenuCommand.printNote: () => printNote(context, ref, widget.noteId),
     // File → Lock Note: lock this note, or, if it already is, lock now.
     MenuCommand.lockNote: () => _locked ? _lock.lockNow() : _lockNote(),
   };

@@ -1,5 +1,6 @@
 import Cocoa
 import FlutterMacOS
+import PDFKit
 
 /// The one Corplex window. Content runs under a transparent title bar (the
 /// Flutter side leaves a `macTitleBarHeight` strip at the top of each
@@ -49,6 +50,18 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         result(nil)
       case "isFullScreen":
         result(self.styleMask.contains(.fullScreen))
+      case "printPdf":
+        // File → Print…: the note rendered by the PDF exporter, through
+        // the standard print panel as a sheet on this window.
+        guard let args = call.arguments as? [String: Any],
+          let data = (args["pdf"] as? FlutterStandardTypedData)?.data,
+          let document = PDFDocument(data: data),
+          let operation = document.printOperation(
+            for: NSPrintInfo.shared, scalingMode: .pageScaleToFit, autoRotate: true)
+        else { return result(false) }
+        operation.jobTitle = args["title"] as? String ?? "Corplex"
+        operation.runModal(for: self, delegate: nil, didRun: nil, contextInfo: nil)
+        result(true)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -120,6 +133,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("New Note", "newNote", key: "n"),
         item("Import PDF…", "importPdf", key: "o"),
         item("Import References…", "importReferences"),
+        item("Duplicate Note", "duplicateNote", key: "d"),
         .separator(),
         item("Back Up to a File…", "backup"),
         item("Export as Markdown…", "exportMarkdown"),
@@ -129,6 +143,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         .separator(),
         item("Move to Trash", "moveToTrash", key: backspace),
         item("Show Trash", "trash"),
+        .separator(),
+        item("Print…", "printNote", key: "p"),
         .separator(),
         NSMenuItem(
           title: "Close Window", action: #selector(NSWindow.performClose(_:)),

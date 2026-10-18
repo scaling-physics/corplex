@@ -11,6 +11,7 @@ import '../../data/database_provider.dart';
 import 'folders_providers.dart';
 import '../lock/note_lock_service.dart' show isLockedContent;
 import 'note_content.dart';
+import 'note_file_actions.dart' show duplicateMenuAction;
 import 'note_lock_actions.dart';
 import '../home/adaptive.dart';
 import '../home/open_card.dart';
@@ -53,6 +54,73 @@ Future<void> createNote(BuildContext context, WidgetRef ref) async {
   // A note started while viewing a project belongs to it.
   if (filter is ProjectFilter) {
     await addNoteToProject(db, noteId: id, projectId: filter.projectId);
+  }
+}
+
+/// The group a note sits under in the list, as in Apple Notes: Pinned,
+/// Today, Yesterday, Previous 7 Days, Previous 30 Days, then the month
+/// (this year) or the year. Lists are ordered pinned first, then newest
+/// edit, so each group is one run.
+String noteDateSection(Note note, DateTime now) {
+  if (note.pinned) return 'Pinned';
+  final d = note.updatedAt;
+  // Calendar days, immune to a daylight-saving hour.
+  final days = DateTime.utc(
+    now.year,
+    now.month,
+    now.day,
+  ).difference(DateTime.utc(d.year, d.month, d.day)).inDays;
+  if (days <= 0) return 'Today';
+  if (days == 1) return 'Yesterday';
+  if (days < 7) return 'Previous 7 Days';
+  if (days < 30) return 'Previous 30 Days';
+  if (d.year == now.year) return DateFormat.MMMM().format(d);
+  return '${d.year}';
+}
+
+/// For each note, the group header to show above it (null when it is in
+/// the same group as the note before).
+List<String?> noteSectionHeaders(List<Note> notes, DateTime now) {
+  String? previous;
+  return [
+    for (final n in notes)
+      () {
+        final section = noteDateSection(n, now);
+        final header = section == previous ? null : section;
+        previous = section;
+        return header;
+      }(),
+  ];
+}
+
+/// A group header in the Notes list.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.label, {required this.first, required this.mac});
+
+  final String label;
+  final bool first;
+  final bool mac;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: mac
+          ? EdgeInsets.fromLTRB(12, first ? 6 : 18, 12, 4)
+          : EdgeInsets.fromLTRB(4, first ? 4 : 10, 4, 8),
+      child: Semantics(
+        header: true,
+        child: Text(
+          label,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: mac
+                ? theme.colorScheme.onSurface
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -129,6 +197,7 @@ class NotesScreen extends ConsumerWidget {
                           : folderNames,
                     );
                   }
+                  final headers = noteSectionHeaders(notes, DateTime.now());
                   return NewItemScope(
                     ids: [for (final n in notes) n.id],
                     child: ListView.separated(
@@ -138,26 +207,40 @@ class NotesScreen extends ConsumerWidget {
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final note = notes[index];
+                        final card = SwipeToTrash(
+                          dismissKey: ValueKey('swipe-${note.id}'),
+                          onTrash: () => deleteNoteWithUndo(
+                            ref,
+                            ScaffoldMessenger.of(context),
+                            note.id,
+                            note.title,
+                          ),
+                          child: _NoteCard(
+                            note: note,
+                            // The folder is redundant while filtering by it.
+                            folderName: filter is FolderFilter
+                                ? null
+                                : folderNames[note.folderId],
+                          ),
+                        );
                         return ListItemMotion(
                           key: ValueKey(note.id),
                           id: note.id,
                           index: index,
-                          child: SwipeToTrash(
-                            dismissKey: ValueKey('swipe-${note.id}'),
-                            onTrash: () => deleteNoteWithUndo(
-                              ref,
-                              ScaffoldMessenger.of(context),
-                              note.id,
-                              note.title,
-                            ),
-                            child: _NoteCard(
-                              note: note,
-                              // The folder is redundant while filtering by it.
-                              folderName: filter is FolderFilter
-                                  ? null
-                                  : folderNames[note.folderId],
-                            ),
-                          ),
+                          child: headers[index] == null
+                              ? card
+                              : Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _SectionHeader(
+                                      headers[index]!,
+                                      first: index == 0,
+                                      mac: false,
+                                    ),
+                                    card,
+                                  ],
+                                ),
                         );
                       },
                     ),
@@ -333,6 +416,7 @@ class _NoteCard extends ConsumerWidget {
         ),
         lockMenuAction(context, ref, note),
         pinMenuAction(ref, note),
+        duplicateMenuAction(context, ref, note),
         null,
         ContextMenuAction(
           label: 'Move to trash',
@@ -355,7 +439,7 @@ class _NoteCard extends ConsumerWidget {
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(date.year, date.month, date.day);
     final diff = today.difference(day).inDays;
-    if (diff == 0) return 'Today, ${DateFormat.jm().format(date)}';
+    if (diff == 0) return DateFormat.jm().format(date); // under "Today"
     if (diff == 1) return 'Yesterday';
     if (diff < 7) return DateFormat.EEEE().format(date);
     if (date.year == now.year) return DateFormat.MMMd().format(date);
@@ -685,6 +769,7 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
         : null;
     final theme = Theme.of(context);
     final c = theme.colorScheme;
+    final headers = noteSectionHeaders(notes, DateTime.now());
     return NewItemScope(
       ids: [for (final n in notes) n.id],
       child: Focus(
@@ -699,110 +784,125 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
             final locked = isLockedContent(note.content);
             final preview = locked ? '' : notePlainTextPreview(note.content);
             final folder = widget.folderNames[note.folderId];
+            final row = KeyedSubtree(
+              key: _keys.putIfAbsent(note.id, GlobalKey.new),
+              child: ContextMenuRegion(
+                actions: [
+                  ContextMenuAction(
+                    label: 'Open',
+                    icon: Icons.open_in_new,
+                    onSelected: () => _select(note.id),
+                  ),
+                  ContextMenuAction(
+                    label: 'Add to project…',
+                    icon: Icons.folder_special_outlined,
+                    onSelected: () =>
+                        showProjectPickerSheet(context, noteId: note.id),
+                  ),
+                  lockMenuAction(context, ref, note),
+                  pinMenuAction(ref, note),
+                  duplicateMenuAction(context, ref, note),
+                  null,
+                  ContextMenuAction(
+                    label: 'Move to trash',
+                    icon: Icons.delete_outline,
+                    destructive: true,
+                    onSelected: () => deleteNoteWithUndo(
+                      ref,
+                      ScaffoldMessenger.of(context),
+                      note.id,
+                      note.title,
+                    ),
+                  ),
+                ],
+                child: MacListRow(
+                  selected: note.id == selectedId,
+                  listFocused: _focus.hasFocus,
+                  showDivider:
+                      index < notes.length - 1 && headers[index + 1] == null,
+                  onTap: () {
+                    _focus.requestFocus();
+                    _select(note.id);
+                  },
+                  title: Text.rich(
+                    TextSpan(
+                      children: [
+                        if (note.pinned)
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 5),
+                              child: Icon(
+                                Icons.push_pin,
+                                size: 12,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        TextSpan(
+                          text: note.title.isEmpty ? 'Untitled' : note.title,
+                        ),
+                        if (locked)
+                          const WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: EdgeInsets.only(left: 5),
+                              child: Icon(Icons.lock_outline, size: 13),
+                            ),
+                          ),
+                      ],
+                    ),
+                    style: note.title.isEmpty
+                        ? TextStyle(color: c.onSurfaceVariant)
+                        : null,
+                  ),
+                  subtitle: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _NoteCard._friendlyDate(note.updatedAt),
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        if (locked)
+                          const TextSpan(
+                            text: '  Locked',
+                            style: TextStyle(fontStyle: FontStyle.italic),
+                          )
+                        else if (preview.isNotEmpty)
+                          TextSpan(text: '  $preview'),
+                      ],
+                    ),
+                  ),
+                  trailing: folder == null
+                      ? null
+                      : Tooltip(
+                          message: folder,
+                          child: Icon(
+                            Icons.folder_outlined,
+                            size: 14,
+                            color: c.primary,
+                          ),
+                        ),
+                ),
+              ),
+            );
             return ListItemMotion(
               key: ValueKey(note.id),
               id: note.id,
               index: index,
-              child: KeyedSubtree(
-                key: _keys.putIfAbsent(note.id, GlobalKey.new),
-                child: ContextMenuRegion(
-                  actions: [
-                    ContextMenuAction(
-                      label: 'Open',
-                      icon: Icons.open_in_new,
-                      onSelected: () => _select(note.id),
+              child: headers[index] == null
+                  ? row
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SectionHeader(
+                          headers[index]!,
+                          first: index == 0,
+                          mac: true,
+                        ),
+                        row,
+                      ],
                     ),
-                    ContextMenuAction(
-                      label: 'Add to project…',
-                      icon: Icons.folder_special_outlined,
-                      onSelected: () =>
-                          showProjectPickerSheet(context, noteId: note.id),
-                    ),
-                    lockMenuAction(context, ref, note),
-                    pinMenuAction(ref, note),
-                    null,
-                    ContextMenuAction(
-                      label: 'Move to trash',
-                      icon: Icons.delete_outline,
-                      destructive: true,
-                      onSelected: () => deleteNoteWithUndo(
-                        ref,
-                        ScaffoldMessenger.of(context),
-                        note.id,
-                        note.title,
-                      ),
-                    ),
-                  ],
-                  child: MacListRow(
-                    selected: note.id == selectedId,
-                    listFocused: _focus.hasFocus,
-                    showDivider: index < notes.length - 1,
-                    onTap: () {
-                      _focus.requestFocus();
-                      _select(note.id);
-                    },
-                    title: Text.rich(
-                      TextSpan(
-                        children: [
-                          if (note.pinned)
-                            WidgetSpan(
-                              alignment: PlaceholderAlignment.middle,
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: Icon(
-                                  Icons.push_pin,
-                                  size: 12,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          TextSpan(
-                            text: note.title.isEmpty ? 'Untitled' : note.title,
-                          ),
-                          if (locked)
-                            const WidgetSpan(
-                              alignment: PlaceholderAlignment.middle,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 5),
-                                child: Icon(Icons.lock_outline, size: 13),
-                              ),
-                            ),
-                        ],
-                      ),
-                      style: note.title.isEmpty
-                          ? TextStyle(color: c.onSurfaceVariant)
-                          : null,
-                    ),
-                    subtitle: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: _NoteCard._friendlyDate(note.updatedAt),
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          if (locked)
-                            const TextSpan(
-                              text: '  Locked',
-                              style: TextStyle(fontStyle: FontStyle.italic),
-                            )
-                          else if (preview.isNotEmpty)
-                            TextSpan(text: '  $preview'),
-                        ],
-                      ),
-                    ),
-                    trailing: folder == null
-                        ? null
-                        : Tooltip(
-                            message: folder,
-                            child: Icon(
-                              Icons.folder_outlined,
-                              size: 14,
-                              color: c.primary,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
             );
           },
         ),

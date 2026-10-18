@@ -48,10 +48,22 @@ Future<String?> importPaperFile(BuildContext context, WidgetRef ref) async {
     type: FileType.custom,
     allowedExtensions: ['pdf'],
   );
-  if (picked?.path == null) return null;
+  if (picked?.path == null || !context.mounted) return null;
+  return importPdfAt(context, ref, picked!.path!, picked.name);
+}
 
-  final localPath = await copyIntoAppStorage(picked!.path!, 'papers');
-  final title = titleFromFileName(picked.name);
+/// Adds the PDF at [sourcePath] (named [name]) to the library as a paper,
+/// copied into app storage, with the usual background DOI/arXiv lookup.
+/// Returns the paper's id. Used by the file picker and by files pasted or
+/// dropped into a note.
+Future<String> importPdfAt(
+  BuildContext context,
+  WidgetRef ref,
+  String sourcePath,
+  String name,
+) async {
+  final localPath = await copyIntoAppStorage(sourcePath, 'papers');
+  final title = titleFromFileName(name);
 
   final id = const Uuid().v4();
   final db = ref.read(databaseProvider);

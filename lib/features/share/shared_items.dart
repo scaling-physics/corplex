@@ -44,7 +44,8 @@ class SharedText extends SharedItem {
   final String text;
 }
 
-const _audioExtensions = {
+/// Audio files Corplex plays (share import, files dropped into a note).
+const audioFileExtensions = {
   '.mp3',
   '.m4a',
   '.aac',
@@ -68,7 +69,7 @@ List<SharedItem> classifyShared(Iterable<SharedMediaFile> media) {
         final ext = p.extension(m.path).toLowerCase();
         if (ext == '.pdf' || m.mimeType == 'application/pdf') {
           items.add(SharedPdf(m.path));
-        } else if (_audioExtensions.contains(ext) ||
+        } else if (audioFileExtensions.contains(ext) ||
             (m.mimeType?.startsWith('audio/') ?? false)) {
           items.add(SharedAudio(m.path));
         }

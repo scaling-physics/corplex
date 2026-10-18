@@ -60,6 +60,8 @@ enum MenuCommand {
   moveToTrash,
   lockNote,
   lockAllNotes,
+  duplicateNote,
+  printNote,
   // Edit → Find
   find,
   findNext,
@@ -138,6 +140,9 @@ abstract class MacWindow {
   ValueListenable<bool> get fullScreen;
   Future<void> startDrag();
   Future<void> zoom();
+
+  /// File → Print…: shows the print panel for [pdf]. False if it couldn't.
+  Future<bool> printPdf(Uint8List pdf, String title);
 }
 
 /// The default: no native window (tests, iOS, Android). Never make this
@@ -155,6 +160,8 @@ class InertMacWindow implements MacWindow {
   Future<void> startDrag() async {}
   @override
   Future<void> zoom() async {}
+  @override
+  Future<bool> printPdf(Uint8List pdf, String title) async => false;
 }
 
 class ChannelMacWindow implements MacWindow {
@@ -185,6 +192,13 @@ class ChannelMacWindow implements MacWindow {
   Future<void> startDrag() => _channel.invokeMethod('startDrag');
   @override
   Future<void> zoom() => _channel.invokeMethod('zoom');
+  @override
+  Future<bool> printPdf(Uint8List pdf, String title) async =>
+      await _channel.invokeMethod<bool>('printPdf', {
+        'pdf': pdf,
+        'title': title,
+      }) ??
+      false;
 }
 
 final macWindowProvider = Provider<MacWindow>((ref) => InertMacWindow());

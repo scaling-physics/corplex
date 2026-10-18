@@ -15,6 +15,8 @@ const shortcutSections = <(String, List<ShortcutEntry>)>[
     [
       ShortcutEntry('New note', ['⌘', 'N']),
       ShortcutEntry('Import PDF', ['⌘', 'O']),
+      ShortcutEntry('Duplicate note', ['⌘', 'D']),
+      ShortcutEntry('Print', ['⌘', 'P']),
       ShortcutEntry('Move to Trash', ['⌘', '⌫']),
       ShortcutEntry('Settings', ['⌘', ',']),
       ShortcutEntry('Keyboard shortcuts', ['⌘', '/']),

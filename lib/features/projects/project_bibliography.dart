@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/citation_formatter.dart';
@@ -43,15 +44,15 @@ Future<void> shareProjectBibliography(
   );
   if (!context.mounted) return;
   if (text.trim().isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No papers in this project yet.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.l10n.projectsNoPapersYet)));
     return;
   }
   await SharePlus.instance.share(
     ShareParams(
       text: text,
-      subject: '${project.name} bibliography',
+      subject: context.l10n.projectsBibliographySubject(project.name),
       sharePositionOrigin: shareOrigin(context),
     ),
   );

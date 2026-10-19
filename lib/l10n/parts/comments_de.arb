@@ -1,0 +1,21 @@
+{
+  "@@locale": "de",
+  "commentsOpenCount": "{count, plural, =1{1 offener Kommentar} other{{count} offene Kommentare}}",
+  "commentsEditComment": "Kommentar bearbeiten",
+  "commentsAddComment": "Kommentar hinzufügen",
+  "commentsComment": "Kommentar",
+  "commentsFromOptional": "Von (optional)",
+  "commentsFromHint": "z. B. Betreuer:in",
+  "commentsResolve": "Erledigen",
+  "commentsReopen": "Wieder öffnen",
+  "commentsTitle": "Kommentare",
+  "commentsOnSelection": "Auswahl kommentieren",
+  "commentsSelectAPassage": "Eine Stelle zum Kommentieren auswählen",
+  "commentsDeleted": "Kommentar gelöscht",
+  "commentsShowResolved": "Erledigte anzeigen ({count})",
+  "commentsEmpty": "Eine Stelle auswählen, dann „Kommentar hinzufügen“ wählen.",
+  "commentsNothingOpen": "Nichts offen.",
+  "commentsPassageChanged": "Stelle geändert",
+  "commentsOptions": "Kommentaroptionen",
+  "commentsUnlockToAdd": "Notizen entsperren, um einen Kommentar hinzuzufügen."
+}

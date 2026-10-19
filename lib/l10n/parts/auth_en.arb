@@ -1,0 +1,25 @@
+{
+  "@@locale": "en",
+  "authWelcomeBack": "Welcome back",
+  "authSignInIntro": "Sign in to sync your notes and papers across your devices.",
+  "authEmail": "Email",
+  "authPassword": "Password",
+  "authSignIn": "Sign in",
+  "authNoAccount": "Don't have an account? Sign up",
+  "authCreateTitle": "Create your account",
+  "authCreateIntro": "Your notes stay on this device and sync to your other devices once you're signed in.",
+  "authPasswordHelper": "At least 6 characters",
+  "authCreateAccount": "Create account",
+  "authInvalidEmail": "Enter a valid email address.",
+  "authShortPassword": "Password must be at least 6 characters.",
+  "authConfirmEmail": "Check your email to confirm your account, then sign in.",
+  "authOffline": "Could not reach the server. Check your connection and try again.",
+  "authUnknown": "Something went wrong ({type}). Try again.",
+  "@authUnknown": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  }
+}

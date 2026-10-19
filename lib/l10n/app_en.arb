@@ -1,0 +1,1909 @@
+{
+  "@@locale": "en",
+  "attachmentsAddPodcastLink": "Add podcast link",
+  "attachmentsAll": "All",
+  "attachmentsAudio": "Audio",
+  "attachmentsAudioHint": "A NotebookLM audio overview, lecture or podcast file",
+  "attachmentsCopyName": "Copy name",
+  "attachmentsEmptyMessage": "Images, recordings, links and files you attach to notes and papers appear here.",
+  "attachmentsEmptyTitle": "No attachments yet",
+  "attachmentsFile": "File",
+  "attachmentsImage": "Image",
+  "attachmentsImageFrom": "Image {name}, from {parent}",
+  "@attachmentsImageFrom": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "parent": {
+        "type": "String"
+      }
+    }
+  },
+  "attachmentsKindAudio": "Audio",
+  "attachmentsKindFiles": "Files",
+  "attachmentsKindImages": "Images",
+  "attachmentsKindLinks": "Links",
+  "attachmentsMarkUp": "Mark up",
+  "attachmentsNoMatch": "No attachment matches.",
+  "attachmentsNothingFound": "Nothing found",
+  "attachmentsPodcastLink": "Podcast link",
+  "attachmentsPodcastLinkHint": "A NotebookLM share link or audio URL",
+  "attachmentsPodcastLinkNote": "Direct audio links (.mp3, .m4a…) play here. NotebookLM share links open in the browser — to listen and timestamp inside Corplex, download the audio overview and add it as Audio.",
+  "attachmentsRecordAudio": "Record audio",
+  "attachmentsSearch": "Search attachments",
+  "attachmentsShowInNote": "Show in note",
+  "attachmentsShowInPaper": "Show in paper",
+  "attachmentsTitle": "Attachments",
+  "attachmentsUntitledPaper": "Untitled paper",
+  "attachmentsVoiceNote": "A voice note",
+  "attachmentsVoiceNoteTranscribed": "A voice note, transcribed on this device",
+  "audioBack10": "Back 10 seconds",
+  "audioChannelName": "Audio playback",
+  "audioClosePlayer": "Close player",
+  "audioForward30": "Forward 30 seconds",
+  "audioMark": "Mark",
+  "audioNotSynced": "This recording hasn't synced to this device yet.",
+  "audioPause": "Pause",
+  "audioPlay": "Play",
+  "audioPlayFailed": "Couldn't play this recording.",
+  "authConfirmEmail": "Check your email to confirm your account, then sign in.",
+  "authCreateAccount": "Create account",
+  "authCreateIntro": "Your notes stay on this device and sync to your other devices once you're signed in.",
+  "authCreateTitle": "Create your account",
+  "authEmail": "Email",
+  "authInvalidEmail": "Enter a valid email address.",
+  "authNoAccount": "Don't have an account? Sign up",
+  "authOffline": "Could not reach the server. Check your connection and try again.",
+  "authPassword": "Password",
+  "authPasswordHelper": "At least 6 characters",
+  "authShortPassword": "Password must be at least 6 characters.",
+  "authSignIn": "Sign in",
+  "authSignInIntro": "Sign in to sync your notes and papers across your devices.",
+  "authUnknown": "Something went wrong ({type}). Try again.",
+  "@authUnknown": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "authWelcomeBack": "Welcome back",
+  "commentsAddComment": "Add comment",
+  "commentsComment": "Comment",
+  "commentsDeleted": "Comment deleted",
+  "commentsEditComment": "Edit comment",
+  "commentsEmpty": "Select a passage, then choose Add comment.",
+  "commentsFromHint": "e.g. Supervisor",
+  "commentsFromOptional": "From (optional)",
+  "commentsNothingOpen": "Nothing open.",
+  "commentsOnSelection": "Comment on the selection",
+  "commentsOpenCount": "{count, plural, =1{1 open comment} other{{count} open comments}}",
+  "@commentsOpenCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commentsOptions": "Comment options",
+  "commentsPassageChanged": "Passage changed",
+  "commentsReopen": "Reopen",
+  "commentsResolve": "Resolve",
+  "commentsSelectAPassage": "Select a passage to comment on",
+  "commentsShowResolved": "Show resolved ({count})",
+  "@commentsShowResolved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commentsTitle": "Comments",
+  "commentsUnlockToAdd": "Unlock your notes to add a comment.",
+  "commonAdd": "Add",
+  "commonCancel": "Cancel",
+  "commonClose": "Close",
+  "commonCopied": "Copied",
+  "commonCopy": "Copy",
+  "commonDelete": "Delete",
+  "commonDone": "Done",
+  "commonEdit": "Edit",
+  "commonImportPdf": "Import PDF",
+  "commonLess": "Less",
+  "commonLibrary": "Library",
+  "commonLocked": "Locked",
+  "commonMore": "More",
+  "commonMoveToTrash": "Move to trash",
+  "commonNewNote": "New note",
+  "commonNotes": "Notes",
+  "commonOk": "OK",
+  "commonOpen": "Open",
+  "commonProjects": "Projects",
+  "commonRemove": "Remove",
+  "commonRename": "Rename",
+  "commonSave": "Save",
+  "commonSearch": "Search",
+  "commonSettings": "Settings",
+  "commonShare": "Share",
+  "commonTrash": "Trash",
+  "commonTryAgain": "Try again",
+  "commonUndo": "Undo",
+  "commonUntitled": "Untitled",
+  "cslAddStyle": "Add a style…",
+  "cslAutomatic": "Automatic",
+  "cslAutomaticWith": "Automatic ({language})",
+  "@cslAutomaticWith": {
+    "placeholders": {
+      "language": {
+        "type": "String",
+        "example": "English (US)"
+      }
+    }
+  },
+  "cslCitationLanguage": "Citation language",
+  "@cslCitationLanguage": {
+    "description": "Title of the list of languages that citation text (month names, \"et al.\", quotes) can be written in."
+  },
+  "cslCitationLanguageRow": "Citation language: {language}",
+  "@cslCitationLanguageRow": {
+    "description": "A quiet row in the reference style picker showing the current citation language.",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "cslProblemDependent": "This style is a small variant that points to a parent style. Import the parent style instead.",
+  "cslProblemNoBibliography": "That style has no bibliography section, so it can't format reference lists.",
+  "cslProblemNoInfo": "That style has no title or ID block.",
+  "cslProblemNoLayout": "That style is missing its layout, so it can't format references.",
+  "cslProblemNoTitle": "That style has no title.",
+  "cslProblemNotStyle": "That file isn't a citation style (.csl) file.",
+  "cslProblemNotXml": "That file isn't valid XML, so it can't be a citation style.",
+  "cslProblemTooLarge": "That file is too large to be a style.",
+  "cslProblemUndefinedMacro": "That style uses an undefined macro \"{name}\".",
+  "@cslProblemUndefinedMacro": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "cslProblemUnreadable": "Couldn't read that file.",
+  "cslProblemWrongVersion": "Only CSL 1.0 styles are supported.",
+  "cslReferenceStyle": "Reference style",
+  "cslStyleCantBeUsed": "That style can't be used",
+  "dataNewerVersion": "This backup was made by a newer version of Corplex. Update the app first.",
+  "dataNotABackup": "That file isn’t a Corplex backup.",
+  "dataUnsupportedVersion": "This backup is from an unsupported version.",
+  "editorAddBibliography": "Add bibliography",
+  "editorAddPaperAndCite": "Add this paper and cite it?",
+  "editorAddToProject": "Add to project",
+  "editorAddedReferences": "{count, plural, =1{Added 1 reference} other{Added {count} references}}",
+  "@editorAddedReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editorAttach": "Attach audio, image or file",
+  "editorBibliographyHint": "A reference list of what this note cites",
+  "editorCiteHint": "Or type [@ while writing",
+  "editorCmdAttach": "Attach",
+  "editorCmdAttachHint": "Audio, an image or a file",
+  "editorCmdBibliography": "Add bibliography",
+  "editorCmdBibliographyHint": "A reference list of what this note cites",
+  "editorCmdChecklist": "Checklist",
+  "editorCmdChecklistHint": "Tick-box items",
+  "editorCmdCite": "Cite a paper",
+  "editorCmdCiteHint": "Insert a citation from your library",
+  "editorCmdDictate": "Dictate",
+  "editorCmdDictateHint": "Speak instead of typing",
+  "editorCmdDraw": "Draw",
+  "editorCmdDrawHint": "A sketch, with a pen or finger",
+  "editorCmdEquation": "Equation",
+  "editorCmdEquationHint": "LaTeX maths, or type $$",
+  "editorCmdFigure": "Figure caption",
+  "editorCmdFigureHint": "A numbered figure caption for this line",
+  "editorCmdHeading": "Heading",
+  "editorCmdHeadingHint": "Make this line a heading",
+  "editorCmdInsertTable": "Table",
+  "editorCmdInsertTableHint": "Rows and columns, 3 by 3 to start",
+  "editorCmdLink": "Link to a note",
+  "editorCmdLinkHint": "Or type [[",
+  "editorCmdRefer": "Refer to a figure or table",
+  "editorCmdReferHint": "Insert its number, kept right as things move",
+  "editorCmdTable": "Table caption",
+  "editorCmdTableHint": "A numbered table caption for this line",
+  "editorCmdTemplate": "Literature note template",
+  "editorCmdTemplateHint": "Summary, method, findings, critique",
+  "editorCmdVoice": "Voice note",
+  "editorCmdVoiceHint": "Record a thought as you read",
+  "editorDraw": "Draw",
+  "editorEditDate": "{date} at {time}",
+  "@editorEditDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "editorExport": "Export",
+  "editorExportHint": "Markdown, Word or PDF, with references",
+  "editorFindInNote": "Find in note",
+  "editorImageTapToEnlarge": "Image, tap to enlarge",
+  "editorLinkPaper": "Link a paper",
+  "editorLinkToNote": "Link to a note",
+  "editorLinkToNoteHint": "Or type [[ while writing",
+  "editorLinkedFrom": "Linked from",
+  "editorLockHint": "Needs your notes password to open",
+  "editorLockedTapToLock": "Locked — tap to lock now",
+  "editorLookupUnreachable": "Couldn't reach the lookup service. The link is unchanged.",
+  "editorMoveToFolder": "Move to folder",
+  "editorNoCitations": "No citations to list yet. Type [@ to cite a paper.",
+  "editorNoPaperFound": "No paper found for {id}.",
+  "@editorNoPaperFound": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "editorNoteLockedFiles": "Note locked. Attached files (images, audio, PDFs) aren't encrypted — only the note's text and sketches.",
+  "editorPaperRemoved": "That paper was removed.",
+  "editorPrint": "Print…",
+  "editorRecordingRemoved": "That recording was removed.",
+  "editorSelectPassage": "Select the passage to comment on.",
+  "editorStartWriting": "Start writing…",
+  "editorStyleBody": "Body text",
+  "editorStyleHeading": "Heading",
+  "editorStyleHighlight": "Highlight",
+  "editorStyleMonospaced": "Monospaced",
+  "editorStyleQuote": "Quote",
+  "editorStyleStrike": "Strikethrough",
+  "editorStyleSubheading": "Subheading",
+  "editorStyleTable": "Table",
+  "editorStyleTitle": "Title",
+  "editorTags": "Tags",
+  "editorTemplate": "Literature note template",
+  "editorTemplateHint": "Summary, method, findings, critique",
+  "editorTextStyle": "Text style",
+  "editorTipBold": "Bold {shortcut}",
+  "@editorTipBold": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipBulleted": "Bulleted list {shortcut}",
+  "@editorTipBulleted": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipChecklist": "Checklist {shortcut}",
+  "@editorTipChecklist": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipHighlight": "Highlight {shortcut}",
+  "@editorTipHighlight": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipItalic": "Italic {shortcut}",
+  "@editorTipItalic": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipNumbered": "Numbered list {shortcut}",
+  "@editorTipNumbered": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipUnderline": "Underline {shortcut}",
+  "@editorTipUnderline": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTitleHint": "Title",
+  "editorTypewriter": "Typewriter scrolling",
+  "editorTypewriterHint": "Keep the line you type centred",
+  "editorWordCount": "Word count",
+  "editorWordCountHint": "And reading time",
+  "exportCitationsAndReferences": "Citations and references",
+  "exportCouldntCreateFile": "Couldn't create that file.",
+  "exportFormatLatex": "LaTeX (Overleaf)",
+  "exportFormatMarkdown": "Markdown",
+  "exportFormatPdf": "PDF",
+  "exportFormatWord": "Word document",
+  "exportUnlockNoteToContinue": "Unlock this note to continue.",
+  "exportUnlockNotesToContinue": "Unlock your locked notes to continue.",
+  "findCount": "{current} of {total}",
+  "@findCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "findHideReplace": "Hide replace",
+  "findNext": "Next",
+  "findNotFound": "Not found",
+  "findPrevious": "Previous",
+  "findReplace": "Replace",
+  "findReplaceAll": "All",
+  "@findReplaceAll": {
+    "description": "Button: replace every match"
+  },
+  "findReplaceWith": "Replace with",
+  "foldCollapseAll": "Collapse all sections",
+  "foldCollapseSection": "Collapse section",
+  "foldExpandAll": "Expand all sections",
+  "foldExpandSection": "Expand section",
+  "foldShowSection": "Show section",
+  "graphCouldntDraw": "Couldn’t draw the map",
+  "graphEmptyMessage": "Link notes to each other or to papers, or cite a paper with [@, and the connections appear here.",
+  "graphHideUnconnected": "Hide unconnected items",
+  "graphLockedNote": "Locked note",
+  "graphMap": "Map",
+  "graphNothingConnected": "Nothing connected",
+  "graphNothingToMap": "Nothing to map yet",
+  "graphShowUnconnected": "Show unconnected items",
+  "graphTryAgainInAMoment": "Try again in a moment.",
+  "graphUntitledPaper": "Untitled paper",
+  "highlightsAddComment": "Add a comment",
+  "highlightsAddCommentMenu": "Add a comment…",
+  "highlightsButter": "Butter highlight",
+  "highlightsDelete": "Delete highlight",
+  "highlightsEditCommentMenu": "Edit comment…",
+  "highlightsEmptyMessage": "Select text in a PDF and choose Highlight; it will collect here.",
+  "highlightsEmptyTitle": "No highlights yet",
+  "highlightsHighlight": "Highlight",
+  "highlightsMist": "Mist highlight",
+  "highlightsNoMatches": "No matches.",
+  "highlightsQuoteToNote": "Quote to note",
+  "highlightsRevisit": "Revisit highlights",
+  "highlightsRose": "Rose highlight",
+  "highlightsSage": "Sage highlight",
+  "highlightsSearchHint": "Search your highlights",
+  "highlightsSelectHint": "Select text on a page, then tap Highlight.",
+  "highlightsTooltip": "Highlights",
+  "homeAttachments": "Attachments",
+  "homeCountItems": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
+  "@homeCountItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeCountNotes": "{count, plural, =0{No notes} =1{1 note} other{{count} notes}}",
+  "@homeCountNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeCountPapers": "{count, plural, =0{No papers} =1{1 paper} other{{count} papers}}",
+  "@homeCountPapers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeImportFirstPaper": "Import your first paper",
+  "homeImportPdfTooltip": "Import PDF (⌘O)",
+  "homeNewNoteTooltip": "New Note (⌘N)",
+  "homePickNote": "Pick a note, or start a new one.",
+  "homePickPaper": "Pick a paper to read, annotate and cite.",
+  "homeSearchSubtitle": "Notes, papers and highlights",
+  "homeShowAttachments": "Show Attachments",
+  "homeShowSidebarTooltip": "Show Sidebar (⌃⌘S)",
+  "homeStepHighlightText": "Press and hold on the text, then Highlight or Quote to note.",
+  "homeStepHighlightTitle": "Highlight as you read",
+  "homeStepImportText": "A PDF from Files. Its title, authors and year fill in by themselves.",
+  "homeStepImportTitle": "Import a paper",
+  "homeStepWriteText": "In a note, type / for tools, or [@ to cite a paper.",
+  "homeStepWriteTitle": "Write and cite",
+  "homeWelcome": "Welcome to Corplex",
+  "homeWelcomeSubtitle": "Read, annotate, take notes and cite in one place.",
+  "inkBlue": "Blue",
+  "inkClay": "Clay",
+  "inkColor": "Ink color",
+  "inkColour": "Colour",
+  "inkConvertToText": "Convert to text",
+  "inkDrawHere": "Draw here",
+  "inkDrawWithFingers": "Draw with fingers",
+  "inkDrawing": "Drawing",
+  "inkDuplicate": "Duplicate",
+  "inkEraser": "Eraser",
+  "inkExpand": "Expand",
+  "inkFingersDraw": "Fingers draw (tap to scroll with fingers instead)",
+  "inkFingersScroll": "Fingers scroll (tap to draw with fingers)",
+  "inkGraphite": "Graphite",
+  "inkHighlighter": "Highlighter",
+  "inkMoreOptions": "More drawing options",
+  "inkMoreSpace": "More space",
+  "inkNoHandwriting": "No handwriting found",
+  "inkPaste": "Paste",
+  "inkPen": "Pen",
+  "inkRedo": "Redo",
+  "inkSage": "Sage",
+  "inkScrollWithFingers": "Scroll with fingers",
+  "inkSelect": "Select",
+  "inkTapToDraw": "Tap to draw",
+  "inkThickness": "Line thickness",
+  "libraryAddById": "Add by DOI or arXiv ID",
+  "libraryAddByIdHint": "10.1038/nature14539, arXiv:1706.03762 or PMID: 9500320",
+  "libraryAddToProject": "Add to project…",
+  "libraryAddedPapers": "Added {count, plural, =1{1 paper} other{{count} papers}}",
+  "@libraryAddedPapers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryAll": "All",
+  "libraryAllHighlights": "All highlights",
+  "libraryAllHighlightsHint": "Across every paper",
+  "libraryAlreadyInLibrary": "Already in your library.",
+  "libraryAlreadyInLibraryCount": "{count} already in your library",
+  "@libraryAlreadyInLibraryCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryCitationCopied": "Citation copied",
+  "libraryCitationsAdded": "Added to your library.",
+  "libraryCitationsCitedBy": "Cited by",
+  "libraryCitationsInLibrary": "In your library",
+  "libraryCitationsLoadMore": "Load more",
+  "libraryCitationsLoadMoreFailed": "Couldn’t load more. Try again online.",
+  "libraryCitationsLoading": "Loading…",
+  "libraryCitationsMoreNotShown": "{count} more not shown.",
+  "@libraryCitationsMoreNotShown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryCitationsNoCiting": "No citing papers found.",
+  "libraryCitationsNoReferences": "No references listed.",
+  "libraryCitationsNotFound": "OpenAlex has no record of this paper.",
+  "libraryCitationsReferences": "References",
+  "libraryCitationsRefresh": "Refresh",
+  "libraryCitationsRefreshFailed": "Couldn’t refresh. Try again online.",
+  "libraryCitationsRetry": "Retry",
+  "libraryCitationsTitle": "References · Cited by",
+  "libraryCitationsUnreachable": "Couldn’t reach OpenAlex. Try again online.",
+  "libraryCopyCitation": "Copy citation",
+  "libraryEmptyMessage": "Tap Import PDF to add a paper, or link one from a note.",
+  "libraryEmptyTitle": "Your library is empty",
+  "libraryError": "Something went wrong: {error}",
+  "@libraryError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryExportBibtex": "Export as BibTeX",
+  "libraryFoundDetails": "Found the details for “{title}”",
+  "@libraryFoundDetails": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryImportReferences": "Import references",
+  "libraryImportReferencesHint": "BibTeX, RIS or CSL JSON (Zotero, Mendeley)",
+  "libraryImportZotero": "Import from Zotero…",
+  "libraryIsEmpty": "Your library is empty.",
+  "libraryLocatorChapter": "Chapter",
+  "libraryLocatorFigure": "Figure",
+  "libraryLocatorLine": "Line",
+  "libraryLocatorNote": "Note",
+  "libraryLocatorPage": "Page",
+  "libraryLocatorParagraph": "Paragraph",
+  "libraryLocatorSection": "Section",
+  "libraryLocatorVolume": "Volume",
+  "libraryLookingUp": "Looking it up…",
+  "libraryLooksDuplicate": "Looks like “{title}” is already here.",
+  "@libraryLooksDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryLookupUnreachable": "Couldn't reach the lookup service. Try again online.",
+  "libraryNoMatches": "No matches",
+  "libraryNoMatchesHint": "Try a different title or author.",
+  "libraryNoPaperFound": "No paper found for {id}.",
+  "@libraryNoPaperFound": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryNoReferencesFound": "No references found in that file.",
+  "libraryNotAnIdentifier": "That doesn't look like a DOI, arXiv or PubMed ID.",
+  "libraryNoticeConcern": "Expression of concern issued",
+  "libraryNoticeCorrected": "Corrected",
+  "libraryNoticeDatePattern": "d MMMM y",
+  "libraryNoticeOn": "{kind} on {date} — see the notice",
+  "@libraryNoticeOn": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryNoticeRetracted": "Retracted",
+  "libraryNoticeUndated": "{kind} — see the notice",
+  "@libraryNoticeUndated": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryNoticeWithdrawn": "Withdrawn",
+  "libraryOpenPdf": "Open PDF",
+  "librarySearchPapers": "Search papers",
+  "libraryShowAttachments": "Show Attachments",
+  "libraryStatusDone": "Done",
+  "libraryStatusReading": "Reading",
+  "libraryStatusToRead": "To read",
+  "listAddToProject": "Add to project…",
+  "listAll": "All",
+  "listCreate": "Create",
+  "listDeleteFolderEllipsis": "Delete folder…",
+  "listDeleteFolderMessage": "Notes inside will be unfiled, not deleted.",
+  "listDeleteFolderTitle": "Delete “{name}”?",
+  "@listDeleteFolderTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "listDeleteTagEllipsis": "Delete tag…",
+  "listDeleteTagMessage": "This removes the tag from every note.",
+  "listDeleteTagTitle": "Delete “#{name}”?",
+  "@listDeleteTagTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "listDuplicate": "Duplicate",
+  "listFolderName": "Folder name",
+  "listFolderOrTag": "Folder or tag",
+  "listLockNote": "Lock note",
+  "listNewFolder": "New folder",
+  "listNewTag": "New tag",
+  "listNoNotesMessage": "Tap New note to capture your first thought.",
+  "listNoNotesTitle": "No notes yet",
+  "listNothingHereMessage": "Notes you add while this filter is on land here.",
+  "listNothingHereTitle": "Nothing here yet",
+  "listPinToTop": "Pin to top",
+  "listPinned": "Pinned",
+  "listPrevious30Days": "Previous 30 Days",
+  "listPrevious7Days": "Previous 7 Days",
+  "listRemoveLock": "Remove lock",
+  "listSomethingWentWrong": "Something went wrong: {error}",
+  "@listSomethingWentWrong": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "listTagName": "Tag name",
+  "listToday": "Today",
+  "listUnpin": "Unpin",
+  "listYesterday": "Yesterday",
+  "lockBiometricFaceTouch": "Face ID / Touch ID",
+  "lockBiometricFingerprint": "fingerprint",
+  "lockBiometricGeneric": "biometrics",
+  "lockBiometricReason": "Unlock your locked notes",
+  "lockBiometricSubtitle": "Open locked notes without typing",
+  "lockBiometricTouch": "Touch ID",
+  "lockChangePassword": "Change password",
+  "lockChangeTitle": "Change notes password",
+  "lockConfirm": "Confirm",
+  "lockContinue": "Continue",
+  "lockCurrentPassword": "Current password",
+  "lockCurrentWrong": "The current password is wrong.",
+  "lockEarlierPassword": "This note uses an earlier notes password",
+  "lockEnterPassword": "Enter your notes password.",
+  "lockEnterToTurnOn": "Enter your notes password to turn this on.",
+  "lockForgottenWarning": "If you forget this password, locked notes can't be recovered — not by you, and not by us.",
+  "lockHint": "Hint: {hint}",
+  "@lockHint": {
+    "placeholders": {
+      "hint": {
+        "type": "String"
+      }
+    }
+  },
+  "lockHintHelper": "Shown on the lock screen. Not the password!",
+  "lockHintOptional": "Hint (optional)",
+  "lockLockedNote": "This note is locked",
+  "lockMinLength": "Use at least {count} characters.",
+  "@lockMinLength": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lockMismatch": "The passwords don't match.",
+  "lockNewMismatch": "The new passwords don't match.",
+  "lockNewPassword": "New password",
+  "lockNotNow": "Not now",
+  "lockNotesPassword": "Notes password",
+  "lockNow": "Lock now",
+  "lockNowSubtitle": "Locked notes ask for the password again",
+  "lockOfferBody": "Open locked notes with {name} instead of typing the password. The password still works.",
+  "@lockOfferBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockOfferTitle": "Use {name} to unlock?",
+  "@lockOfferTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockPassword": "Password",
+  "lockPasswordChanged": "Notes password changed",
+  "lockResetBody": "You'll choose a new password for notes you lock from now on.\n\nNotes already locked stay locked under the old password. Without it they can't be opened — not by you, and not by us. If you remember the old password later, entering it opens them again.",
+  "lockResetDialogTitle": "Reset the notes password?",
+  "lockResetItem": "Reset password…",
+  "lockResetItemSubtitle": "For a forgotten password",
+  "lockResetPassword": "Reset password",
+  "lockResetTitle": "Reset notes password",
+  "lockSetPassword": "Set password",
+  "lockSetTitle": "Set a notes password",
+  "lockShowHint": "Show hint",
+  "lockUnlock": "Unlock",
+  "lockUnlockToContinue": "Unlock your locked notes to continue.",
+  "lockUseBiometric": "Use {name}",
+  "@lockUseBiometric": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockWrongPassword": "Wrong password",
+  "macAllNotes": "All Notes",
+  "macAllPapers": "All Papers",
+  "macCreate": "Create",
+  "macDeleteFolder": "Delete Folder…",
+  "macDeleteTag": "Delete Tag…",
+  "macFolderNameHint": "Folder name",
+  "macHideSidebarTooltip": "Hide Sidebar (⌃⌘S)",
+  "macKeyActualSize": "Actual size",
+  "macKeyAddComment": "Add comment",
+  "macKeyAttachments": "Attachments",
+  "macKeyBack": "Back",
+  "macKeyBlockQuote": "Block quote",
+  "macKeyBody": "Body",
+  "macKeyBold": "Bold",
+  "macKeyBulletedList": "Bulleted list",
+  "macKeyChecklist": "Checklist",
+  "macKeyCitePaper": "Cite a paper",
+  "macKeyCloseDialog": "Close a dialog or menu",
+  "macKeyCloseWindow": "Close window",
+  "macKeyDefaultInterface": "Default interface size",
+  "macKeyDuplicateNote": "Duplicate note",
+  "macKeyFindInDocument": "Find in document",
+  "macKeyFindNext": "Find next",
+  "macKeyFindPrevious": "Find previous",
+  "macKeyHeading": "Heading",
+  "macKeyHighlight": "Highlight",
+  "macKeyImportPdf": "Import PDF",
+  "macKeyItalic": "Italic",
+  "macKeyLargerInterface": "Larger interface",
+  "macKeyLibrary": "Library",
+  "macKeyLinkNote": "Link to a note",
+  "macKeyMonospaced": "Monospaced",
+  "macKeyMoveThroughList": "Move through a list",
+  "macKeyMoveToTrash": "Move to Trash",
+  "macKeyNewNote": "New note",
+  "macKeyNextColumn": "Next or previous column",
+  "macKeyNotes": "Notes",
+  "macKeyNumberedList": "Numbered list",
+  "macKeyOpenSelected": "Open the selected item",
+  "macKeyPrint": "Print",
+  "macKeyQuickNote": "Quick note from anywhere",
+  "macKeySearch": "Search",
+  "macKeySettings": "Settings",
+  "macKeyShortcuts": "Keyboard shortcuts",
+  "macKeySidebar": "Show or hide the sidebar",
+  "macKeySmallerInterface": "Smaller interface",
+  "macKeyStrikethrough": "Strikethrough",
+  "macKeySubheading": "Subheading",
+  "macKeyTable": "Table",
+  "macKeyTitle": "Title",
+  "macKeyUnderline": "Underline",
+  "macKeyZoomIn": "Zoom in",
+  "macKeyZoomOut": "Zoom out",
+  "macMoreMenu": "More…",
+  "macNewFolderTitle": "New folder",
+  "macNewFolderTooltip": "New Folder",
+  "macOpenProjectPage": "Open Project Page",
+  "macRenameFolder": "Rename Folder…",
+  "macRenameFolderTitle": "Rename folder",
+  "macSectionCollapsed": "{title}, collapsed",
+  "@macSectionCollapsed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "macSectionExpanded": "{title}, expanded",
+  "@macSectionExpanded": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "macShortcutsFormatting": "Notes & Formatting",
+  "macShortcutsGeneral": "General",
+  "macShortcutsNavigation": "Navigation",
+  "macShortcutsReader": "Library & Reader",
+  "macShortcutsTitle": "Keyboard Shortcuts",
+  "macTags": "Tags",
+  "markupMarkUp": "Mark up",
+  "markupOpenFailed": "Couldn't open this image.",
+  "markupSaveFailed": "Couldn't save the marks.",
+  "matrixAddDefaults": "Add method, sample, findings",
+  "matrixAddStudyColumns": "Add study columns",
+  "matrixAddTheme": "Add a theme",
+  "matrixAllNotHereYet": "All the ones not here yet",
+  "matrixAlreadyAColumn": "Already a column",
+  "matrixCellHint": "What does this paper say?",
+  "matrixColumnFindings": "Findings",
+  "matrixColumnMethod": "Method",
+  "matrixColumnSample": "Sample",
+  "matrixCopiedAsMarkdown": "Table copied as Markdown",
+  "matrixCopyAsMarkdown": "Copy as Markdown",
+  "matrixDeleteColumn": "Delete column",
+  "matrixDeleteTheme": "Delete theme and its notes",
+  "matrixEmptyMessage": "Add the themes you are comparing — method, sample, findings — and fill in what each paper says.",
+  "matrixEmptyTitle": "Compare papers side by side",
+  "matrixExport": "Export",
+  "matrixFromHighlights": "From your highlights",
+  "matrixFromStudyDetails": "From study details",
+  "matrixNewTheme": "New theme",
+  "matrixNoPapers": "No papers in this project",
+  "matrixNoPapersMessage": "Add papers to it from their screens, then compare them here.",
+  "matrixPapersKeepDetails": "Papers keep their study details",
+  "matrixRenameTheme": "Rename theme",
+  "matrixSeparateWithSemicolon": "Separate with ;",
+  "matrixShare": "Share…",
+  "matrixShareSubject": "{project} matrix",
+  "@matrixShareSubject": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "notesAddTag": "Add tag",
+  "notesBeforeRestoring": "Before restoring",
+  "notesChangePage": "Change page",
+  "notesCitationLabel": "Citation {label}",
+  "@notesCitationLabel": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCitationMissingLabel": "Citation {marker}, paper not found",
+  "@notesCitationMissingLabel": {
+    "placeholders": {
+      "marker": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCitationNotInLibrary": "@{key} isn't in your library.",
+  "@notesCitationNotInLibrary": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCiteAPaper": "Cite a paper",
+  "notesClear": "Clear",
+  "notesCompare": "Compare",
+  "notesCompareChanged": "{when} · now has {words} words · {added} added, {removed} removed",
+  "@notesCompareChanged": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "words": {
+        "type": "String"
+      },
+      "added": {
+        "type": "int"
+      },
+      "removed": {
+        "type": "int"
+      }
+    }
+  },
+  "notesCompareSame": "{when} · the same as now",
+  "@notesCompareSame": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCouldntAddFile": "Couldn't add that file.",
+  "notesCouldntDuplicate": "Couldn't duplicate that note.",
+  "notesCouldntPrint": "Couldn't print that note.",
+  "notesCreate": "Create",
+  "notesDropToAttach": "Drop to attach",
+  "notesDuplicate": "Duplicate",
+  "notesEquationEmpty": "Tap to write an equation",
+  "notesEquationLabel": "Equation {latex}",
+  "@notesEquationLabel": {
+    "placeholders": {
+      "latex": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureCaptionLabel": "{name} caption",
+  "@notesFigureCaptionLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureMissing": "Figure ??",
+  "notesFigureName": "Figure {number}",
+  "@notesFigureName": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureReferenceLabel": "Reference to {name}",
+  "@notesFigureReferenceLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureReferenceMissing": "Reference to a missing figure",
+  "notesFiguresEmpty": "No figures or tables yet. Type / and choose Figure caption or Table caption.",
+  "notesFolderName": "Folder name",
+  "notesHighlightBlue": "Blue",
+  "notesHighlightGreen": "Green",
+  "notesHighlightPink": "Pink",
+  "notesHighlightPurple": "Purple",
+  "notesHighlightYellow": "Yellow",
+  "notesImportAPdf": "Import a PDF",
+  "notesLatexHint": "LaTeX, e.g. x^2 + \\alpha",
+  "notesLatexInvalid": "Not valid LaTeX yet. It is kept as you typed it.",
+  "notesLessThanAMinute": "< 1 min",
+  "notesLinkToANote": "Link to a note…",
+  "notesLockNote": "Lock note",
+  "notesMinutes": "{count} min",
+  "@notesMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesNewFolder": "New folder",
+  "notesNewNoteNamed": "New note “{title}”",
+  "@notesNewNoteNamed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notesNewTagName": "New tag name",
+  "notesNoFolder": "No folder",
+  "notesNoPapersFound": "No papers found.",
+  "notesNoTagsYet": "No tags yet.",
+  "notesNoteLocked": "Note locked",
+  "notesNothingMatches": "Nothing matches.",
+  "notesOpenPaper": "Open paper",
+  "notesPage": "Page",
+  "notesPageEllipsis": "Page…",
+  "notesPageHint": "42 or 3–5",
+  "notesPageShort": "p. {page}",
+  "@notesPageShort": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "notesPinToTop": "Pin to top",
+  "notesPreview": "Preview",
+  "notesRemoveHighlight": "Remove highlight",
+  "notesRemoveLock": "Remove lock",
+  "notesRenameVersion": "Rename version",
+  "notesRestore": "Restore",
+  "notesRestoreThisVersion": "Restore this version",
+  "notesRestoreVersionMessage": "The note goes back to this version. What is there now is saved first as “{label}”.",
+  "@notesRestoreVersionMessage": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "notesRestoreVersionTitle": "Restore this version?",
+  "notesSaveAVersion": "Save a version",
+  "notesSaveVersionNow": "Save a version now",
+  "notesSavedVersion": "Saved version",
+  "notesSearchFigures": "Search figures and tables",
+  "notesSearchPapersToLink": "Search papers to link",
+  "notesSentToSupervisor": "Sent to supervisor",
+  "notesSet": "Set",
+  "notesStatsCharacters": "Characters",
+  "notesStatsCitations": "Citations",
+  "notesStatsLinkedPapers": "Linked papers",
+  "notesStatsParagraphs": "Paragraphs",
+  "notesStatsReadingTime": "Reading time",
+  "notesStatsWords": "Words",
+  "notesTableMissing": "Table ??",
+  "notesTableName": "Table {number}",
+  "@notesTableName": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "notesTemplateCritique": "Critique",
+  "notesTemplateFindings": "Findings",
+  "notesTemplateMethod": "Method",
+  "notesTemplateSummary": "Summary",
+  "notesUnchangedLines": "{count, plural, =1{1 unchanged line} other{{count} unchanged lines}}",
+  "@notesUnchangedLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesUnlock": "Unlock",
+  "notesUnlockToCompare": "Unlock this note to compare its versions.",
+  "notesUnlockToCompareOrRestore": "Unlock this note to compare or restore versions.",
+  "notesUnlockToDuplicate": "Unlock this note to duplicate it.",
+  "notesUnlockToPrint": "Unlock this note to print it.",
+  "notesUnlockToRestore": "Unlock the note to restore it.",
+  "notesUnpin": "Unpin",
+  "notesVersionDeleted": "Version deleted",
+  "notesVersionNameHint": "Name (optional)",
+  "notesVersionOptions": "Version options",
+  "notesVersionRestored": "Version restored",
+  "notesVersions": "Versions",
+  "notesVersionsEmptyMessage": "A version is a saved copy of this note. One is kept automatically when a chapter goes to your supervisor, and you can save one any time.",
+  "notesVersionsEmptyTitle": "No versions yet",
+  "notesVersionsSince": "{delta} since",
+  "@notesVersionsSince": {
+    "placeholders": {
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "notesVersionsWords": "{count, plural, =1{1 word} other{{count} words}}",
+  "@notesVersionsWords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ocrReadingText": "Reading text… {percent}%",
+  "@ocrReadingText": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "ocrRecogniseText": "Recognise text",
+  "ocrRecogniseTextHint": "Search and highlight a scan",
+  "paperAbstract": "Abstract",
+  "paperAddToProject": "Add to project",
+  "paperAttachmentsEmpty": "Podcasts, images, links or files for this paper.",
+  "paperAttachmentsError": "Could not load attachments: {error}",
+  "@paperAttachmentsError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "paperAuthorsHelper": "Separate authors with ;",
+  "paperAuthorsHint": "Authors",
+  "paperCitation": "Citation",
+  "paperCitationStyle": "Citation style",
+  "paperContinueReading": "Continue reading · p. {page}",
+  "@paperContinueReading": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "paperDetails": "Details",
+  "paperDownloadFileFailed": "Couldn't download the file. Try again.",
+  "paperDownloadPdf": "Download PDF",
+  "paperDownloadPdfFailed": "Couldn't download the PDF. Try again.",
+  "paperDownloading": "Downloading…",
+  "paperEditAuthors": "Edit authors",
+  "paperEnterIdentifier": "Enter a DOI, arXiv or PubMed ID first.",
+  "paperExportWithHighlights": "Export with highlights",
+  "paperFilledIn": "Filled in the missing details.",
+  "paperHighlights": "Highlights",
+  "paperIdentifierLabel": "DOI, arXiv or PubMed ID",
+  "paperLink": "Link",
+  "paperLookUp": "Look up",
+  "paperLookupUnreachable": "Couldn't reach the lookup service.",
+  "paperMoreStyles": "More…",
+  "paperNothingNew": "Nothing new to fill in.",
+  "paperOpenInPubmed": "Open in PubMed",
+  "paperOpenLink": "Open link",
+  "paperPageShort": "p. {page}",
+  "@paperPageShort": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "paperProject": "Project",
+  "paperPubmedId": "PubMed ID",
+  "paperReadWithNote": "Read with a note",
+  "paperReferencedInNotes": "Referenced in notes",
+  "paperTitleHint": "Title",
+  "paperVenue": "Journal or conference",
+  "paperYear": "Year",
+  "platformUntitledPaper": "Untitled paper",
+  "platformWidgetPage": "p. {page}",
+  "@platformWidgetPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbrCopyAsText": "Copy as text",
+  "projectsAbbrDefined": "{count} defined",
+  "@projectsAbbrDefined": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbrList": "List",
+  "projectsAbbrListTitle": "List of abbreviations",
+  "projectsAbbrNeverSpelled": "Never spelled out ({count})",
+  "@projectsAbbrNeverSpelled": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbrToCheck": "{count} to check",
+  "@projectsAbbrToCheck": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbrUsedBefore": "{abbreviation} is used before it's spelled out",
+  "@projectsAbbrUsedBefore": {
+    "placeholders": {
+      "abbreviation": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsAbbreviations": "Abbreviations",
+  "projectsAddChapter": "Add chapter",
+  "projectsBibliography": "Bibliography",
+  "projectsBibliographySubject": "{project} bibliography",
+  "@projectsBibliographySubject": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsBibliographySubtitle": "All its papers, in a citation style",
+  "projectsChangeDate": "Change date",
+  "projectsChangeDueDate": "Change due date",
+  "projectsChangeStatus": "Change status",
+  "projectsChapterCitations": "Ch. {chapter} · {count}×",
+  "@projectsChapterCitations": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsChapterOptions": "Chapter options",
+  "projectsChapters": "Chapters",
+  "projectsChaptersFinal": "{finished} of {count, plural, =1{1 chapter} other{{count} chapters}} final",
+  "@projectsChaptersFinal": {
+    "placeholders": {
+      "finished": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsChaptersLockedReason": "Some chapters are locked. Unlock them to include them.",
+  "projectsCitations": "Citations",
+  "projectsCitedInChapters": "Cited in chapters ({count})",
+  "@projectsCitedInChapters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsCitedOutside": "Cited, not in this project ({count})",
+  "@projectsCitedOutside": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsClearDate": "Clear date",
+  "projectsClearDueDate": "Clear due date",
+  "projectsCreateAndAdd": "Create and add",
+  "projectsDatePattern": "d MMMM",
+  "projectsDatePatternYear": "d MMMM y",
+  "projectsDaysAgo": "{days, plural, =1{1 day ago} other{{days} days ago}}",
+  "@projectsDaysAgo": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsDeleteMessage": "The papers and notes in it stay in your library; only the grouping goes away.",
+  "projectsDeleteProject": "Delete project",
+  "projectsDeleteProjectSubtitle": "Its papers and notes are kept",
+  "projectsDeleteTitle": "Delete “{name}”?",
+  "@projectsDeleteTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsDue": "Due {date} · {rest}",
+  "@projectsDue": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "rest": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsDueToday": "Due today · {date}",
+  "@projectsDueToday": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsExportCancelledLocked": "Export cancelled: chapters are locked.",
+  "projectsExportProject": "Export project",
+  "projectsExportProjectSubtitle": "Its notes as one document",
+  "projectsFigureTodo": "Figure",
+  "projectsHighlightCount": "{count, plural, =1{1 highlight} other{{count} highlights}}",
+  "@projectsHighlightCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsInDays": "{days, plural, =1{1 day} other{{days} days}}",
+  "@projectsInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsMap": "Map",
+  "projectsNeedsCitation": "Needs a citation",
+  "projectsNewProject": "New project",
+  "projectsNoNotesYet": "No notes in this project yet.",
+  "projectsNoPapersYet": "No papers in this project yet.",
+  "projectsNoStatus": "No status",
+  "projectsNoteCount": "{count, plural, =1{1 note} other{{count} notes}}",
+  "@projectsNoteCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsNothingYet": "Nothing here yet",
+  "projectsNothingYetMessage": "Use “Add to project” on a paper or a note to collect it here.",
+  "projectsOpenProject": "Open project",
+  "projectsOpenProjectSubtitle": "Its papers, notes and reading progress",
+  "projectsPaperCount": "{count, plural, =1{1 paper} other{{count} papers}}",
+  "@projectsPaperCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsPapers": "Papers",
+  "projectsPickerIntro": "A project groups the papers and notes for one review, chapter or paper you're writing.",
+  "projectsReadNotCited": "Read but not cited ({count})",
+  "@projectsReadNotCited": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsReadProgress": "{done} of {total} read",
+  "@projectsReadProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsRemoveFromProject": "Remove from project",
+  "projectsRenameProject": "Rename project",
+  "projectsSetDueDate": "Set due date",
+  "projectsStatus": "Status",
+  "projectsStatusDraft": "Draft",
+  "projectsStatusFinal": "Final",
+  "projectsStatusOutline": "Outline",
+  "projectsStatusRead": "Read",
+  "projectsStatusReading": "Reading",
+  "projectsStatusRevised": "Revised",
+  "projectsStatusToRead": "To read",
+  "projectsStatusWithSupervisor": "With supervisor",
+  "projectsSubmissionDate": "Submission date",
+  "projectsSubmissionDateSubtitle": "The submission date",
+  "projectsSynthesisMatrix": "Synthesis matrix",
+  "projectsSynthesisMatrixSubtitle": "Compare its papers by theme",
+  "projectsTodoWord": "TODO",
+  "projectsTodosTitle": "To do in the writing ({count})",
+  "@projectsTodosTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsWordTarget": "Word target",
+  "projectsWordTargetHint": "e.g. 8000",
+  "projectsWords": "{words, plural, =1{1 word} other{{words} words}}",
+  "@projectsWords": {
+    "placeholders": {
+      "words": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "projectsWordsOfTarget": "{words} / {target} words",
+  "@projectsWordsOfTarget": {
+    "placeholders": {
+      "words": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "target": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "readAloudBack": "Back to reading",
+  "readAloudFinished": "Finished",
+  "readAloudNext": "Next sentence",
+  "readAloudNoText": "No text to read",
+  "readAloudPause": "Pause",
+  "readAloudPlay": "Play",
+  "readAloudPreparing": "Preparing…",
+  "readAloudPrevious": "Previous sentence",
+  "readAloudSpeed": "Speed",
+  "readAloudStop": "Stop reading",
+  "reviewCaughtUp": "All caught up",
+  "reviewDismiss": "Dismiss until tomorrow",
+  "reviewEmptyMessage": "Highlights come back here a day after you make them, then less and less often.",
+  "reviewKeep": "Keep",
+  "reviewLater": "The ones you kept will return in a while.",
+  "reviewNothing": "Nothing to revisit",
+  "reviewOpenInPaper": "Open in paper",
+  "reviewPosition": "{current} of {total}",
+  "@reviewPosition": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewPrompt": "{count, plural, =1{1 highlight to revisit} other{{count} highlights to revisit}}",
+  "@reviewPrompt": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewQuote": "“{quote}”",
+  "@reviewQuote": {
+    "placeholders": {
+      "quote": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewRemind": "Remind me on the home screen",
+  "reviewRemindHint": "A single quiet line when something is due",
+  "reviewSkip": "Skip",
+  "reviewSource": "{title} · p. {page}",
+  "@reviewSource": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewTitle": "Revisit highlights",
+  "reviewTomorrow": "They will come back tomorrow.",
+  "searchAttachments": "Attachments",
+  "searchClear": "Clear",
+  "searchEmptyMessage": "Find a note, a paper, or a passage you highlighted.",
+  "searchEmptyTitle": "Search everything",
+  "searchHint": "Search notes, papers and highlights",
+  "searchIndexing": "Indexing papers…",
+  "searchKindHighlights": "Highlights",
+  "searchKindInPapers": "In papers",
+  "searchKindPapers": "Papers",
+  "searchMap": "Map",
+  "searchNoMatches": "No matches",
+  "searchNoMatchesHint": "Try fewer or different words.",
+  "searchPage": "p. {page}",
+  "@searchPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsAppearance": "Appearance",
+  "settingsBackUp": "Back up to a file",
+  "settingsBackUpSubtitle": "Notes, papers and files in one zip",
+  "settingsBackupFailed": "Couldn't create the backup.",
+  "settingsBackupSubject": "Corplex backup",
+  "settingsCantRestore": "Can't restore",
+  "settingsClearAndSignOut": "Clear and sign out",
+  "settingsClearTitle": "Clear this device?",
+  "settingsErasePending": "{count, plural, =1{1 change on this device hasn't synced and will be lost for good. Everything else is safe in your account.} other{{count} changes on this device haven't synced and will be lost for good. Everything else is safe in your account.}}",
+  "@settingsErasePending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsEraseSafe": "Notes, papers and files on this device will be removed. Everything is safe in your account.",
+  "settingsExport": "Export",
+  "settingsExportBody": "One Markdown file per note and paper, with links, highlights and a BibTeX file. Open the folder as an Obsidian vault.",
+  "settingsExportFailed": "Couldn't create the export.",
+  "settingsExportLocked": "Locked notes are exported as placeholders.",
+  "settingsExportMarkdown": "Export as Markdown",
+  "settingsExportMarkdownSubtitle": "A folder of notes for Obsidian",
+  "settingsExportSubject": "Corplex notes (Markdown)",
+  "settingsIncludePdfs": "Include PDFs",
+  "settingsIncludePdfsSubtitle": "Makes the export much larger",
+  "settingsInterfaceSize": "Interface size",
+  "settingsInterfaceSizeSubtitle": "For large or ultrawide displays",
+  "settingsOnDemand": "Download files when opened",
+  "settingsOnDemandSubtitle": "Otherwise papers and audio download in the background.",
+  "settingsOneMoreStep": "One more step",
+  "settingsPreparingBackup": "Preparing backup…",
+  "settingsQuickNote": "Quick note shortcut (⌃⌥N)",
+  "settingsQuickNoteSubtitle": "Start a note from any app",
+  "settingsReadingNight": "Night",
+  "settingsReadingPaper": "Paper",
+  "settingsReadingSepia": "Sepia",
+  "settingsReplace": "Replace",
+  "settingsReplaceTitle": "Replace this device's data?",
+  "settingsRestartToFinish": "Close Corplex completely and open it again to finish restoring.",
+  "settingsRestoreAction": "Restore",
+  "settingsRestoreBody": "From {date}: {notes, plural, =1{1 note} other{{notes} notes}} and {papers, plural, =1{1 paper} other{{papers} papers}}.\n\nIt replaces what's on this device now. Your current library is kept aside in case you change your mind.",
+  "@settingsRestoreBody": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "notes": {
+        "type": "int"
+      },
+      "papers": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsRestoreFromBackup": "Restore from a backup",
+  "settingsRestoreTitle": "Restore this backup?",
+  "settingsSignIn": "Sign in",
+  "settingsSignInSubtitle": "Sync your library across devices",
+  "settingsSignOut": "Sign out",
+  "settingsSignOutClear": "Sign out and clear this device",
+  "settingsSpellCheck": "Check spelling while typing",
+  "settingsSyncFailed": "Sync failed",
+  "settingsSyncNow": "Sync now",
+  "settingsSyncOffline": "Not syncing",
+  "settingsSyncSyncing": "Syncing…",
+  "settingsSyncUpToDate": "Up to date",
+  "settingsThemeAuto": "Auto",
+  "settingsThemeDark": "Dark",
+  "settingsThemeLight": "Light",
+  "settingsTrashCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@settingsTrashCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsUseThisAccount": "Use this account on this device",
+  "settingsUseThisAccountSubtitle": "Replaces what's on this device with this account's data.",
+  "settingsWifiOnly": "Send files on Wi-Fi only",
+  "settingsWifiOnlySubtitle": "Notes always sync. Opening a file downloads it on any network.",
+  "shareAddedToLibrary": "Added “{name}” to your library",
+  "@shareAddedToLibrary": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareAttachTo": "Attach “{name}” to…",
+  "@shareAttachTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareAudioAttached": "Audio attached",
+  "shareNewNote": "A new note",
+  "shareSavedAsNote": "Saved as a note",
+  "shareSavedLink": "Saved link as a note",
+  "spellIgnore": "Ignore Spelling",
+  "spellLearn": "Learn Spelling",
+  "studyAdd": "Add study details",
+  "studyChip": "Study",
+  "studyChipCount": "Study · {count}",
+  "@studyChipCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyClear": "Clear",
+  "studyClearFilter": "Clear study filter",
+  "studyDetails": "Study details",
+  "studyFieldBrainRegions": "Brain regions",
+  "studyFieldParadigm": "Task / paradigm",
+  "studyFieldSampleSize": "Sample size (n)",
+  "studyFieldSpecies": "Species / model",
+  "studyFieldTechniques": "Techniques",
+  "studyListHint": "Press enter or comma to add",
+  "studyMinSampleSize": "Minimum sample size (n)",
+  "syncAccountMismatch": "This device holds data from a different account. Sign back in to that account to sync.",
+  "syncFilesIncomplete": "Some files haven't synced yet.",
+  "syncGenericError": "Couldn't sync. Your notes are safe on this device.",
+  "syncServerOutdated": "Your sync server needs a database update. Run the newest files in supabase/migrations on your Supabase project.",
+  "tableAddColumnLeft": "Add column left",
+  "tableAddColumnRight": "Add column right",
+  "tableAddRowAbove": "Add row above",
+  "tableAddRowBelow": "Add row below",
+  "tableDeleteColumn": "Delete column",
+  "tableDeleteRow": "Delete row",
+  "tableDeleteTable": "Delete table",
+  "tableHeaderRow": "Header row",
+  "tableTooltip": "Table",
+  "trashDaysLeft": "{days, plural, =1{1 day left} other{{days} days left}}",
+  "@trashDaysLeft": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashDeletingSoon": "deleting soon",
+  "trashEmptyAction": "Empty",
+  "trashEmptyBody": "{count, plural, =1{1 item will be deleted for good.} other{{count} items will be deleted for good.}}",
+  "@trashEmptyBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trashEmptyMessage": "Deleted notes and papers stay here for {days, plural, =1{1 day} other{{days} days}}.",
+  "@trashEmptyMessage": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashEmptyTitle": "Empty the trash?",
+  "trashIsEmpty": "Trash is empty",
+  "trashKept": "Kept for {days, plural, =1{1 day} other{{days} days}}, then deleted for good.",
+  "@trashKept": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashKindNote": "Note",
+  "trashKindPaper": "Paper",
+  "trashMovedToTrash": "{label} moved to trash",
+  "@trashMovedToTrash": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "trashQuoted": "“{title}”",
+  "@trashQuoted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "trashRestore": "Restore",
+  "trashRestored": "Restored",
+  "viewerAboutThisPaper": "About this paper",
+  "viewerCloseSearch": "Close search",
+  "viewerContents": "Contents",
+  "viewerDrawOnPage": "Draw on the page",
+  "viewerExportDamaged": "This PDF can’t be annotated: its structure is damaged or uses features Corplex can’t write into.",
+  "viewerExportEncrypted": "This PDF is encrypted, so highlights can’t be written into it.",
+  "viewerExportFailed": "Couldn’t export this PDF.",
+  "viewerExportNoPdf": "This paper’s PDF isn’t on this device.",
+  "viewerExportNotPdf": "This file isn’t a PDF Corplex can read.",
+  "viewerExportNothing": "Nothing to export: the marks don’t match this PDF’s pages.",
+  "viewerFind": "Find in document",
+  "viewerFindCount": "{current} of {total}",
+  "@viewerFindCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerFindCountMore": "{current} of {total}+",
+  "@viewerFindCountMore": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerFindNoMatches": "No matches",
+  "viewerFindNoMatchesYet": "No matches yet",
+  "viewerFindSearching": "Searching…",
+  "viewerFocus": "Focus",
+  "viewerFocusHint": "Tap the page to bring back",
+  "viewerHighlightColour": "Highlight colour",
+  "viewerNextMatch": "Next match",
+  "viewerNightPage": "Night page",
+  "viewerNoContents": "This PDF has no table of contents.",
+  "viewerNotesOn": "Notes on {title}",
+  "@viewerNotesOn": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerPageLong": "Page {page}",
+  "@viewerPageLong": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPagePill": "{page} / {count}",
+  "@viewerPagePill": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPageShort": "p. {page}",
+  "@viewerPageShort": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPageStrip": "Page strip",
+  "viewerPaperPage": "Paper page",
+  "viewerPreviousMatch": "Previous match",
+  "viewerQuoteAdded": "Added to your note",
+  "viewerQuoteNewNote": "New note",
+  "viewerReadAloud": "Read aloud",
+  "viewerReadAloudUnavailable": "Reading aloud isn't available here",
+  "viewerRecentNotes": "Recent notes",
+  "viewerSepiaPage": "Sepia page",
+  "viewerShowPages": "Show pages",
+  "viewerSnapPrompt": "Drag around a figure or table",
+  "viewerSnapWholeView": "Whole view",
+  "viewerSnapshot": "Snapshot to a note",
+  "viewerSnapshotHint": "For figures and tables",
+  "viewerStopDrawing": "Stop drawing",
+  "viewerStopReadAloud": "Stop reading aloud",
+  "viewerUnlockToAdd": "Unlock the note to add to it.",
+  "viewerUnlockToQuote": "Unlock the note to add this quote to it.",
+  "voiceDictate": "Dictate",
+  "voiceFinishing": "Finishing…",
+  "voiceMicDenied": "Corplex needs the microphone to record. You can allow it in Settings.",
+  "voiceNoSpeechCaught": "Didn’t catch any speech.",
+  "voiceNote": "Voice note",
+  "voiceNoteTitle": "Voice note, {date}",
+  "@voiceNoteTitle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceOpenSettings": "Open Settings",
+  "voiceRecordingUnavailable": "Recording isn’t available here, so nothing was recorded.",
+  "voiceSavedAllowSpeech": "Saved the audio. Allow Speech Recognition to get text too.",
+  "voiceSavedCantTranscribe": "Saved the audio. This device can’t transcribe it offline.",
+  "voiceSavedNoSpeech": "Saved. No speech was heard.",
+  "voiceSavingTranscribing": "Saving and transcribing…",
+  "voiceStartRecording": "Start recording",
+  "voiceStopRecording": "Stop recording",
+  "zoteroApiKey": "API key",
+  "zoteroBadKey": "Zotero didn't accept that user ID and key. Check both, and that the key is allowed to read your library.",
+  "zoteroConnect": "Connect",
+  "zoteroConnectTitle": "Connect to Zotero",
+  "zoteroEnterBoth": "Enter both your user ID and an API key.",
+  "zoteroEverything": "Everything",
+  "zoteroEverythingHint": "Every item; collections become projects",
+  "zoteroForgetKey": "Forget key",
+  "zoteroImport": "Import",
+  "zoteroImportFailed": "{message}\nWhat was imported before this stays in your library.",
+  "@zoteroImportFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroImportTitle": "Import from Zotero",
+  "zoteroImporting": "Importing",
+  "zoteroImportingItem": "Importing “{title}”",
+  "@zoteroImportingItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroKeyHelp": "Create a read-only key at zotero.org/settings/keys (Create new private key, allow library access only). Your user ID is shown on the same page. They stay on this device, in secure storage, and are never synced or backed up.",
+  "zoteroNotFound": "Zotero couldn't find that library. Check the user ID (the number on zotero.org/settings/keys).",
+  "zoteroOffline": "Couldn't reach Zotero. Check your connection and try again.",
+  "zoteroOpenKeys": "Open zotero.org/settings/keys",
+  "zoteroProgress": "{done} of {total}",
+  "@zoteroProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroRateLimited": "Zotero is asking for a pause. Try again in a few minutes.",
+  "zoteroReadingAttachments": "Reading attachments and annotations…",
+  "zoteroReadingItems": "Reading items…",
+  "zoteroReadingLibrary": "Reading your Zotero library…",
+  "zoteroServerProblem": "Zotero had a problem. Try again later.",
+  "zoteroServerProblemDetail": "Zotero had a problem ({detail}). Try again later.",
+  "@zoteroServerProblemDetail": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroSomeCollections": "Only some collections",
+  "zoteroSomethingWrong": "Something went wrong.",
+  "zoteroStopped": "Stopped",
+  "zoteroStopping": "Stopping…",
+  "zoteroSummaryAlreadyIn": "{count} already in your library",
+  "@zoteroSummaryAlreadyIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryDone": "{summary}.",
+  "@zoteroSummaryDone": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroSummaryMain": "Imported {papers, plural, =1{1 paper} other{{papers} papers}}, {pdfs, plural, =1{1 PDF} other{{pdfs} PDFs}}, {highlights, plural, =1{1 highlight} other{{highlights} highlights}} into {projects, plural, =1{1 project} other{{projects} projects}}",
+  "@zoteroSummaryMain": {
+    "placeholders": {
+      "papers": {
+        "type": "int"
+      },
+      "pdfs": {
+        "type": "int"
+      },
+      "highlights": {
+        "type": "int"
+      },
+      "projects": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryNotes": "{count, plural, =1{1 note} other{{count} notes}} added",
+  "@zoteroSummaryNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryPdfsFailed": "{count, plural, =1{1 PDF} other{{count} PDFs}} couldn't be downloaded",
+  "@zoteroSummaryPdfsFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummarySkipped": "{count, plural, =1{1 item} other{{count} items}} skipped",
+  "@zoteroSummarySkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryStopped": "Stopped. {summary}.",
+  "@zoteroSummaryStopped": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroTitle": "Zotero",
+  "zoteroUserId": "User ID",
+  "zoteroUserIdNumber": "The user ID is a number, not your username."
+}

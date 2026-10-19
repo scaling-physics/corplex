@@ -1,0 +1,20 @@
+{
+  "cslReferenceStyle": "Zitierstil",
+  "cslAddStyle": "Stil hinzufügen…",
+  "cslStyleCantBeUsed": "Dieser Stil lässt sich nicht verwenden",
+  "cslCitationLanguage": "Zitiersprache",
+  "cslCitationLanguageRow": "Zitiersprache: {language}",
+  "cslAutomatic": "Automatisch",
+  "cslAutomaticWith": "Automatisch ({language})",
+  "cslProblemNotXml": "Die Datei ist kein gültiges XML und kann daher kein Zitierstil sein.",
+  "cslProblemNotStyle": "Die Datei ist keine Zitierstil-Datei (.csl).",
+  "cslProblemNoInfo": "Dem Stil fehlt der Block mit Titel und ID.",
+  "cslProblemDependent": "Dieser Stil ist eine kleine Variante eines übergeordneten Stils. Importiere stattdessen den übergeordneten Stil.",
+  "cslProblemWrongVersion": "Nur CSL-1.0-Stile werden unterstützt.",
+  "cslProblemNoLayout": "Dem Stil fehlt das Layout, daher kann er keine Literaturangaben formatieren.",
+  "cslProblemNoBibliography": "Der Stil hat keinen Literaturverzeichnis-Abschnitt und kann keine Verzeichnisse formatieren.",
+  "cslProblemUndefinedMacro": "Der Stil verwendet das nicht definierte Makro „{name}“.",
+  "cslProblemNoTitle": "Der Stil hat keinen Titel.",
+  "cslProblemTooLarge": "Die Datei ist zu groß für einen Stil.",
+  "cslProblemUnreadable": "Die Datei konnte nicht gelesen werden."
+}

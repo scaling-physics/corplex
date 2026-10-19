@@ -36,6 +36,59 @@ class CslCite {
   final String label;
 }
 
+/// One rendered cite of a cluster, with its date markers, for collapsing.
+class _Rendered {
+  _Rendered(this.cite, this.spans, this.suffix);
+
+  final CslCite cite;
+  final List<CslSpan> spans;
+  final String? suffix;
+
+  late final String plain = spans.map((s) => s.text).join();
+  late final int _ds = plain.indexOf(cslDateStart);
+  late final int _de = plain.lastIndexOf(cslDateEnd);
+
+  /// The text before the date (the authors), or null when this cite can't
+  /// be collapsed into another: no date, or a pinpoint of its own.
+  String? get collapseKey => _ds < 0 || _de < _ds || cite.locator != null
+      ? null
+      : plain.substring(0, _ds);
+
+  /// The date without its year suffix: "2019" for "2019a".
+  String get yearBase {
+    final d = _strip(plain.substring(_ds, _de + 1));
+    final s = suffix;
+    return s != null && d.endsWith(s) ? d.substring(0, d.length - s.length) : d;
+  }
+
+  List<CslSpan> full() => _stripSpans(spans);
+
+  List<CslSpan> dateOnly() => _stripSpans(_slice(spans, _ds));
+
+  static final _markers = RegExp('[$cslDateStart$cslDateEnd]');
+
+  static String _strip(String s) => s.replaceAll(_markers, '');
+
+  static List<CslSpan> _stripSpans(List<CslSpan> spans) => [
+    for (final s in spans)
+      if (_strip(s.text).isNotEmpty) s.withText(_strip(s.text)),
+  ];
+
+  /// The spans from character offset [from] on.
+  static List<CslSpan> _slice(List<CslSpan> spans, int from) {
+    final out = <CslSpan>[];
+    var at = 0;
+    for (final s in spans) {
+      final end = at + s.text.length;
+      if (end > from) {
+        out.add(from > at ? s.withText(s.text.substring(from - at)) : s);
+      }
+      at = end;
+    }
+    return out;
+  }
+}
+
 class _State {
   int? useFirst;
   bool full = false;
@@ -75,6 +128,8 @@ class CslProcessor {
       bool bib = false,
       String position = 'first',
       CslCite? cite,
+      bool markDates = false,
+      AuthorSubstitute? substitute,
     }) => CslContext(
       data[i],
       bibliography: bib,
@@ -85,17 +140,37 @@ class CslProcessor {
       position: position,
       locator: cite?.locator,
       locatorLabel: cite?.label ?? 'page',
+      markDates: markDates,
+      substitute: substitute,
     );
 
-    final bibliography = [
-      for (final i in order) engine.bibliographyEntry(ctxFor(i, bib: true)),
-    ];
+    final substituteText = style.bibliography?.getAttribute(
+      'subsequent-author-substitute',
+    );
+    final substituteRule =
+        style.bibliography?.getAttribute('subsequent-author-substitute-rule') ??
+        'complete-all';
+    final bibliography = <CslRich>[];
+    List<String>? previousNames;
+    for (final i in order) {
+      final sub = substituteText == null
+          ? null
+          : AuthorSubstitute(substituteText, substituteRule, previousNames);
+      bibliography.add(
+        engine.bibliographyEntry(ctxFor(i, bib: true, substitute: sub)),
+      );
+      previousNames = sub?.record;
+    }
 
     final seen = <int>{};
     final citations = <CslRich>[];
     final layout = style.citationLayout;
     final delimiter = layout?.getAttribute('delimiter') ?? '';
     final collapse = style.citation?.getAttribute('collapse');
+    final byYear =
+        collapse == 'year' ||
+        collapse == 'year-suffix' ||
+        collapse == 'year-suffix-ranged';
     final all = [
       for (final c in clusters) [for (final i in c) CslCite(i)],
       ...cites,
@@ -115,38 +190,15 @@ class CslProcessor {
               c.item,
               position: seen.contains(c.item) ? 'subsequent' : 'first',
               cite: c,
+              markDates: byYear,
             ),
           ),
         );
       }
       seen.addAll(sorted);
-      final spans = <CslSpan>[];
-      void add(List<CslSpan> s, {String joiner = ''}) {
-        if (spans.isNotEmpty && joiner.isNotEmpty) spans.add(CslSpan(joiner));
-        spans.addAll(s);
-      }
-
-      final hasLocator = ordered.any((c) => c.locator != null);
-      var k = 0;
-      while (k < sorted.length) {
-        if (collapse == 'citation-number' && !hasLocator) {
-          var end = k;
-          while (end + 1 < sorted.length &&
-              (data[sorted[end + 1]]['citation-number'] as int) ==
-                  (data[sorted[end]]['citation-number'] as int) + 1) {
-            end++;
-          }
-          if (end - k >= 2) {
-            add(rendered[k].spans, joiner: delimiter);
-            spans.add(const CslSpan('–'));
-            spans.addAll(rendered[end].spans);
-            k = end + 1;
-            continue;
-          }
-        }
-        add(rendered[k].spans, joiner: delimiter);
-        k++;
-      }
+      final spans = byYear
+          ? _collapseByYear(ordered, rendered, states, collapse!, delimiter)
+          : _joinCites(ordered, rendered, data, collapse, delimiter);
       citations.add(
         engine.wrapCitation(
           spans,
@@ -159,6 +211,135 @@ class CslProcessor {
       bibliography: bibliography,
       bibliographyOrder: order,
     );
+  }
+
+  // ----------------------------------------------------------- joining
+
+  /// The cites of a cluster joined by the layout's delimiter; with
+  /// `collapse="citation-number"` runs of three or more consecutive numbers
+  /// become a range ("1–3").
+  List<CslSpan> _joinCites(
+    List<CslCite> ordered,
+    List<CslRich> rendered,
+    List<Map<String, dynamic>> data,
+    String? collapse,
+    String delimiter,
+  ) {
+    final spans = <CslSpan>[];
+    void add(List<CslSpan> s) {
+      if (spans.isNotEmpty && delimiter.isNotEmpty) {
+        spans.add(CslSpan(delimiter));
+      }
+      spans.addAll(s);
+    }
+
+    int number(int k) => data[ordered[k].item]['citation-number'] as int;
+    final hasLocator = ordered.any((c) => c.locator != null);
+    var k = 0;
+    while (k < ordered.length) {
+      if (collapse == 'citation-number' && !hasLocator) {
+        var end = k;
+        while (end + 1 < ordered.length && number(end + 1) == number(end) + 1) {
+          end++;
+        }
+        if (end - k >= 2) {
+          add(rendered[k].spans);
+          spans.add(const CslSpan('–'));
+          spans.addAll(rendered[end].spans);
+          k = end + 1;
+          continue;
+        }
+      }
+      add(rendered[k].spans);
+      k++;
+    }
+    return spans;
+  }
+
+  /// `collapse="year"` and friends. Cites by the same authors (the text
+  /// before the date) are moved together ("cite grouping"); after the first,
+  /// a group prints only the date, or with the year-suffix modes only the
+  /// suffix when the year repeats ("Smith, 2019a, b"; ranged: "2019a–c").
+  /// [rendered] carries date markers (see [cslDateStart]).
+  List<CslSpan> _collapseByYear(
+    List<CslCite> ordered,
+    List<CslRich> rendered,
+    List<_State> states,
+    String collapse,
+    String delimiter,
+  ) {
+    final part = style.citation;
+    final groupDelimiter = part?.getAttribute('cite-group-delimiter') ?? ', ';
+    final afterCollapse =
+        part?.getAttribute('after-collapse-delimiter') ?? delimiter;
+    final suffixDelimiter =
+        part?.getAttribute('year-suffix-delimiter') ?? groupDelimiter;
+    final suffixMode = collapse != 'year';
+    final ranged = collapse == 'year-suffix-ranged';
+
+    final groups = <List<_Rendered>>[];
+    for (final (k, c) in ordered.indexed) {
+      final it = _Rendered(c, rendered[k].spans, states[c.item].suffix);
+      final key = it.collapseKey;
+      if (key != null) {
+        final home = groups.where((g) => g.first.collapseKey == key);
+        if (home.isNotEmpty) {
+          home.first.add(it);
+          continue;
+        }
+      }
+      groups.add([it]);
+    }
+
+    final out = <CslSpan>[];
+    for (final (gi, g) in groups.indexed) {
+      if (gi > 0) {
+        final d = groups[gi - 1].length > 1 ? afterCollapse : delimiter;
+        if (d.isNotEmpty) out.add(CslSpan(d));
+      }
+      out.addAll(g.first.full());
+      var i = 1;
+      while (i < g.length) {
+        final prev = g[i - 1], cur = g[i];
+        if (suffixMode &&
+            cur.suffix != null &&
+            prev.suffix != null &&
+            cur.yearBase == prev.yearBase) {
+          var r = i - 1;
+          if (ranged) {
+            while (r + 1 < g.length &&
+                g[r + 1].yearBase == cur.yearBase &&
+                g[r + 1].suffix != null &&
+                _letterIndex(g[r + 1].suffix!) ==
+                    _letterIndex(g[r].suffix!) + 1) {
+              r++;
+            }
+          }
+          if (ranged && r - (i - 1) >= 2) {
+            out.add(const CslSpan('–'));
+            out.add(CslSpan(g[r].suffix!));
+            i = r + 1;
+          } else {
+            out.add(CslSpan(suffixDelimiter));
+            out.add(CslSpan(cur.suffix!));
+            i++;
+          }
+        } else {
+          out.add(CslSpan(groupDelimiter));
+          out.addAll(cur.dateOnly());
+          i++;
+        }
+      }
+    }
+    return out;
+  }
+
+  static int _letterIndex(String s) {
+    var n = 0;
+    for (final r in s.runes) {
+      n = n * 26 + (r - 96);
+    }
+    return n - 1;
   }
 
   // ------------------------------------------------------------ sorting

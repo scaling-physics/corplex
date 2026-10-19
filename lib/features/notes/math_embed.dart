@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'citation_embed.dart' show FreshCitations;
 import 'math_markers.dart';
@@ -119,7 +120,7 @@ class MathInlineEmbedBuilder extends EmbedBuilder {
       node: embedContext.node,
       child: Semantics(
         button: !embedContext.readOnly,
-        label: 'Equation $latex',
+        label: context.l10n.notesEquationLabel(latex),
         child: GestureDetector(
           onTap: embedContext.readOnly
               ? null
@@ -170,7 +171,7 @@ class MathBlockEmbedBuilder extends EmbedBuilder {
       node: embedContext.node,
       child: Semantics(
         button: !embedContext.readOnly,
-        label: 'Equation $latex',
+        label: context.l10n.notesEquationLabel(latex),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: embedContext.readOnly
@@ -187,7 +188,7 @@ class MathBlockEmbedBuilder extends EmbedBuilder {
                 scrollDirection: Axis.horizontal,
                 child: latex.trim().isEmpty
                     ? Text(
-                        'Tap to write an equation',
+                        context.l10n.notesEquationEmpty,
                         style: TextStyle(color: c.outline),
                       )
                     : mathView(
@@ -277,7 +278,10 @@ class _MathEditorState extends State<_MathEditor> {
               ),
               alignment: Alignment.center,
               child: latex.isEmpty
-                  ? Text('Preview', style: TextStyle(color: c.outline))
+                  ? Text(
+                      context.l10n.notesPreview,
+                      style: TextStyle(color: c.outline),
+                    )
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: mathView(
@@ -295,7 +299,7 @@ class _MathEditorState extends State<_MathEditor> {
                   : Padding(
                       padding: const EdgeInsets.only(top: 8, left: 4),
                       child: Text(
-                        'Not valid LaTeX yet. It is kept as you typed it.',
+                        context.l10n.notesLatexInvalid,
                         style: tt.bodySmall?.copyWith(color: c.outline),
                       ),
                     ),
@@ -310,8 +314,8 @@ class _MathEditorState extends State<_MathEditor> {
               autocorrect: false,
               enableSuggestions: false,
               style: const TextStyle(fontFamilyFallback: _monoFallback),
-              decoration: const InputDecoration(
-                hintText: r'LaTeX, e.g. \frac{a}{b}',
+              decoration: InputDecoration(
+                hintText: context.l10n.notesLatexHint,
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -321,12 +325,12 @@ class _MathEditorState extends State<_MathEditor> {
                 if (widget.canRemove)
                   TextButton(
                     onPressed: () => Navigator.pop(context, ''),
-                    child: const Text('Remove'),
+                    child: Text(context.l10n.commonRemove),
                   ),
                 const Spacer(),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, _text.text.trim()),
-                  child: const Text('Done'),
+                  child: Text(context.l10n.commonDone),
                 ),
               ],
             ),

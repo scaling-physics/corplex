@@ -1,0 +1,41 @@
+{
+  "@@locale": "en",
+  "attachmentsAudio": "Audio",
+  "attachmentsAudioHint": "A NotebookLM audio overview, lecture or podcast file",
+  "attachmentsRecordAudio": "Record audio",
+  "attachmentsVoiceNoteTranscribed": "A voice note, transcribed on this device",
+  "attachmentsVoiceNote": "A voice note",
+  "attachmentsPodcastLink": "Podcast link",
+  "attachmentsPodcastLinkHint": "A NotebookLM share link or audio URL",
+  "attachmentsImage": "Image",
+  "attachmentsFile": "File",
+  "attachmentsAddPodcastLink": "Add podcast link",
+  "attachmentsPodcastLinkNote": "Direct audio links (.mp3, .m4a…) play here. NotebookLM share links open in the browser — to listen and timestamp inside Corplex, download the audio overview and add it as Audio.",
+  "attachmentsUntitledPaper": "Untitled paper",
+  "attachmentsShowInNote": "Show in note",
+  "attachmentsShowInPaper": "Show in paper",
+  "attachmentsMarkUp": "Mark up",
+  "attachmentsCopyName": "Copy name",
+  "attachmentsSearch": "Search attachments",
+  "attachmentsAll": "All",
+  "attachmentsEmptyTitle": "No attachments yet",
+  "attachmentsNothingFound": "Nothing found",
+  "attachmentsEmptyMessage": "Images, recordings, links and files you attach to notes and papers appear here.",
+  "attachmentsNoMatch": "No attachment matches.",
+  "attachmentsTitle": "Attachments",
+  "attachmentsKindImages": "Images",
+  "attachmentsKindAudio": "Audio",
+  "attachmentsKindLinks": "Links",
+  "attachmentsKindFiles": "Files",
+  "attachmentsImageFrom": "Image {name}, from {parent}",
+  "@attachmentsImageFrom": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "parent": {
+        "type": "String"
+      }
+    }
+  }
+}

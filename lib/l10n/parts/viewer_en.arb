@@ -1,0 +1,98 @@
+{
+  "@@locale": "en",
+  "viewerReadAloudUnavailable": "Reading aloud isn't available here",
+  "viewerNoContents": "This PDF has no table of contents.",
+  "viewerPreviousMatch": "Previous match",
+  "viewerNextMatch": "Next match",
+  "viewerCloseSearch": "Close search",
+  "viewerFind": "Find in document",
+  "viewerStopDrawing": "Stop drawing",
+  "viewerDrawOnPage": "Draw on the page",
+  "viewerPageStrip": "Page strip",
+  "viewerFocus": "Focus",
+  "viewerFocusHint": "Tap the page to bring back",
+  "viewerReadAloud": "Read aloud",
+  "viewerStopReadAloud": "Stop reading aloud",
+  "viewerContents": "Contents",
+  "viewerPaperPage": "Paper page",
+  "viewerSepiaPage": "Sepia page",
+  "viewerNightPage": "Night page",
+  "viewerSnapshot": "Snapshot to a note",
+  "viewerSnapshotHint": "For figures and tables",
+  "viewerPageLong": "Page {page}",
+  "@viewerPageLong": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPageShort": "p. {page}",
+  "@viewerPageShort": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPagePill": "{page} / {count}",
+  "@viewerPagePill": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerShowPages": "Show pages",
+  "viewerHighlightColour": "Highlight colour",
+  "viewerFindSearching": "Searching…",
+  "viewerFindNoMatches": "No matches",
+  "viewerFindNoMatchesYet": "No matches yet",
+  "viewerFindCount": "{current} of {total}",
+  "@viewerFindCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerFindCountMore": "{current} of {total}+",
+  "@viewerFindCountMore": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerSnapPrompt": "Drag around a figure or table",
+  "viewerSnapWholeView": "Whole view",
+  "viewerQuoteAdded": "Added to your note",
+  "viewerQuoteNewNote": "New note",
+  "viewerNotesOn": "Notes on {title}",
+  "@viewerNotesOn": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "viewerAboutThisPaper": "About this paper",
+  "viewerRecentNotes": "Recent notes",
+  "viewerUnlockToQuote": "Unlock the note to add this quote to it.",
+  "viewerUnlockToAdd": "Unlock the note to add to it.",
+  "viewerExportNoPdf": "This paper’s PDF isn’t on this device.",
+  "viewerExportNothing": "Nothing to export: the marks don’t match this PDF’s pages.",
+  "viewerExportFailed": "Couldn’t export this PDF.",
+  "viewerExportNotPdf": "This file isn’t a PDF Corplex can read.",
+  "viewerExportEncrypted": "This PDF is encrypted, so highlights can’t be written into it.",
+  "viewerExportDamaged": "This PDF can’t be annotated: its structure is damaged or uses features Corplex can’t write into."
+}

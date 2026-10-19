@@ -1,0 +1,5 @@
+/* Permission prompts and the display name, German. English lives in Info.plist. */
+"NSFaceIDUsageDescription" = "Corplex verwendet Face ID, um deine gesperrten Notizen zu entsperren.";
+"NSMicrophoneUsageDescription" = "Corplex nutzt das Mikrofon, um Sprachnotizen aufzunehmen.";
+"NSSpeechRecognitionUsageDescription" = "Corplex wandelt deine Sprachnotizen auf diesem Gerät in Text um.";
+"NSPhotoLibraryUsageDescription" = "Corplex braucht Zugriff auf deine Fotos, um Bilder an Notizen und Paper anzuhängen.";

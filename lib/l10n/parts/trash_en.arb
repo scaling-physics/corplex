@@ -1,0 +1,59 @@
+{
+  "@@locale": "en",
+  "trashEmptyAction": "Empty",
+  "trashEmptyTitle": "Empty the trash?",
+  "trashEmptyBody": "{count, plural, =1{1 item will be deleted for good.} other{{count} items will be deleted for good.}}",
+  "@trashEmptyBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trashIsEmpty": "Trash is empty",
+  "trashEmptyMessage": "Deleted notes and papers stay here for {days, plural, =1{1 day} other{{days} days}}.",
+  "@trashEmptyMessage": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashKept": "Kept for {days, plural, =1{1 day} other{{days} days}}, then deleted for good.",
+  "@trashKept": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashKindNote": "Note",
+  "trashKindPaper": "Paper",
+  "trashDeletingSoon": "deleting soon",
+  "trashDaysLeft": "{days, plural, =1{1 day left} other{{days} days left}}",
+  "@trashDaysLeft": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trashRestore": "Restore",
+  "trashRestored": "Restored",
+  "trashMovedToTrash": "{label} moved to trash",
+  "@trashMovedToTrash": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "trashQuoted": "“{title}”",
+  "@trashQuoted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
+}

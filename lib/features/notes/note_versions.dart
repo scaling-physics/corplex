@@ -4,16 +4,21 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../lock/note_lock_service.dart';
 import 'editor_document.dart';
 import 'note_content.dart';
 import 'note_stats.dart';
 
 /// Label of the version saved when a chapter goes to the supervisor. The
-/// date is shown beside every version, so it isn't repeated here.
+/// date is shown beside every version, so it isn't repeated here. This is
+/// the English default: a label is stored as written, so callers with an
+/// `AppLocalizations` pass its [AppLocalizations.notesSentToSupervisor]
+/// and the label follows the language the app had when it was saved.
 const sentToSupervisorLabel = 'Sent to supervisor';
 
-/// Label of the safety copy taken just before a version is restored.
+/// Label of the safety copy taken just before a version is restored
+/// (English default; see [sentToSupervisorLabel]).
 const beforeRestoringLabel = 'Before restoring';
 
 /// Saves a copy of the note as it is *stored* right now (title and body).
@@ -125,6 +130,7 @@ Future<bool> restoreNoteVersion(
   AppDatabase db,
   String versionId, {
   NoteLockService? lock,
+  AppLocalizations? l10n,
 }) => db.transaction(() async {
   final version = await (db.select(
     db.noteVersions,
@@ -149,7 +155,11 @@ Future<bool> restoreNoteVersion(
   } else if (sameBody(version.title, version.content, note)) {
     return true;
   }
-  await saveNoteVersion(db, note.id, label: beforeRestoringLabel);
+  await saveNoteVersion(
+    db,
+    note.id,
+    label: l10n?.notesBeforeRestoring ?? beforeRestoringLabel,
+  );
   await (db.update(db.notes)..where((n) => n.id.equals(note.id))).write(
     NotesCompanion(
       title: Value(version.title),

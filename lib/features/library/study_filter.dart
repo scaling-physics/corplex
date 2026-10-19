@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import 'papers_providers.dart';
 import 'study_details.dart';
@@ -106,14 +107,18 @@ class StudyFilterChip extends ConsumerWidget {
     final filter = ref.watch(studyFilterProvider);
     return InputChip(
       avatar: const Icon(Icons.science_outlined, size: 18),
-      label: Text(filter.isActive ? 'Study · ${filter.count}' : 'Study'),
+      label: Text(
+        filter.isActive
+            ? context.l10n.studyChipCount(filter.count)
+            : context.l10n.studyChip,
+      ),
       selected: filter.isActive,
       onPressed: () => showStudyFilterSheet(context),
       onDeleted: filter.isActive
           ? () => ref.read(studyFilterProvider.notifier).state =
                 const StudyFilter()
           : null,
-      deleteButtonTooltipMessage: 'Clear study filter',
+      deleteButtonTooltipMessage: context.l10n.studyClearFilter,
     );
   }
 }
@@ -170,18 +175,24 @@ class _StudyFilterSheetState extends ConsumerState<_StudyFilterSheet> {
             Row(
               children: [
                 Expanded(
-                  child: Text('Study', style: theme.textTheme.titleMedium),
+                  child: Text(
+                    context.l10n.studyChip,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
                 if (filter.isActive)
                   TextButton(
                     onPressed: () => notifier.state = const StudyFilter(),
-                    child: const Text('Clear'),
+                    child: Text(context.l10n.studyClear),
                   ),
               ],
             ),
             for (final entry in options.entries) ...[
               const SizedBox(height: 12),
-              Text(entry.key.label, style: theme.textTheme.titleSmall),
+              Text(
+                entry.key.labelFor(context.l10n),
+                style: theme.textTheme.titleSmall,
+              ),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
@@ -202,8 +213,8 @@ class _StudyFilterSheetState extends ConsumerState<_StudyFilterSheet> {
               controller: _n,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Minimum sample size (n)',
+              decoration: InputDecoration(
+                labelText: context.l10n.studyMinSampleSize,
               ),
               onChanged: (v) => notifier.state = ref
                   .read(studyFilterProvider)

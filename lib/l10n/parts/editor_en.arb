@@ -1,0 +1,160 @@
+{
+  "@@locale": "en",
+  "editorLockedTapToLock": "Locked — tap to lock now",
+  "editorMoveToFolder": "Move to folder",
+  "editorTags": "Tags",
+  "editorLinkPaper": "Link a paper",
+  "editorAttach": "Attach audio, image or file",
+  "editorAddToProject": "Add to project",
+  "editorLinkToNote": "Link to a note",
+  "editorLinkToNoteHint": "Or type [[ while writing",
+  "editorCiteHint": "Or type [@ while writing",
+  "editorTemplate": "Literature note template",
+  "editorTemplateHint": "Summary, method, findings, critique",
+  "editorAddBibliography": "Add bibliography",
+  "editorBibliographyHint": "A reference list of what this note cites",
+  "editorExport": "Export",
+  "editorExportHint": "Markdown, Word or PDF, with references",
+  "editorWordCount": "Word count",
+  "editorWordCountHint": "And reading time",
+  "editorTypewriter": "Typewriter scrolling",
+  "editorTypewriterHint": "Keep the line you type centred",
+  "editorLockHint": "Needs your notes password to open",
+  "editorFindInNote": "Find in note",
+  "editorPrint": "Print…",
+  "editorTitleHint": "Title",
+  "editorStartWriting": "Start writing…",
+  "editorDraw": "Draw",
+  "editorLinkedFrom": "Linked from",
+  "editorImageTapToEnlarge": "Image, tap to enlarge",
+  "editorEditDate": "{date} at {time}",
+  "@editorEditDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTextStyle": "Text style",
+  "editorStyleTitle": "Title",
+  "editorStyleHeading": "Heading",
+  "editorStyleSubheading": "Subheading",
+  "editorStyleBody": "Body text",
+  "editorStyleQuote": "Quote",
+  "editorStyleStrike": "Strikethrough",
+  "editorStyleMonospaced": "Monospaced",
+  "editorStyleHighlight": "Highlight",
+  "editorStyleTable": "Table",
+  "editorTipBold": "Bold {shortcut}",
+  "@editorTipBold": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipItalic": "Italic {shortcut}",
+  "@editorTipItalic": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipUnderline": "Underline {shortcut}",
+  "@editorTipUnderline": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipBulleted": "Bulleted list {shortcut}",
+  "@editorTipBulleted": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipNumbered": "Numbered list {shortcut}",
+  "@editorTipNumbered": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipChecklist": "Checklist {shortcut}",
+  "@editorTipChecklist": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorTipHighlight": "Highlight {shortcut}",
+  "@editorTipHighlight": {
+    "placeholders": {
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "editorCmdCite": "Cite a paper",
+  "editorCmdCiteHint": "Insert a citation from your library",
+  "editorCmdEquation": "Equation",
+  "editorCmdEquationHint": "LaTeX maths, or type $$",
+  "editorCmdFigure": "Figure caption",
+  "editorCmdFigureHint": "A numbered figure caption for this line",
+  "editorCmdTable": "Table caption",
+  "editorCmdTableHint": "A numbered table caption for this line",
+  "editorCmdRefer": "Refer to a figure or table",
+  "editorCmdReferHint": "Insert its number, kept right as things move",
+  "editorCmdLink": "Link to a note",
+  "editorCmdLinkHint": "Or type [[",
+  "editorCmdDraw": "Draw",
+  "editorCmdDrawHint": "A sketch, with a pen or finger",
+  "editorCmdInsertTable": "Table",
+  "editorCmdInsertTableHint": "Rows and columns, 3 by 3 to start",
+  "editorCmdHeading": "Heading",
+  "editorCmdHeadingHint": "Make this line a heading",
+  "editorCmdChecklist": "Checklist",
+  "editorCmdChecklistHint": "Tick-box items",
+  "editorCmdAttach": "Attach",
+  "editorCmdAttachHint": "Audio, an image or a file",
+  "editorCmdVoice": "Voice note",
+  "editorCmdVoiceHint": "Record a thought as you read",
+  "editorCmdDictate": "Dictate",
+  "editorCmdDictateHint": "Speak instead of typing",
+  "editorCmdTemplate": "Literature note template",
+  "editorCmdTemplateHint": "Summary, method, findings, critique",
+  "editorCmdBibliography": "Add bibliography",
+  "editorCmdBibliographyHint": "A reference list of what this note cites",
+  "editorPaperRemoved": "That paper was removed.",
+  "editorRecordingRemoved": "That recording was removed.",
+  "editorAddPaperAndCite": "Add this paper and cite it?",
+  "editorLookupUnreachable": "Couldn't reach the lookup service. The link is unchanged.",
+  "editorNoPaperFound": "No paper found for {id}.",
+  "@editorNoPaperFound": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "editorNoCitations": "No citations to list yet. Type [@ to cite a paper.",
+  "editorAddedReferences": "{count, plural, =1{Added 1 reference} other{Added {count} references}}",
+  "@editorAddedReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editorNoteLockedFiles": "Note locked. Attached files (images, audio, PDFs) aren't encrypted — only the note's text and sketches.",
+  "editorSelectPassage": "Select the passage to comment on."
+}

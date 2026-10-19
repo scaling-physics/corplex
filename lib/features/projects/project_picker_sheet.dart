@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database_provider.dart';
 import 'projects_providers.dart';
 
@@ -100,15 +101,15 @@ class _ProjectPickerSheetState extends ConsumerState<_ProjectPickerSheet> {
                       child: TextField(
                         controller: _controller,
                         textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          hintText: 'New project',
+                        decoration: InputDecoration(
+                          hintText: context.l10n.projectsNewProject,
                         ),
                         onSubmitted: (_) => _createAndAdd(),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.add),
-                      tooltip: 'Create and add',
+                      tooltip: context.l10n.projectsCreateAndAdd,
                       onPressed: _createAndAdd,
                     ),
                   ],
@@ -116,12 +117,9 @@ class _ProjectPickerSheetState extends ConsumerState<_ProjectPickerSheet> {
               ),
               Flexible(
                 child: projects.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 8, 24, 32),
-                        child: Text(
-                          'A project groups the papers and notes for one '
-                          'review, chapter or paper you\'re writing.',
-                        ),
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                        child: Text(context.l10n.projectsPickerIntro),
                       )
                     : ListView(
                         shrinkWrap: true,

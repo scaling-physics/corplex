@@ -8,6 +8,11 @@ import 'sync_remote.dart';
 
 enum SyncStatus { offline, syncing, upToDate, error }
 
+/// [SyncService.lastError] for a failure the user can't act on. The UI
+/// swaps it for its translation (`localizedSyncError`).
+const syncGenericErrorMessage =
+    'Couldn\'t sync. Your notes are safe on this device.';
+
 /// What the rest of the app knows about sync: start/stop it for a signed-in
 /// user, ask for a sync, and observe its status. Screens depend only on
 /// this interface, never on the backend behind it.
@@ -186,7 +191,7 @@ class EngineSyncService implements SyncService {
               e is SyncFilesIncomplete ||
               e is SyncServerOutdated
           ? e.toString()
-          : 'Couldn\'t sync. Your notes are safe on this device.';
+          : syncGenericErrorMessage;
       _emit(SyncStatus.error);
     } finally {
       _running = false;

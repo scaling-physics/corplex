@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'handwriting.dart';
 import 'ink_canvas.dart';
@@ -140,7 +141,7 @@ class _InlineSketchState extends State<InlineSketch> implements InlineDrawing {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Semantics(
-        label: 'Drawing',
+        label: context.l10n.inkDrawing,
         button: !active,
         child: GestureDetector(
           // A tap with a finger or mouse chooses the drawing (a pen draws
@@ -198,7 +199,9 @@ class _InlineSketchState extends State<InlineSketch> implements InlineDrawing {
                         child: IgnorePointer(
                           child: Center(
                             child: Text(
-                              active ? 'Draw here' : 'Tap to draw',
+                              active
+                                  ? context.l10n.inkDrawHere
+                                  : context.l10n.inkTapToDraw,
                               style: TextStyle(color: c.outline),
                             ),
                           ),
@@ -284,7 +287,7 @@ class _StaticSketch extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Semantics(
-        label: 'Drawing',
+        label: context.l10n.inkDrawing,
         child: GestureDetector(
           onTap: embedContext.readOnly ? null : () => _edit(context, sketch),
           child: Container(

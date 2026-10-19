@@ -1,3 +1,4 @@
+import '../../l10n/l10n.dart';
 import '../library/authors.dart';
 
 import 'package:flutter/material.dart';
@@ -50,14 +51,14 @@ class _CitePaperSheetState extends ConsumerState<_CitePaperSheet> {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: SearchBar(
-                  hintText: 'Cite a paper',
+                  hintText: context.l10n.notesCiteAPaper,
                   leading: const Icon(Icons.format_quote),
                   onChanged: (v) => setState(() => _query = v),
                 ),
               ),
               Expanded(
                 child: shown.isEmpty
-                    ? const Center(child: Text('No papers found.'))
+                    ? Center(child: Text(context.l10n.notesNoPapersFound))
                     : ListView(
                         children: [
                           for (final paper in shown)

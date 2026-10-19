@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../lock/note_lock_service.dart';
 import '../lock/notes_password_dialogs.dart' show requestNotesUnlock;
 
@@ -10,8 +11,12 @@ import '../lock/notes_password_dialogs.dart' show requestNotesUnlock;
 Future<bool> requestUnlock(
   BuildContext context,
   NoteLockService lock, {
-  String reason = 'Unlock your locked notes to continue.',
-}) => requestNotesUnlock(context, lock, reason: reason);
+  String? reason,
+}) => requestNotesUnlock(
+  context,
+  lock,
+  reason: reason ?? context.l10n.exportUnlockNotesToContinue,
+);
 
 /// [content] of note [noteId] as plain Delta JSON for something that must
 /// read the body: as is when not locked, decrypted when its key is
@@ -22,11 +27,12 @@ Future<String?> readableForAction(
   NoteLockService lock,
   String noteId,
   String content, {
-  String reason = 'Unlock this note to continue.',
+  String? reason,
 }) async {
   if (!isLockedContent(content)) return content;
   if (!lock.canRead(content)) {
-    if (!await requestUnlock(context, lock, reason: reason)) return null;
+    final why = reason ?? context.l10n.exportUnlockNoteToContinue;
+    if (!await requestUnlock(context, lock, reason: why)) return null;
     if (!lock.canRead(content)) return null;
   }
   try {

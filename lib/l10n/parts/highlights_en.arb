@@ -1,0 +1,20 @@
+{
+  "@@locale": "en",
+  "highlightsHighlight": "Highlight",
+  "highlightsQuoteToNote": "Quote to note",
+  "highlightsTooltip": "Highlights",
+  "highlightsAddComment": "Add a comment",
+  "highlightsAddCommentMenu": "Add a comment…",
+  "highlightsEditCommentMenu": "Edit comment…",
+  "highlightsSelectHint": "Select text on a page, then tap Highlight.",
+  "highlightsButter": "Butter highlight",
+  "highlightsSage": "Sage highlight",
+  "highlightsRose": "Rose highlight",
+  "highlightsMist": "Mist highlight",
+  "highlightsDelete": "Delete highlight",
+  "highlightsSearchHint": "Search your highlights",
+  "highlightsRevisit": "Revisit highlights",
+  "highlightsEmptyTitle": "No highlights yet",
+  "highlightsEmptyMessage": "Select text in a PDF and choose Highlight; it will collect here.",
+  "highlightsNoMatches": "No matches."
+}

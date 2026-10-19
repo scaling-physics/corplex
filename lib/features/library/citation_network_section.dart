@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../home/adaptive.dart' show openPaper;
 import 'metadata_lookup.dart';
@@ -97,9 +98,7 @@ class _CitationNetworkSectionState
     } on LookupFailed {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Couldn’t load more. Try again online.'),
-          ),
+          SnackBar(content: Text(context.l10n.libraryCitationsLoadMoreFailed)),
         );
       }
     } finally {
@@ -126,8 +125,8 @@ class _CitationNetworkSectionState
         SnackBar(
           content: Text(
             result.existing != null
-                ? 'Already in your library.'
-                : 'Added to your library.',
+                ? context.l10n.libraryAlreadyInLibrary
+                : context.l10n.libraryCitationsAdded,
           ),
         ),
       );
@@ -152,7 +151,7 @@ class _CitationNetworkSectionState
             children: [
               ListTile(
                 key: const ValueKey('citation-network-toggle'),
-                title: const Text('References · Cited by'),
+                title: Text(context.l10n.libraryCitationsTitle),
                 trailing: AnimatedRotation(
                   turns: _open ? 0.5 : 0,
                   duration: reduced ? Duration.zero : AppMotion.short,
@@ -171,11 +170,15 @@ class _CitationNetworkSectionState
                           segments: [
                             ButtonSegment(
                               value: false,
-                              label: Text(_label('References', false)),
+                              label: Text(
+                                _label(context.l10n.libraryCitationsReferences, false),
+                              ),
                             ),
                             ButtonSegment(
                               value: true,
-                              label: Text(_label('Cited by', true)),
+                              label: Text(
+                                _label(context.l10n.libraryCitationsCitedBy, true),
+                              ),
                             ),
                           ],
                           selected: {_cited},
@@ -184,7 +187,7 @@ class _CitationNetworkSectionState
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Refresh',
+                        tooltip: context.l10n.libraryCitationsRefresh,
                         icon: const Icon(Icons.refresh, size: 20),
                         onPressed: _loading ? null : () => _load(refresh: true),
                       ),
@@ -220,7 +223,11 @@ class _CitationNetworkSectionState
                 ),
               ),
             ),
-            if (retry) TextButton(onPressed: _load, child: const Text('Retry')),
+            if (retry)
+              TextButton(
+                onPressed: _load,
+                child: Text(context.l10n.libraryCitationsRetry),
+              ),
           ],
         ),
       );
@@ -239,28 +246,22 @@ class _CitationNetworkSectionState
       );
     }
     if (_unreachable && _record == null) {
-      return _message(
-        theme,
-        'Couldn’t reach OpenAlex. Try again online.',
-        retry: true,
-      );
+      return _message(theme, context.l10n.libraryCitationsUnreachable, retry: true);
     }
     if (_unreachable) {
-      return _message(
-        theme,
-        'Couldn’t refresh. Try again online.',
-        retry: true,
-      );
+      return _message(theme, context.l10n.libraryCitationsRefreshFailed, retry: true);
     }
     final r = _record;
     if (_notFound || r == null) {
-      return _message(theme, 'OpenAlex has no record of this paper.');
+      return _message(theme, context.l10n.libraryCitationsNotFound);
     }
     final items = _cited ? r.cited : r.references;
     if (items.isEmpty) {
       return _message(
         theme,
-        _cited ? 'No citing papers found.' : 'No references listed.',
+        _cited
+            ? context.l10n.libraryCitationsNoCiting
+            : context.l10n.libraryCitationsNoReferences,
       );
     }
     return Column(
@@ -270,14 +271,20 @@ class _CitationNetworkSectionState
         if (!_cited && r.referenceCount > r.references.length)
           _message(
             theme,
-            '${r.referenceCount - r.references.length} more not shown.',
+            context.l10n.libraryCitationsMoreNotShown(
+              r.referenceCount - r.references.length,
+            ),
           ),
         if (_cited && r.hasMoreCited)
           Padding(
             padding: const EdgeInsets.all(8),
             child: TextButton(
               onPressed: _loadingMore ? null : _more,
-              child: Text(_loadingMore ? 'Loading…' : 'Load more'),
+              child: Text(
+                _loadingMore
+                    ? context.l10n.libraryCitationsLoading
+                    : context.l10n.libraryCitationsLoadMore,
+              ),
             ),
           ),
       ],
@@ -301,9 +308,12 @@ class _CitationNetworkSectionState
               Icons.check_circle_outline,
               size: 20,
               color: theme.colorScheme.primary,
-              semanticLabel: 'In your library',
+              semanticLabel: context.l10n.libraryCitationsInLibrary,
             )
-          : TextButton(onPressed: () => _add(w), child: const Text('Add')),
+          : TextButton(
+              onPressed: () => _add(w),
+              child: Text(context.l10n.commonAdd),
+            ),
       onTap: inLibrary == null
           ? null
           : () => openPaper(context, ref, inLibrary.id),

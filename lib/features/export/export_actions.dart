@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../csl/csl_format.dart';
 import '../csl/csl_rich.dart';
@@ -32,6 +33,14 @@ enum ExportFormat {
   final String label;
   final String extension;
   final IconData icon;
+
+  /// The format's name in the app's language.
+  String name(AppLocalizations l10n) => switch (this) {
+    markdown => l10n.exportFormatMarkdown,
+    word => l10n.exportFormatWord,
+    pdf => l10n.exportFormatPdf,
+    latex => l10n.exportFormatLatex,
+  };
 }
 
 /// A safe file name from a title: letters, digits, spaces, dashes.
@@ -93,7 +102,7 @@ class _ExportSheetState extends State<_ExportSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            title: const Text('Citations and references'),
+            title: Text(context.l10n.exportCitationsAndReferences),
             subtitle: Text(_style.label),
             trailing: const Icon(Icons.expand_more),
             onTap: () async {
@@ -104,7 +113,7 @@ class _ExportSheetState extends State<_ExportSheet> {
           for (final f in ExportFormat.values)
             ListTile(
               leading: Icon(f.icon),
-              title: Text(f.label),
+              title: Text(f.name(context.l10n)),
               onTap: () => Navigator.pop(context, (format: f, style: _style)),
             ),
         ],
@@ -120,6 +129,7 @@ Future<void> shareExport(
   ExportFormat format,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
   final origin = shareOrigin(context);
   try {
     final dir = Directory(
@@ -135,7 +145,7 @@ Future<void> shareExport(
     );
   } catch (_) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('Couldn\'t create that file.')),
+      SnackBar(content: Text(l10n.exportCouldntCreateFile)),
     );
   }
 }

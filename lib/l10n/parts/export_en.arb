@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "exportFormatMarkdown": "Markdown",
+  "exportFormatWord": "Word document",
+  "exportFormatPdf": "PDF",
+  "exportFormatLatex": "LaTeX (Overleaf)",
+  "exportCitationsAndReferences": "Citations and references",
+  "exportCouldntCreateFile": "Couldn't create that file.",
+  "exportUnlockNotesToContinue": "Unlock your locked notes to continue.",
+  "exportUnlockNoteToContinue": "Unlock this note to continue."
+}

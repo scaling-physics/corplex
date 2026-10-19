@@ -1,3 +1,5 @@
+import '../../l10n/l10n.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -57,15 +59,15 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
                     Expanded(
                       child: TextField(
                         controller: _controller,
-                        decoration: const InputDecoration(
-                          hintText: 'New tag name',
+                        decoration: InputDecoration(
+                          hintText: context.l10n.notesNewTagName,
                         ),
                         onSubmitted: (_) => _createAndAdd(),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.add),
-                      tooltip: 'Add tag',
+                      tooltip: context.l10n.notesAddTag,
                       onPressed: _createAndAdd,
                     ),
                   ],
@@ -74,7 +76,7 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
               Expanded(
                 child: switch (tagsAsync.value) {
                   null => const SizedBox.shrink(),
-                  [] => const Center(child: Text('No tags yet.')),
+                  [] => Center(child: Text(context.l10n.notesNoTagsYet)),
                   final tags => ListView(
                     children: tags.map((tag) {
                       final added = currentIds.contains(tag.id);

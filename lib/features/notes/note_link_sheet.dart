@@ -1,3 +1,5 @@
+import '../../l10n/l10n.dart';
+
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,9 +66,9 @@ class _NoteLinkSheetState extends ConsumerState<_NoteLinkSheet> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: TextField(
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Link to a note…',
-                    prefixIcon: Icon(Icons.search),
+                  decoration: InputDecoration(
+                    hintText: context.l10n.notesLinkToANote,
+                    prefixIcon: const Icon(Icons.search),
                   ),
                   onChanged: (v) => setState(() => _query = v),
                 ),
@@ -86,7 +88,7 @@ class _NoteLinkSheetState extends ConsumerState<_NoteLinkSheet> {
                             ))
                           ListTile(
                             leading: const Icon(Icons.add),
-                            title: Text('New note “$query”'),
+                            title: Text(context.l10n.notesNewNoteNamed(query)),
                             onTap: () async {
                               final id = const Uuid().v4();
                               await db
@@ -106,13 +108,17 @@ class _NoteLinkSheetState extends ConsumerState<_NoteLinkSheet> {
                           ListTile(
                             leading: const Icon(Icons.edit_note_outlined),
                             title: Text(
-                              n.title.isEmpty ? 'Untitled' : n.title,
+                              n.title.isEmpty
+                                  ? context.l10n.commonUntitled
+                                  : n.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             onTap: () => Navigator.pop(context, (
                               id: n.id,
-                              title: n.title.isEmpty ? 'Untitled' : n.title,
+                              title: n.title.isEmpty
+                                  ? context.l10n.commonUntitled
+                                  : n.title,
                             )),
                           ),
                       ],

@@ -1,0 +1,7 @@
+{
+  "@@locale": "en",
+  "syncAccountMismatch": "This device holds data from a different account. Sign back in to that account to sync.",
+  "syncFilesIncomplete": "Some files haven't synced yet.",
+  "syncServerOutdated": "Your sync server needs a database update. Run the newest files in supabase/migrations on your Supabase project.",
+  "syncGenericError": "Couldn't sync. Your notes are safe on this device."
+}

@@ -1,0 +1,20 @@
+{
+  "@@locale": "de",
+  "highlightsHighlight": "Markieren",
+  "highlightsQuoteToNote": "In Notiz zitieren",
+  "highlightsTooltip": "Markierungen",
+  "highlightsAddComment": "Kommentar hinzufügen",
+  "highlightsAddCommentMenu": "Kommentar hinzufügen…",
+  "highlightsEditCommentMenu": "Kommentar bearbeiten…",
+  "highlightsSelectHint": "Text auf einer Seite auswählen und „Markieren“ tippen.",
+  "highlightsButter": "Buttergelbe Markierung",
+  "highlightsSage": "Salbeigrüne Markierung",
+  "highlightsRose": "Rosa Markierung",
+  "highlightsMist": "Nebelgraue Markierung",
+  "highlightsDelete": "Markierung löschen",
+  "highlightsSearchHint": "Markierungen durchsuchen",
+  "highlightsRevisit": "Markierungen wiederholen",
+  "highlightsEmptyTitle": "Noch keine Markierungen",
+  "highlightsEmptyMessage": "Text in einem PDF auswählen und „Markieren“ wählen; die Markierungen sammeln sich hier.",
+  "highlightsNoMatches": "Keine Treffer."
+}

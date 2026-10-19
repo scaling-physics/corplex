@@ -1,3 +1,4 @@
+import '../../l10n/l10n.dart';
 import '../export/export_images.dart';
 
 import 'package:drift/drift.dart' show Value;
@@ -122,6 +123,7 @@ Future<void> duplicateNoteAndOpen(
   final db = ref.read(databaseProvider);
   final lock = ref.read(noteLockServiceProvider);
   final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
   await ref.read(openNoteFlushProvider)[noteId]?.call();
   final note = await (db.select(
     db.notes,
@@ -132,16 +134,14 @@ Future<void> duplicateNoteAndOpen(
     lock,
     noteId,
     note.content,
-    reason: 'Unlock this note to duplicate it.',
+    reason: l10n.notesUnlockToDuplicate,
   );
   if (readable == null || !context.mounted) return;
   try {
     final id = await duplicateNote(db, lock, noteId);
     if (context.mounted) openNote(context, ref, id);
   } on Object {
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Couldn\'t duplicate that note.')),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.notesCouldntDuplicate)));
   }
 }
 
@@ -156,6 +156,7 @@ Future<void> printNote(
   final lock = ref.read(noteLockServiceProvider);
   final window = ref.read(macWindowProvider);
   final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
   await ref.read(openNoteFlushProvider)[noteId]?.call();
   final note = await (db.select(
     db.notes,
@@ -166,7 +167,7 @@ Future<void> printNote(
     lock,
     noteId,
     note.content,
-    reason: 'Unlock this note to print it.',
+    reason: l10n.notesUnlockToPrint,
   );
   if (content == null) return;
   try {
@@ -190,14 +191,14 @@ Future<void> printNote(
       figures: figures,
     );
     final pdf = await exportToPdf(doc);
-    final title = note.title.trim().isEmpty ? 'Untitled' : note.title.trim();
+    final title = note.title.trim().isEmpty
+        ? l10n.commonUntitled
+        : note.title.trim();
     if (await window.printPdf(pdf, title)) return;
   } on Object {
     // Reported below.
   }
-  messenger.showSnackBar(
-    const SnackBar(content: Text('Couldn\'t print that note.')),
-  );
+  messenger.showSnackBar(SnackBar(content: Text(l10n.notesCouldntPrint)));
 }
 
 /// The right-click item for [note]: Duplicate.
@@ -206,7 +207,7 @@ ContextMenuAction duplicateMenuAction(
   WidgetRef ref,
   Note note,
 ) => ContextMenuAction(
-  label: 'Duplicate',
+  label: context.l10n.notesDuplicate,
   icon: Icons.copy_outlined,
   onSelected: () => duplicateNoteAndOpen(context, ref, note.id),
 );

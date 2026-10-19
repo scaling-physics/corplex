@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../data/database.dart';
+import '../../l10n/l10n.dart';
 
 /// A paper's optional study details (schema v15): what was studied and how.
 /// Shared by the paper screen, Library filters, search, the synthesis
@@ -17,6 +18,15 @@ enum StudyField {
   /// The SQL / sync column name, also stored in `matrix_columns.paper_field`.
   final String key;
   final String label;
+
+  /// [label] in the reader's language.
+  String labelFor(AppLocalizations l10n) => switch (this) {
+    species => l10n.studyFieldSpecies,
+    brainRegions => l10n.studyFieldBrainRegions,
+    techniques => l10n.studyFieldTechniques,
+    sampleSize => l10n.studyFieldSampleSize,
+    paradigm => l10n.studyFieldParadigm,
+  };
 
   /// Fields that hold several values (`a; b`).
   bool get isList =>

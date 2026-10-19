@@ -6,6 +6,7 @@ import '../home/adaptive.dart' show ReadableColumn;
 import '../../data/database_provider.dart';
 import '../../data/tables/trash_table.dart';
 import '../../data/trash.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/motion_widgets.dart';
 
 /// Deleted notes and papers, restorable for [trashRetention].
@@ -20,7 +21,7 @@ class TrashScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trash'),
+        title: Text(context.l10n.commonTrash),
         actions: [
           if (items.isNotEmpty)
             TextButton(
@@ -28,26 +29,23 @@ class TrashScreen extends ConsumerWidget {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Empty the trash?'),
-                    content: Text(
-                      '${items.length} item${items.length == 1 ? '' : 's'} '
-                      'will be deleted for good.',
-                    ),
+                    title: Text(context.l10n.trashEmptyTitle),
+                    content: Text(context.l10n.trashEmptyBody(items.length)),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
+                        child: Text(context.l10n.commonCancel),
                       ),
                       FilledButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Empty'),
+                        child: Text(context.l10n.trashEmptyAction),
                       ),
                     ],
                   ),
                 );
                 if (confirmed == true) await purgeTrash(db, all: true);
               },
-              child: const Text('Empty'),
+              child: Text(context.l10n.trashEmptyAction),
             ),
         ],
       ),
@@ -55,10 +53,8 @@ class TrashScreen extends ConsumerWidget {
         child: items.isEmpty
             ? EmptyState(
                 icon: Icons.delete_outline,
-                title: 'Trash is empty',
-                message:
-                    'Deleted notes and papers stay here for '
-                    '${trashRetention.inDays} days.',
+                title: context.l10n.trashIsEmpty,
+                message: context.l10n.trashEmptyMessage(trashRetention.inDays),
               )
             : ListView(
                 padding: const EdgeInsets.only(bottom: 32),
@@ -66,7 +62,7 @@ class TrashScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                     child: Text(
-                      'Kept for ${trashRetention.inDays} days, then deleted for good.',
+                      context.l10n.trashKept(trashRetention.inDays),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -80,24 +76,28 @@ class TrashScreen extends ConsumerWidget {
                             : Icons.article_outlined,
                       ),
                       title: Text(
-                        item.title.isEmpty ? 'Untitled' : item.title,
+                        item.title.isEmpty
+                            ? context.l10n.commonUntitled
+                            : item.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
-                        '${item.kind == TrashKind.note ? 'Note' : 'Paper'} · '
-                        '${_daysLeft(item.deletedAt)}',
+                        '${item.kind == TrashKind.note ? context.l10n.trashKindNote : context.l10n.trashKindPaper} · '
+                        '${_daysLeft(context.l10n, item.deletedAt)}',
                       ),
                       trailing: TextButton(
                         onPressed: () async {
                           await restoreFromTrash(db, item.id);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Restored')),
+                              SnackBar(
+                                content: Text(context.l10n.trashRestored),
+                              ),
                             );
                           }
                         },
-                        child: const Text('Restore'),
+                        child: Text(context.l10n.trashRestore),
                       ),
                     ),
                 ],
@@ -106,10 +106,10 @@ class TrashScreen extends ConsumerWidget {
     );
   }
 
-  static String _daysLeft(DateTime deletedAt) {
+  static String _daysLeft(AppLocalizations l10n, DateTime deletedAt) {
     final left = trashRetention - DateTime.now().difference(deletedAt);
     final days = left.inDays + (left.inHours % 24 > 0 ? 1 : 0);
-    if (days <= 0) return 'deleting soon';
-    return '$days day${days == 1 ? '' : 's'} left';
+    if (days <= 0) return l10n.trashDeletingSoon;
+    return l10n.trashDaysLeft(days);
   }
 }

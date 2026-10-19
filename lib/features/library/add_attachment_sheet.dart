@@ -9,6 +9,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import '../../data/tables/attachments_table.dart';
+import '../../l10n/l10n.dart';
 import '../voice/voice_services.dart' show transcribesRecordingsProvider;
 import '../voice/voice_sheet.dart';
 
@@ -87,19 +88,17 @@ Future<AttachmentType?> showAddAttachmentSheet(
             children: [
               ListTile(
                 leading: const Icon(Icons.headphones_outlined),
-                title: const Text('Audio'),
-                subtitle: const Text(
-                  'A NotebookLM audio overview, lecture or podcast file',
-                ),
+                title: Text(sheetContext.l10n.attachmentsAudio),
+                subtitle: Text(sheetContext.l10n.attachmentsAudioHint),
                 onTap: () => run(() => _addAudio(insert)),
               ),
               ListTile(
                 leading: const Icon(Icons.mic_none),
-                title: const Text('Record audio'),
+                title: Text(sheetContext.l10n.attachmentsRecordAudio),
                 subtitle: Text(
                   transcribes
-                      ? 'A voice note, transcribed on this device'
-                      : 'A voice note',
+                      ? sheetContext.l10n.attachmentsVoiceNoteTranscribed
+                      : sheetContext.l10n.attachmentsVoiceNote,
                 ),
                 onTap: () {
                   recordVoice = true;
@@ -108,18 +107,18 @@ Future<AttachmentType?> showAddAttachmentSheet(
               ),
               ListTile(
                 leading: const Icon(Icons.podcasts),
-                title: const Text('Podcast link'),
-                subtitle: const Text('A NotebookLM share link or audio URL'),
+                title: Text(sheetContext.l10n.attachmentsPodcastLink),
+                subtitle: Text(sheetContext.l10n.attachmentsPodcastLinkHint),
                 onTap: () => run(() => _addPodcastLink(sheetContext, insert)),
               ),
               ListTile(
                 leading: const Icon(Icons.image_outlined),
-                title: const Text('Image'),
+                title: Text(sheetContext.l10n.attachmentsImage),
                 onTap: () => run(() => _addImage(insert)),
               ),
               ListTile(
                 leading: const Icon(Icons.attach_file),
-                title: const Text('File'),
+                title: Text(sheetContext.l10n.attachmentsFile),
                 onTap: () => run(() => _addFile(insert)),
               ),
             ],
@@ -172,7 +171,7 @@ Future<AttachmentType?> _addPodcastLink(
   final url = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Add podcast link'),
+      title: Text(dialogContext.l10n.attachmentsAddPodcastLink),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,9 +184,7 @@ Future<AttachmentType?> _addPodcastLink(
           ),
           const SizedBox(height: 12),
           Text(
-            'Direct audio links (.mp3, .m4a…) play here. NotebookLM share '
-            'links open in the browser — to listen and timestamp inside '
-            'Corplex, download the audio overview and add it as Audio.',
+            dialogContext.l10n.attachmentsPodcastLinkNote,
             style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
               color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
             ),
@@ -197,11 +194,11 @@ Future<AttachmentType?> _addPodcastLink(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
+          child: Text(dialogContext.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
-          child: const Text('Add'),
+          child: Text(dialogContext.l10n.commonAdd),
         ),
       ],
     ),

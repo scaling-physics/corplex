@@ -11,6 +11,7 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import '../../data/tables/attachments_table.dart';
+import '../../l10n/l10n.dart';
 import '../library/add_attachment_sheet.dart';
 import '../library/library_actions.dart';
 import '../library/paper_detail_screen.dart';
@@ -109,7 +110,7 @@ void _saved(BuildContext context, String message, Widget Function() open) {
       SnackBar(
         content: Text(message),
         action: SnackBarAction(
-          label: 'Open',
+          label: context.l10n.commonOpen,
           onPressed: () =>
               Navigator.of(context)
                   .push(MaterialPageRoute(builder: (_) => open())),
@@ -141,7 +142,7 @@ Future<void> _importPdf(
   );
   _saved(
     context,
-    'Added “${item.name}” to your library',
+    context.l10n.shareAddedToLibrary(item.name),
     () => PaperDetailScreen(paperId: id),
   );
 }
@@ -165,7 +166,11 @@ Future<void> _saveLink(
     ],
   );
   if (!context.mounted) return;
-  _saved(context, 'Saved link as a note', () => NoteEditorScreen(noteId: id));
+  _saved(
+    context,
+    context.l10n.shareSavedLink,
+    () => NoteEditorScreen(noteId: id),
+  );
 }
 
 Future<void> _saveText(
@@ -182,7 +187,11 @@ Future<void> _saveText(
     ],
   );
   if (!context.mounted) return;
-  _saved(context, 'Saved as a note', () => NoteEditorScreen(noteId: id));
+  _saved(
+    context,
+    context.l10n.shareSavedAsNote,
+    () => NoteEditorScreen(noteId: id),
+  );
 }
 
 Future<String> _newNote(
@@ -234,7 +243,7 @@ Future<void> _attachAudio(
   if (!context.mounted) return;
   _saved(
     context,
-    'Audio attached',
+    context.l10n.shareAudioAttached,
     () => noteId != null
         ? NoteEditorScreen(noteId: noteId)
         : PaperDetailScreen(paperId: target.paperId!),
@@ -274,13 +283,13 @@ Future<({String? noteId, String? paperId})?> _pickAudioTarget(
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
               child: Text(
-                'Attach “$name” to…',
+                context.l10n.shareAttachTo(name),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
             ListTile(
               leading: const Icon(Icons.add),
-              title: const Text('A new note'),
+              title: Text(context.l10n.shareNewNote),
               onTap: () =>
                   Navigator.pop(context, (noteId: null, paperId: null)),
             ),
@@ -288,7 +297,7 @@ Future<({String? noteId, String? paperId})?> _pickAudioTarget(
               ListTile(
                 leading: const Icon(Icons.edit_note_outlined),
                 title: Text(
-                  n.title.isEmpty ? 'Untitled' : n.title,
+                  n.title.isEmpty ? context.l10n.commonUntitled : n.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

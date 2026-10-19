@@ -1,0 +1,7 @@
+{
+  "@@locale": "de",
+  "syncAccountMismatch": "Dieses Gerät enthält Daten eines anderen Kontos. Melde dich wieder bei diesem Konto an, um zu synchronisieren.",
+  "syncFilesIncomplete": "Einige Dateien sind noch nicht synchronisiert.",
+  "syncServerOutdated": "Dein Sync-Server braucht ein Datenbank-Update. Führe die neuesten Dateien aus supabase/migrations in deinem Supabase-Projekt aus.",
+  "syncGenericError": "Synchronisierung nicht möglich. Deine Notizen sind sicher auf diesem Gerät."
+}

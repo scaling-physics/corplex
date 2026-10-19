@@ -1,0 +1,44 @@
+{
+  "@@locale": "en",
+  "homePickNote": "Pick a note, or start a new one.",
+  "homePickPaper": "Pick a paper to read, annotate and cite.",
+  "homeWelcome": "Welcome to Corplex",
+  "homeWelcomeSubtitle": "Read, annotate, take notes and cite in one place.",
+  "homeStepImportTitle": "Import a paper",
+  "homeStepImportText": "A PDF from Files. Its title, authors and year fill in by themselves.",
+  "homeStepHighlightTitle": "Highlight as you read",
+  "homeStepHighlightText": "Press and hold on the text, then Highlight or Quote to note.",
+  "homeStepWriteTitle": "Write and cite",
+  "homeStepWriteText": "In a note, type / for tools, or [@ to cite a paper.",
+  "homeImportFirstPaper": "Import your first paper",
+  "homeShowSidebarTooltip": "Show Sidebar (⌃⌘S)",
+  "homeNewNoteTooltip": "New Note (⌘N)",
+  "homeImportPdfTooltip": "Import PDF (⌘O)",
+  "homeSearchSubtitle": "Notes, papers and highlights",
+  "homeCountNotes": "{count, plural, =0{No notes} =1{1 note} other{{count} notes}}",
+  "@homeCountNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeCountPapers": "{count, plural, =0{No papers} =1{1 paper} other{{count} papers}}",
+  "@homeCountPapers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeCountItems": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
+  "@homeCountItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeShowAttachments": "Show Attachments",
+  "homeAttachments": "Attachments"
+}

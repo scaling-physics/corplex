@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill/quill_delta.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/haptics.dart';
 import '../ocr/ocr_engine.dart';
@@ -217,6 +218,7 @@ class InkSession extends InkTools {
     final offset = _active;
     if (engine == null || offset == null) return false;
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final noHandwriting = context.l10n.inkNoHandwriting;
     final sketch = sketchAt(controller.document, offset);
     if (sketch == null || sketch.isEmpty) return false;
     var text = sketch.text ?? '';
@@ -230,9 +232,7 @@ class InkSession extends InkTools {
     if (_disposed) return false;
     text = text.trim();
     if (text.isEmpty) {
-      messenger?.showSnackBar(
-        const SnackBar(content: Text('No handwriting found')),
-      );
+      messenger?.showSnackBar(SnackBar(content: Text(noHandwriting)));
       return false;
     }
     // Strokes changed (or the drawing moved) while reading: find it again.
@@ -420,13 +420,13 @@ class InlineInkToolbar extends StatelessWidget {
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.undo),
-                      tooltip: 'Undo',
+                      tooltip: context.l10n.commonUndo,
                       onPressed: controller.hasUndo ? controller.undo : null,
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.redo),
-                      tooltip: 'Redo',
+                      tooltip: context.l10n.inkRedo,
                       onPressed: controller.hasRedo ? controller.redo : null,
                     ),
                   ],
@@ -435,7 +435,7 @@ class InlineInkToolbar extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       PopupMenuButton<String>(
-                        tooltip: 'More drawing options',
+                        tooltip: context.l10n.inkMoreOptions,
                         icon: const Icon(Icons.more_horiz),
                         onSelected: (v) {
                           switch (v) {
@@ -449,19 +449,19 @@ class InlineInkToolbar extends StatelessWidget {
                           }
                         },
                         itemBuilder: (_) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'expand',
                             child: ListTile(
-                              leading: Icon(Icons.open_in_full),
-                              title: Text('Expand'),
+                              leading: const Icon(Icons.open_in_full),
+                              title: Text(context.l10n.inkExpand),
                             ),
                           ),
                           if (session.ocr != null)
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'convert',
                               child: ListTile(
-                                leading: Icon(Icons.text_fields),
-                                title: Text('Convert to text'),
+                                leading: const Icon(Icons.text_fields),
+                                title: Text(context.l10n.inkConvertToText),
                               ),
                             ),
                           if (!desktop)
@@ -475,8 +475,8 @@ class InlineInkToolbar extends StatelessWidget {
                                 ),
                                 title: Text(
                                   fingersDraw
-                                      ? 'Scroll with fingers'
-                                      : 'Draw with fingers',
+                                      ? context.l10n.inkScrollWithFingers
+                                      : context.l10n.inkDrawWithFingers,
                                 ),
                               ),
                             ),
@@ -484,7 +484,7 @@ class InlineInkToolbar extends StatelessWidget {
                       ),
                       FilledButton.tonal(
                         onPressed: session.deactivate,
-                        child: const Text('Done'),
+                        child: Text(context.l10n.commonDone),
                       ),
                     ],
                   ),

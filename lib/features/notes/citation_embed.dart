@@ -1,3 +1,5 @@
+import '../../l10n/l10n.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -190,7 +192,11 @@ class _LocatorDialogState extends State<_LocatorDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.item.hasLocator ? 'Change page' : 'Page'),
+      title: Text(
+        widget.item.hasLocator
+            ? context.l10n.notesChangePage
+            : context.l10n.notesPage,
+      ),
       content: Row(
         children: [
           DropdownButton<String>(
@@ -198,7 +204,10 @@ class _LocatorDialogState extends State<_LocatorDialog> {
             underline: const SizedBox.shrink(),
             items: [
               for (final l in locatorLabels)
-                DropdownMenuItem(value: l, child: Text(locatorName(l))),
+                DropdownMenuItem(
+                  value: l,
+                  child: Text(locatorLabelName(context.l10n, l)),
+                ),
             ],
             onChanged: (v) => setState(() => _label = v ?? 'page'),
           ),
@@ -207,7 +216,7 @@ class _LocatorDialogState extends State<_LocatorDialog> {
             child: TextField(
               controller: _text,
               autofocus: true,
-              decoration: const InputDecoration(hintText: '42 or 3–5'),
+              decoration: InputDecoration(hintText: context.l10n.notesPageHint),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _save(),
             ),
@@ -218,13 +227,13 @@ class _LocatorDialogState extends State<_LocatorDialog> {
         if (widget.item.hasLocator)
           TextButton(
             onPressed: () => Navigator.pop(context, CiteItem(widget.item.key)),
-            child: const Text('Clear'),
+            child: Text(context.l10n.notesClear),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
-        FilledButton(onPressed: _save, child: const Text('Set')),
+        FilledButton(onPressed: _save, child: Text(context.l10n.notesSet)),
       ],
     );
   }
@@ -465,7 +474,9 @@ class _CitationChipState extends ConsumerState<_CitationChip>
 
     return Semantics(
       button: first != null,
-      label: known ? 'Citation $label' : 'Citation $marker, paper not found',
+      label: known
+          ? context.l10n.notesCitationLabel(label)
+          : context.l10n.notesCitationMissingLabel(marker),
       onLongPress: _showCard,
       child: MouseRegion(
         onEnter: (_) {
@@ -601,7 +612,7 @@ class _CitationCardOverlay extends ConsumerWidget {
                       )
                     else
                       Text(
-                        '@$key isn\'t in your library.',
+                        context.l10n.notesCitationNotInLibrary(key),
                         style: TextStyle(color: c.error),
                       ),
                   ],
@@ -683,7 +694,7 @@ class _CitedPaperSection extends ConsumerWidget {
                   children: [
                     TextSpan(text: h.quote),
                     TextSpan(
-                      text: '  p. ${h.pageNumber}',
+                      text: '  ${context.l10n.notesPageShort(h.pageNumber)}',
                       style: text.bodySmall?.copyWith(color: c.secondary),
                     ),
                   ],
@@ -700,11 +711,15 @@ class _CitedPaperSection extends ConsumerWidget {
             children: [
               TextButton(
                 onPressed: onPage,
-                child: Text(item.hasLocator ? 'Change page' : 'Page…'),
+                child: Text(
+                  item.hasLocator
+                      ? context.l10n.notesChangePage
+                      : context.l10n.notesPageEllipsis,
+                ),
               ),
               TextButton(
                 onPressed: () => onOpen(paper.id),
-                child: const Text('Open paper'),
+                child: Text(context.l10n.notesOpenPaper),
               ),
             ],
           ),

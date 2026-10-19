@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/authors.dart';
@@ -39,15 +40,33 @@ Future<String> addMatrixColumn(
   return id;
 }
 
-Future<void> addDefaultMatrixColumns(AppDatabase db, String projectId) async {
-  for (final name in defaultMatrixColumns) {
+/// Adds Method, Sample and Findings. Column names are stored as written,
+/// so with [l10n] they are created in the app's language.
+Future<void> addDefaultMatrixColumns(
+  AppDatabase db,
+  String projectId, [
+  AppLocalizations? l10n,
+]) async {
+  final names = l10n == null
+      ? defaultMatrixColumns
+      : [
+          l10n.matrixColumnMethod,
+          l10n.matrixColumnSample,
+          l10n.matrixColumnFindings,
+        ];
+  for (final name in names) {
     await addMatrixColumn(db, projectId, name);
   }
 }
 
 /// Adds the study-detail columns the project doesn't have yet, in order.
-/// Returns how many were added.
-Future<int> addStudyColumns(AppDatabase db, String projectId) async {
+/// Returns how many were added. Column names are written in [l10n]'s
+/// language (English without it), like the default columns.
+Future<int> addStudyColumns(
+  AppDatabase db,
+  String projectId, [
+  AppLocalizations? l10n,
+]) async {
   final existing =
       (await (db.select(
             db.matrixColumns,
@@ -57,7 +76,12 @@ Future<int> addStudyColumns(AppDatabase db, String projectId) async {
   var added = 0;
   for (final f in StudyField.values) {
     if (existing.contains(f.key)) continue;
-    await addMatrixColumn(db, projectId, f.label, field: f);
+    await addMatrixColumn(
+      db,
+      projectId,
+      l10n == null ? f.label : f.labelFor(l10n),
+      field: f,
+    );
     added++;
   }
   return added;

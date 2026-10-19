@@ -1,0 +1,12 @@
+{
+  "@@locale": "de",
+  "audioChannelName": "Audiowiedergabe",
+  "audioNotSynced": "Diese Aufnahme wurde noch nicht auf dieses Gerät synchronisiert.",
+  "audioPlayFailed": "Diese Aufnahme konnte nicht abgespielt werden.",
+  "audioClosePlayer": "Player schließen",
+  "audioBack10": "10 Sekunden zurück",
+  "audioForward30": "30 Sekunden vor",
+  "audioPause": "Pause",
+  "audioPlay": "Wiedergabe",
+  "audioMark": "Marke"
+}

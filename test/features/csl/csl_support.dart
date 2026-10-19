@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:corplex/features/csl/csl_locale.dart';
 import 'package:corplex/features/csl/csl_processor.dart';
+import 'package:corplex/features/csl/csl_registry.dart';
 import 'package:corplex/features/csl/csl_style.dart';
 
 CslLocale testLocale() =>
@@ -119,4 +120,34 @@ final arxiv = paper(
     'number': 'arXiv:2001.08361',
     'URL': 'https://arxiv.org/abs/2001.08361',
   },
+);
+
+/// A processor for `assets/csl/<file>.csl` formatting in [tag], read through
+/// the registry (fallback chain and the style's own `<locale>` blocks).
+Future<CslProcessor> processorForLocale(String file, String tag) async {
+  CslRegistry.loadAsset = (p) => File(p).readAsString();
+  return CslProcessor(
+    CslStyle.parse(
+      File('assets/csl/$file.csl').readAsStringSync(),
+      await CslRegistry.localeFor(tag),
+    ),
+  );
+}
+
+/// A cited item by [family] and [year].
+Map<String, dynamic> byAuthor(
+  String id,
+  String family,
+  int year,
+  String title, {
+  String given = 'Alex',
+  Map<String, dynamic> extra = const {},
+}) => paper(
+  id,
+  'article-journal',
+  title,
+  [person(family, given)],
+  year: year,
+  venue: 'Journal of Tests',
+  extra: extra,
 );

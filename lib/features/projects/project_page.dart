@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show OrderingTerm, innerJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/papers_table.dart' show ReadingStatus;
@@ -44,8 +45,6 @@ final projectPapersProvider = StreamProvider.autoDispose
         (rows) => [for (final r in rows) r.readTable(db.papers)],
       );
     });
-
-String _count(int n, String noun) => '$n $noun${n == 1 ? '' : 's'}';
 
 /// Papers in [papers] marked done, as a 0..1 share (0 when there are none).
 double readingProgress(List<Paper> papers) => papers.isEmpty
@@ -90,8 +89,8 @@ class ProjectScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Text(
           [
-            _count(papers.length, 'paper'),
-            _count(notes.length, 'note'),
+            context.l10n.projectsPaperCount(papers.length),
+            context.l10n.projectsNoteCount(notes.length),
           ].join(' · '),
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -105,7 +104,10 @@ class ProjectScreen extends ConsumerWidget {
           child: _Progress(
             key: const ValueKey('project-progress'),
             value: readingProgress(papers),
-            label: '${done.length} of ${papers.length} read',
+            label: context.l10n.projectsReadProgress(
+              done.length,
+              papers.length,
+            ),
           ),
         ),
       Padding(
@@ -117,7 +119,7 @@ class ProjectScreen extends ConsumerWidget {
             if (papers.isNotEmpty)
               ActionChip(
                 avatar: const Icon(Icons.table_chart_outlined, size: 18),
-                label: const Text('Synthesis matrix'),
+                label: Text(context.l10n.projectsSynthesisMatrix),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => MatrixScreen(project: project),
@@ -127,20 +129,20 @@ class ProjectScreen extends ConsumerWidget {
             if (papers.isNotEmpty)
               ActionChip(
                 avatar: const Icon(Icons.list_alt, size: 18),
-                label: const Text('Bibliography'),
+                label: Text(context.l10n.projectsBibliography),
                 onPressed: () =>
                     shareProjectBibliography(context, ref, project),
               ),
             if (notes.isNotEmpty)
               ActionChip(
                 avatar: const Icon(Icons.ios_share, size: 18),
-                label: const Text('Export project'),
+                label: Text(context.l10n.projectsExportProject),
                 onPressed: () => exportProject(context, ref, project),
               ),
             if (notes.isNotEmpty && project.dueDate == null)
               ActionChip(
                 avatar: const Icon(Icons.event_outlined, size: 18),
-                label: const Text('Set due date'),
+                label: Text(context.l10n.projectsSetDueDate),
                 onPressed: () => pickProjectDueDate(
                   context,
                   ref.read(databaseProvider),
@@ -150,7 +152,7 @@ class ProjectScreen extends ConsumerWidget {
             if (papers.isNotEmpty || notes.isNotEmpty)
               ActionChip(
                 avatar: const Icon(Icons.hub_outlined, size: 18),
-                label: const Text('Map'),
+                label: Text(context.l10n.projectsMap),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) =>
@@ -162,7 +164,7 @@ class ProjectScreen extends ConsumerWidget {
         ),
       ),
       if (papers.isNotEmpty) ...[
-        _Heading('Papers'),
+        _Heading(context.l10n.projectsPapers),
         for (final (i, p) in papers.indexed)
           EntranceTransition(
             key: ValueKey('paper-${p.id}'),
@@ -175,14 +177,12 @@ class ProjectScreen extends ConsumerWidget {
       ],
       ChaptersSection(project: project, chapters: chapters),
       if (papers.isEmpty && notes.isEmpty)
-        const Padding(
-          padding: EdgeInsets.only(top: 48),
+        Padding(
+          padding: const EdgeInsets.only(top: 48),
           child: EmptyState(
             icon: Icons.folder_open_outlined,
-            title: 'Nothing here yet',
-            message:
-                'Use “Add to project” on a paper or a note to '
-                'collect it here.',
+            title: context.l10n.projectsNothingYet,
+            message: context.l10n.projectsNothingYetMessage,
           ),
         ),
     ];
@@ -243,10 +243,10 @@ class _Progress extends StatelessWidget {
   }
 }
 
-String? _statusLabel(ReadingStatus? s) => switch (s) {
-  ReadingStatus.toRead => 'To read',
-  ReadingStatus.reading => 'Reading',
-  ReadingStatus.done => 'Read',
+String? _statusLabel(AppLocalizations l10n, ReadingStatus? s) => switch (s) {
+  ReadingStatus.toRead => l10n.projectsStatusToRead,
+  ReadingStatus.reading => l10n.projectsStatusReading,
+  ReadingStatus.done => l10n.projectsStatusRead,
   null => null,
 };
 
@@ -258,7 +258,7 @@ class _PaperTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _statusLabel(paper.readingStatus);
+    final status = _statusLabel(context.l10n, paper.readingStatus);
     final authors = displayAuthors(paper.authors);
     final sub = [
       if (authors.isNotEmpty) authors,

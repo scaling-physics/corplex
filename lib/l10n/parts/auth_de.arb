@@ -1,0 +1,18 @@
+{
+  "@@locale": "de",
+  "authWelcomeBack": "Willkommen zurück",
+  "authSignInIntro": "Anmelden, um Notizen und Paper geräteübergreifend zu synchronisieren.",
+  "authEmail": "E-Mail",
+  "authPassword": "Passwort",
+  "authSignIn": "Anmelden",
+  "authNoAccount": "Noch kein Konto? Registrieren",
+  "authCreateTitle": "Konto erstellen",
+  "authCreateIntro": "Deine Notizen bleiben auf diesem Gerät und werden mit deinen anderen Geräten synchronisiert, sobald du angemeldet bist.",
+  "authPasswordHelper": "Mindestens 6 Zeichen",
+  "authCreateAccount": "Konto erstellen",
+  "authInvalidEmail": "Gültige E-Mail-Adresse eingeben.",
+  "authShortPassword": "Das Passwort muss mindestens 6 Zeichen haben.",
+  "authConfirmEmail": "Bestätige dein Konto über die E-Mail, die wir dir geschickt haben, und melde dich dann an.",
+  "authOffline": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen.",
+  "authUnknown": "Etwas ist schiefgelaufen ({type}). Bitte erneut versuchen."
+}

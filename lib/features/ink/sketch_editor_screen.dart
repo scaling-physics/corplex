@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/l10n.dart';
 import '../platform/mac_window.dart' show isDesktop;
 import 'ink_canvas.dart';
 import 'ink_model.dart';
@@ -129,18 +130,18 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
           backgroundColor: c.surfaceContainerLow,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Done',
+            tooltip: context.l10n.commonDone,
             onPressed: _done,
           ),
           actions: [
             IconButton(
               icon: const Icon(Icons.undo),
-              tooltip: 'Undo',
+              tooltip: context.l10n.commonUndo,
               onPressed: _undo.isEmpty ? null : _undoLast,
             ),
             IconButton(
               icon: const Icon(Icons.redo),
-              tooltip: 'Redo',
+              tooltip: context.l10n.inkRedo,
               onPressed: _redo.isEmpty ? null : _redoLast,
             ),
             // A mouse or trackpad always draws on a desktop; the finger
@@ -151,8 +152,8 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
                 icon: const Icon(Icons.pan_tool_outlined),
                 selectedIcon: const Icon(Icons.gesture),
                 tooltip: fingersDraw
-                    ? 'Fingers draw (tap to scroll with fingers instead)'
-                    : 'Fingers scroll (tap to draw with fingers)',
+                    ? context.l10n.inkFingersDraw
+                    : context.l10n.inkFingersScroll,
                 onPressed: () => setState(
                   () => inkPolicy.fingerDrawsOverride = !fingersDraw,
                 ),
@@ -161,7 +162,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
               padding: const EdgeInsets.only(right: 8),
               child: FilledButton.tonal(
                 onPressed: _done,
-                child: const Text('Done'),
+                child: Text(context.l10n.commonDone),
               ),
             ),
           ],
@@ -206,7 +207,7 @@ class _SketchEditorScreenState extends State<SketchEditorScreen> {
                   if (_sketch.aspect < Sketch.maxAspect)
                     TextButton.icon(
                       icon: const Icon(Icons.expand_more),
-                      label: const Text('More space'),
+                      label: Text(context.l10n.inkMoreSpace),
                       onPressed: _moreSpace,
                     ),
                 ],

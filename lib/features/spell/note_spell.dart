@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../../l10n/l10n.dart';
+
 import 'spell_checker.dart';
 
 /// Whether a misspelling the platform reported is worth showing. Skips
@@ -327,14 +329,14 @@ class _SpellMenuState extends State<_SpellMenu> {
           },
         ),
       ContextMenuButtonItem(
-        label: 'Learn Spelling',
+        label: context.l10n.spellLearn,
         onPressed: () {
           spell.learn(miss.word);
           done();
         },
       ),
       ContextMenuButtonItem(
-        label: 'Ignore Spelling',
+        label: context.l10n.spellIgnore,
         onPressed: () {
           spell.ignore(miss.word);
           done();

@@ -4,5 +4,6 @@ Each style's authors and licence are in its own <info> block.
 They are licensed under Creative Commons Attribution-ShareAlike 3.0
 (http://creativecommons.org/licenses/by-sa/3.0/).
 
-locales-en-US.xml comes from https://github.com/citation-style-language/locales
-and is licensed under Creative Commons Attribution-ShareAlike 3.0.
+The locales-*.xml files (en-US, en-GB, de-DE, de-AT, fr-FR, es-ES, it-IT,
+nl-NL, pt-BR) come unmodified from https://github.com/citation-style-language/locales
+and are licensed under Creative Commons Attribution-ShareAlike 3.0.

@@ -20,6 +20,7 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		9BEAA5345A3894BC090B874B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 253E6B3392CCDDE00CB0FF89 /* Foundation.framework */; };
+		D14634B4BF7A9A595E364080 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = C4943B3387D876A592993011 /* InfoPlist.strings */; };
 		D432EEA53E68EC4E9ADE3A47 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF352E27B6E9D46DDB31E1F /* ShareViewController.swift */; };
 		EEDEF01645496E70FE78335D /* CorplexWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C9DE2EE8E2FA2CEB00443DCA /* CorplexWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -85,6 +86,7 @@
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		365873F9B061F87488504287 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		47A32E31C55F4899206145D6 /* de */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		5B869AE18C8C7E72FB411BBE /* ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				2EAF0E776148FCAB574397CE /* Runner.entitlements */,
+				C4943B3387D876A592993011 /* InfoPlist.strings */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -337,6 +340,7 @@
 			knownRegions = (
 				en,
 				Base,
+				de,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
@@ -384,6 +388,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				D14634B4BF7A9A595E364080 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -495,6 +500,14 @@
 				97C147001CF9000F007C117D /* Base */,
 			);
 			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		C4943B3387D876A592993011 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				47A32E31C55F4899206145D6 /* de */,
+			);
+			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

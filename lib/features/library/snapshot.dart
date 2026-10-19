@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/database.dart';
 import '../../data/local_files.dart';
 import '../../data/tables/attachments_table.dart';
+import '../../l10n/l10n.dart';
 import '../notes/note_content.dart';
 import 'highlights.dart';
 
@@ -174,17 +175,17 @@ class _SnapshotOverlayState extends State<SnapshotOverlay> {
                   children: [
                     Flexible(
                       child: Text(
-                        'Drag around a figure or table',
+                        context.l10n.viewerSnapPrompt,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: () => widget.onSelected(null),
-                      child: const Text('Whole view'),
+                      child: Text(context.l10n.viewerSnapWholeView),
                     ),
                     IconButton(
-                      tooltip: 'Cancel',
+                      tooltip: context.l10n.commonCancel,
                       icon: const Icon(Icons.close),
                       onPressed: widget.onCancel,
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 
 /// How pages look in the PDF reader, independent of the app's theme: a
@@ -13,7 +14,14 @@ enum ReadingTheme {
 
   const ReadingTheme(this.label);
 
+  /// English name; screens show [localizedLabel].
   final String label;
+
+  String localizedLabel(AppLocalizations l10n) => switch (this) {
+    ReadingTheme.paper => l10n.settingsReadingPaper,
+    ReadingTheme.sepia => l10n.settingsReadingSepia,
+    ReadingTheme.night => l10n.settingsReadingNight,
+  };
 
   /// A color filter over the rendered page (and the marks on it), or null
   /// for the page as printed.

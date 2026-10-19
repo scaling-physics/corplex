@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../home/adaptive.dart';
 import 'abbreviations.dart';
 import 'todos.dart' show openNoteAtSelection;
@@ -23,9 +24,11 @@ class ProjectAbbreviationsSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     final issues = report.issueCount;
+    final l10n = context.l10n;
     final summary = [
-      if (report.defined.isNotEmpty) '${report.defined.length} defined',
-      if (issues > 0) '$issues to check',
+      if (report.defined.isNotEmpty)
+        l10n.projectsAbbrDefined(report.defined.length),
+      if (issues > 0) l10n.projectsAbbrToCheck(issues),
     ].join(' · ');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,7 +40,7 @@ class ProjectAbbreviationsSection extends ConsumerWidget {
               Expanded(
                 child: Text.rich(
                   TextSpan(
-                    text: 'Abbreviations',
+                    text: l10n.projectsAbbreviations,
                     style: theme.textTheme.titleSmall,
                     children: [
                       TextSpan(
@@ -53,7 +56,7 @@ class ProjectAbbreviationsSection extends ConsumerWidget {
               if (report.defined.isNotEmpty)
                 TextButton(
                   onPressed: () => _showList(context, report),
-                  child: const Text('List'),
+                  child: Text(l10n.projectsAbbrList),
                 ),
             ],
           ),
@@ -62,7 +65,7 @@ class ProjectAbbreviationsSection extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Text(
-              c.title.trim().isEmpty ? 'Untitled' : c.title.trim(),
+              c.title.trim().isEmpty ? l10n.commonUntitled : c.title.trim(),
               style: theme.textTheme.labelMedium?.copyWith(color: muted),
             ),
           ),
@@ -71,7 +74,7 @@ class ProjectAbbreviationsSection extends ConsumerWidget {
               key: ValueKey('abbr-${c.noteId}-${i.offset}'),
               dense: true,
               leading: Icon(Icons.abc, size: 20, color: muted),
-              title: Text(i.message),
+              title: Text(i.messageIn(l10n)),
               onTap: () =>
                   openNoteAtSelection(context, ref, c.noteId, i.selection),
             ),
@@ -86,7 +89,7 @@ class ProjectAbbreviationsSection extends ConsumerWidget {
               collapsedShape: const Border(),
               dense: true,
               title: Text(
-                'Never spelled out (${report.undefined.length})',
+                l10n.projectsAbbrNeverSpelled(report.undefined.length),
                 style: theme.textTheme.labelMedium?.copyWith(color: muted),
               ),
               children: [
@@ -132,7 +135,7 @@ class _AbbreviationList extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Copied')));
+        .showSnackBar(SnackBar(content: Text(context.l10n.commonCopied)));
   }
 
   @override
@@ -152,18 +155,18 @@ class _AbbreviationList extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'List of abbreviations',
+                      context.l10n.projectsAbbrListTitle,
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
                   TextButton(
                     onPressed: () => _copy(context, abbreviationsTsv(list)),
-                    child: const Text('Copy as text'),
+                    child: Text(context.l10n.projectsAbbrCopyAsText),
                   ),
                   FilledButton.tonal(
                     onPressed: () =>
                         _copy(context, abbreviationsMarkdown(list)),
-                    child: const Text('Copy'),
+                    child: Text(context.l10n.commonCopy),
                   ),
                 ],
               ),

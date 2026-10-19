@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'read_aloud_controller.dart';
 
@@ -33,13 +34,14 @@ class ReadAloudBar extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        final l = context.l10n;
         final status = controller.loading
-            ? 'Preparing…'
+            ? l.readAloudPreparing
             : controller.isEmpty
-            ? 'No text to read'
+            ? l.readAloudNoText
             : controller.finished
-            ? 'Finished'
-            : 'p. ${controller.page}';
+            ? l.readAloudFinished
+            : l.viewerPageShort(controller.page);
         final ready = !controller.loading && !controller.isEmpty;
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -50,7 +52,7 @@ class ReadAloudBar extends StatelessWidget {
                 child: ActionChip(
                   key: const ValueKey('read-back'),
                   avatar: const Icon(Icons.my_location, size: 16),
-                  label: const Text('Back to reading'),
+                  label: Text(l.readAloudBack),
                   onPressed: onBackToReading,
                 ),
               ),
@@ -66,7 +68,7 @@ class ReadAloudBar extends StatelessWidget {
                     IconButton(
                       key: const ValueKey('read-prev'),
                       icon: const Icon(Icons.skip_previous),
-                      tooltip: 'Previous sentence',
+                      tooltip: l.readAloudPrevious,
                       onPressed: ready ? () => controller.skip(-1) : null,
                     ),
                     IconButton.filled(
@@ -74,18 +76,20 @@ class ReadAloudBar extends StatelessWidget {
                       icon: Icon(
                         controller.playing ? Icons.pause : Icons.play_arrow,
                       ),
-                      tooltip: controller.playing ? 'Pause' : 'Play',
+                      tooltip: controller.playing
+                          ? l.readAloudPause
+                          : l.readAloudPlay,
                       onPressed: ready ? controller.toggle : null,
                     ),
                     IconButton(
                       key: const ValueKey('read-next'),
                       icon: const Icon(Icons.skip_next),
-                      tooltip: 'Next sentence',
+                      tooltip: l.readAloudNext,
                       onPressed: ready ? () => controller.skip(1) : null,
                     ),
                     PopupMenuButton<double>(
                       key: const ValueKey('read-speed'),
-                      tooltip: 'Speed',
+                      tooltip: l.readAloudSpeed,
                       onSelected: controller.setRate,
                       itemBuilder: (_) => [
                         for (final s in speeds)
@@ -121,7 +125,7 @@ class ReadAloudBar extends StatelessWidget {
                     IconButton(
                       key: const ValueKey('read-close'),
                       icon: const Icon(Icons.close),
-                      tooltip: 'Stop reading',
+                      tooltip: l.readAloudStop,
                       onPressed: onClose,
                     ),
                   ],

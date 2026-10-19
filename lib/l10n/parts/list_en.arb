@@ -1,0 +1,53 @@
+{
+  "@@locale": "en",
+  "listPinned": "Pinned",
+  "listToday": "Today",
+  "listYesterday": "Yesterday",
+  "listPrevious7Days": "Previous 7 Days",
+  "listPrevious30Days": "Previous 30 Days",
+  "listSomethingWentWrong": "Something went wrong: {error}",
+  "@listSomethingWentWrong": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "listNoNotesTitle": "No notes yet",
+  "listNoNotesMessage": "Tap New note to capture your first thought.",
+  "listNothingHereTitle": "Nothing here yet",
+  "listNothingHereMessage": "Notes you add while this filter is on land here.",
+  "listAddToProject": "Add to project…",
+  "listLockNote": "Lock note",
+  "listRemoveLock": "Remove lock",
+  "listPinToTop": "Pin to top",
+  "listUnpin": "Unpin",
+  "listDuplicate": "Duplicate",
+  "listAll": "All",
+  "listFolderOrTag": "Folder or tag",
+  "listDeleteFolderEllipsis": "Delete folder…",
+  "listDeleteTagEllipsis": "Delete tag…",
+  "listDeleteFolderTitle": "Delete “{name}”?",
+  "@listDeleteFolderTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "listDeleteFolderMessage": "Notes inside will be unfiled, not deleted.",
+  "listDeleteTagTitle": "Delete “#{name}”?",
+  "@listDeleteTagTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "listDeleteTagMessage": "This removes the tag from every note.",
+  "listNewFolder": "New folder",
+  "listNewTag": "New tag",
+  "listFolderName": "Folder name",
+  "listTagName": "Tag name",
+  "listCreate": "Create"
+}

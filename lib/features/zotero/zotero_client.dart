@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:http/http.dart' as http;
+
+import '../../l10n/l10n.dart';
 
 /// Why a Zotero request failed, in words a reader can act on.
 enum ZoteroProblem { badKey, notFound, rateLimited, offline, server }
@@ -14,20 +17,18 @@ class ZoteroException implements Exception {
   final ZoteroProblem problem;
   final String? detail;
 
-  String get message => switch (problem) {
-    ZoteroProblem.badKey =>
-      'Zotero didn\'t accept that user ID and key. Check both, and that the '
-          'key is allowed to read your library.',
-    ZoteroProblem.notFound =>
-      'Zotero couldn\'t find that library. Check the user ID '
-          '(the number on zotero.org/settings/keys).',
-    ZoteroProblem.rateLimited =>
-      'Zotero is asking for a pause. Try again in a few minutes.',
-    ZoteroProblem.offline =>
-      'Couldn\'t reach Zotero. Check your connection and try again.',
+  /// In English, for logs and tests; the dialog words it with [messageFor].
+  String get message => messageFor(lookupAppLocalizations(const Locale('en')));
+
+  String messageFor(AppLocalizations l10n) => switch (problem) {
+    ZoteroProblem.badKey => l10n.zoteroBadKey,
+    ZoteroProblem.notFound => l10n.zoteroNotFound,
+    ZoteroProblem.rateLimited => l10n.zoteroRateLimited,
+    ZoteroProblem.offline => l10n.zoteroOffline,
     ZoteroProblem.server =>
-      'Zotero had a problem${detail == null ? '' : ' ($detail)'}. '
-          'Try again later.',
+      detail == null
+          ? l10n.zoteroServerProblem
+          : l10n.zoteroServerProblemDetail(detail!),
   };
 
   @override

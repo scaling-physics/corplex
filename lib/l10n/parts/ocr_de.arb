@@ -1,0 +1,6 @@
+{
+  "@@locale": "de",
+  "ocrReadingText": "Text wird gelesen… {percent} %",
+  "ocrRecogniseText": "Text erkennen",
+  "ocrRecogniseTextHint": "Scan durchsuchen und markieren"
+}

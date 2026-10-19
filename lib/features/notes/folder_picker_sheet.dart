@@ -1,3 +1,5 @@
+import '../../l10n/l10n.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,7 +38,7 @@ class _FolderPickerSheet extends ConsumerWidget {
         children: [
           ListTile(
             leading: const Icon(Icons.block),
-            title: const Text('No folder'),
+            title: Text(context.l10n.notesNoFolder),
             trailing: currentFolderId == null ? const Icon(Icons.check) : null,
             onTap: () => _select(context, ref, null),
           ),
@@ -55,7 +57,7 @@ class _FolderPickerSheet extends ConsumerWidget {
           },
           ListTile(
             leading: const Icon(Icons.add),
-            title: const Text('New folder'),
+            title: Text(context.l10n.notesNewFolder),
             onTap: () => _createAndSelect(context, ref),
           ),
         ],
@@ -81,21 +83,23 @@ class _FolderPickerSheet extends ConsumerWidget {
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('New folder'),
+        title: Text(dialogContext.l10n.notesNewFolder),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Folder name'),
+          decoration: InputDecoration(
+            hintText: dialogContext.l10n.notesFolderName,
+          ),
           onSubmitted: (value) => Navigator.pop(dialogContext, value),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(dialogContext.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Create'),
+            child: Text(dialogContext.l10n.notesCreate),
           ),
         ],
       ),

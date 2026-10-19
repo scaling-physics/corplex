@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../../l10n/l10n.dart';
 import '../projects/figures.dart';
 import 'figure_markers.dart';
 
@@ -59,9 +60,11 @@ class FigureScope extends ChangeNotifier {
   FigureEntry? find(FigureKind kind, String label) =>
       _byKey['${kind.tag}:$label'];
 
-  /// "Figure 3.2", or "Figure ??".
-  String nameOf(FigureKind kind, String label) =>
-      find(kind, label)?.name ?? '${kind.title} ??';
+  /// "Figure 3.2", or "Figure ??", in the app's language.
+  String displayName(AppLocalizations l10n, FigureKind kind, String label) {
+    final number = find(kind, label)?.number;
+    return figureDisplayName(l10n, kind, number);
+  }
 
   /// The note's own definitions from the live [document].
   void documentChanged(Document document) {
@@ -175,11 +178,11 @@ class _FigureChip extends StatelessWidget {
     final c = Theme.of(context).colorScheme;
     if (parsed == null) return Text(marker, style: textStyle);
     final entry = scope?.find(parsed.kind, parsed.label);
-    final name = entry?.name ?? '${parsed.kind.title} ??';
+    final name = figureDisplayName(context.l10n, parsed.kind, entry?.number);
 
     if (parsed.isDefinition) {
       return Semantics(
-        label: '$name caption',
+        label: context.l10n.notesFigureCaptionLabel(name),
         child: Padding(
           padding: const EdgeInsets.only(right: 2),
           child: Text(
@@ -195,7 +198,9 @@ class _FigureChip extends StatelessWidget {
     final known = entry != null;
     return Semantics(
       button: known,
-      label: known ? 'Reference to $name' : 'Reference to a missing figure',
+      label: known
+          ? context.l10n.notesFigureReferenceLabel(name)
+          : context.l10n.notesFigureReferenceMissing,
       child: GestureDetector(
         onTap: known
             ? () => scope?.onOpen?.call(parsed.kind, parsed.label)
@@ -249,12 +254,13 @@ class _FigureRefSheetState extends State<_FigureRefSheet> {
   Widget build(BuildContext context) {
     final scope = widget.scope;
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final all = [...scope.local, ...scope.others];
     final q = _query.trim().toLowerCase();
     bool matches(FigureEntry e) =>
         q.isEmpty ||
-        e.name.toLowerCase().contains(q) ||
-        scope.caption(e).toLowerCase().contains(q);
+        figureDisplayName(l10n, e.kind, e.number).toLowerCase().contains(q) ||
+        scope.caption(l10n, e).toLowerCase().contains(q);
     final shown = [
       for (final e in all)
         if (matches(e)) e,
@@ -272,20 +278,17 @@ class _FigureRefSheetState extends State<_FigureRefSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (all.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(24, 8, 24, 24),
-                  child: Text(
-                    'No figures or tables yet. Type / and choose Figure '
-                    'caption or Table caption.',
-                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Text(l10n.notesFiguresEmpty),
                 )
               else ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search figures and tables',
-                      prefixIcon: Icon(Icons.search),
+                    decoration: InputDecoration(
+                      hintText: l10n.notesSearchFigures,
+                      prefixIcon: const Icon(Icons.search),
                     ),
                     onChanged: (v) => setState(() => _query = v),
                   ),
@@ -302,11 +305,13 @@ class _FigureRefSheetState extends State<_FigureRefSheet> {
                                 ? Icons.image_outlined
                                 : Icons.table_chart_outlined,
                           ),
-                          title: Text(e.name),
-                          subtitle: scope.caption(e).isEmpty
+                          title: Text(
+                            figureDisplayName(l10n, e.kind, e.number),
+                          ),
+                          subtitle: scope.caption(l10n, e).isEmpty
                               ? null
                               : Text(
-                                  scope.caption(e),
+                                  scope.caption(l10n, e),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -328,9 +333,9 @@ class _FigureRefSheetState extends State<_FigureRefSheet> {
                           onTap: () => Navigator.pop(context, e),
                         ),
                       if (shown.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text('Nothing matches.'),
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(l10n.notesNothingMatches),
                         ),
                     ],
                   ),
@@ -346,5 +351,21 @@ class _FigureRefSheetState extends State<_FigureRefSheet> {
 
 extension on FigureScope {
   /// A caption for display: references written out, citations as typed.
-  String caption(FigureEntry e) => replaceFigureRefs(e.caption, nameOf);
+  String caption(AppLocalizations l10n, FigureEntry e) => replaceFigureRefs(
+    e.caption,
+    (kind, label) => displayName(l10n, kind, label),
+  );
 }
+
+/// "Figure 3.2" / "Abbildung 3.2" for the editor; "Figure ??" when the
+/// label is unknown ([number] null). Exports keep [FigureEntry.name].
+String figureDisplayName(
+  AppLocalizations l10n,
+  FigureKind kind,
+  String? number,
+) => switch ((kind, number)) {
+  (FigureKind.figure, null) => l10n.notesFigureMissing,
+  (FigureKind.table, null) => l10n.notesTableMissing,
+  (FigureKind.figure, final n?) => l10n.notesFigureName(n),
+  (FigureKind.table, final n?) => l10n.notesTableName(n),
+};

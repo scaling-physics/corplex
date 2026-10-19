@@ -1,8 +1,11 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../lock/note_lock_service.dart';
@@ -177,5 +180,5 @@ final openCommentCountsProvider = StreamProvider.autoDispose<Map<String, int>>((
 /// (set by the project page; the editor takes and clears it).
 final pendingCommentsPanelProvider = StateProvider<String?>((ref) => null);
 
-String openCommentsLabel(int n) =>
-    n == 1 ? '1 open comment' : '$n open comments';
+String openCommentsLabel(int n, [AppLocalizations? l10n]) =>
+    (l10n ?? lookupAppLocalizations(const Locale('en'))).commentsOpenCount(n);

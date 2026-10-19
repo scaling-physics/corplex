@@ -1,8 +1,10 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/projects_table.dart' show ChapterStatus;
@@ -36,8 +38,10 @@ class Chapter {
   /// Stored position; null until the writer first reorders.
   final int? position;
 
-  String get title =>
-      note.title.trim().isEmpty ? 'Untitled' : note.title.trim();
+  String get title => titleIn(_english);
+
+  String titleIn(AppLocalizations l10n) =>
+      note.title.trim().isEmpty ? l10n.commonUntitled : note.title.trim();
 
   /// 0..1 progress toward the target, null without one.
   double? get progress => wordTarget == null || wordTarget! <= 0
@@ -132,42 +136,40 @@ class ChapterSummary {
   final int finished;
   final bool anyStatus;
 
-  /// "12,400 / 40,000 words", or "12,400 words" with no targets.
-  String get wordsLabel => target > 0
-      ? '${formatCount(words)} / ${formatCount(target)} words'
-      : '${formatCount(words)} words';
+  /// "12,400 / 40,000 words", or "12,400 words" with no targets (English
+  /// unless [wordsText] is asked for another language).
+  String get wordsLabel => wordsText(_english);
 
-  String get finishedLabel =>
-      '$finished of $count chapter${count == 1 ? '' : 's'} final';
+  String wordsText(AppLocalizations l10n) => target > 0
+      ? l10n.projectsWordsOfTarget(words, target)
+      : l10n.projectsWords(words);
+
+  String get finishedLabel => finishedText(_english);
+
+  String finishedText(AppLocalizations l10n) =>
+      l10n.projectsChaptersFinal(finished, count);
 }
 
-String formatCount(int n) => NumberFormat.decimalPattern('en').format(n);
+final _english = lookupAppLocalizations(const Locale('en'));
 
-String chapterStatusLabel(ChapterStatus s) => switch (s) {
-  ChapterStatus.outline => 'Outline',
-  ChapterStatus.draft => 'Draft',
-  ChapterStatus.withSupervisor => 'With supervisor',
-  ChapterStatus.revised => 'Revised',
-  ChapterStatus.finished => 'Final',
-};
+/// [n] with the locale's digit grouping ("12,400" / "12.400").
+String formatCount(int n, [String locale = 'en']) =>
+    NumberFormat.decimalPattern(locale).format(n);
 
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+String chapterStatusLabel(ChapterStatus s, [AppLocalizations? l10n]) {
+  final l = l10n ?? _english;
+  return switch (s) {
+    ChapterStatus.outline => l.projectsStatusOutline,
+    ChapterStatus.draft => l.projectsStatusDraft,
+    ChapterStatus.withSupervisor => l.projectsStatusWithSupervisor,
+    ChapterStatus.revised => l.projectsStatusRevised,
+    ChapterStatus.finished => l.projectsStatusFinal,
+  };
+}
 
 /// "Due 14 March · 152 days" (the year is added when it isn't this one).
-String dueLabel(DateTime due, DateTime now) {
+String dueLabel(DateTime due, DateTime now, [AppLocalizations? l10n]) {
+  final l = l10n ?? _english;
   final d = DateTime(due.year, due.month, due.day);
   final today = DateTime(now.year, now.month, now.day);
   final days = DateTime.utc(
@@ -175,14 +177,17 @@ String dueLabel(DateTime due, DateTime now) {
     d.month,
     d.day,
   ).difference(DateTime.utc(today.year, today.month, today.day)).inDays;
-  final date =
-      '${d.day} ${_months[d.month - 1]}${d.year == today.year ? '' : ' ${d.year}'}';
-  final rest = days == 0
-      ? 'today'
-      : days > 0
-      ? '$days day${days == 1 ? '' : 's'}'
-      : '${-days} day${days == -1 ? '' : 's'} ago';
-  return days == 0 ? 'Due today · $date' : 'Due $date · $rest';
+  final date = DateFormat(
+    d.year == today.year ? l.projectsDatePattern : l.projectsDatePatternYear,
+    // `en` has no date data until a localization delegate loads it; the
+    // built-in `en_US` reads the same for these patterns.
+    l.localeName == 'en' ? 'en_US' : l.localeName,
+  ).format(d);
+  if (days == 0) return l.projectsDueToday(date);
+  return l.projectsDue(
+    date,
+    days > 0 ? l.projectsInDays(days) : l.projectsDaysAgo(-days),
+  );
 }
 
 /// Writes positions 0..n-1 for [orderedNoteIds] (only rows that change).
@@ -210,8 +215,9 @@ Future<void> setChapterStatus(
   AppDatabase db,
   String projectId,
   String noteId,
-  ChapterStatus? status,
-) async {
+  ChapterStatus? status, {
+  AppLocalizations? l10n,
+}) async {
   final where = db.select(db.projectNotes)
     ..where((r) => r.projectId.equals(projectId) & r.noteId.equals(noteId));
   final before = (await where.getSingleOrNull())?.status;
@@ -224,7 +230,7 @@ Future<void> setChapterStatus(
     await saveNoteVersion(
       db,
       noteId,
-      label: sentToSupervisorLabel,
+      label: l10n?.notesSentToSupervisor ?? sentToSupervisorLabel,
       skipIfUnchanged: true,
     );
   }

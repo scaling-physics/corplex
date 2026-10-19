@@ -1,3 +1,4 @@
+import '../../l10n/l10n.dart';
 import '../export/export_images.dart';
 
 import 'package:flutter/material.dart';
@@ -34,51 +35,53 @@ Future<void> showProjectMenu(
           children: [
             ListTile(
               leading: const Icon(Icons.folder_open_outlined),
-              title: const Text('Open project'),
-              subtitle: const Text('Its papers, notes and reading progress'),
+              title: Text(context.l10n.projectsOpenProject),
+              subtitle: Text(context.l10n.projectsOpenProjectSubtitle),
               onTap: () => Navigator.pop(context, 'open'),
             ),
             ListTile(
               leading: const Icon(Icons.table_chart_outlined),
-              title: const Text('Synthesis matrix'),
-              subtitle: const Text('Compare its papers by theme'),
+              title: Text(context.l10n.projectsSynthesisMatrix),
+              subtitle: Text(context.l10n.projectsSynthesisMatrixSubtitle),
               onTap: () => Navigator.pop(context, 'matrix'),
             ),
             ListTile(
               leading: const Icon(Icons.list_alt),
-              title: const Text('Bibliography'),
-              subtitle: const Text('All its papers, in a citation style'),
+              title: Text(context.l10n.projectsBibliography),
+              subtitle: Text(context.l10n.projectsBibliographySubtitle),
               onTap: () => Navigator.pop(context, 'bibliography'),
             ),
             ListTile(
               leading: const Icon(Icons.ios_share),
-              title: const Text('Export project'),
-              subtitle: const Text('Its notes as one document'),
+              title: Text(context.l10n.projectsExportProject),
+              subtitle: Text(context.l10n.projectsExportProjectSubtitle),
               onTap: () => Navigator.pop(context, 'export'),
             ),
             ListTile(
               leading: const Icon(Icons.event_outlined),
               title: Text(
-                project.dueDate == null ? 'Set due date' : 'Change due date',
+                project.dueDate == null
+                    ? context.l10n.projectsSetDueDate
+                    : context.l10n.projectsChangeDueDate,
               ),
-              subtitle: const Text('The submission date'),
+              subtitle: Text(context.l10n.projectsSubmissionDateSubtitle),
               onTap: () => Navigator.pop(context, 'due'),
             ),
             if (project.dueDate != null)
               ListTile(
                 leading: const Icon(Icons.event_busy_outlined),
-                title: const Text('Clear due date'),
+                title: Text(context.l10n.projectsClearDueDate),
                 onTap: () => Navigator.pop(context, 'clear-due'),
               ),
             ListTile(
               leading: const Icon(Icons.edit_outlined),
-              title: const Text('Rename'),
+              title: Text(context.l10n.commonRename),
               onTap: () => Navigator.pop(context, 'rename'),
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Delete project'),
-              subtitle: const Text('Its papers and notes are kept'),
+              title: Text(context.l10n.projectsDeleteProject),
+              subtitle: Text(context.l10n.projectsDeleteProjectSubtitle),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -126,19 +129,16 @@ Future<void> showProjectMenu(
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete “${project.name}”?'),
-        content: const Text(
-          'The papers and notes in it stay in your library; only the '
-          'grouping goes away.',
-        ),
+        title: Text(context.l10n.projectsDeleteTitle(project.name)),
+        content: Text(context.l10n.projectsDeleteMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(context.l10n.commonDelete),
           ),
         ],
       ),
@@ -163,9 +163,8 @@ Future<void> exportProject(
   final notes = await orderedProjectNotes(db, project.id);
   if (!context.mounted) return;
   if (notes.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No notes in this project yet.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.projectsNoNotesYet)));
     return;
   }
   if (notes.any(
@@ -174,14 +173,12 @@ Future<void> exportProject(
     final ok = await requestUnlock(
       context,
       lock,
-      reason: 'Some chapters are locked. Unlock them to include them.',
+      reason: context.l10n.projectsChaptersLockedReason,
     );
     if (!ok || !context.mounted) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Export cancelled: chapters are locked.'),
-          ),
+          SnackBar(content: Text(context.l10n.projectsExportCancelledLocked)),
         );
       }
       return;
@@ -221,7 +218,7 @@ Future<void> renameProjectDialog(
   final name = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Rename project'),
+      title: Text(context.l10n.projectsRenameProject),
       content: TextField(
         controller: controller,
         autofocus: true,
@@ -230,11 +227,11 @@ Future<void> renameProjectDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('Save'),
+          child: Text(context.l10n.commonSave),
         ),
       ],
     ),

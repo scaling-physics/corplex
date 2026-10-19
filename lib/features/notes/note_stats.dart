@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:intl/intl.dart';
 
+import '../../l10n/l10n.dart';
 import '../library/citations.dart';
 import 'citation_embed.dart';
 import 'note_table.dart';
@@ -63,10 +65,15 @@ NoteStats noteStats(Document document) {
   );
 }
 
-String readingTimeLabel(NoteStats stats) {
-  if (stats.words == 0) return '0 min';
-  if (stats.readingMinutes <= 1) return '< 1 min';
-  return '${stats.readingMinutes} min';
+String readingTimeLabel(NoteStats stats, [AppLocalizations? l10n]) {
+  if (l10n == null) {
+    if (stats.words == 0) return '0 min';
+    if (stats.readingMinutes <= 1) return '< 1 min';
+    return '${stats.readingMinutes} min';
+  }
+  if (stats.words == 0) return l10n.notesMinutes(0);
+  if (stats.readingMinutes <= 1) return l10n.notesLessThanAMinute;
+  return l10n.notesMinutes(stats.readingMinutes);
 }
 
 /// A small sheet of numbers about the note; nothing of it shows on the
@@ -77,8 +84,12 @@ Future<void> showNoteStatsSheet(
   required int linkedPapers,
 }) {
   final text = Theme.of(context).textTheme;
-  Widget tile(String label, String value) => SizedBox(
-    key: ValueKey(label),
+  final l10n = context.l10n;
+  final fmt = NumberFormat.decimalPattern(
+    Localizations.localeOf(context).toString(),
+  );
+  Widget tile(String key, String label, String value) => SizedBox(
+    key: ValueKey(key),
     width: 104,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,12 +114,32 @@ Future<void> showNoteStatsSheet(
           spacing: 16,
           runSpacing: 20,
           children: [
-            tile('Words', '${stats.words}'),
-            tile('Characters', '${stats.characters}'),
-            tile('Paragraphs', '${stats.paragraphs}'),
-            tile('Reading time', readingTimeLabel(stats)),
-            tile('Citations', '${stats.citations}'),
-            tile('Linked papers', '$linkedPapers'),
+            tile('Words', l10n.notesStatsWords, fmt.format(stats.words)),
+            tile(
+              'Characters',
+              l10n.notesStatsCharacters,
+              fmt.format(stats.characters),
+            ),
+            tile(
+              'Paragraphs',
+              l10n.notesStatsParagraphs,
+              fmt.format(stats.paragraphs),
+            ),
+            tile(
+              'Reading time',
+              l10n.notesStatsReadingTime,
+              readingTimeLabel(stats, l10n),
+            ),
+            tile(
+              'Citations',
+              l10n.notesStatsCitations,
+              fmt.format(stats.citations),
+            ),
+            tile(
+              'Linked papers',
+              l10n.notesStatsLinkedPapers,
+              fmt.format(linkedPapers),
+            ),
           ],
         ),
       ),

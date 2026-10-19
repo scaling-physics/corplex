@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:corplex/features/lock/note_lock_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:corplex/app.dart';
@@ -379,6 +380,44 @@ void main() {
     await dispose(tester);
   }, variant: macOnly);
 
+  testWidgets('editor commands with no editor focused do nothing', (
+    tester,
+  ) async {
+    // Empty switch cases fall through: Bold et al. once fell into
+    // "Close All Locked Notes", so ⌘B in the list locked every note.
+    final lock = _CountingLockService(db);
+    useMacWindow(tester, macWindowSizes['laptop13']!);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          audioEngineProvider.overrideWithValue(FakeAudioEngine()),
+          shareIntentSourceProvider.overrideWithValue(
+            const NoShareIntentSource(),
+          ),
+          macWindowProvider.overrideWithValue(window),
+          noteLockServiceProvider.overrideWith((ref) => lock),
+        ],
+        child: const CorplexApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final c in [
+      MenuCommand.bold,
+      MenuCommand.heading,
+      MenuCommand.insertTable,
+      MenuCommand.citePaper,
+      MenuCommand.collapseSections,
+      MenuCommand.expandSections,
+    ]) {
+      await send(tester, c);
+    }
+    expect(lock.locks, 0);
+    await send(tester, MenuCommand.lockAllNotes);
+    expect(lock.locks, 1);
+    await dispose(tester);
+  }, variant: macOnly);
+
   testWidgets('move to trash trashes the open note, with Undo', (tester) async {
     await show(tester, macWindowSizes['laptop13']!);
     await send(tester, MenuCommand.moveToTrash); // nothing open: no-op
@@ -473,4 +512,15 @@ void main() {
     expect(hits, 1);
     expect(dispatchMenuCommand(MenuCommand.back), isFalse);
   }, variant: macOnly);
+}
+
+class _CountingLockService extends NoteLockService {
+  _CountingLockService(super.db);
+  int locks = 0;
+
+  @override
+  void lockNow() {
+    locks++;
+    super.lockNow();
+  }
 }

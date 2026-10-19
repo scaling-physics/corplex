@@ -15,6 +15,7 @@ import 'tables/highlights_table.dart';
 import 'tables/matrix_table.dart';
 import 'tables/note_keys_table.dart';
 import 'tables/note_paper_refs_table.dart';
+import 'tables/note_previews_table.dart';
 import 'tables/note_tags_table.dart';
 import 'tables/note_comments_table.dart';
 import 'tables/note_versions_table.dart';
@@ -49,6 +50,7 @@ part 'database.g.dart';
     TrashItems,
     OcrPages,
     OcrPapers,
+    NotePreviews,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -72,7 +74,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,6 +84,7 @@ class AppDatabase extends _$AppDatabase {
     },
     beforeOpen: (details) async {
       await _createPerformanceIndexes();
+      await _createNotePreviewTriggers();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -300,8 +303,24 @@ class AppDatabase extends _$AppDatabase {
         }
         await _createSyncSchema(markExisting: false);
       }
+      if (from < 21) {
+        // v21: stored previews for the Notes list (local-only, derived).
+        // Empty on purpose: the list fills it as it shows notes.
+        if (!await _hasTable('note_previews')) {
+          await m.createTable(notePreviews);
+        }
+        await _createNotePreviewTriggers();
+      }
     },
   );
+
+  /// The triggers that keep `note_previews` honest (see [NotePreviews]).
+  /// Idempotent, run on migration and every open.
+  Future<void> _createNotePreviewTriggers() async {
+    for (final statement in notePreviewStatements) {
+      await customStatement(statement);
+    }
+  }
 
   /// Local-only indexes for the lookups the UI and the cascades make. They
   /// are not part of the synced schema and need no schema bump:
@@ -393,4 +412,16 @@ const performanceIndexStatements = <String>[
   'CREATE INDEX IF NOT EXISTS idx_note_versions_note ON note_versions (note_id, created_at DESC)',
   'CREATE INDEX IF NOT EXISTS idx_note_comments_note ON note_comments (note_id)',
   'CREATE INDEX IF NOT EXISTS idx_matrix_cells_paper ON matrix_cells (paper_id)',
+];
+
+/// A note's stored preview is deleted whenever its body changes or the row is
+/// (re)inserted, so a missing row always means "recompute". Separate from the
+/// sync triggers: these only touch `note_previews`, which isn't synced.
+const notePreviewStatements = <String>[
+  'CREATE TRIGGER IF NOT EXISTS note_previews_stale_upd '
+      'AFTER UPDATE OF content ON notes '
+      'BEGIN DELETE FROM note_previews WHERE note_id = NEW.id; END',
+  'CREATE TRIGGER IF NOT EXISTS note_previews_stale_ins '
+      'AFTER INSERT ON notes '
+      'BEGIN DELETE FROM note_previews WHERE note_id = NEW.id; END',
 ];

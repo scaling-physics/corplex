@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../platform/mac_window.dart';
 import 'highlights.dart';
@@ -59,7 +60,7 @@ class PageIndicator extends StatelessWidget {
         child: ValueListenableBuilder<int>(
           valueListenable: page,
           builder: (_, value, _) => Text(
-            '$value / $pageCount',
+            context.l10n.viewerPagePill(value, pageCount),
             style: Theme.of(context).textTheme.labelMedium
                 ?.copyWith(color: c.onSurfaceVariant),
           ),
@@ -69,7 +70,7 @@ class PageIndicator extends StatelessWidget {
     if (!desktop) return pill;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: Tooltip(message: 'Show pages', child: pill),
+      child: Tooltip(message: context.l10n.viewerShowPages, child: pill),
     );
   }
 }
@@ -218,7 +219,10 @@ class _PageStripState extends State<PageStrip> {
                 ),
               );
               return desktop
-                  ? Tooltip(message: 'Page $page', child: item)
+                  ? Tooltip(
+                      message: context.l10n.viewerPageLong(page),
+                      child: item,
+                    )
                   : item;
             },
           ),
@@ -281,7 +285,7 @@ class HighlightMinimap extends StatelessWidget {
               height: hit,
               child: _hoverable(
                 context,
-                'Page ${mark.page}',
+                context.l10n.viewerPageLong(mark.page),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => onJump(mark.page),

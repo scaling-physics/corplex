@@ -1,0 +1,227 @@
+{
+  "@@locale": "en",
+  "notesChangePage": "Change page",
+  "notesPage": "Page",
+  "notesPageEllipsis": "Page…",
+  "notesPageHint": "42 or 3–5",
+  "notesClear": "Clear",
+  "notesSet": "Set",
+  "notesCitationLabel": "Citation {label}",
+  "@notesCitationLabel": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCitationMissingLabel": "Citation {marker}, paper not found",
+  "@notesCitationMissingLabel": {
+    "placeholders": {
+      "marker": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCitationNotInLibrary": "@{key} isn't in your library.",
+  "@notesCitationNotInLibrary": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "notesPageShort": "p. {page}",
+  "@notesPageShort": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "notesOpenPaper": "Open paper",
+  "notesCiteAPaper": "Cite a paper",
+  "notesNoPapersFound": "No papers found.",
+  "notesSearchPapersToLink": "Search papers to link",
+  "notesImportAPdf": "Import a PDF",
+  "notesNoFolder": "No folder",
+  "notesNewFolder": "New folder",
+  "notesFolderName": "Folder name",
+  "notesCreate": "Create",
+  "notesLinkToANote": "Link to a note…",
+  "notesNewNoteNamed": "New note “{title}”",
+  "@notesNewNoteNamed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "notesNewTagName": "New tag name",
+  "notesAddTag": "Add tag",
+  "notesNoTagsYet": "No tags yet.",
+  "notesFigureName": "Figure {number}",
+  "@notesFigureName": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "notesTableName": "Table {number}",
+  "@notesTableName": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureMissing": "Figure ??",
+  "notesTableMissing": "Table ??",
+  "notesFigureCaptionLabel": "{name} caption",
+  "@notesFigureCaptionLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureReferenceLabel": "Reference to {name}",
+  "@notesFigureReferenceLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notesFigureReferenceMissing": "Reference to a missing figure",
+  "notesFiguresEmpty": "No figures or tables yet. Type / and choose Figure caption or Table caption.",
+  "notesSearchFigures": "Search figures and tables",
+  "notesNothingMatches": "Nothing matches.",
+  "notesEquationLabel": "Equation {latex}",
+  "@notesEquationLabel": {
+    "placeholders": {
+      "latex": {
+        "type": "String"
+      }
+    }
+  },
+  "notesEquationEmpty": "Tap to write an equation",
+  "notesPreview": "Preview",
+  "notesLatexInvalid": "Not valid LaTeX yet. It is kept as you typed it.",
+  "notesLatexHint": "LaTeX, e.g. x^2 + \\alpha",
+  "notesTemplateSummary": "Summary",
+  "notesTemplateMethod": "Method",
+  "notesTemplateFindings": "Findings",
+  "notesTemplateCritique": "Critique",
+  "notesMinutes": "{count} min",
+  "@notesMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesLessThanAMinute": "< 1 min",
+  "notesStatsWords": "Words",
+  "notesStatsCharacters": "Characters",
+  "notesStatsParagraphs": "Paragraphs",
+  "notesStatsReadingTime": "Reading time",
+  "notesStatsCitations": "Citations",
+  "notesStatsLinkedPapers": "Linked papers",
+  "notesHighlightYellow": "Yellow",
+  "notesHighlightGreen": "Green",
+  "notesHighlightBlue": "Blue",
+  "notesHighlightPink": "Pink",
+  "notesHighlightPurple": "Purple",
+  "notesRemoveHighlight": "Remove highlight",
+  "notesCouldntAddFile": "Couldn't add that file.",
+  "notesDropToAttach": "Drop to attach",
+  "notesUnlockToDuplicate": "Unlock this note to duplicate it.",
+  "notesCouldntDuplicate": "Couldn't duplicate that note.",
+  "notesUnlockToPrint": "Unlock this note to print it.",
+  "notesCouldntPrint": "Couldn't print that note.",
+  "notesDuplicate": "Duplicate",
+  "notesNoteLocked": "Note locked",
+  "notesRemoveLock": "Remove lock",
+  "notesLockNote": "Lock note",
+  "notesUnpin": "Unpin",
+  "notesPinToTop": "Pin to top",
+  "notesSentToSupervisor": "Sent to supervisor",
+  "notesBeforeRestoring": "Before restoring",
+  "notesVersionsSince": "{delta} since",
+  "@notesVersionsSince": {
+    "placeholders": {
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "notesVersionNameHint": "Name (optional)",
+  "notesSaveAVersion": "Save a version",
+  "notesVersions": "Versions",
+  "notesSaveVersionNow": "Save a version now",
+  "notesVersionsEmptyTitle": "No versions yet",
+  "notesVersionsEmptyMessage": "A version is a saved copy of this note. One is kept automatically when a chapter goes to your supervisor, and you can save one any time.",
+  "notesSavedVersion": "Saved version",
+  "notesVersionsWords": "{count, plural, =1{1 word} other{{count} words}}",
+  "@notesVersionsWords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesVersionOptions": "Version options",
+  "notesRenameVersion": "Rename version",
+  "notesVersionDeleted": "Version deleted",
+  "notesCompare": "Compare",
+  "notesUnlockToCompareOrRestore": "Unlock this note to compare or restore versions.",
+  "notesUnlockToCompare": "Unlock this note to compare its versions.",
+  "notesUnlock": "Unlock",
+  "notesRestoreVersionTitle": "Restore this version?",
+  "notesRestoreVersionMessage": "The note goes back to this version. What is there now is saved first as “{label}”.",
+  "@notesRestoreVersionMessage": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "notesRestore": "Restore",
+  "notesUnlockToRestore": "Unlock the note to restore it.",
+  "notesVersionRestored": "Version restored",
+  "notesUnchangedLines": "{count, plural, =1{1 unchanged line} other{{count} unchanged lines}}",
+  "@notesUnchangedLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesRestoreThisVersion": "Restore this version",
+  "notesCompareSame": "{when} · the same as now",
+  "@notesCompareSame": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "notesCompareChanged": "{when} · now has {words} words · {added} added, {removed} removed",
+  "@notesCompareChanged": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "words": {
+        "type": "String"
+      },
+      "added": {
+        "type": "int"
+      },
+      "removed": {
+        "type": "int"
+      }
+    }
+  }
+}

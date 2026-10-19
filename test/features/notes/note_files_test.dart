@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -17,7 +18,9 @@ import 'package:corplex/features/lock/note_crypto.dart';
 import 'package:corplex/features/lock/note_lock_service.dart';
 import 'package:corplex/features/notes/note_drop.dart';
 import 'package:corplex/features/notes/note_file_actions.dart';
+import 'package:corplex/features/notes/notes_providers.dart';
 import 'package:corplex/features/notes/notes_screen.dart';
+import 'package:corplex/l10n/l10n.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin
@@ -58,34 +61,41 @@ void main() {
   });
 
   group('date sections', () {
+    setUpAll(() => initializeDateFormatting('en'));
     final now = DateTime(2026, 10, 18, 9);
-    Note note(DateTime updated, {bool pinned = false}) => Note(
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    NoteListItem note(DateTime updated, {bool pinned = false}) => NoteListItem(
       id: 'x',
       title: '',
-      content: '',
+      folderId: null,
+      preview: '',
+      locked: false,
       createdAt: updated,
       updatedAt: updated,
       pinned: pinned,
     );
 
     test('Notes-style groups', () {
-      expect(noteDateSection(note(DateTime(2026, 10, 18, 8)), now), 'Today');
       expect(
-        noteDateSection(note(DateTime(2026, 10, 17, 23)), now),
+        noteDateSection(note(DateTime(2026, 10, 18, 8)), now, l10n),
+        'Today',
+      );
+      expect(
+        noteDateSection(note(DateTime(2026, 10, 17, 23)), now, l10n),
         'Yesterday',
       );
       expect(
-        noteDateSection(note(DateTime(2026, 10, 13)), now),
+        noteDateSection(note(DateTime(2026, 10, 13)), now, l10n),
         'Previous 7 Days',
       );
       expect(
-        noteDateSection(note(DateTime(2026, 9, 25)), now),
+        noteDateSection(note(DateTime(2026, 9, 25)), now, l10n),
         'Previous 30 Days',
       );
-      expect(noteDateSection(note(DateTime(2026, 3, 2)), now), 'March');
-      expect(noteDateSection(note(DateTime(2024, 12, 30)), now), '2024');
+      expect(noteDateSection(note(DateTime(2026, 3, 2)), now, l10n), 'March');
+      expect(noteDateSection(note(DateTime(2024, 12, 30)), now, l10n), '2024');
       expect(
-        noteDateSection(note(DateTime(2020), pinned: true), now),
+        noteDateSection(note(DateTime(2020), pinned: true), now, l10n),
         'Pinned',
       );
     });
@@ -97,7 +107,7 @@ void main() {
         note(DateTime(2026, 10, 18, 7)),
         note(DateTime(2026, 3, 2)),
       ];
-      expect(noteSectionHeaders(notes, now), [
+      expect(noteSectionHeaders(notes, now, l10n), [
         'Pinned',
         'Today',
         null,

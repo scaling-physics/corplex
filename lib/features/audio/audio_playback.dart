@@ -8,6 +8,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../data/attachment_label.dart';
 import '../../data/database.dart';
+import '../../l10n/l10n.dart';
 import 'audio_link.dart';
 
 /// The few player operations the app needs, so tests can run without the
@@ -51,7 +52,7 @@ class JustAudioEngine implements AudioEngine {
   /// controls.
   static Future<void> initBackground() => JustAudioBackground.init(
     androidNotificationChannelId: 'com.corplex.corplex.audio',
-    androidNotificationChannelName: 'Audio playback',
+    androidNotificationChannelName: deviceL10n().audioChannelName,
     androidNotificationIcon: 'drawable/ic_stat_corplex',
     androidNotificationOngoing: true,
   );
@@ -91,6 +92,9 @@ class JustAudioEngine implements AudioEngine {
   Future<void> dispose() => _player.dispose();
 }
 
+/// Why a recording didn't start.
+enum AudioError { notSynced, playFailed }
+
 /// App-wide "what's playing": one recording at a time, shared by every
 /// screen, so a podcast started from a paper keeps playing (and can be
 /// timestamped) while you write in a note.
@@ -122,7 +126,7 @@ class AudioPlayback extends ChangeNotifier {
   Duration? _duration;
   bool _playing = false;
   double _speed = 1;
-  String? _error;
+  AudioError? _errorKind;
 
   Attachment? get current => _current;
   Duration get position => _position;
@@ -131,22 +135,29 @@ class AudioPlayback extends ChangeNotifier {
   double get speed => _speed;
 
   /// Why the last [open] failed, for the player bar to show.
-  String? get error => _error;
+  String? get error => switch (_errorKind) {
+    null => null,
+    AudioError.notSynced => 'This recording hasn\'t synced to this device yet.',
+    AudioError.playFailed => 'Couldn\'t play this recording.',
+  };
+
+  /// The same, as a kind the player bar words in the app's language.
+  AudioError? get errorKind => _errorKind;
 
   /// Starts [attachment] (optionally from [at]). Re-opening what's already
   /// loaded just seeks, so tapping timestamps in a row doesn't reload.
   Future<void> open(Attachment attachment, {Duration? at}) async {
     final source = audioSourceOf(attachment);
     if (source == null) {
-      _error = 'This recording hasn\'t synced to this device yet.';
+      _errorKind = AudioError.notSynced;
       _current = attachment;
       notifyListeners();
       return;
     }
     try {
-      if (_current?.id != attachment.id || _error != null) {
+      if (_current?.id != attachment.id || _errorKind != null) {
         _current = attachment;
-        _error = null;
+        _errorKind = null;
         _position = Duration.zero;
         _duration = null;
         notifyListeners();
@@ -160,7 +171,7 @@ class AudioPlayback extends ChangeNotifier {
       if (at != null) await _engine.seek(at);
       await _engine.play();
     } catch (_) {
-      _error = 'Couldn\'t play this recording.';
+      _errorKind = AudioError.playFailed;
       notifyListeners();
     }
   }
@@ -196,7 +207,7 @@ class AudioPlayback extends ChangeNotifier {
   Future<void> close() async {
     await _engine.stop();
     _current = null;
-    _error = null;
+    _errorKind = null;
     notifyListeners();
   }
 

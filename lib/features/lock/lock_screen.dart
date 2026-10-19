@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'note_lock_service.dart';
 import 'notes_password_dialogs.dart';
@@ -32,7 +33,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
     vsync: this,
     duration: const Duration(milliseconds: 320),
   );
-  String? _error;
+  String Function(AppLocalizations)? _error;
   String? _hint;
   bool _showHint = false;
   bool _busy = false;
@@ -60,7 +61,9 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
     if (!mounted) return;
     setState(() => _biometrics = enabled);
     if (!enabled) return;
-    final ok = await _service.unlockWithBiometrics();
+    final ok = await _service.unlockWithBiometrics(
+      reason: context.l10n.lockBiometricReason,
+    );
     if (!mounted || ok) return;
     if (!automatic) _focus.requestFocus();
   }
@@ -78,14 +81,14 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
       // isn't, the note is under an earlier password.
       setState(() {
         _busy = false;
-        _error = 'This note uses an earlier notes password';
+        _error = (l) => l.lockEarlierPassword;
         _password.clear();
       });
       return;
     }
     setState(() {
       _busy = false;
-      _error = 'Wrong password';
+      _error = (l) => l.lockWrongPassword;
     });
     _focus.requestFocus();
     _password.selection = TextSelection(
@@ -99,7 +102,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final c = theme.colorScheme;
-    final name = biometricName(theme.platform);
+    final name = biometricName(context.l10n, theme.platform);
     return Scaffold(
       appBar: AppBar(automaticallyImplyLeading: !widget.embedded),
       body: Center(
@@ -114,7 +117,9 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                 Icon(Icons.lock_outline, size: 40, color: c.primary),
                 const SizedBox(height: 16),
                 Text(
-                  widget.title.isEmpty ? 'Untitled' : widget.title,
+                  widget.title.isEmpty
+                      ? context.l10n.commonUntitled
+                      : widget.title,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -122,7 +127,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'This note is locked',
+                  context.l10n.lockLockedNote,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: c.onSurfaceVariant,
@@ -147,8 +152,8 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                     obscureText: true,
                     textInputAction: TextInputAction.go,
                     decoration: InputDecoration(
-                      labelText: 'Password',
-                      errorText: _error,
+                      labelText: context.l10n.lockPassword,
+                      errorText: _error?.call(context.l10n),
                       errorMaxLines: 2,
                       suffixIcon: _busy
                           ? const Padding(
@@ -162,7 +167,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                               ),
                             )
                           : IconButton(
-                              tooltip: 'Unlock',
+                              tooltip: context.l10n.lockUnlock,
                               icon: const Icon(Icons.arrow_forward),
                               onPressed: _submit,
                             ),
@@ -174,7 +179,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                   const SizedBox(height: 8),
                   if (_showHint)
                     Text(
-                      'Hint: $_hint',
+                      context.l10n.lockHint(_hint!),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: c.onSurfaceVariant,
@@ -183,7 +188,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                   else
                     TextButton(
                       onPressed: () => setState(() => _showHint = true),
-                      child: const Text('Show hint'),
+                      child: Text(context.l10n.lockShowHint),
                     ),
                 ],
                 if (_biometrics) ...[
@@ -195,7 +200,7 @@ class _NoteLockScreenState extends ConsumerState<NoteLockScreen>
                           ? Icons.fingerprint
                           : Icons.lock_open_outlined,
                     ),
-                    label: Text('Use $name'),
+                    label: Text(context.l10n.lockUseBiometric(name)),
                   ),
                 ],
               ],

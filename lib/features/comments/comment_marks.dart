@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../notes/heading_fold_controller.dart';
 import 'comment_anchor.dart';
 import 'comments_data.dart';
 
@@ -9,11 +10,21 @@ import 'comments_data.dart';
 /// tint that marks them. The stored document is never touched: this only
 /// wraps the editor's span builder.
 class CommentMarks {
-  CommentMarks(this.controller) {
+  CommentMarks(this.controller, {this.folds}) {
     controller.addListener(_invalidate);
   }
 
   final QuillController controller;
+
+  /// The note's collapsed sections. Passages are located in the whole
+  /// note's text (hidden sections included) and so are [ranges]; a passage
+  /// inside a collapsed section simply has no tint while it is hidden.
+  final HeadingFolds? folds;
+
+  String _wholeText() =>
+      folds?.unfoldedText() ?? controller.document.toPlainText();
+
+  int _whole(int live) => folds?.unfoldedOffset(live) ?? live;
   List<CommentView> _comments = const [];
   List<({CommentSpan span, List<CommentView> comments})>? _ranges;
 
@@ -37,7 +48,7 @@ class CommentMarks {
         if (!c.resolved && c.quote.isNotEmpty) c,
     ];
     if (open.isEmpty) return _ranges = const [];
-    final text = controller.document.toPlainText();
+    final text = _wholeText();
     final byStart = <String, List<CommentView>>{};
     final spans = <String, CommentSpan>{};
     for (final c in open) {
@@ -56,8 +67,10 @@ class CommentMarks {
   static CommentSpan? locate(String text, CommentView c) =>
       locateQuote(text, c.quote, c.anchor);
 
-  /// Comments whose passage covers [offset].
-  List<CommentView> at(int offset) => [
+  /// Comments whose passage covers [offset] (an editor offset).
+  List<CommentView> at(int liveOffset) => _at(_whole(liveOffset));
+
+  List<CommentView> _at(int offset) => [
     for (final r in ranges)
       if (offset >= r.span.start && offset < r.span.end) ...r.comments,
   ];
@@ -77,7 +90,7 @@ class CommentMarks {
       if (text.isEmpty || _comments.isEmpty) {
         return inner(context, node, nodeOffset, text, style, recognizer);
       }
-      final start = node.documentOffset + nodeOffset;
+      final start = _whole(node.documentOffset) + nodeOffset;
       final end = start + text.length;
       final hits = [
         for (final r in ranges)

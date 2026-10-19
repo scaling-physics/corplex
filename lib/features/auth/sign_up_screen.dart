@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import 'auth_service.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
@@ -13,7 +14,7 @@ class SignUpScreen extends ConsumerStatefulWidget {
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String? _error;
+  Object? _error;
   bool _submitting = false;
 
   @override
@@ -39,7 +40,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -55,12 +56,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Create your account',
+              context.l10n.authCreateTitle,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 6),
             Text(
-              "Your notes stay on this device and sync to your other devices once you're signed in.",
+              context.l10n.authCreateIntro,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -68,16 +69,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             const SizedBox(height: 28),
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(labelText: context.l10n.authEmail),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                helperText: 'At least 6 characters',
+              decoration: InputDecoration(
+                labelText: context.l10n.authPassword,
+                helperText: context.l10n.authPasswordHelper,
               ),
               obscureText: true,
               autofillHints: const [AutofillHints.newPassword],
@@ -85,7 +86,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                authErrorText(context.l10n, _error!),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: 20),
             FilledButton(
@@ -96,7 +100,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Create account'),
+                  : Text(context.l10n.authCreateAccount),
             ),
           ],
         ),

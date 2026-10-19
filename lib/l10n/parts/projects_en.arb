@@ -1,0 +1,254 @@
+{
+  "@@locale": "en",
+  "projectsWordsOfTarget": "{words} / {target} words",
+  "@projectsWordsOfTarget": {
+    "placeholders": {
+      "words": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "target": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "projectsWords": "{words, plural, =1{1 word} other{{words} words}}",
+  "@projectsWords": {
+    "placeholders": {
+      "words": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "projectsChaptersFinal": "{finished} of {count, plural, =1{1 chapter} other{{count} chapters}} final",
+  "@projectsChaptersFinal": {
+    "placeholders": {
+      "finished": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsStatusOutline": "Outline",
+  "projectsStatusDraft": "Draft",
+  "projectsStatusWithSupervisor": "With supervisor",
+  "projectsStatusRevised": "Revised",
+  "projectsStatusFinal": "Final",
+  "projectsDatePattern": "d MMMM",
+  "projectsDatePatternYear": "d MMMM y",
+  "projectsDueToday": "Due today · {date}",
+  "@projectsDueToday": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsDue": "Due {date} · {rest}",
+  "@projectsDue": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "rest": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsInDays": "{days, plural, =1{1 day} other{{days} days}}",
+  "@projectsInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsDaysAgo": "{days, plural, =1{1 day ago} other{{days} days ago}}",
+  "@projectsDaysAgo": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsSubmissionDate": "Submission date",
+  "projectsChangeDate": "Change date",
+  "projectsClearDate": "Clear date",
+  "projectsChapters": "Chapters",
+  "projectsAddChapter": "Add chapter",
+  "projectsChangeStatus": "Change status",
+  "projectsNoStatus": "No status",
+  "projectsStatus": "Status",
+  "projectsChapterOptions": "Chapter options",
+  "projectsWordTarget": "Word target",
+  "projectsRemoveFromProject": "Remove from project",
+  "projectsWordTargetHint": "e.g. 8000",
+  "projectsOpenProject": "Open project",
+  "projectsOpenProjectSubtitle": "Its papers, notes and reading progress",
+  "projectsSynthesisMatrix": "Synthesis matrix",
+  "projectsSynthesisMatrixSubtitle": "Compare its papers by theme",
+  "projectsBibliography": "Bibliography",
+  "projectsBibliographySubtitle": "All its papers, in a citation style",
+  "projectsExportProject": "Export project",
+  "projectsExportProjectSubtitle": "Its notes as one document",
+  "projectsSetDueDate": "Set due date",
+  "projectsChangeDueDate": "Change due date",
+  "projectsSubmissionDateSubtitle": "The submission date",
+  "projectsClearDueDate": "Clear due date",
+  "projectsDeleteProject": "Delete project",
+  "projectsDeleteProjectSubtitle": "Its papers and notes are kept",
+  "projectsDeleteTitle": "Delete “{name}”?",
+  "@projectsDeleteTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsDeleteMessage": "The papers and notes in it stay in your library; only the grouping goes away.",
+  "projectsNoNotesYet": "No notes in this project yet.",
+  "projectsChaptersLockedReason": "Some chapters are locked. Unlock them to include them.",
+  "projectsExportCancelledLocked": "Export cancelled: chapters are locked.",
+  "projectsRenameProject": "Rename project",
+  "projectsNewProject": "New project",
+  "projectsCreateAndAdd": "Create and add",
+  "projectsPickerIntro": "A project groups the papers and notes for one review, chapter or paper you're writing.",
+  "projectsPaperCount": "{count, plural, =1{1 paper} other{{count} papers}}",
+  "@projectsPaperCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsNoteCount": "{count, plural, =1{1 note} other{{count} notes}}",
+  "@projectsNoteCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsReadProgress": "{done} of {total} read",
+  "@projectsReadProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsMap": "Map",
+  "projectsPapers": "Papers",
+  "projectsNothingYet": "Nothing here yet",
+  "projectsNothingYetMessage": "Use “Add to project” on a paper or a note to collect it here.",
+  "projectsStatusToRead": "To read",
+  "projectsStatusReading": "Reading",
+  "projectsStatusRead": "Read",
+  "projectsAbbrUsedBefore": "{abbreviation} is used before it's spelled out",
+  "@projectsAbbrUsedBefore": {
+    "placeholders": {
+      "abbreviation": {
+        "type": "String"
+      }
+    }
+  },
+  "projectsAbbrDefined": "{count} defined",
+  "@projectsAbbrDefined": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbrToCheck": "{count} to check",
+  "@projectsAbbrToCheck": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbreviations": "Abbreviations",
+  "projectsAbbrList": "List",
+  "projectsAbbrNeverSpelled": "Never spelled out ({count})",
+  "@projectsAbbrNeverSpelled": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsAbbrListTitle": "List of abbreviations",
+  "projectsAbbrCopyAsText": "Copy as text",
+  "projectsTodosTitle": "To do in the writing ({count})",
+  "@projectsTodosTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsTodoWord": "TODO",
+  "projectsNeedsCitation": "Needs a citation",
+  "projectsFigureTodo": "Figure",
+  "projectsCitations": "Citations",
+  "projectsCitedInChapters": "Cited in chapters ({count})",
+  "@projectsCitedInChapters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsChapterCitations": "Ch. {chapter} · {count}×",
+  "@projectsChapterCitations": {
+    "placeholders": {
+      "chapter": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsReadNotCited": "Read but not cited ({count})",
+  "@projectsReadNotCited": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsHighlightCount": "{count, plural, =1{1 highlight} other{{count} highlights}}",
+  "@projectsHighlightCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsCitedOutside": "Cited, not in this project ({count})",
+  "@projectsCitedOutside": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectsNoPapersYet": "No papers in this project yet.",
+  "projectsBibliographySubject": "{project} bibliography",
+  "@projectsBibliographySubject": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  }
+}

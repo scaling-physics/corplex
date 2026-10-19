@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import 'auth_service.dart';
 import 'sign_up_screen.dart';
 
@@ -14,7 +15,7 @@ class SignInScreen extends ConsumerStatefulWidget {
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String? _error;
+  Object? _error;
   bool _submitting = false;
 
   @override
@@ -38,7 +39,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -54,12 +55,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Welcome back',
+              context.l10n.authWelcomeBack,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 6),
             Text(
-              "Sign in to sync your notes and papers across your devices.",
+              context.l10n.authSignInIntro,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -67,21 +68,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             const SizedBox(height: 28),
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(labelText: context.l10n.authEmail),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: InputDecoration(labelText: context.l10n.authPassword),
               obscureText: true,
               autofillHints: const [AutofillHints.password],
               onSubmitted: (_) => _submit(),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                authErrorText(context.l10n, _error!),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: 20),
             FilledButton(
@@ -92,7 +96,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Sign in'),
+                  : Text(context.l10n.authSignIn),
             ),
             const SizedBox(height: 12),
             TextButton(
@@ -101,7 +105,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   : () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const SignUpScreen()),
                     ),
-              child: const Text("Don't have an account? Sign up"),
+              child: Text(context.l10n.authNoAccount),
             ),
           ],
         ),

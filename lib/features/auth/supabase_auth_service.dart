@@ -38,6 +38,7 @@ class SupabaseAuthService implements AuthService {
           // Happens when the project requires email confirmation.
           throw const AuthException(
             'Check your email to confirm your account, then sign in.',
+            code: AuthErrorCode.confirmEmail,
           );
         }
       });
@@ -49,8 +50,10 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<void> signOut() => _run(_auth.signOut);
 
-  static const _offline =
-      'Could not reach the server. Check your connection and try again.';
+  static const _offline = AuthException(
+    'Could not reach the server. Check your connection and try again.',
+    code: AuthErrorCode.offline,
+  );
 
   Future<void> _run(Future<void> Function() action) async {
     try {
@@ -60,14 +63,18 @@ class SupabaseAuthService implements AuthService {
     } on AuthException {
       rethrow;
     } on SocketException {
-      throw const AuthException(_offline);
+      throw _offline;
     } on TimeoutException {
-      throw const AuthException(_offline);
+      throw _offline;
     } on http.ClientException {
-      throw const AuthException(_offline);
+      throw _offline;
     } catch (e) {
       // Not a connectivity problem: say so, rather than blaming the network.
-      throw AuthException('Something went wrong (${e.runtimeType}). Try again.');
+      throw AuthException(
+        'Something went wrong (${e.runtimeType}). Try again.',
+        code: AuthErrorCode.unknown,
+        detail: '${e.runtimeType}',
+      );
     }
   }
 }

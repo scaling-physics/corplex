@@ -21,6 +21,22 @@ private func widgetLink(_ url: URL) -> URL {
   return parts.url ?? url
 }
 
+/// The widget's few fixed texts, English or German by the system language
+/// (a table in code: the extension has no strings files).
+private let germanTexts = [
+  "Continue reading": "Weiterlesen",
+  "Open a paper to pick up where you left off.":
+    "Paper öffnen und dort weiterlesen, wo du aufgehört hast.",
+  "New note": "Neue Notiz",
+  "Pick up your paper where you left off, or start a note.":
+    "Paper dort weiterlesen, wo du aufgehört hast, oder eine Notiz beginnen.",
+]
+
+private func tr(_ english: String) -> String {
+  let german = Locale.preferredLanguages.first?.hasPrefix("de") ?? false
+  return german ? (germanTexts[english] ?? english) : english
+}
+
 struct ReadingEntry: TimelineEntry {
   let date: Date
   let title: String?
@@ -105,7 +121,7 @@ struct CorplexWidgetView: View {
   private var reading: some View {
     VStack(alignment: .leading, spacing: 4) {
       if let title = entry.title {
-        Text("Continue reading")
+        Text(verbatim: tr("Continue reading"))
           .font(.caption2.weight(.medium))
           .foregroundColor(.sage)
         Text(title)
@@ -121,7 +137,7 @@ struct CorplexWidgetView: View {
         Text("Corplex")
           .font(.system(.headline, design: .serif).weight(.semibold))
           .foregroundColor(.ink)
-        Text("Open a paper to pick up where you left off.")
+        Text(verbatim: tr("Open a paper to pick up where you left off."))
           .font(.caption)
           .foregroundColor(.inkSoft)
           .lineLimit(3)
@@ -133,7 +149,7 @@ struct CorplexWidgetView: View {
 
   private var newNoteButton: some View {
     Link(destination: newNoteURL) {
-      Label("New note", systemImage: "square.and.pencil")
+      Label(tr("New note"), systemImage: "square.and.pencil")
         .font(.footnote.weight(.semibold))
         .foregroundColor(.onSage)
         .padding(.horizontal, 14)
@@ -162,7 +178,7 @@ struct CorplexWidget: Widget {
       CorplexWidgetView(entry: entry)
     }
     .configurationDisplayName("Corplex")
-    .description("Pick up your paper where you left off, or start a note.")
+    .description(tr("Pick up your paper where you left off, or start a note."))
     .supportedFamilies([.systemSmall, .systemMedium])
   }
 }

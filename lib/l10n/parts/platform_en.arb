@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "platformUntitledPaper": "Untitled paper",
+  "platformWidgetPage": "p. {page}",
+  "@platformWidgetPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  }
+}

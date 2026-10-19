@@ -1,0 +1,36 @@
+{
+  "@@locale": "en",
+  "matrixColumnMethod": "Method",
+  "matrixColumnSample": "Sample",
+  "matrixColumnFindings": "Findings",
+  "matrixExport": "Export",
+  "matrixCopiedAsMarkdown": "Table copied as Markdown",
+  "matrixShareSubject": "{project} matrix",
+  "@matrixShareSubject": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "matrixCopyAsMarkdown": "Copy as Markdown",
+  "matrixShare": "Share…",
+  "matrixAddTheme": "Add a theme",
+  "matrixNoPapers": "No papers in this project",
+  "matrixNoPapersMessage": "Add papers to it from their screens, then compare them here.",
+  "matrixEmptyTitle": "Compare papers side by side",
+  "matrixEmptyMessage": "Add the themes you are comparing — method, sample, findings — and fill in what each paper says.",
+  "matrixAddDefaults": "Add method, sample, findings",
+  "matrixAddStudyColumns": "Add study columns",
+  "matrixNewTheme": "New theme",
+  "matrixFromStudyDetails": "From study details",
+  "matrixAllNotHereYet": "All the ones not here yet",
+  "matrixAlreadyAColumn": "Already a column",
+  "matrixRenameTheme": "Rename theme",
+  "matrixDeleteTheme": "Delete theme and its notes",
+  "matrixDeleteColumn": "Delete column",
+  "matrixPapersKeepDetails": "Papers keep their study details",
+  "matrixCellHint": "What does this paper say?",
+  "matrixSeparateWithSemicolon": "Separate with ;",
+  "matrixFromHighlights": "From your highlights"
+}

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/haptics.dart';
 import '../ocr/ocr_engine.dart';
 import '../ocr/ocr_service.dart';
@@ -152,16 +153,19 @@ class _OcrSelectionLayerState extends ConsumerState<OcrSelectionLayer> {
     final choice = await showMenu<OcrSelectionAction>(
       context: context,
       position: RelativeRect.fromRect(anchor, Offset.zero & screen),
-      items: const [
+      items: [
         PopupMenuItem(
           value: OcrSelectionAction.highlight,
-          child: Text('Highlight'),
+          child: Text(context.l10n.highlightsHighlight),
         ),
         PopupMenuItem(
           value: OcrSelectionAction.quote,
-          child: Text('Quote to note'),
+          child: Text(context.l10n.highlightsQuoteToNote),
         ),
-        PopupMenuItem(value: OcrSelectionAction.copy, child: Text('Copy')),
+        PopupMenuItem(
+          value: OcrSelectionAction.copy,
+          child: Text(context.l10n.commonCopy),
+        ),
       ],
     );
     if (mounted) _selected.value = const [];

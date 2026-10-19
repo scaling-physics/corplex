@@ -1,0 +1,24 @@
+{
+  "@@locale": "en",
+  "voiceNoteTitle": "Voice note, {date}",
+  "@voiceNoteTitle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceNote": "Voice note",
+  "voiceDictate": "Dictate",
+  "voiceFinishing": "Finishing…",
+  "voiceSavingTranscribing": "Saving and transcribing…",
+  "voiceStopRecording": "Stop recording",
+  "voiceStartRecording": "Start recording",
+  "voiceMicDenied": "Corplex needs the microphone to record. You can allow it in Settings.",
+  "voiceRecordingUnavailable": "Recording isn’t available here, so nothing was recorded.",
+  "voiceOpenSettings": "Open Settings",
+  "voiceNoSpeechCaught": "Didn’t catch any speech.",
+  "voiceSavedNoSpeech": "Saved. No speech was heard.",
+  "voiceSavedCantTranscribe": "Saved the audio. This device can’t transcribe it offline.",
+  "voiceSavedAllowSpeech": "Saved the audio. Allow Speech Recognition to get text too."
+}

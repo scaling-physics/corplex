@@ -1,3 +1,4 @@
+import '../../l10n/l10n.dart';
 import '../library/authors.dart';
 
 import 'package:flutter/material.dart';
@@ -50,7 +51,7 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: SearchBar(
-                  hintText: 'Search papers to link',
+                  hintText: context.l10n.notesSearchPapersToLink,
                   leading: const Icon(Icons.search),
                   onChanged: (value) => setState(() => _query = value),
                 ),
@@ -60,7 +61,7 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
               // background) and linked here in the same step.
               ListTile(
                 leading: const Icon(Icons.upload_file_outlined),
-                title: const Text('Import a PDF'),
+                title: Text(context.l10n.notesImportAPdf),
                 onTap: _importAndLink,
               ),
               Expanded(
@@ -79,7 +80,9 @@ class _LinkPaperSheetState extends ConsumerState<_LinkPaperSheet> {
                               )
                               .toList();
                     if (filtered.isEmpty) {
-                      return const Center(child: Text('No papers found.'));
+                      return Center(
+                        child: Text(context.l10n.notesNoPapersFound),
+                      );
                     }
                     return ListView(
                       children: filtered.map((paper) {

@@ -1,0 +1,134 @@
+{
+  "@@locale": "en",
+  "libraryStatusToRead": "To read",
+  "libraryStatusReading": "Reading",
+  "libraryStatusDone": "Done",
+  "librarySearchPapers": "Search papers",
+  "libraryAll": "All",
+  "libraryError": "Something went wrong: {error}",
+  "@libraryError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryNoMatches": "No matches",
+  "libraryNoMatchesHint": "Try a different title or author.",
+  "libraryEmptyTitle": "Your library is empty",
+  "libraryEmptyMessage": "Tap Import PDF to add a paper, or link one from a note.",
+  "libraryOpenPdf": "Open PDF",
+  "libraryAddToProject": "Add to project…",
+  "libraryCopyCitation": "Copy citation",
+  "libraryCitationCopied": "Citation copied",
+  "libraryShowAttachments": "Show Attachments",
+  "libraryAllHighlights": "All highlights",
+  "libraryAllHighlightsHint": "Across every paper",
+  "libraryAddById": "Add by DOI or arXiv ID",
+  "libraryAddByIdHint": "10.1038/nature14539, arXiv:1706.03762 or PMID: 9500320",
+  "libraryImportReferences": "Import references",
+  "libraryImportReferencesHint": "BibTeX, RIS or CSL JSON (Zotero, Mendeley)",
+  "libraryImportZotero": "Import from Zotero…",
+  "libraryExportBibtex": "Export as BibTeX",
+  "libraryNotAnIdentifier": "That doesn't look like a DOI, arXiv or PubMed ID.",
+  "libraryLookingUp": "Looking it up…",
+  "libraryNoPaperFound": "No paper found for {id}.",
+  "@libraryNoPaperFound": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryAlreadyInLibrary": "Already in your library.",
+  "libraryLookupUnreachable": "Couldn't reach the lookup service. Try again online.",
+  "libraryNoReferencesFound": "No references found in that file.",
+  "libraryAddedPapers": "Added {count, plural, =1{1 paper} other{{count} papers}}",
+  "@libraryAddedPapers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryAlreadyInLibraryCount": "{count} already in your library",
+  "@libraryAlreadyInLibraryCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryIsEmpty": "Your library is empty.",
+  "libraryFoundDetails": "Found the details for “{title}”",
+  "@libraryFoundDetails": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryLooksDuplicate": "Looks like “{title}” is already here.",
+  "@libraryLooksDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryNoticeRetracted": "Retracted",
+  "libraryNoticeWithdrawn": "Withdrawn",
+  "libraryNoticeConcern": "Expression of concern issued",
+  "libraryNoticeCorrected": "Corrected",
+  "libraryNoticeDatePattern": "d MMMM y",
+  "libraryNoticeOn": "{kind} on {date} — see the notice",
+  "@libraryNoticeOn": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryNoticeUndated": "{kind} — see the notice",
+  "@libraryNoticeUndated": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryLocatorPage": "Page",
+  "libraryLocatorChapter": "Chapter",
+  "libraryLocatorSection": "Section",
+  "libraryLocatorFigure": "Figure",
+  "libraryLocatorParagraph": "Paragraph",
+  "libraryLocatorVolume": "Volume",
+  "libraryLocatorLine": "Line",
+  "libraryLocatorNote": "Note",
+  "libraryCitationsLoadMoreFailed": "Couldn’t load more. Try again online.",
+  "libraryCitationsAdded": "Added to your library.",
+  "libraryCitationsTitle": "References · Cited by",
+  "libraryCitationsReferences": "References",
+  "libraryCitationsCitedBy": "Cited by",
+  "libraryCitationsRefresh": "Refresh",
+  "libraryCitationsRetry": "Retry",
+  "libraryCitationsUnreachable": "Couldn’t reach OpenAlex. Try again online.",
+  "libraryCitationsRefreshFailed": "Couldn’t refresh. Try again online.",
+  "libraryCitationsNotFound": "OpenAlex has no record of this paper.",
+  "libraryCitationsNoCiting": "No citing papers found.",
+  "libraryCitationsNoReferences": "No references listed.",
+  "libraryCitationsMoreNotShown": "{count} more not shown.",
+  "@libraryCitationsMoreNotShown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryCitationsLoading": "Loading…",
+  "libraryCitationsLoadMore": "Load more",
+  "libraryCitationsInLibrary": "In your library"
+}

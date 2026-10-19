@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../notes/note_editor_screen.dart';
 import '../notes/note_papers_providers.dart';
 import '../platform/mac_window.dart';
@@ -201,7 +202,11 @@ class _ResizableSplitState extends State<ResizableSplit> {
 
 /// The note to read alongside [paper]: the one most recently edited among
 /// those linked to it, or a new one (titled after it, linked) if none.
-Future<String> noteForReading(AppDatabase db, Paper paper) async {
+Future<String> noteForReading(
+  AppDatabase db,
+  Paper paper, {
+  String? newNoteTitle,
+}) async {
   final existing =
       await (db.select(db.notes).join([
               innerJoin(
@@ -221,7 +226,7 @@ Future<String> noteForReading(AppDatabase db, Paper paper) async {
       .insert(
         NotesCompanion.insert(
           id: Value(id),
-          title: Value('Notes on ${paper.title}'),
+          title: Value(newNoteTitle ?? 'Notes on ${paper.title}'),
         ),
       );
   await linkPaperToNote(db, noteId: id, paperId: paper.id);
@@ -234,7 +239,12 @@ Future<void> openSplitReader(
   WidgetRef ref,
   Paper paper,
 ) async {
-  final noteId = await noteForReading(ref.read(databaseProvider), paper);
+  final title = context.l10n.viewerNotesOn(paper.title);
+  final noteId = await noteForReading(
+    ref.read(databaseProvider),
+    paper,
+    newNoteTitle: title,
+  );
   if (!context.mounted) return;
   await Navigator.of(context).push(
     MaterialPageRoute<void>(

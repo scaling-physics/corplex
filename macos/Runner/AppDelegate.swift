@@ -22,7 +22,8 @@ class AppDelegate: FlutterAppDelegate {
     }
     let menu = NSMenu()
     let item = NSMenuItem(
-      title: "New Note", action: #selector(MainFlutterWindow.dockNewNote(_:)), keyEquivalent: "")
+      title: menuTitle("New Note"),
+      action: #selector(MainFlutterWindow.dockNewNote(_:)), keyEquivalent: "")
     item.target = window
     menu.addItem(item)
     return menu

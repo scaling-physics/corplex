@@ -1,0 +1,35 @@
+{
+  "@@locale": "en",
+  "commentsOpenCount": "{count, plural, =1{1 open comment} other{{count} open comments}}",
+  "@commentsOpenCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commentsEditComment": "Edit comment",
+  "commentsAddComment": "Add comment",
+  "commentsComment": "Comment",
+  "commentsFromOptional": "From (optional)",
+  "commentsFromHint": "e.g. Supervisor",
+  "commentsResolve": "Resolve",
+  "commentsReopen": "Reopen",
+  "commentsTitle": "Comments",
+  "commentsOnSelection": "Comment on the selection",
+  "commentsSelectAPassage": "Select a passage to comment on",
+  "commentsDeleted": "Comment deleted",
+  "commentsShowResolved": "Show resolved ({count})",
+  "@commentsShowResolved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commentsEmpty": "Select a passage, then choose Add comment.",
+  "commentsNothingOpen": "Nothing open.",
+  "commentsPassageChanged": "Passage changed",
+  "commentsOptions": "Comment options",
+  "commentsUnlockToAdd": "Unlock your notes to add a comment."
+}

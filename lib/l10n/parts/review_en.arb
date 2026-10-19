@@ -1,0 +1,53 @@
+{
+  "@@locale": "en",
+  "reviewPrompt": "{count, plural, =1{1 highlight to revisit} other{{count} highlights to revisit}}",
+  "@reviewPrompt": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewDismiss": "Dismiss until tomorrow",
+  "reviewTitle": "Revisit highlights",
+  "reviewNothing": "Nothing to revisit",
+  "reviewCaughtUp": "All caught up",
+  "reviewEmptyMessage": "Highlights come back here a day after you make them, then less and less often.",
+  "reviewTomorrow": "They will come back tomorrow.",
+  "reviewLater": "The ones you kept will return in a while.",
+  "reviewPosition": "{current} of {total}",
+  "@reviewPosition": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewRemind": "Remind me on the home screen",
+  "reviewRemindHint": "A single quiet line when something is due",
+  "reviewQuote": "“{quote}”",
+  "@reviewQuote": {
+    "placeholders": {
+      "quote": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewSource": "{title} · p. {page}",
+  "@reviewSource": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewKeep": "Keep",
+  "reviewSkip": "Skip",
+  "reviewOpenInPaper": "Open in paper"
+}

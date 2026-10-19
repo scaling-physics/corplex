@@ -18,6 +18,10 @@ jobs:
       # database.g.dart is committed; fail if it's stale.
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: git diff --exit-code lib/data/database.g.dart
+      # Strings: app_*.arb are merged from lib/l10n/parts and the Dart
+      # classes generated from them; both are committed.
+      - run: dart run tool/l10n/build_arb.dart --check
+      - run: flutter gen-l10n && git diff --exit-code lib/l10n
       - run: flutter analyze
       # Android release builds refuse cleartext http; an http:// request
       # works in debug and tests and silently fails on phones (it broke

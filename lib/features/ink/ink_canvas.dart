@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/haptics.dart';
 import 'ink_model.dart';
 import 'ink_painter.dart';
@@ -682,7 +683,7 @@ class _InkCanvasState extends State<InkCanvas> {
                     child: ActionChip(
                       key: const ValueKey('ink-paste'),
                       avatar: const Icon(Icons.content_paste, size: 16),
-                      label: const Text('Paste'),
+                      label: Text(context.l10n.inkPaste),
                       visualDensity: VisualDensity.compact,
                       onPressed: _paste,
                     ),
@@ -754,16 +755,21 @@ class _SelectionMenu extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          button(const ValueKey('ink-sel-copy'), Icons.copy, 'Copy', onCopy),
+          button(
+            const ValueKey('ink-sel-copy'),
+            Icons.copy,
+            context.l10n.commonCopy,
+            onCopy,
+          ),
           button(
             const ValueKey('ink-sel-duplicate'),
             Icons.control_point_duplicate,
-            'Duplicate',
+            context.l10n.inkDuplicate,
             onDuplicate,
           ),
           PopupMenuButton<int>(
             key: const ValueKey('ink-sel-color'),
-            tooltip: 'Colour',
+            tooltip: context.l10n.inkColour,
             icon: const Icon(Icons.palette_outlined, size: 20),
             padding: EdgeInsets.zero,
             onSelected: onColor,
@@ -782,7 +788,14 @@ class _SelectionMenu extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text(const ['Graphite', 'Sage', 'Clay', 'Blue'][i]),
+                      Text(
+                        [
+                          context.l10n.inkGraphite,
+                          context.l10n.inkSage,
+                          context.l10n.inkClay,
+                          context.l10n.inkBlue,
+                        ][i],
+                      ),
                     ],
                   ),
                 ),
@@ -791,7 +804,7 @@ class _SelectionMenu extends StatelessWidget {
           button(
             const ValueKey('ink-sel-delete'),
             Icons.delete_outline,
-            'Delete',
+            context.l10n.commonDelete,
             onDelete,
           ),
         ],

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
+import '../../l10n/l10n.dart';
+
 /// Where find-in-document gets its text. The PDF's own text layer is one
 /// source ([PdfrxTextSource]); a later one (OCR of scanned pages) only has
 /// to answer the same question: where on page N does [query] appear?
@@ -109,14 +111,20 @@ class DocumentSearch extends ChangeNotifier {
   }
 
   /// "3 of 41", "No matches", or "" before anything is typed.
-  String get summary {
+  String get summary => summaryIn(lookupAppLocalizations(const Locale('en')));
+
+  /// [summary] in [l]'s language.
+  String summaryIn(AppLocalizations l) {
     if (_query.isEmpty) return '';
     final more = _busy || (incomplete?.call() ?? false);
     if (_matches.isEmpty) {
-      if (_busy) return 'Searching…';
-      return more ? 'No matches yet' : 'No matches';
+      if (_busy) return l.viewerFindSearching;
+      return more ? l.viewerFindNoMatchesYet : l.viewerFindNoMatches;
     }
-    return '${_current! + 1} of ${_matches.length}${more ? '+' : ''}';
+    final at = _current! + 1;
+    return more
+        ? l.viewerFindCountMore(at, _matches.length)
+        : l.viewerFindCount(at, _matches.length);
   }
 
   @override

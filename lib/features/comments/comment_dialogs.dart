@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import 'comment_anchor.dart';
 import 'comments_data.dart';
 
@@ -72,7 +73,11 @@ class _CommentDialogState extends State<_CommentDialog> {
     final theme = Theme.of(context);
     final quote = displayQuote(widget.quote);
     return AlertDialog(
-      title: Text(widget.editing ? 'Edit comment' : 'Add comment'),
+      title: Text(
+        widget.editing
+            ? context.l10n.commentsEditComment
+            : context.l10n.commentsAddComment,
+      ),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -108,16 +113,18 @@ class _CommentDialogState extends State<_CommentDialog> {
                 minLines: 2,
                 maxLines: 6,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(hintText: 'Comment'),
+                decoration: InputDecoration(
+                  hintText: context.l10n.commentsComment,
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 key: const ValueKey('comment-author'),
                 controller: _author,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'From (optional)',
-                  hintText: 'e.g. Supervisor',
+                decoration: InputDecoration(
+                  labelText: context.l10n.commentsFromOptional,
+                  hintText: context.l10n.commentsFromHint,
                 ),
               ),
               if (widget.suggestions.isNotEmpty) ...[
@@ -141,12 +148,14 @@ class _CommentDialogState extends State<_CommentDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           key: const ValueKey('comment-save'),
           onPressed: _save,
-          child: Text(widget.editing ? 'Save' : 'Add'),
+          child: Text(
+            widget.editing ? context.l10n.commonSave : context.l10n.commonAdd,
+          ),
         ),
       ],
     );
@@ -187,21 +196,21 @@ Future<({CommentView comment, CommentChoice choice})?> showCommentPopover(
                           comment: c,
                           choice: CommentChoice.resolve,
                         )),
-                        child: const Text('Resolve'),
+                        child: Text(context.l10n.commentsResolve),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(context, (
                           comment: c,
                           choice: CommentChoice.edit,
                         )),
-                        child: const Text('Edit'),
+                        child: Text(context.l10n.commonEdit),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(context, (
                           comment: c,
                           choice: CommentChoice.delete,
                         )),
-                        child: const Text('Delete'),
+                        child: Text(context.l10n.commonDelete),
                       ),
                     ],
                   ),

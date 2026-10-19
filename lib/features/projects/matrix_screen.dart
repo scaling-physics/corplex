@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../theme/motion_widgets.dart';
@@ -34,7 +35,7 @@ class MatrixScreen extends ConsumerWidget {
         actions: [
           if (columns.isNotEmpty && papers.isNotEmpty)
             PopupMenuButton<String>(
-              tooltip: 'Export',
+              tooltip: context.l10n.matrixExport,
               icon: const Icon(Icons.ios_share),
               onSelected: (v) async {
                 final md = matrixToMarkdown(columns, papers, cells);
@@ -42,54 +43,62 @@ class MatrixScreen extends ConsumerWidget {
                   await Clipboard.setData(ClipboardData(text: md));
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Table copied as Markdown')),
+                      SnackBar(
+                        content: Text(context.l10n.matrixCopiedAsMarkdown),
+                      ),
                     );
                   }
                 } else {
                   await SharePlus.instance.share(
                     ShareParams(
                       text: md,
-                      subject: '${project.name} matrix',
+                      subject: context.l10n.matrixShareSubject(project.name),
                       sharePositionOrigin: shareOrigin(context),
                     ),
                   );
                 }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'copy', child: Text('Copy as Markdown')),
-                PopupMenuItem(value: 'share', child: Text('Share…')),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'copy',
+                  child: Text(context.l10n.matrixCopyAsMarkdown),
+                ),
+                PopupMenuItem(
+                  value: 'share',
+                  child: Text(context.l10n.matrixShare),
+                ),
               ],
             ),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Add a theme',
+            tooltip: context.l10n.matrixAddTheme,
             onPressed: () => _addColumn(context, db, columns),
           ),
         ],
       ),
       body: papers.isEmpty
-          ? const EmptyState(
+          ? EmptyState(
               icon: Icons.table_chart_outlined,
-              title: 'No papers in this project',
-              message: 'Add papers to it from their screens, then compare them here.',
+              title: context.l10n.matrixNoPapers,
+              message: context.l10n.matrixNoPapersMessage,
             )
           : columns.isEmpty
           ? EmptyState(
               icon: Icons.table_chart_outlined,
-              title: 'Compare papers side by side',
-              message:
-                  'Add the themes you are comparing — method, sample, '
-                  'findings — and fill in what each paper says.',
+              title: context.l10n.matrixEmptyTitle,
+              message: context.l10n.matrixEmptyMessage,
               action: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   FilledButton(
-                    onPressed: () => addDefaultMatrixColumns(db, project.id),
-                    child: const Text('Add method, sample, findings'),
+                    onPressed: () =>
+                        addDefaultMatrixColumns(db, project.id, context.l10n),
+                    child: Text(context.l10n.matrixAddDefaults),
                   ),
                   TextButton(
-                    onPressed: () => addStudyColumns(db, project.id),
-                    child: const Text('Add study columns'),
+                    onPressed: () =>
+                        addStudyColumns(db, project.id, context.l10n),
+                    child: Text(context.l10n.matrixAddStudyColumns),
                   ),
                 ],
               ),
@@ -185,27 +194,27 @@ class MatrixScreen extends ConsumerWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.add),
-                title: const Text('New theme'),
+                title: Text(context.l10n.matrixNewTheme),
                 onTap: () => Navigator.pop(context, 'new'),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Text('From study details'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(context.l10n.matrixFromStudyDetails),
               ),
               if (StudyField.values.any((f) => !have.contains(f.key)))
                 ListTile(
                   leading: const Icon(Icons.table_rows_outlined),
-                  title: const Text('Add study columns'),
-                  subtitle: const Text('All the ones not here yet'),
+                  title: Text(context.l10n.matrixAddStudyColumns),
+                  subtitle: Text(context.l10n.matrixAllNotHereYet),
                   onTap: () => Navigator.pop(context, 'all'),
                 ),
               for (final f in StudyField.values)
                 ListTile(
                   leading: const Icon(Icons.science_outlined),
-                  title: Text(f.label),
+                  title: Text(f.labelFor(context.l10n)),
                   enabled: !have.contains(f.key),
                   subtitle: have.contains(f.key)
-                      ? const Text('Already a column')
+                      ? Text(context.l10n.matrixAlreadyAColumn)
                       : null,
                   onTap: () => Navigator.pop(context, f),
                 ),
@@ -216,12 +225,17 @@ class MatrixScreen extends ConsumerWidget {
     );
     if (choice == null || !context.mounted) return;
     if (choice == 'new') {
-      final name = await _askName(context, 'New theme');
+      final name = await _askName(context, context.l10n.matrixNewTheme);
       if (name != null) await addMatrixColumn(db, project.id, name);
     } else if (choice == 'all') {
-      await addStudyColumns(db, project.id);
+      await addStudyColumns(db, project.id, context.l10n);
     } else if (choice is StudyField) {
-      await addMatrixColumn(db, project.id, choice.label, field: choice);
+      await addMatrixColumn(
+        db,
+        project.id,
+        choice.labelFor(context.l10n),
+        field: choice,
+      );
     }
   }
 
@@ -245,14 +259,14 @@ class MatrixScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(
               context,
               controller.text.trim().isEmpty ? null : controller.text,
             ),
-            child: const Text('Save'),
+            child: Text(context.l10n.commonSave),
           ),
         ],
       ),
@@ -272,19 +286,19 @@ class MatrixScreen extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit_outlined),
-              title: const Text('Rename theme'),
+              title: Text(context.l10n.matrixRenameTheme),
               onTap: () => Navigator.pop(context, 'rename'),
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: Text(
                 column.paperField == null
-                    ? 'Delete theme and its notes'
-                    : 'Delete column',
+                    ? context.l10n.matrixDeleteTheme
+                    : context.l10n.matrixDeleteColumn,
               ),
               subtitle: column.paperField == null
                   ? null
-                  : const Text('Papers keep their study details'),
+                  : Text(context.l10n.matrixPapersKeepDetails),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -295,7 +309,7 @@ class MatrixScreen extends ConsumerWidget {
     if (action == 'rename') {
       final name = await _askName(
         context,
-        'Rename theme',
+        context.l10n.matrixRenameTheme,
         initial: column.name,
       );
       if (name != null) await renameMatrixColumn(db, column.id, name);
@@ -410,16 +424,19 @@ class _CellSheetState extends ConsumerState<_CellSheet> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   hintText: widget.column.paperField == null
-                      ? 'What does this paper say?'
+                      ? context.l10n.matrixCellHint
                       : (StudyField.byKey(widget.column.paperField)?.isList ??
                             false)
-                      ? 'Separate with ;'
+                      ? context.l10n.matrixSeparateWithSemicolon
                       : null,
                 ),
               ),
               if (highlights.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('From your highlights', style: theme.textTheme.titleSmall),
+                Text(
+                  context.l10n.matrixFromHighlights,
+                  style: theme.textTheme.titleSmall,
+                ),
                 for (final h in highlights)
                   ListTile(
                     dense: true,
@@ -429,9 +446,11 @@ class _CellSheetState extends ConsumerState<_CellSheet> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: Text('p. ${h.pageNumber}'),
+                    subtitle: Text(context.l10n.notesPageShort(h.pageNumber)),
                     trailing: const Icon(Icons.add_circle_outline),
-                    onTap: () => _append('“${h.quote}” (p. ${h.pageNumber})'),
+                    onTap: () => _append(
+                      '“${h.quote}” (${context.l10n.notesPageShort(h.pageNumber)})',
+                    ),
                   ),
               ],
             ],

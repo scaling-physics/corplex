@@ -4,6 +4,7 @@ import 'package:home_widget/home_widget.dart';
 
 import '../../data/database.dart';
 import '../../data/tables/papers_table.dart';
+import '../../l10n/l10n.dart';
 import '../library/highlights.dart' show paperPageLink;
 
 /// Shared container the iOS widget extension reads (create it in Xcode as
@@ -28,7 +29,9 @@ class WidgetPayload {
   final String? uri;
 
   String get headline => title ?? '';
-  String get detail => title == null ? '' : (page == null ? '' : 'p. $page');
+  String get detail => title == null || page == null
+      ? ''
+      : deviceL10n().platformWidgetPage(page!);
 
   @override
   bool operator ==(Object other) =>
@@ -58,11 +61,14 @@ Paper? pickContinueReading(Iterable<Paper> papers) {
       newest(papers.where((p) => p.lastPage != null));
 }
 
-WidgetPayload widgetPayloadFor(Paper? paper) {
+/// The widget has no context, so [l10n] is the device language by default.
+WidgetPayload widgetPayloadFor(Paper? paper, {AppLocalizations? l10n}) {
   if (paper == null) return const WidgetPayload();
   final page = paper.lastPage;
   return WidgetPayload(
-    title: paper.title.trim().isEmpty ? 'Untitled paper' : paper.title.trim(),
+    title: paper.title.trim().isEmpty
+        ? (l10n ?? deviceL10n()).platformUntitledPaper
+        : paper.title.trim(),
     page: page,
     uri: paperPageLink(paper.id, page ?? 1),
   );

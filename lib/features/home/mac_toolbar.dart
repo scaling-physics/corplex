@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/l10n.dart';
 import '../platform/mac_window.dart';
 
 /// The Mac window's toolbar row, laid out like Notes: one [macToolbarHeight]
@@ -125,11 +126,14 @@ class MacToolbarSearch extends StatelessWidget {
                 style: theme.textTheme.bodyMedium,
                 textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
-                  hintText: 'Search',
+                  hintText: context.l10n.commonSearch,
                   isDense: true,
                   filled: true,
                   fillColor: c.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
                   prefixIcon: Icon(
                     Icons.search,
                     size: 17,
@@ -140,7 +144,7 @@ class MacToolbarSearch extends StatelessWidget {
                       ? null
                       : IconButton(
                           icon: const Icon(Icons.cancel, size: 15),
-                          tooltip: 'Clear',
+                          tooltip: context.l10n.searchClear,
                           onPressed: _clear,
                           padding: EdgeInsets.zero,
                           style: IconButton.styleFrom(
@@ -252,13 +256,6 @@ class MacToolbarRow extends StatelessWidget {
     );
   }
 }
-
-/// "3 notes", "1 paper", "No notes".
-String countLabel(int n, String one, String many) => n == 0
-    ? 'No $many'
-    : n == 1
-    ? '1 $one'
-    : '$n $many';
 
 /// The toolbar row for a pane screen with nothing of its own to put in it
 /// (no note chosen, a note still loading): just [chrome]'s two ends.

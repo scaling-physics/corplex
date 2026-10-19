@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "readAloudPreparing": "Preparing…",
+  "readAloudNoText": "No text to read",
+  "readAloudFinished": "Finished",
+  "readAloudBack": "Back to reading",
+  "readAloudPrevious": "Previous sentence",
+  "readAloudNext": "Next sentence",
+  "readAloudPause": "Pause",
+  "readAloudPlay": "Play",
+  "readAloudSpeed": "Speed",
+  "readAloudStop": "Stop reading"
+}

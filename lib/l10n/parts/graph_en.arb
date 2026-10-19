@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "graphLockedNote": "Locked note",
+  "graphUntitledPaper": "Untitled paper",
+  "graphMap": "Map",
+  "graphHideUnconnected": "Hide unconnected items",
+  "graphShowUnconnected": "Show unconnected items",
+  "graphCouldntDraw": "Couldn’t draw the map",
+  "graphTryAgainInAMoment": "Try again in a moment.",
+  "graphNothingToMap": "Nothing to map yet",
+  "graphNothingConnected": "Nothing connected",
+  "graphEmptyMessage": "Link notes to each other or to papers, or cite a paper with [@, and the connections appear here."
+}

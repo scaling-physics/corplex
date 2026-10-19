@@ -1,0 +1,17 @@
+{
+  "@@locale": "de",
+  "trashEmptyAction": "Leeren",
+  "trashEmptyTitle": "Papierkorb leeren?",
+  "trashEmptyBody": "{count, plural, =1{1 Eintrag wird endgültig gelöscht.} other{{count} Einträge werden endgültig gelöscht.}}",
+  "trashIsEmpty": "Papierkorb ist leer",
+  "trashEmptyMessage": "Gelöschte Notizen und Paper bleiben hier {days, plural, =1{1 Tag} other{{days} Tage}} lang.",
+  "trashKept": "{days, plural, =1{1 Tag} other{{days} Tage}} aufbewahrt, danach endgültig gelöscht.",
+  "trashKindNote": "Notiz",
+  "trashKindPaper": "Paper",
+  "trashDeletingSoon": "wird bald gelöscht",
+  "trashDaysLeft": "{days, plural, =1{noch 1 Tag} other{noch {days} Tage}}",
+  "trashRestore": "Wiederherstellen",
+  "trashRestored": "Wiederhergestellt",
+  "trashMovedToTrash": "{label} in den Papierkorb gelegt",
+  "trashQuoted": "„{title}“"
+}

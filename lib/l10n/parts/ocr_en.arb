@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "ocrReadingText": "Reading text… {percent}%",
+  "@ocrReadingText": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "ocrRecogniseText": "Recognise text",
+  "ocrRecogniseTextHint": "Search and highlight a scan"
+}

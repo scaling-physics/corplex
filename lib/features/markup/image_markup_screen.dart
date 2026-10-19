@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../ink/ink_canvas.dart';
 import '../ink/ink_model.dart';
 import '../ink/ink_tools.dart';
@@ -79,7 +80,7 @@ class _AttachmentImageViewerState extends ConsumerState<AttachmentImageViewer> {
           ...widget.actions,
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Mark up',
+            tooltip: context.l10n.markupMarkUp,
             onPressed: _markUp,
           ),
         ],
@@ -187,9 +188,8 @@ class _ImageMarkupScreenState extends ConsumerState<ImageMarkupScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Couldn\'t save the marks.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.markupSaveFailed)));
     }
   }
 
@@ -228,31 +228,31 @@ class _ImageMarkupScreenState extends ConsumerState<ImageMarkupScreen> {
             backgroundColor: c.surfaceContainerLow,
             leading: IconButton(
               icon: const Icon(Icons.close),
-              tooltip: 'Cancel',
+              tooltip: context.l10n.commonCancel,
               onPressed: () => Navigator.of(context).pop(false),
             ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.undo),
-                tooltip: 'Undo',
+                tooltip: context.l10n.commonUndo,
                 onPressed: _undo.isEmpty ? null : _undoLast,
               ),
               IconButton(
                 icon: const Icon(Icons.redo),
-                tooltip: 'Redo',
+                tooltip: context.l10n.inkRedo,
                 onPressed: _redo.isEmpty ? null : _redoLast,
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: FilledButton.tonal(
                   onPressed: sketch == null || _saving ? null : _done,
-                  child: const Text('Done'),
+                  child: Text(context.l10n.commonDone),
                 ),
               ),
             ],
           ),
           body: _failed
-              ? const Center(child: Text('Couldn\'t open this image.'))
+              ? Center(child: Text(context.l10n.markupOpenFailed))
               : sketch == null
               ? const Center(child: CircularProgressIndicator())
               : Padding(

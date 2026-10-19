@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/haptics.dart';
 import '../audio/audio_link.dart';
@@ -153,6 +154,8 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
   }
 
   Future<void> _stop() async {
+    final l10n = context.l10n;
+    final locale = Localizations.localeOf(context).toString();
     _stopClocks();
     final duration = _stopwatch.elapsed;
     AppHaptics.confirm();
@@ -171,8 +174,8 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
       return;
     }
     final db = ref.read(databaseProvider);
-    final title =
-        'Voice note, ${DateFormat.MMMd().add_Hm().format(DateTime.now())}';
+    final dateText = DateFormat.MMMd(locale).add_Hm().format(DateTime.now());
+    final title = l10n.voiceNoteTitle(dateText);
     final id = await insertAttachment(
       db,
       noteId: widget.noteId,
@@ -216,6 +219,7 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final recording = _phase == _Phase.recording;
+    final l10n = context.l10n;
     return PopScope(
       canPop: _phase == _Phase.idle || _phase == _Phase.blocked,
       child: SafeArea(
@@ -225,7 +229,7 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _dictate ? 'Dictate' : 'Voice note',
+                _dictate ? l10n.voiceDictate : l10n.voiceNote,
                 style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
@@ -264,7 +268,9 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _dictate ? 'Finishing…' : 'Saving and transcribing…',
+                        _dictate
+                            ? l10n.voiceFinishing
+                            : l10n.voiceSavingTranscribing,
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
@@ -272,7 +278,9 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
                 else
                   Semantics(
                     button: true,
-                    label: recording ? 'Stop recording' : 'Start recording',
+                    label: recording
+                        ? l10n.voiceStopRecording
+                        : l10n.voiceStartRecording,
                     excludeSemantics: true,
                     child: SizedBox.square(
                       dimension: 72,
@@ -298,7 +306,11 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
                 TextButton(
                   key: const Key('voice-cancel-button'),
                   onPressed: _cancel,
-                  child: Text(_phase == _Phase.blocked ? 'Close' : 'Cancel'),
+                  child: Text(
+                    _phase == _Phase.blocked
+                        ? l10n.commonClose
+                        : l10n.commonCancel,
+                  ),
                 ),
             ],
           ),
@@ -320,9 +332,8 @@ class _Blocked extends ConsumerWidget {
       children: [
         Text(
           denied
-              ? 'Corplex needs the microphone to record. You can allow it in '
-                    'Settings.'
-              : 'Recording isn’t available here, so nothing was recorded.',
+              ? context.l10n.voiceMicDenied
+              : context.l10n.voiceRecordingUnavailable,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
@@ -331,7 +342,7 @@ class _Blocked extends ConsumerWidget {
           FilledButton.tonal(
             key: const Key('voice-open-settings'),
             onPressed: () => ref.read(openAppSettingsProvider)(),
-            child: const Text('Open Settings'),
+            child: Text(context.l10n.voiceOpenSettings),
           ),
         ],
       ],
@@ -381,14 +392,19 @@ class _LevelMeter extends StatelessWidget {
 /// Puts a dictation's text, or a voice note's title and transcript, in the
 /// note at the cursor. For a voice note the `▸ 0:00 ` link must already be
 /// placed with the cursor after it.
-void insertVoiceText(QuillController controller, VoiceResult result) {
+void insertVoiceText(
+  QuillController controller,
+  VoiceResult result, {
+  AppLocalizations? l10n,
+}) {
+  final heading = l10n?.voiceNote ?? 'Voice note';
   final docEnd = controller.document.length - 1;
   final at = controller.selection.baseOffset;
   final index = at < 0 || at > docEnd ? docEnd : at;
   final text = result.attachmentId != null
       ? (result.transcript.isEmpty
-            ? 'Voice note\n'
-            : 'Voice note\n${result.transcript}\n')
+            ? '$heading\n'
+            : '$heading\n${result.transcript}\n')
       : (result.transcript.isEmpty ? '' : '${result.transcript} ');
   if (text.isEmpty) return;
   controller.replaceText(
@@ -403,11 +419,10 @@ void insertVoiceText(QuillController controller, VoiceResult result) {
 void reportVoiceResult(BuildContext context, WidgetRef ref, VoiceResult r) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
+  final l10n = context.l10n;
   if (r.attachmentId == null) {
     if (r.transcript.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Didn’t catch any speech.')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(l10n.voiceNoSpeechCaught)));
     }
     return;
   }
@@ -415,25 +430,19 @@ void reportVoiceResult(BuildContext context, WidgetRef ref, VoiceResult r) {
     case TranscriptStatus.done:
       if (r.transcript.isEmpty && ref.read(transcribesRecordingsProvider)) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Saved. No speech was heard.')),
+          SnackBar(content: Text(l10n.voiceSavedNoSpeech)),
         );
       }
     case TranscriptStatus.unavailable:
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Saved the audio. This device can’t transcribe it offline.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.voiceSavedCantTranscribe)),
       );
     case TranscriptStatus.denied:
       final open = ref.read(openAppSettingsProvider);
       messenger.showSnackBar(
         SnackBar(
-          content: const Text(
-            'Saved the audio. Allow Speech Recognition to get text too.',
-          ),
-          action: SnackBarAction(label: 'Settings', onPressed: open),
+          content: Text(l10n.voiceSavedAllowSpeech),
+          action: SnackBarAction(label: l10n.commonSettings, onPressed: open),
         ),
       );
   }

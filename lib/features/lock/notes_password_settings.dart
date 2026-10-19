@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
+
 import 'note_lock_service.dart';
 import 'notes_password_dialogs.dart';
 
@@ -15,7 +17,7 @@ class NotesPasswordSettings extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final service = ref.watch(noteLockServiceProvider);
-    final name = biometricName(Theme.of(context).platform);
+    final name = biometricName(context.l10n, Theme.of(context).platform);
     return FutureBuilder<(bool, bool)>(
       // Re-asked on every rebuild, i.e. whenever the service changes.
       future: _biometricState(service),
@@ -28,13 +30,13 @@ class NotesPasswordSettings extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
               child: Text(
-                'Notes password',
+                context.l10n.lockNotesPassword,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
             ListTile(
               leading: const Icon(Icons.password_outlined),
-              title: const Text('Change password'),
+              title: Text(context.l10n.lockChangePassword),
               onTap: () async {
                 final ok = await showChangeNotesPasswordDialog(
                   context,
@@ -42,7 +44,7 @@ class NotesPasswordSettings extends ConsumerWidget {
                 );
                 if (ok && context.mounted) {
                   ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                    const SnackBar(content: Text('Notes password changed')),
+                    SnackBar(content: Text(context.l10n.lockPasswordChanged)),
                   );
                 }
               },
@@ -50,15 +52,15 @@ class NotesPasswordSettings extends ConsumerWidget {
             if (available)
               SwitchListTile(
                 secondary: const Icon(Icons.fingerprint),
-                title: Text('Use $name'),
-                subtitle: const Text('Open locked notes without typing'),
+                title: Text(context.l10n.lockUseBiometric(name)),
+                subtitle: Text(context.l10n.lockBiometricSubtitle),
                 value: enabled,
                 onChanged: (on) async {
                   if (on && !service.anyUnlocked) {
                     final ok = await showUnlockNotesDialog(
                       context,
                       service,
-                      message: 'Enter your notes password to turn this on.',
+                      message: context.l10n.lockEnterToTurnOn,
                     );
                     if (!ok) return;
                   }
@@ -68,14 +70,14 @@ class NotesPasswordSettings extends ConsumerWidget {
             if (service.anyUnlocked)
               ListTile(
                 leading: const Icon(Icons.lock_outline),
-                title: const Text('Lock now'),
-                subtitle: const Text('Locked notes ask for the password again'),
+                title: Text(context.l10n.lockNow),
+                subtitle: Text(context.l10n.lockNowSubtitle),
                 onTap: service.lockNow,
               ),
             ListTile(
               leading: const Icon(Icons.restart_alt),
-              title: const Text('Reset password…'),
-              subtitle: const Text('For a forgotten password'),
+              title: Text(context.l10n.lockResetItem),
+              subtitle: Text(context.l10n.lockResetItemSubtitle),
               onTap: () => _reset(context, service),
             ),
           ],
@@ -91,21 +93,16 @@ class NotesPasswordSettings extends ConsumerWidget {
     final go = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reset the notes password?'),
-        content: const Text(
-          'You\'ll choose a new password for notes you lock from now on.\n\n'
-          'Notes already locked stay locked under the old password. Without '
-          'it they can\'t be opened — not by you, and not by us. If you '
-          'remember the old password later, entering it opens them again.',
-        ),
+        title: Text(context.l10n.lockResetDialogTitle),
+        content: Text(context.l10n.lockResetBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continue'),
+            child: Text(context.l10n.lockContinue),
           ),
         ],
       ),

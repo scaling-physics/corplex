@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../export/unlock_for_export.dart' show requestUnlock;
 import '../lock/note_lock_service.dart';
 import '../notes/note_content.dart';
@@ -27,6 +28,7 @@ Future<String> quoteHighlightIntoNote(
   required Paper paper,
   String? noteId,
   NoteLockService? lock,
+  String? newNoteTitle,
 }) async {
   return db.transaction(() async {
     final id = noteId ?? const Uuid().v4();
@@ -36,7 +38,7 @@ Future<String> quoteHighlightIntoNote(
           .insert(
             NotesCompanion.insert(
               id: Value(id),
-              title: Value('Notes on ${paper.title}'),
+              title: Value(newNoteTitle ?? 'Notes on ${paper.title}'),
             ),
           );
     }
@@ -114,9 +116,9 @@ Future<void> showQuoteToNoteSheet(
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Added to your note'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(context.l10n.viewerQuoteAdded),
+            duration: const Duration(seconds: 2),
           ),
         );
     }
@@ -139,6 +141,7 @@ Future<void> showQuoteToNoteSheet(
           .get();
   if (!context.mounted) return;
 
+  final newTitle = context.l10n.viewerNotesOn(paper.title);
   final choice = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -146,7 +149,7 @@ Future<void> showQuoteToNoteSheet(
       Widget noteTile(Note n) => ListTile(
         leading: const Icon(Icons.edit_note_outlined),
         title: Text(
-          n.title.isEmpty ? 'Untitled' : n.title,
+          n.title.isEmpty ? context.l10n.commonUntitled : n.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -163,20 +166,20 @@ Future<void> showQuoteToNoteSheet(
             children: [
               ListTile(
                 leading: const Icon(Icons.add),
-                title: const Text('New note'),
+                title: Text(context.l10n.viewerQuoteNewNote),
                 subtitle: Text(
-                  'Notes on ${paper.title}',
+                  newTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 onTap: () => Navigator.pop(context, ''),
               ),
               if (linked.isNotEmpty) ...[
-                const _SheetHeader('About this paper'),
+                _SheetHeader(context.l10n.viewerAboutThisPaper),
                 ...linked.map(noteTile),
               ],
               if (others.isNotEmpty) ...[
-                const _SheetHeader('Recent notes'),
+                _SheetHeader(context.l10n.viewerRecentNotes),
                 ...others.map(noteTile),
               ],
             ],
@@ -196,6 +199,7 @@ Future<void> showQuoteToNoteSheet(
       paper: paper,
       noteId: choice.isEmpty ? null : choice,
       lock: lock,
+      newNoteTitle: newTitle,
     );
   } on NoteLockedException {
     // The chosen note is locked: unlock to add to it, else leave it alone.
@@ -204,13 +208,13 @@ Future<void> showQuoteToNoteSheet(
         await requestUnlock(
           context,
           lock,
-          reason: 'Unlock the note to add this quote to it.',
+          reason: context.l10n.viewerUnlockToQuote,
         );
     if (!ok || !context.mounted) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unlock the note to add to it.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.viewerUnlockToAdd)));
       }
       return;
     }

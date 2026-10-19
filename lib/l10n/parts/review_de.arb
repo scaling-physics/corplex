@@ -1,0 +1,19 @@
+{
+  "@@locale": "de",
+  "reviewPrompt": "{count, plural, =1{1 Markierung zum Wiederholen} other{{count} Markierungen zum Wiederholen}}",
+  "reviewDismiss": "Bis morgen ausblenden",
+  "reviewTitle": "Markierungen wiederholen",
+  "reviewNothing": "Nichts zu wiederholen",
+  "reviewCaughtUp": "Alles erledigt",
+  "reviewEmptyMessage": "Markierungen erscheinen hier einen Tag nach dem Erstellen und danach immer seltener.",
+  "reviewTomorrow": "Sie kommen morgen wieder.",
+  "reviewLater": "Die behaltenen kommen später wieder.",
+  "reviewPosition": "{current} von {total}",
+  "reviewRemind": "Auf dem Home-Bildschirm erinnern",
+  "reviewRemindHint": "Eine einzelne, leise Zeile, wenn etwas fällig ist",
+  "reviewQuote": "„{quote}“",
+  "reviewSource": "{title} · S. {page}",
+  "reviewKeep": "Behalten",
+  "reviewSkip": "Überspringen",
+  "reviewOpenInPaper": "Im Paper öffnen"
+}

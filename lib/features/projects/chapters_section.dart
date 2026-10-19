@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../comments/comments_data.dart';
@@ -26,7 +27,7 @@ Future<void> pickProjectDueDate(
     initialDate: project.dueDate ?? now.add(const Duration(days: 30)),
     firstDate: DateTime(now.year - 1),
     lastDate: DateTime(now.year + 15),
-    helpText: 'Submission date',
+    helpText: context.l10n.projectsSubmissionDate,
   );
   if (picked != null) await setProjectDueDate(db, project.id, picked);
 }
@@ -47,6 +48,7 @@ class ChapterHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (chapters.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final summary = ChapterSummary(chapters);
     final style = theme.textTheme.bodyMedium?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -59,8 +61,8 @@ class ChapterHeader extends ConsumerWidget {
         children: [
           Text(
             [
-              summary.wordsLabel,
-              if (summary.anyStatus) summary.finishedLabel,
+              summary.wordsText(l10n),
+              if (summary.anyStatus) summary.finishedText(l10n),
             ].join(' · '),
             key: const ValueKey('chapter-summary'),
             style: style,
@@ -78,12 +80,12 @@ class ChapterHeader extends ConsumerWidget {
                       children: [
                         ListTile(
                           leading: const Icon(Icons.event_outlined),
-                          title: const Text('Change date'),
+                          title: Text(context.l10n.projectsChangeDate),
                           onTap: () => Navigator.pop(context, 'change'),
                         ),
                         ListTile(
                           leading: const Icon(Icons.event_busy_outlined),
-                          title: const Text('Clear date'),
+                          title: Text(context.l10n.projectsClearDate),
                           onTap: () => Navigator.pop(context, 'clear'),
                         ),
                       ],
@@ -99,7 +101,7 @@ class ChapterHeader extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Text(
-                  dueLabel(due, DateTime.now()),
+                  dueLabel(due, DateTime.now(), l10n),
                   key: const ValueKey('due-label'),
                   style: style,
                 ),
@@ -138,7 +140,7 @@ class ChaptersSection extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
           child: Text(
-            'Chapters',
+            context.l10n.projectsChapters,
             style: Theme.of(context).textTheme.titleSmall,
           ),
         ),
@@ -168,7 +170,7 @@ class ChaptersSection extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add chapter'),
+              label: Text(context.l10n.projectsAddChapter),
               onPressed: () async {
                 final id = await addChapter(db, project.id);
                 if (context.mounted) openNoteFromPage(context, ref, id);
@@ -214,11 +216,14 @@ class _ChapterRow extends ConsumerWidget {
     final muted = theme.textTheme.labelMedium?.copyWith(
       color: scheme.onSurfaceVariant,
     );
+    final l10n = context.l10n;
+    final locale = Localizations.localeOf(context).toString();
     final words = c.locked
-        ? 'Locked'
+        ? l10n.commonLocked
         : c.wordTarget == null
-        ? '${formatCount(c.words)} words'
-        : '${formatCount(c.words)} / ${formatCount(c.wordTarget!)}';
+        ? l10n.projectsWords(c.words)
+        : '${formatCount(c.words, locale)} / '
+              '${formatCount(c.wordTarget!, locale)}';
 
     Widget row = InkWell(
       onTap: () => openNoteFromPage(context, ref, c.note.id),
@@ -231,7 +236,7 @@ class _ChapterRow extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    c.title,
+                    c.titleIn(l10n),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyLarge,
@@ -244,24 +249,25 @@ class _ChapterRow extends ConsumerWidget {
                     children: [
                       PopupMenuButton<Object>(
                         key: ValueKey('status-${c.note.id}'),
-                        tooltip: 'Change status',
+                        tooltip: l10n.projectsChangeStatus,
                         onSelected: (v) => setChapterStatus(
                           db,
                           projectId,
                           c.note.id,
                           v is ChapterStatus ? v : null,
+                          l10n: l10n,
                         ),
                         itemBuilder: (_) => [
                           for (final s in ChapterStatus.values)
                             CheckedPopupMenuItem<Object>(
                               value: s,
                               checked: s == c.status,
-                              child: Text(chapterStatusLabel(s)),
+                              child: Text(chapterStatusLabel(s, l10n)),
                             ),
                           if (c.status != null)
-                            const PopupMenuItem<Object>(
+                            PopupMenuItem<Object>(
                               value: 'none',
-                              child: Text('No status'),
+                              child: Text(l10n.projectsNoStatus),
                             ),
                         ],
                         child: Container(
@@ -280,8 +286,8 @@ class _ChapterRow extends ConsumerWidget {
                           ),
                           child: Text(
                             c.status == null
-                                ? 'Status'
-                                : chapterStatusLabel(c.status!),
+                                ? l10n.projectsStatus
+                                : chapterStatusLabel(c.status!, l10n),
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: c.status == null
                                   ? scheme.onSurfaceVariant
@@ -304,7 +310,7 @@ class _ChapterRow extends ConsumerWidget {
                             openNoteFromPage(context, ref, c.note.id);
                           },
                           child: Text(
-                            openCommentsLabel(n),
+                            openCommentsLabel(n, l10n),
                             style: muted?.copyWith(color: scheme.tertiary),
                           ),
                         ),
@@ -326,7 +332,7 @@ class _ChapterRow extends ConsumerWidget {
             ),
             PopupMenuButton<String>(
               key: ValueKey('menu-${c.note.id}'),
-              tooltip: 'Chapter options',
+              tooltip: l10n.projectsChapterOptions,
               onSelected: (v) async {
                 if (v == 'target') {
                   final n = await _askTarget(context, c.wordTarget);
@@ -341,11 +347,14 @@ class _ChapterRow extends ConsumerWidget {
                   );
                 }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'target', child: Text('Word target')),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'target',
+                  child: Text(l10n.projectsWordTarget),
+                ),
                 PopupMenuItem(
                   value: 'remove',
-                  child: Text('Remove from project'),
+                  child: Text(l10n.projectsRemoveFromProject),
                 ),
               ],
             ),
@@ -375,29 +384,31 @@ Future<int?> _askTarget(BuildContext context, int? current) {
   return showDialog<int>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Word target'),
+      title: Text(context.l10n.projectsWordTarget),
       content: TextField(
         controller: controller,
         autofocus: true,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(hintText: 'e.g. 8000'),
+        decoration: InputDecoration(
+          hintText: context.l10n.projectsWordTargetHint,
+        ),
         onSubmitted: (v) => Navigator.pop(context, int.tryParse(v) ?? 0),
       ),
       actions: [
         if (current != null)
           TextButton(
             onPressed: () => Navigator.pop(context, 0),
-            child: const Text('Clear'),
+            child: Text(context.l10n.notesClear),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () =>
               Navigator.pop(context, int.tryParse(controller.text) ?? 0),
-          child: const Text('Save'),
+          child: Text(context.l10n.commonSave),
         ),
       ],
     ),

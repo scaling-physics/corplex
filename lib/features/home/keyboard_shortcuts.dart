@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
+
 /// One shortcut: what it does and its key caps (⌘ ⇧ ⌥ ⌃ then the key).
 class ShortcutEntry {
   const ShortcutEntry(this.label, this.keys);
@@ -9,71 +11,71 @@ class ShortcutEntry {
 
 /// The Mac menu bar's shortcuts (`MainFlutterWindow.swift`) plus the
 /// keyboard navigation that needs no menu.
-const shortcutSections = <(String, List<ShortcutEntry>)>[
+List<(String, List<ShortcutEntry>)> shortcutSections(AppLocalizations l) => [
   (
-    'General',
+    l.macShortcutsGeneral,
     [
-      ShortcutEntry('New note', ['⌘', 'N']),
-      ShortcutEntry('Import PDF', ['⌘', 'O']),
-      ShortcutEntry('Quick note from anywhere', ['⌃', '⌥', 'N']),
-      ShortcutEntry('Duplicate note', ['⌘', 'D']),
-      ShortcutEntry('Print', ['⌘', 'P']),
-      ShortcutEntry('Move to Trash', ['⌘', '⌫']),
-      ShortcutEntry('Settings', ['⌘', ',']),
-      ShortcutEntry('Keyboard shortcuts', ['⌘', '/']),
-      ShortcutEntry('Larger interface', ['⌥', '⌘', '+']),
-      ShortcutEntry('Smaller interface', ['⌥', '⌘', '−']),
-      ShortcutEntry('Default interface size', ['⌥', '⌘', '0']),
-      ShortcutEntry('Close window', ['⌘', 'W']),
+      ShortcutEntry(l.macKeyNewNote, ['⌘', 'N']),
+      ShortcutEntry(l.macKeyImportPdf, ['⌘', 'O']),
+      ShortcutEntry(l.macKeyQuickNote, ['⌃', '⌥', 'N']),
+      ShortcutEntry(l.macKeyDuplicateNote, ['⌘', 'D']),
+      ShortcutEntry(l.macKeyPrint, ['⌘', 'P']),
+      ShortcutEntry(l.macKeyMoveToTrash, ['⌘', '⌫']),
+      ShortcutEntry(l.macKeySettings, ['⌘', ',']),
+      ShortcutEntry(l.macKeyShortcuts, ['⌘', '/']),
+      ShortcutEntry(l.macKeyLargerInterface, ['⌥', '⌘', '+']),
+      ShortcutEntry(l.macKeySmallerInterface, ['⌥', '⌘', '−']),
+      ShortcutEntry(l.macKeyDefaultInterface, ['⌥', '⌘', '0']),
+      ShortcutEntry(l.macKeyCloseWindow, ['⌘', 'W']),
     ],
   ),
   (
-    'Notes & Formatting',
+    l.macShortcutsFormatting,
     [
-      ShortcutEntry('Bold', ['⌘', 'B']),
-      ShortcutEntry('Italic', ['⌘', 'I']),
-      ShortcutEntry('Underline', ['⌘', 'U']),
-      ShortcutEntry('Strikethrough', ['⇧', '⌘', 'X']),
-      ShortcutEntry('Highlight', ['⇧', '⌘', 'E']),
-      ShortcutEntry('Monospaced', ['⇧', '⌘', 'M']),
-      ShortcutEntry('Title', ['⇧', '⌘', 'T']),
-      ShortcutEntry('Heading', ['⇧', '⌘', 'H']),
-      ShortcutEntry('Subheading', ['⇧', '⌘', 'J']),
-      ShortcutEntry('Body', ['⇧', '⌘', 'B']),
-      ShortcutEntry('Bulleted list', ['⇧', '⌘', '7']),
-      ShortcutEntry('Numbered list', ['⇧', '⌘', '9']),
-      ShortcutEntry('Checklist', ['⇧', '⌘', 'L']),
-      ShortcutEntry('Block quote', ['⌘', '\'']),
-      ShortcutEntry('Table', ['⌥', '⌘', 'T']),
-      ShortcutEntry('Add comment', ['⌥', '⌘', 'K']),
-      ShortcutEntry('Link to a note', ['⌘', 'K']),
-      ShortcutEntry('Cite a paper', ['⇧', '⌘', 'K']),
+      ShortcutEntry(l.macKeyBold, ['⌘', 'B']),
+      ShortcutEntry(l.macKeyItalic, ['⌘', 'I']),
+      ShortcutEntry(l.macKeyUnderline, ['⌘', 'U']),
+      ShortcutEntry(l.macKeyStrikethrough, ['⇧', '⌘', 'X']),
+      ShortcutEntry(l.macKeyHighlight, ['⇧', '⌘', 'E']),
+      ShortcutEntry(l.macKeyMonospaced, ['⇧', '⌘', 'M']),
+      ShortcutEntry(l.macKeyTitle, ['⇧', '⌘', 'T']),
+      ShortcutEntry(l.macKeyHeading, ['⇧', '⌘', 'H']),
+      ShortcutEntry(l.macKeySubheading, ['⇧', '⌘', 'J']),
+      ShortcutEntry(l.macKeyBody, ['⇧', '⌘', 'B']),
+      ShortcutEntry(l.macKeyBulletedList, ['⇧', '⌘', '7']),
+      ShortcutEntry(l.macKeyNumberedList, ['⇧', '⌘', '9']),
+      ShortcutEntry(l.macKeyChecklist, ['⇧', '⌘', 'L']),
+      ShortcutEntry(l.macKeyBlockQuote, ['⌘', '\'']),
+      ShortcutEntry(l.macKeyTable, ['⌥', '⌘', 'T']),
+      ShortcutEntry(l.macKeyAddComment, ['⌥', '⌘', 'K']),
+      ShortcutEntry(l.macKeyLinkNote, ['⌘', 'K']),
+      ShortcutEntry(l.macKeyCitePaper, ['⇧', '⌘', 'K']),
     ],
   ),
   (
-    'Library & Reader',
+    l.macShortcutsReader,
     [
-      ShortcutEntry('Find in document', ['⌘', 'F']),
-      ShortcutEntry('Find next', ['⌘', 'G']),
-      ShortcutEntry('Find previous', ['⇧', '⌘', 'G']),
-      ShortcutEntry('Zoom in', ['⌘', '+']),
-      ShortcutEntry('Zoom out', ['⌘', '−']),
-      ShortcutEntry('Actual size', ['⌘', '0']),
+      ShortcutEntry(l.macKeyFindInDocument, ['⌘', 'F']),
+      ShortcutEntry(l.macKeyFindNext, ['⌘', 'G']),
+      ShortcutEntry(l.macKeyFindPrevious, ['⇧', '⌘', 'G']),
+      ShortcutEntry(l.macKeyZoomIn, ['⌘', '+']),
+      ShortcutEntry(l.macKeyZoomOut, ['⌘', '−']),
+      ShortcutEntry(l.macKeyActualSize, ['⌘', '0']),
     ],
   ),
   (
-    'Navigation',
+    l.macShortcutsNavigation,
     [
-      ShortcutEntry('Notes', ['⌘', '1']),
-      ShortcutEntry('Library', ['⌘', '2']),
-      ShortcutEntry('Attachments', ['⌘', '3']),
-      ShortcutEntry('Search', ['⇧', '⌘', 'F']),
-      ShortcutEntry('Show or hide the sidebar', ['⌃', '⌘', 'S']),
-      ShortcutEntry('Back', ['⌘', '[']),
-      ShortcutEntry('Move through a list', ['↑', '↓']),
-      ShortcutEntry('Open the selected item', ['Return']),
-      ShortcutEntry('Next or previous column', ['Tab']),
-      ShortcutEntry('Close a dialog or menu', ['Esc']),
+      ShortcutEntry(l.macKeyNotes, ['⌘', '1']),
+      ShortcutEntry(l.macKeyLibrary, ['⌘', '2']),
+      ShortcutEntry(l.macKeyAttachments, ['⌘', '3']),
+      ShortcutEntry(l.macKeySearch, ['⇧', '⌘', 'F']),
+      ShortcutEntry(l.macKeySidebar, ['⌃', '⌘', 'S']),
+      ShortcutEntry(l.macKeyBack, ['⌘', '[']),
+      ShortcutEntry(l.macKeyMoveThroughList, ['↑', '↓']),
+      ShortcutEntry(l.macKeyOpenSelected, ['Return']),
+      ShortcutEntry(l.macKeyNextColumn, ['Tab']),
+      ShortcutEntry(l.macKeyCloseDialog, ['Esc']),
     ],
   ),
 ];
@@ -93,7 +95,7 @@ Future<void> showKeyboardShortcuts(BuildContext context) => showDialog<void>(
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
             child: Text(
-              'Keyboard Shortcuts',
+              context.l10n.macShortcutsTitle,
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
@@ -103,7 +105,9 @@ Future<void> showKeyboardShortcuts(BuildContext context) => showDialog<void>(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final (title, entries) in shortcutSections) ...[
+                  for (final (title, entries) in shortcutSections(
+                    context.l10n,
+                  )) ...[
                     Padding(
                       padding: const EdgeInsets.only(top: 16, bottom: 6),
                       child: Text(

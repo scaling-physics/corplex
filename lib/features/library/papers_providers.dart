@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/papers_table.dart';
+import '../../l10n/l10n.dart';
 import '../projects/projects_providers.dart';
 import 'study_filter.dart';
 
@@ -16,6 +17,14 @@ final papersListProvider = StreamProvider.autoDispose<List<Paper>>((ref) {
 });
 
 /// Current text typed into the Library search field.
+/// A reading status as the reader sees it.
+String readingStatusLabel(AppLocalizations l10n, ReadingStatus status) =>
+    switch (status) {
+      ReadingStatus.toRead => l10n.libraryStatusToRead,
+      ReadingStatus.reading => l10n.libraryStatusReading,
+      ReadingStatus.done => l10n.libraryStatusDone,
+    };
+
 final librarySearchProvider = StateProvider.autoDispose<String>((ref) => '');
 
 /// Narrows the Library to one reading status (null = everything). The

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'study_details.dart';
 
@@ -82,7 +83,7 @@ class _StudyDetailsSectionState extends ConsumerState<StudyDetailsSection> {
               alignment: Alignment.centerLeft,
               child: TextButton(
                 onPressed: () => setState(() => _asked = true),
-                child: const Text('Add study details'),
+                child: Text(context.l10n.studyAdd),
               ),
             )
           : Padding(
@@ -95,7 +96,7 @@ class _StudyDetailsSectionState extends ConsumerState<StudyDetailsSection> {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Study details',
+                        context.l10n.studyDetails,
                         style: theme.textTheme.titleSmall,
                       ),
                     ),
@@ -315,8 +316,8 @@ class _StudyFieldEditorState extends ConsumerState<_StudyFieldEditor> {
                 }
               : null,
           decoration: InputDecoration(
-            labelText: field.label,
-            helperText: field.isList ? 'Press enter or comma to add' : null,
+            labelText: field.labelFor(context.l10n),
+            helperText: field.isList ? context.l10n.studyListHint : null,
           ),
         ),
         if (suggestions.isNotEmpty)

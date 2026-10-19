@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "studyFieldSpecies": "Species / model",
+  "studyFieldBrainRegions": "Brain regions",
+  "studyFieldTechniques": "Techniques",
+  "studyFieldSampleSize": "Sample size (n)",
+  "studyFieldParadigm": "Task / paradigm",
+  "studyChip": "Study",
+  "studyChipCount": "Study · {count}",
+  "@studyChipCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyClearFilter": "Clear study filter",
+  "studyClear": "Clear",
+  "studyMinSampleSize": "Minimum sample size (n)",
+  "studyAdd": "Add study details",
+  "studyDetails": "Study details",
+  "studyListHint": "Press enter or comma to add"
+}

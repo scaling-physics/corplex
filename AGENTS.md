@@ -207,9 +207,7 @@ the default screens until the user opts in by using the feature.
   account sheet now has Auto / Light / Dark (per-device).
 - **Accessibility**: a test renders both tabs at 2× text scale with no
   overflow. That is a smoke check, not a full Dynamic Type/VoiceOver audit.
-- **Not done: localization.** All strings are still inline English; doing
-  it means moving them to ARB files (`flutter gen-l10n`) and is a
-  cross-cutting change best done as its own pass.
+- **Localization**: done in 1.15 (English + German; see there).
 
 ### v1.5 — Reading flow, overview & platform (built, except as noted)
 - **Reading progress** (`reading_progress.dart`, schema v12):
@@ -350,8 +348,8 @@ the default screens until the user opts in by using the feature.
   `pickCitationStyle` is the one picker (note and project bibliography,
   export, the paper screen's "More…" chip) and "Add a style…" imports a
   `.csl` per device. Exports follow the style (`buildStyledExportDoc`).
-  Not done: collapse by year, subsequent-author-substitute, locators,
-  other locales; editor citation chips stay author-year.
+  Collapse, subsequent-author-substitute and other locales came in 1.15
+  (see there); locators in 1.9. Editor citation chips stay author-year.
 - **iOS extensions** (`ios/ShareExtension`, `ios/CorplexWidget`, targets
   added by `tool/ios/add_extensions.rb` with the `xcodeproj` gem — rerun
   it rather than editing the pbxproj by hand). Both use App Group
@@ -577,8 +575,7 @@ the default screens until the user opts in by using the feature.
   `HomeShell` subscribes. New Services entries may need a logout or
   `/System/Library/CoreServices/pbs -update` to appear. No Mac share
   extension (no team id / App Group with ad-hoc signing).
-- **Not done**: collapsible headings (flutter_quill can restyle a line but
-  not hide one — needs a fork) and a note in its own window (Flutter's
+- **Not done**: a note in its own window (Flutter's
   multi-window API is private and debug-only in 3.47; a second engine
   would mean a second database connection whose streams don't see the
   first's writes).
@@ -702,9 +699,8 @@ the default screens until the user opts in by using the feature.
   the sync triggers). `PdfTextIndex.kickIfIncomplete()` for frequent
   callers, `kick()` at startup (after 4 s); pages written 8 per batch.
   `notePlainTextPreview` is an LRU; `paperCoverProvider` is `autoDispose`
-  with a 120-entry memory cache. Known gap: the Notes list still loads full
-  note bodies (37 ms on a Mac at 3,000 notes); fixing it needs a stored
-  preview column.
+  with a 120-entry memory cache. The Notes list's full-body load (37 ms at
+  3,000 notes) was fixed in 1.15 with stored previews (11 ms).
 - **Photos in exports** (`export/export_images.dart`): `ExportNote.images`
   (`noteExportImages`: the note's image attachments with a local file, in
   attachment order) become `BlockKind.photo` blocks after the note body —
@@ -737,6 +733,139 @@ the default screens until the user opts in by using the feature.
   items get `URL`, `PMID`, `abstract`; search indexes the abstract in the
   paper's body column (below titles in rank). OpenAlex abstracts aren't
   used.
+
+### 1.15 — German, collapsible headings, citation locales (built; not yet on a device)
+- **Localization** (`lib/l10n/`, `l10n.yaml`, `tool/l10n/`): English
+  (template) and German, ~990 strings. Source of truth is the per-area
+  **ARB parts** `lib/l10n/parts/<area>_en.arb` (values + `@key` metadata)
+  and `<area>_de.arb` (values only); every key starts with its area, so
+  parts written in parallel can't collide. `dart run
+  tool/l10n/build_arb.dart` merges them into `lib/l10n/app_{en,de}.arb`
+  (checking that every key has a German twin with the same ICU
+  placeholders — `arb_parts.dart`, also run by `test/l10n/arb_parts_test.dart`)
+  and runs `flutter gen-l10n` into `lib/l10n/generated/`; both outputs are
+  committed (CI checks them). Never edit `app_*.arb` or `generated/` by
+  hand. Use `context.l10n.key` (`lib/l10n/l10n.dart`), never
+  `AppLocalizations.of`: it falls back to English when no delegate is above
+  the context, so tests with a bare `MaterialApp` keep working.
+  `deviceL10n()` is only for places with no context (app-icon shortcuts,
+  widget text, notification channel, biometric prompt default). The app
+  follows the system language (no in-app setting); iOS/macOS Info.plists
+  declare `CFBundleLocalizations` en/de, without which Flutter only ever
+  sees English. German uses informal *du*, no pronouns where avoidable,
+  „…“ quotes; the glossary (Notiz, Paper, Markierung, Zitation,
+  Literaturverzeichnis, Betreuer:in, …) is followed everywhere — **have a
+  native speaker review before release**.
+  * **Logic that produced English text** keeps an English getter (tests,
+    logs, stored text) and gains a `…For(l10n)` / `…In(l10n)` twin or an
+    error enum the UI words: `ZoteroException.messageFor`,
+    `UpdateNotice.messageFor`, `StudyField.labelFor`, `locatorLabelName`,
+    `readingStatusLabel`, `DocumentSearch.summaryIn`, `figureDisplayName`,
+    `AudioError`, `BackupProblem`, `AnnotatedPdfException.problem`,
+    `CslFormatException.problem`, `authErrorText`. `localizedSyncError`
+    (`sync/sync_messages.dart`) maps `SyncService.lastError` by comparing
+    with the English exception texts — change those texts and the German
+    silently stops matching.
+  * **Stored text is written in the language of the moment** and not
+    translated later: version labels ("Sent to supervisor", "Before
+    restoring"), default matrix columns and bound study columns, voice note
+    titles and the literature-template headings. Kept English on purpose:
+    the "Zotero notes: …" title (the importer's dedupe key), "Pasted image"
+    (`isCameraStyleName` matches it), Quote to note's "— p. N" / snapshot
+    "From p. N" (tied to the page-link format), study suggestion values,
+    citation output, and **the fixed wording inside exported documents**
+    (References, Figure, List of figures, [Sketch]) — `cslTerm` /
+    `cslBibliographyHeading` (`csl/csl_terms.dart`) can supply localized
+    terms if exports should follow the citation language later.
+  * Trash snackbars: `deleteNoteWithUndo` / `deletePaperWithUndo` take
+    `l10n:` (callers pass `context.l10n`, captured before any `await`).
+  * **Native**: Mac menus use `germanMenuTitles` in `MainFlutterWindow.swift`
+    (picked by `Locale.preferredLanguages`; keep it in step with
+    `shortcutSections(l10n)` in `keyboard_shortcuts.dart`); template menus
+    are found by action, never by English title. Permission prompts and the
+    Services entry: `{ios,macos}/Runner/de.lproj/InfoPlist.strings`, added
+    to the Xcode projects by `tool/l10n/add_info_plist_strings.rb`
+    (rerunnable; never hand-edit a pbxproj). iOS widget: its own `tr()`
+    table; Android: `values-de/strings.xml` (widget strings kept in
+    `res/raw/keep.xml`). The Mac sidebar's folded sections are keyed by
+    English ids, not visible titles.
+  * Tests: `localizedApp(...)` (`test/support/l10n_app.dart`) pumps a
+    screen in German; `test/l10n/*_de_test.dart` check each area's German
+    strings and that phone rows (format bar, ink toolbar, read-aloud bar,
+    paper screen at 360 px) and the Mac toolbar at the minimum window don't
+    overflow. Untested: the German Mac menu bar and permission prompts at
+    runtime.
+- **Collapsible headings** (`notes/heading_fold.dart`,
+  `heading_fold_controller.dart`, `heading_fold_ui.dart`; no schema
+  change, **no flutter_quill fork**): a collapsed section exists only in the
+  editor's document — the lines under a heading, up to the next heading of
+  the same or higher level, become one `fold` block embed carrying them as
+  Delta JSON. `storedFromEditor` expands every fold first, so everything
+  that reads stored form (save, word count, exports, versions, sync merge)
+  sees the whole note and collapse/expand never changes stored content.
+  Anything reading the **live controller** must use
+  `HeadingFolds.unfoldedDocument()` / `unfoldedText()` and map offsets with
+  `unfoldedOffset(live)` / `reveal(unfolded)` (word count, figure index,
+  Find in note, bibliography and comments do). Folding is composed under
+  `ChangeSource.silent` with history off, then the history stacks are
+  transformed over it: not an undo step, never dirty. Quill delivers
+  `document.changes` after the fact, so repairs run in a microtask: an edit
+  deleting at most a fold's own line expands it back in place, one reaching
+  past it takes the hidden text too (undo restores), a duplicated fold
+  (paste) is expanded. Navigation into text reveals first (Find,
+  `initialSelection`, `pendingNoteSelectionProvider`, comments, appended
+  quotes). Fold state: per device, `notes.folds.<noteId>` in
+  shared_preferences, as SHA-256 fingerprints (never heading text — locked
+  notes), restored after the note shows and re-applied after an absorbed
+  outside change. UI: a chevron in the left margin (hover, the caret's
+  heading, always when collapsed) — an overlay positioned from caret rects,
+  whose hover `MouseRegion` must stay an ancestor of the chevrons; the
+  folded section is a quiet "…" row; ⋮ and Mac View → Collapse / Expand
+  All Sections. Comments locate passages and save anchors in whole-note
+  offsets whatever is collapsed, skip tinting hidden passages, and reveal
+  on pick. Known limits: formatting a range across a fold doesn't reach the
+  hidden text; hidden text isn't spell-checked.
+- **Notes-list previews** (schema v21): `NotePreviews`
+  (`data/tables/note_previews_table.dart`) is **local-only and derived** —
+  not in `syncTables`, no Supabase file, emptied (`DELETE`, not `DROP`) in
+  backups. SQLite triggers `note_previews_stale_upd/ins`
+  (`notePreviewStatements`, created in the migration and in `beforeOpen`)
+  delete a note's row when `content` changes or the row is inserted, so
+  every write path — editor, sync's raw SQL, restores, imports — is
+  covered; a missing row means recompute. `watchNoteList`
+  (`notes_providers.dart`) LEFT JOINs it and returns light `NoteListItem`s
+  (no body); missing previews are computed 60 per pass from just those
+  notes' `content` and stored with a conditional `INSERT OR REPLACE` via
+  `customStatement` (doesn't notify, so it can't loop); later passes are
+  woken explicitly and equal emissions dropped. A locked body stores
+  `locked = 1` and no text. Anything needing a full `Note` from a list row
+  (lock, pin, duplicate) loads it by id when chosen. 37 → 11 ms at 3,000
+  notes (`docs/performance.md`).
+- **Citation locales & collapse** (`features/csl/`): bundled locales en-US,
+  en-GB, de-DE, de-AT, fr-FR, es-ES, it-IT, nl-NL, pt-BR
+  (`assets/csl/locales-*.xml`, unmodified, CC BY-SA, `ATTRIBUTION.txt`).
+  `CslRegistry.localeFor(tag)` composes per CSL's fallback chain (en-US →
+  primary dialect → exact dialect); `CslStyle.parse` layers the style's own
+  `<locale>` blocks by language only (apa.csl ships a German "et al.", so
+  APA in German prints "et al." while Harvard prints "u. a."). The
+  per-device "Citation language" (`citation_language.dart`,
+  shared_preferences `csl.citationLanguage`, never synced) is the last row
+  of the style picker; Automatic = the style's `default-locale`, else the
+  device language if bundled, else en-US. `setLanguageChoice` re-parses
+  loaded styles, swapping each when ready, so `formatCitation` stays sync.
+  Ordinals follow the spec (`match`, gendered forms). `collapse="year |
+  year-suffix | year-suffix-ranged"` with cite grouping (same-author cites
+  moved together; cites with a locator aren't collapsed) works by the
+  engine marking a cite's date with private-use characters
+  (`cslDateStart`/`cslDateEnd`, `CslContext.markDates`) that the processor
+  splits on and strips (`csl_markers_test.dart` checks no style leaks them);
+  `citation-number` collapse gives "[1]–[3]". `subsequent-author-substitute`
+  with all four rules. The bundled IEEE and Chicago files set neither, so
+  they print as the official styles do. Not done:
+  `givenname-disambiguation-rule` beyond the cheap cases, inner quotes.
+- **Fixed**: on the Mac, Format commands sent while no note editor had
+  focus fell through an empty `switch` case into "Close All Locked Notes"
+  (⌘B in the list locked every note); `mac_layout_test` guards it.
 
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
@@ -900,7 +1029,8 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   sheet are dialogs on desktop.
 - **Menu bar & keyboard**: the native menus (File with Duplicate ⌘D / Print ⌘P, Edit → Find, Format with
   Apple Notes' shortcuts, View, Go → Back ⌘[, Help → Keyboard Shortcuts ⌘/)
-  send `MenuCommand`s on `corplex/window`. **Key equivalents reach Flutter
+  send `MenuCommand`s on `corplex/window` (View also has Collapse / Expand
+  All Sections, no key, handled in the editor's `_commands`). **Key equivalents reach Flutter
   first**; only keys Flutter leaves unhandled reach the menu. A command is
   then offered to the nearest `MenuCommandHandler` above the primary focus
   (`dispatchMenuCommand`, a responder chain — not `Actions`, which stops at
@@ -946,7 +1076,9 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
 
 ### Engineering (ongoing, start now)
 - CI (`.github/workflows/ci.yml`, on every push and PR): `flutter
-  analyze`, a stale-`database.g.dart` check, `flutter test`, a guard
+  analyze`, a stale-`database.g.dart` check, stale-strings checks
+  (`dart run tool/l10n/build_arb.dart --check`, then `flutter gen-l10n`
+  and `git diff --exit-code lib/l10n`), `flutter test`, a guard
   against plain-`http://` requests in `lib/` (Android release builds block
   them), and an Android **release** build that checks the notification
   drawables survived resource shrinking — release-only failures are
@@ -1089,6 +1221,9 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   suite bit-rot as features are added.
 - Do not introduce a cloud backend dependency for features that can work
   offline — sync is additive, not required.
+- **Every user-visible string goes through `context.l10n`** with an
+  English and a German entry in `lib/l10n/parts/<area>_{en,de}.arb` (keys
+  start with the area), then `dart run tool/l10n/build_arb.dart`. See 1.15.
 
 ## Status
 
@@ -1611,6 +1746,15 @@ Not yet built: hand-testing sync through the app UI on two devices. Update the s
 so this file stays accurate for future agent sessions.
 
 ### Testing gotchas (drift + Riverpod + flutter_test)
+
+- **Empty `case`s in a Dart `switch` fall through** to the next case with a
+  body. A group of "ignore these" cases needs its own `break;` body, or it
+  runs whatever comes next (see the 1.15 lock fix).
+- Mac tests: call `loadMacFonts` in `setUpAll`, never inside `testWidgets`
+  (it hangs there).
+- `DateFormat` with plain `en` needs date data from a delegate or
+  `initializeDateFormatting`; pure unit tests that format dates call
+  `initializeDateFormatting('en')` (or format with `en_US`).
 
 - Any widget test that renders a `TextField` must set
   `EditableText.debugDeterministicCursor = true` in `setUp` (and reset to

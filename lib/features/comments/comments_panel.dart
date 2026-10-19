@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart' show NoteComment;
 import 'comment_anchor.dart';
 import 'comment_views.dart';
@@ -87,15 +88,18 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text('Comments', style: theme.textTheme.titleMedium),
+                  child: Text(
+                    context.l10n.commentsTitle,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
                 ValueListenableBuilder<bool>(
                   valueListenable: widget.hasSelection,
                   builder: (_, has, _) => IconButton(
                     key: const ValueKey('comments-add'),
                     tooltip: has
-                        ? 'Comment on the selection'
-                        : 'Select a passage to comment on',
+                        ? context.l10n.commentsOnSelection
+                        : context.l10n.commentsSelectAPassage,
                     icon: const Icon(Icons.add_comment_outlined),
                     onPressed: has ? widget.onAdd : null,
                   ),
@@ -103,7 +107,7 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
                 if (widget.showClose)
                   IconButton(
                     key: const ValueKey('comments-close'),
-                    tooltip: 'Close',
+                    tooltip: context.l10n.commonClose,
                     icon: const Icon(Icons.close),
                     onPressed: widget.onClose,
                   ),
@@ -113,14 +117,17 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
           if (_deleted != null)
             ListTile(
               dense: true,
-              title: const Text('Comment deleted'),
-              trailing: TextButton(onPressed: _undo, child: const Text('Undo')),
+              title: Text(context.l10n.commentsDeleted),
+              trailing: TextButton(
+                onPressed: _undo,
+                child: Text(context.l10n.commonUndo),
+              ),
             ),
           if (resolved.isNotEmpty)
             SwitchListTile(
               key: const ValueKey('comments-show-resolved'),
               dense: true,
-              title: Text('Show resolved (${resolved.length})'),
+              title: Text(context.l10n.commentsShowResolved(resolved.length)),
               value: _showResolved,
               onChanged: (v) => setState(() => _showResolved = v),
             ),
@@ -130,8 +137,8 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
                     padding: const EdgeInsets.all(24),
                     child: Text(
                       all.isEmpty
-                          ? 'Select a passage, then choose Add comment.'
-                          : 'Nothing open.',
+                          ? context.l10n.commentsEmpty
+                          : context.l10n.commentsNothingOpen,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -224,8 +231,10 @@ class _CommentTile extends StatelessWidget {
                     Text(
                       [
                         if (c.author != null) c.author!,
-                        DateFormat('d MMM y').format(c.createdAt),
-                        if (span == null) 'Passage changed',
+                        DateFormat.yMMMd(
+                          Localizations.localeOf(context).toString(),
+                        ).format(c.createdAt),
+                        if (span == null) context.l10n.commentsPassageChanged,
                       ].join(' · '),
                       style: muted,
                     ),
@@ -234,7 +243,7 @@ class _CommentTile extends StatelessWidget {
               ),
               PopupMenuButton<String>(
                 key: ValueKey('comment-menu-${c.id}'),
-                tooltip: 'Comment options',
+                tooltip: context.l10n.commentsOptions,
                 onSelected: (v) => switch (v) {
                   'resolve' => onResolved(c, true),
                   'reopen' => onResolved(c, false),
@@ -244,10 +253,20 @@ class _CommentTile extends StatelessWidget {
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: c.resolved ? 'reopen' : 'resolve',
-                    child: Text(c.resolved ? 'Reopen' : 'Resolve'),
+                    child: Text(
+                      c.resolved
+                          ? context.l10n.commentsReopen
+                          : context.l10n.commentsResolve,
+                    ),
                   ),
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Text(context.l10n.commonEdit),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text(context.l10n.commonDelete),
+                  ),
                 ],
               ),
             ],

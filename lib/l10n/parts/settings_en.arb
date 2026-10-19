@@ -1,0 +1,85 @@
+{
+  "@@locale": "en",
+  "settingsSignIn": "Sign in",
+  "settingsSignInSubtitle": "Sync your library across devices",
+  "settingsSyncNow": "Sync now",
+  "settingsSyncOffline": "Not syncing",
+  "settingsSyncSyncing": "Syncing…",
+  "settingsSyncUpToDate": "Up to date",
+  "settingsSyncFailed": "Sync failed",
+  "settingsUseThisAccount": "Use this account on this device",
+  "settingsUseThisAccountSubtitle": "Replaces what's on this device with this account's data.",
+  "settingsWifiOnly": "Send files on Wi-Fi only",
+  "settingsWifiOnlySubtitle": "Notes always sync. Opening a file downloads it on any network.",
+  "settingsOnDemand": "Download files when opened",
+  "settingsOnDemandSubtitle": "Otherwise papers and audio download in the background.",
+  "settingsAppearance": "Appearance",
+  "settingsThemeAuto": "Auto",
+  "settingsThemeLight": "Light",
+  "settingsThemeDark": "Dark",
+  "settingsInterfaceSize": "Interface size",
+  "settingsInterfaceSizeSubtitle": "For large or ultrawide displays",
+  "settingsQuickNote": "Quick note shortcut (⌃⌥N)",
+  "settingsQuickNoteSubtitle": "Start a note from any app",
+  "settingsSpellCheck": "Check spelling while typing",
+  "settingsTrashCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@settingsTrashCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsBackUp": "Back up to a file",
+  "settingsBackUpSubtitle": "Notes, papers and files in one zip",
+  "settingsExportMarkdown": "Export as Markdown",
+  "settingsExportMarkdownSubtitle": "A folder of notes for Obsidian",
+  "settingsRestoreFromBackup": "Restore from a backup",
+  "settingsSignOut": "Sign out",
+  "settingsSignOutClear": "Sign out and clear this device",
+  "settingsClearTitle": "Clear this device?",
+  "settingsReplaceTitle": "Replace this device's data?",
+  "settingsEraseSafe": "Notes, papers and files on this device will be removed. Everything is safe in your account.",
+  "settingsErasePending": "{count, plural, =1{1 change on this device hasn't synced and will be lost for good. Everything else is safe in your account.} other{{count} changes on this device haven't synced and will be lost for good. Everything else is safe in your account.}}",
+  "@settingsErasePending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsClearAndSignOut": "Clear and sign out",
+  "settingsReplace": "Replace",
+  "settingsPreparingBackup": "Preparing backup…",
+  "settingsBackupFailed": "Couldn't create the backup.",
+  "settingsBackupSubject": "Corplex backup",
+  "settingsExportBody": "One Markdown file per note and paper, with links, highlights and a BibTeX file. Open the folder as an Obsidian vault.",
+  "settingsExportLocked": "Locked notes are exported as placeholders.",
+  "settingsIncludePdfs": "Include PDFs",
+  "settingsIncludePdfsSubtitle": "Makes the export much larger",
+  "settingsExport": "Export",
+  "settingsExportFailed": "Couldn't create the export.",
+  "settingsExportSubject": "Corplex notes (Markdown)",
+  "settingsCantRestore": "Can't restore",
+  "settingsRestoreTitle": "Restore this backup?",
+  "settingsRestoreBody": "From {date}: {notes, plural, =1{1 note} other{{notes} notes}} and {papers, plural, =1{1 paper} other{{papers} papers}}.\n\nIt replaces what's on this device now. Your current library is kept aside in case you change your mind.",
+  "@settingsRestoreBody": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "notes": {
+        "type": "int"
+      },
+      "papers": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsRestoreAction": "Restore",
+  "settingsOneMoreStep": "One more step",
+  "settingsRestartToFinish": "Close Corplex completely and open it again to finish restoring.",
+  "settingsReadingPaper": "Paper",
+  "settingsReadingSepia": "Sepia",
+  "settingsReadingNight": "Night"
+}

@@ -1,0 +1,6 @@
+{
+  "@@locale": "en",
+  "dataNotABackup": "That file isn’t a Corplex backup.",
+  "dataUnsupportedVersion": "This backup is from an unsupported version.",
+  "dataNewerVersion": "This backup was made by a newer version of Corplex. Update the app first."
+}

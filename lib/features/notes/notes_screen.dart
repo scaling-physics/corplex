@@ -9,10 +9,9 @@ import '../home/getting_started.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import 'folders_providers.dart';
-import '../lock/note_lock_service.dart' show isLockedContent;
-import 'note_content.dart';
-import 'note_file_actions.dart' show duplicateMenuAction;
-import 'note_lock_actions.dart';
+import '../../l10n/l10n.dart';
+import 'note_file_actions.dart' show duplicateNoteAndOpen;
+import 'note_lock_actions.dart' show lockNoteFromList, removeLockFromList;
 import '../home/adaptive.dart';
 import '../home/mac_sidebar.dart' show DraggedNote, macSidebarVisibleProvider;
 import '../home/open_card.dart';
@@ -62,8 +61,8 @@ Future<void> createNote(BuildContext context, WidgetRef ref) async {
 /// Today, Yesterday, Previous 7 Days, Previous 30 Days, then the month
 /// (this year) or the year. Lists are ordered pinned first, then newest
 /// edit, so each group is one run.
-String noteDateSection(Note note, DateTime now) {
-  if (note.pinned) return 'Pinned';
+String noteDateSection(NoteListItem note, DateTime now, AppLocalizations l10n) {
+  if (note.pinned) return l10n.listPinned;
   final d = note.updatedAt;
   // Calendar days, immune to a daylight-saving hour.
   final days = DateTime.utc(
@@ -71,22 +70,26 @@ String noteDateSection(Note note, DateTime now) {
     now.month,
     now.day,
   ).difference(DateTime.utc(d.year, d.month, d.day)).inDays;
-  if (days <= 0) return 'Today';
-  if (days == 1) return 'Yesterday';
-  if (days < 7) return 'Previous 7 Days';
-  if (days < 30) return 'Previous 30 Days';
-  if (d.year == now.year) return DateFormat.MMMM().format(d);
+  if (days <= 0) return l10n.listToday;
+  if (days == 1) return l10n.listYesterday;
+  if (days < 7) return l10n.listPrevious7Days;
+  if (days < 30) return l10n.listPrevious30Days;
+  if (d.year == now.year) return DateFormat.MMMM(l10n.localeName).format(d);
   return '${d.year}';
 }
 
 /// For each note, the group header to show above it (null when it is in
 /// the same group as the note before).
-List<String?> noteSectionHeaders(List<Note> notes, DateTime now) {
+List<String?> noteSectionHeaders(
+  List<NoteListItem> notes,
+  DateTime now,
+  AppLocalizations l10n,
+) {
   String? previous;
   return [
     for (final n in notes)
       () {
-        final section = noteDateSection(n, now);
+        final section = noteDateSection(n, now, l10n);
         final header = section == previous ? null : section;
         previous = section;
         return header;
@@ -174,24 +177,24 @@ class NotesScreen extends ConsumerWidget {
               },
               child: notesAsync.when(
                 loading: () => const SizedBox.shrink(),
-                error: (error, _) =>
-                    Center(child: Text('Something went wrong: $error')),
+                error: (error, _) => Center(
+                  child: Text(context.l10n.listSomethingWentWrong('$error')),
+                ),
                 data: (notes) {
                   if (notes.isEmpty) {
                     if (filter is AllNotes && ref.watch(isFreshStartProvider)) {
                       return const GettingStarted();
                     }
                     return filter is AllNotes
-                        ? const EmptyState(
+                        ? EmptyState(
                             icon: Icons.edit_note_outlined,
-                            title: 'No notes yet',
-                            message:
-                                'Tap New note to capture your first thought.',
+                            title: context.l10n.listNoNotesTitle,
+                            message: context.l10n.listNoNotesMessage,
                           )
-                        : const EmptyState(
+                        : EmptyState(
                             icon: Icons.filter_list,
-                            title: 'Nothing here yet',
-                            message: 'Notes you add while this filter is on land here.',
+                            title: context.l10n.listNothingHereTitle,
+                            message: context.l10n.listNothingHereMessage,
                           );
                   }
                   if (isDesktop(context)) {
@@ -202,7 +205,11 @@ class NotesScreen extends ConsumerWidget {
                           : folderNames,
                     );
                   }
-                  final headers = noteSectionHeaders(notes, DateTime.now());
+                  final headers = noteSectionHeaders(
+                    notes,
+                    DateTime.now(),
+                    context.l10n,
+                  );
                   return NewItemScope(
                     ids: [for (final n in notes) n.id],
                     child: ListView.separated(
@@ -219,6 +226,7 @@ class NotesScreen extends ConsumerWidget {
                             ScaffoldMessenger.of(context),
                             note.id,
                             note.title,
+                            l10n: context.l10n,
                           ),
                           child: _NoteCard(
                             note: note,
@@ -297,21 +305,23 @@ Future<void> _trash(BuildContext context, WidgetRef ref, String id) async {
     ScaffoldMessenger.of(context),
     id,
     note?.title ?? '',
+    l10n: context.l10n,
   );
 }
 
 class _NoteCard extends ConsumerWidget {
   const _NoteCard({required this.note, required this.folderName});
 
-  final Note note;
+  final NoteListItem note;
   final String? folderName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final c = theme.colorScheme;
-    final locked = isLockedContent(note.content);
-    final preview = locked ? '' : notePlainTextPreview(note.content);
+    final l10n = context.l10n;
+    final locked = note.locked;
+    final preview = note.preview;
     final meta = theme.textTheme.labelMedium?.copyWith(
       color: c.onSurfaceVariant,
     );
@@ -342,7 +352,9 @@ class _NoteCard extends ConsumerWidget {
                         child: Icon(Icons.push_pin, size: 15, color: c.primary),
                       ),
                     ),
-                  TextSpan(text: note.title.isEmpty ? 'Untitled' : note.title),
+                  TextSpan(
+                    text: note.title.isEmpty ? l10n.commonUntitled : note.title,
+                  ),
                   if (locked)
                     WidgetSpan(
                       alignment: PlaceholderAlignment.middle,
@@ -366,7 +378,7 @@ class _NoteCard extends ConsumerWidget {
             if (locked) ...[
               SizedBox(height: desktop ? 2 : 4),
               Text(
-                'Locked',
+                l10n.commonLocked,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: c.onSurfaceVariant,
                   fontStyle: FontStyle.italic,
@@ -386,7 +398,7 @@ class _NoteCard extends ConsumerWidget {
             SizedBox(height: desktop ? 6 : 10),
             Row(
               children: [
-                Text(_friendlyDate(note.updatedAt), style: meta),
+                Text(_friendlyDate(context, note.updatedAt), style: meta),
                 if (folderName case final name?) ...[
                   const SizedBox(width: 12),
                   Icon(Icons.folder_outlined, size: 14, color: c.primary),
@@ -408,48 +420,93 @@ class _NoteCard extends ConsumerWidget {
     );
     if (!desktop) return card;
     return ContextMenuRegion(
-      actions: [
-        ContextMenuAction(
-          label: 'Open',
-          icon: Icons.open_in_new,
-          onSelected: () => openNote(context, ref, note.id),
-        ),
-        ContextMenuAction(
-          label: 'Add to project…',
-          icon: Icons.folder_special_outlined,
-          onSelected: () => showProjectPickerSheet(context, noteId: note.id),
-        ),
-        lockMenuAction(context, ref, note),
-        pinMenuAction(ref, note),
-        duplicateMenuAction(context, ref, note),
-        null,
-        ContextMenuAction(
-          label: 'Move to trash',
-          icon: Icons.delete_outline,
-          destructive: true,
-          onSelected: () => deleteNoteWithUndo(
-            ref,
-            ScaffoldMessenger.of(context),
-            note.id,
-            note.title,
-          ),
-        ),
-      ],
+      actions: _noteMenuActions(
+        context,
+        ref,
+        note,
+        onOpen: () => openNote(context, ref, note.id),
+      ),
       child: card,
     );
   }
 
-  static String _friendlyDate(DateTime date) {
+  static String _friendlyDate(BuildContext context, DateTime date) {
+    final locale = Localizations.localeOf(context).toString();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(date.year, date.month, date.day);
     final diff = today.difference(day).inDays;
-    if (diff == 0) return DateFormat.jm().format(date); // under "Today"
-    if (diff == 1) return 'Yesterday';
-    if (diff < 7) return DateFormat.EEEE().format(date);
-    if (date.year == now.year) return DateFormat.MMMd().format(date);
-    return DateFormat.yMMMd().format(date);
+    if (diff == 0) return DateFormat.jm(locale).format(date); // under "Today"
+    if (diff == 1) return context.l10n.listYesterday;
+    if (diff < 7) return DateFormat.EEEE(locale).format(date);
+    if (date.year == now.year) return DateFormat.MMMd(locale).format(date);
+    return DateFormat.yMMMd(locale).format(date);
   }
+}
+
+/// The right-click items for a list row. The lock and duplicate actions
+/// load the note itself only when chosen, so the list never holds bodies.
+List<ContextMenuAction?> _noteMenuActions(
+  BuildContext context,
+  WidgetRef ref,
+  NoteListItem note, {
+  required VoidCallback onOpen,
+}) {
+  final l10n = context.l10n;
+  return [
+    ContextMenuAction(
+      label: l10n.commonOpen,
+      icon: Icons.open_in_new,
+      onSelected: onOpen,
+    ),
+    ContextMenuAction(
+      label: l10n.listAddToProject,
+      icon: Icons.folder_special_outlined,
+      onSelected: () => showProjectPickerSheet(context, noteId: note.id),
+    ),
+    ContextMenuAction(
+      label: note.locked ? l10n.listRemoveLock : l10n.listLockNote,
+      icon: note.locked ? Icons.lock_open_outlined : Icons.lock_outline,
+      onSelected: () async {
+        final full = await ref
+            .read(databaseProvider)
+            .managers
+            .notes
+            .filter((f) => f.id.equals(note.id))
+            .getSingleOrNull();
+        if (full == null || !context.mounted) return;
+        if (note.locked) {
+          await removeLockFromList(context, ref, full);
+        } else {
+          await lockNoteFromList(context, ref, full);
+        }
+      },
+    ),
+    ContextMenuAction(
+      label: note.pinned ? l10n.listUnpin : l10n.listPinToTop,
+      icon: note.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+      onSelected: () =>
+          setNotePinned(ref.read(databaseProvider), note.id, !note.pinned),
+    ),
+    ContextMenuAction(
+      label: l10n.listDuplicate,
+      icon: Icons.copy_outlined,
+      onSelected: () => duplicateNoteAndOpen(context, ref, note.id),
+    ),
+    null,
+    ContextMenuAction(
+      label: l10n.commonMoveToTrash,
+      icon: Icons.delete_outline,
+      destructive: true,
+      onSelected: () => deleteNoteWithUndo(
+        ref,
+        ScaffoldMessenger.of(context),
+        note.id,
+        note.title,
+        l10n: context.l10n,
+      ),
+    ),
+  ];
 }
 
 class _FilterBar extends ConsumerWidget {
@@ -476,7 +533,7 @@ class _FilterBar extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ChoiceChip(
-              label: const Text('All'),
+              label: Text(context.l10n.listAll),
               selected: filter is AllNotes,
               onSelected: (_) => ref.read(notesFilterProvider.notifier).state =
                   const AllNotes(),
@@ -509,7 +566,7 @@ class _FilterBar extends ConsumerWidget {
                 onSecondaryTapUp: isDesktop(context)
                     ? (d) => showContextMenuAt(context, d.globalPosition, [
                         ContextMenuAction(
-                          label: 'Delete folder…',
+                          label: context.l10n.listDeleteFolderEllipsis,
                           icon: Icons.delete_outline,
                           destructive: true,
                           onSelected: () =>
@@ -536,7 +593,7 @@ class _FilterBar extends ConsumerWidget {
                 onSecondaryTapUp: isDesktop(context)
                     ? (d) => showContextMenuAt(context, d.globalPosition, [
                         ContextMenuAction(
-                          label: 'Delete tag…',
+                          label: context.l10n.listDeleteTagEllipsis,
                           icon: Icons.delete_outline,
                           destructive: true,
                           onSelected: () => confirmDeleteTag(context, ref, tag),
@@ -558,7 +615,7 @@ class _FilterBar extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ActionChip(
               avatar: const Icon(Icons.add, size: 18),
-              label: const Text('Folder or tag'),
+              label: Text(context.l10n.listFolderOrTag),
               onPressed: () => showCreateFolderOrTagSheet(context, ref),
             ),
           ),
@@ -577,16 +634,16 @@ Future<void> confirmDeleteFolder(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('Delete "${folder.name}"?'),
-      content: const Text('Notes inside will be unfiled, not deleted.'),
+      title: Text(context.l10n.listDeleteFolderTitle(folder.name)),
+      content: Text(context.l10n.listDeleteFolderMessage),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Delete'),
+          child: Text(context.l10n.commonDelete),
         ),
       ],
     ),
@@ -609,16 +666,16 @@ Future<void> confirmDeleteTag(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('Delete "#${tag.name}"?'),
-      content: const Text('This removes the tag from every note.'),
+      title: Text(context.l10n.listDeleteTagTitle(tag.name)),
+      content: Text(context.l10n.listDeleteTagMessage),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Delete'),
+          child: Text(context.l10n.commonDelete),
         ),
       ],
     ),
@@ -645,12 +702,12 @@ Future<void> showCreateFolderOrTagSheet(
         children: [
           ListTile(
             leading: const Icon(Icons.folder_outlined),
-            title: const Text('New folder'),
+            title: Text(context.l10n.listNewFolder),
             onTap: () => Navigator.pop(context, 'folder'),
           ),
           ListTile(
             leading: const Icon(Icons.tag),
-            title: const Text('New tag'),
+            title: Text(context.l10n.listNewTag),
             onTap: () => Navigator.pop(context, 'tag'),
           ),
         ],
@@ -677,23 +734,27 @@ Future<String?> promptForName(BuildContext context, String kind) {
   return showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(kind == 'folder' ? 'New folder' : 'New tag'),
+      title: Text(
+        kind == 'folder' ? context.l10n.listNewFolder : context.l10n.listNewTag,
+      ),
       content: TextField(
         controller: controller,
         autofocus: true,
         decoration: InputDecoration(
-          hintText: kind == 'folder' ? 'Folder name' : 'Tag name',
+          hintText: kind == 'folder'
+              ? context.l10n.listFolderName
+              : context.l10n.listTagName,
         ),
         onSubmitted: (value) => Navigator.pop(context, value),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('Create'),
+          child: Text(context.l10n.listCreate),
         ),
       ],
     ),
@@ -706,7 +767,7 @@ Future<String?> promptForName(BuildContext context, String kind) {
 class _MacNotesList extends ConsumerStatefulWidget {
   const _MacNotesList({required this.notes, required this.folderNames});
 
-  final List<Note> notes;
+  final List<NoteListItem> notes;
   final Map<String, String> folderNames;
 
   @override
@@ -777,7 +838,7 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
         : null;
     final theme = Theme.of(context);
     final c = theme.colorScheme;
-    final headers = noteSectionHeaders(notes, DateTime.now());
+    final headers = noteSectionHeaders(notes, DateTime.now(), context.l10n);
     return NewItemScope(
       ids: [for (final n in notes) n.id],
       child: Focus(
@@ -789,40 +850,18 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
           itemCount: notes.length,
           itemBuilder: (context, index) {
             final note = notes[index];
-            final locked = isLockedContent(note.content);
-            final preview = locked ? '' : notePlainTextPreview(note.content);
+            final locked = note.locked;
+            final preview = note.preview;
             final folder = widget.folderNames[note.folderId];
             final row = KeyedSubtree(
               key: _keys.putIfAbsent(note.id, GlobalKey.new),
               child: ContextMenuRegion(
-                actions: [
-                  ContextMenuAction(
-                    label: 'Open',
-                    icon: Icons.open_in_new,
-                    onSelected: () => _select(note.id),
-                  ),
-                  ContextMenuAction(
-                    label: 'Add to project…',
-                    icon: Icons.folder_special_outlined,
-                    onSelected: () =>
-                        showProjectPickerSheet(context, noteId: note.id),
-                  ),
-                  lockMenuAction(context, ref, note),
-                  pinMenuAction(ref, note),
-                  duplicateMenuAction(context, ref, note),
-                  null,
-                  ContextMenuAction(
-                    label: 'Move to trash',
-                    icon: Icons.delete_outline,
-                    destructive: true,
-                    onSelected: () => deleteNoteWithUndo(
-                      ref,
-                      ScaffoldMessenger.of(context),
-                      note.id,
-                      note.title,
-                    ),
-                  ),
-                ],
+                actions: _noteMenuActions(
+                  context,
+                  ref,
+                  note,
+                  onOpen: () => _select(note.id),
+                ),
                 child: MacListRow(
                   selected: note.id == selectedId,
                   listFocused: _focus.hasFocus,
@@ -848,7 +887,9 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
                             ),
                           ),
                         TextSpan(
-                          text: note.title.isEmpty ? 'Untitled' : note.title,
+                          text: note.title.isEmpty
+                              ? context.l10n.commonUntitled
+                              : note.title,
                         ),
                         if (locked)
                           const WidgetSpan(
@@ -868,12 +909,15 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
                     TextSpan(
                       children: [
                         TextSpan(
-                          text: _NoteCard._friendlyDate(note.updatedAt),
+                          text: _NoteCard._friendlyDate(
+                            context,
+                            note.updatedAt,
+                          ),
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
                         if (locked)
-                          const TextSpan(
-                            text: '  Locked',
+                          TextSpan(
+                            text: '  ${context.l10n.commonLocked}',
                             style: TextStyle(fontStyle: FontStyle.italic),
                           )
                         else if (preview.isNotEmpty)
@@ -899,7 +943,9 @@ class _MacNotesListState extends ConsumerState<_MacNotesList> {
               data: DraggedNote(note.id, note.title),
               dragAnchorStrategy: pointerDragAnchorStrategy,
               feedback: _DragChip(
-                title: note.title.isEmpty ? 'Untitled' : note.title,
+                title: note.title.isEmpty
+                    ? context.l10n.commonUntitled
+                    : note.title,
               ),
               childWhenDragging: Opacity(opacity: 0.5, child: row),
               child: row,

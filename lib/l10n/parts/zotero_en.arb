@@ -1,0 +1,130 @@
+{
+  "@@locale": "en",
+  "zoteroBadKey": "Zotero didn't accept that user ID and key. Check both, and that the key is allowed to read your library.",
+  "zoteroNotFound": "Zotero couldn't find that library. Check the user ID (the number on zotero.org/settings/keys).",
+  "zoteroRateLimited": "Zotero is asking for a pause. Try again in a few minutes.",
+  "zoteroOffline": "Couldn't reach Zotero. Check your connection and try again.",
+  "zoteroServerProblem": "Zotero had a problem. Try again later.",
+  "zoteroServerProblemDetail": "Zotero had a problem ({detail}). Try again later.",
+  "@zoteroServerProblemDetail": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroSummaryMain": "Imported {papers, plural, =1{1 paper} other{{papers} papers}}, {pdfs, plural, =1{1 PDF} other{{pdfs} PDFs}}, {highlights, plural, =1{1 highlight} other{{highlights} highlights}} into {projects, plural, =1{1 project} other{{projects} projects}}",
+  "@zoteroSummaryMain": {
+    "placeholders": {
+      "papers": {
+        "type": "int"
+      },
+      "pdfs": {
+        "type": "int"
+      },
+      "highlights": {
+        "type": "int"
+      },
+      "projects": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryNotes": "{count, plural, =1{1 note} other{{count} notes}} added",
+  "@zoteroSummaryNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryAlreadyIn": "{count} already in your library",
+  "@zoteroSummaryAlreadyIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryPdfsFailed": "{count, plural, =1{1 PDF} other{{count} PDFs}} couldn't be downloaded",
+  "@zoteroSummaryPdfsFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummarySkipped": "{count, plural, =1{1 item} other{{count} items}} skipped",
+  "@zoteroSummarySkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "zoteroSummaryStopped": "Stopped. {summary}.",
+  "@zoteroSummaryStopped": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroSummaryDone": "{summary}.",
+  "@zoteroSummaryDone": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroEnterBoth": "Enter both your user ID and an API key.",
+  "zoteroUserIdNumber": "The user ID is a number, not your username.",
+  "zoteroImportFailed": "{message}\nWhat was imported before this stays in your library.",
+  "@zoteroImportFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroTitle": "Zotero",
+  "zoteroConnectTitle": "Connect to Zotero",
+  "zoteroConnect": "Connect",
+  "zoteroImportTitle": "Import from Zotero",
+  "zoteroForgetKey": "Forget key",
+  "zoteroImport": "Import",
+  "zoteroImporting": "Importing",
+  "zoteroStopping": "Stopping…",
+  "zoteroStopped": "Stopped",
+  "zoteroSomethingWrong": "Something went wrong.",
+  "zoteroKeyHelp": "Create a read-only key at zotero.org/settings/keys (Create new private key, allow library access only). Your user ID is shown on the same page. They stay on this device, in secure storage, and are never synced or backed up.",
+  "zoteroOpenKeys": "Open zotero.org/settings/keys",
+  "zoteroUserId": "User ID",
+  "zoteroApiKey": "API key",
+  "zoteroEverything": "Everything",
+  "zoteroEverythingHint": "Every item; collections become projects",
+  "zoteroSomeCollections": "Only some collections",
+  "zoteroReadingLibrary": "Reading your Zotero library…",
+  "zoteroReadingItems": "Reading items…",
+  "zoteroReadingAttachments": "Reading attachments and annotations…",
+  "zoteroImportingItem": "Importing “{title}”",
+  "@zoteroImportingItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "zoteroProgress": "{done} of {total}",
+  "@zoteroProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
+}

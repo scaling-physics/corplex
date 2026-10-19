@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "audioChannelName": "Audio playback",
+  "audioNotSynced": "This recording hasn't synced to this device yet.",
+  "audioPlayFailed": "Couldn't play this recording.",
+  "audioClosePlayer": "Close player",
+  "audioBack10": "Back 10 seconds",
+  "audioForward30": "Forward 30 seconds",
+  "audioPause": "Pause",
+  "audioPlay": "Play",
+  "audioMark": "Mark"
+}

@@ -35,8 +35,8 @@ folders, 40 tags, 8 projects, and generated PDFs (one of 300 pages, three of
 | 100 x "highlights of one paper" | 109 | 7 |
 | Trash 20 papers (13 highlights each) | 114 | 46 |
 | Previews of 40 notes scrolled back to | ~4 | 0.4 |
-| Notes list (all, pinned first) | 40 | 37 (unchanged) |
-| Notes list per folder / tag / project | 5 / 4 / 1 | 3 / 4 / 1 |
+| Notes list (all, pinned first), previews stored | 40 | 37, then 11 (no bodies loaded, 1.4.1; first load computes 60 previews: 76) |
+| Notes list per folder / tag / project | 5 / 4 / 1 | 3 / 4 / 1, then 2.5 / 1.3 / 0.7 |
 | Library list, filtered list | 9, 3 | 7, 4 |
 | Sidebar counts (folders / projects) | 3 / 1 | 2 / 1 |
 | Attachments browser | 21 | 19 (see below) |
@@ -139,12 +139,12 @@ device, the PDF viewer's own scroll and zoom.
 
 ## Found, not fixed
 
-- **The Notes list holds every note's full body.** `visibleNotesProvider`
-  selects whole rows, and any note save re-runs it (3,000 notes: 37 ms and
-  several MB on a Mac; about 40 ms extra per save on the emulator while the
-  list is alive, e.g. under the editor on a phone or beside it on an iPad).
-  A list projection without `content` would need a stored preview column
-  (schema change) or a second query for the visible rows.
+- **The Notes list used to hold every note's full body** (fixed in schema
+  v21). It now selects only the light columns plus a stored one-line preview
+  from the local-only `note_previews` table; a SQLite trigger drops a note's
+  preview whenever its `content` changes, and the list recomputes missing
+  ones (60 per pass, 3,000 notes: about 1.2 s in the background on a Mac,
+  then 11 ms per list load instead of 37, and no bodies in memory).
 - **Indexing `noteSearchText` runs on the main isolate** (chunked, yielding;
   about 0.1 ms/note on a Mac, 3-5 ms on the emulator). Moving it to
   `Isolate.run` is possible but isolates don't run under the fake clock in

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database_provider.dart';
 import '../home/adaptive.dart';
 import '../lock/note_lock_service.dart';
@@ -27,9 +28,14 @@ class WritingTodo {
     required this.text,
     required this.offset,
     required this.length,
+    this.placeholder = false,
   });
 
   final TodoKind kind;
+
+  /// [text] is a stand-in for an empty marker ("Figure", "TODO"); the list
+  /// shows its own words in the app's language instead.
+  final bool placeholder;
 
   /// What to show in a list.
   final String text;
@@ -82,6 +88,7 @@ List<WritingTodo> findTodos(String storedContent) {
         text: caption.isEmpty ? 'Figure' : _clip(caption),
         offset: m.start,
         length: m.end - m.start,
+        placeholder: caption.isEmpty,
       ),
     );
     taken.add((m.start, m.end));
@@ -119,6 +126,7 @@ List<WritingTodo> findTodos(String storedContent) {
         text: context.isEmpty ? 'Needs a citation' : context,
         offset: m.start,
         length: m.end - m.start,
+        placeholder: context.isEmpty,
       ),
     );
     taken.add((m.start, m.end));
@@ -135,6 +143,7 @@ List<WritingTodo> findTodos(String storedContent) {
         text: rest.isEmpty ? 'TODO' : rest,
         offset: m.start,
         length: m.end - m.start,
+        placeholder: rest.isEmpty,
       ),
     );
   }
@@ -236,6 +245,7 @@ class ProjectTodosSection extends ConsumerWidget {
         .value;
     if (groups == null || groups.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final count = groups.fold(0, (a, g) => a + g.todos.length);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,7 +253,7 @@ class ProjectTodosSection extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
           child: Text(
-            'To do in the writing ($count)',
+            l10n.projectsTodosTitle(count),
             style: theme.textTheme.titleSmall,
           ),
         ),
@@ -251,7 +261,7 @@ class ProjectTodosSection extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Text(
-              g.title.trim().isEmpty ? 'Untitled' : g.title.trim(),
+              g.title.trim().isEmpty ? l10n.commonUntitled : g.title.trim(),
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -273,7 +283,17 @@ class ProjectTodosSection extends ConsumerWidget {
                   _ => theme.colorScheme.onSurfaceVariant,
                 },
               ),
-              title: Text(t.text, maxLines: 2, overflow: TextOverflow.ellipsis),
+              title: Text(
+                t.placeholder
+                    ? switch (t.kind) {
+                        TodoKind.todo => l10n.projectsTodoWord,
+                        TodoKind.needsCitation => l10n.projectsNeedsCitation,
+                        TodoKind.figure => l10n.projectsFigureTodo,
+                      }
+                    : t.text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
               onTap: () =>
                   openNoteAtSelection(context, ref, g.noteId, t.selection),
             ),

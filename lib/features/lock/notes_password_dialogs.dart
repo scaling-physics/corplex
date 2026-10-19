@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
+
 import 'note_lock_service.dart';
 
 /// Shortest notes password we accept. The password protects text that can't
@@ -8,16 +10,13 @@ import 'note_lock_service.dart';
 const minNotesPasswordLength = 6;
 
 /// What this platform calls unlocking with your body.
-String biometricName(TargetPlatform platform) => switch (platform) {
-  TargetPlatform.macOS => 'Touch ID',
-  TargetPlatform.iOS => 'Face ID / Touch ID',
-  TargetPlatform.android => 'fingerprint',
-  _ => 'biometrics',
-};
-
-const forgottenPasswordWarning =
-    'If you forget this password, locked notes can\'t be recovered — '
-    'not by you, and not by us.';
+String biometricName(AppLocalizations l10n, TargetPlatform platform) =>
+    switch (platform) {
+      TargetPlatform.macOS => l10n.lockBiometricTouch,
+      TargetPlatform.iOS => l10n.lockBiometricFaceTouch,
+      TargetPlatform.android => l10n.lockBiometricFingerprint,
+      _ => l10n.lockBiometricGeneric,
+    };
 
 /// Gets the notes unlocked for something that needs the current key:
 /// sets the password first if there isn't one, tries biometrics if they're
@@ -26,13 +25,14 @@ Future<bool> ensureNotesUnlocked(
   BuildContext context,
   NoteLockService service,
 ) async {
+  final reason = context.l10n.lockBiometricReason;
   if (!await service.hasPassword()) {
     if (!context.mounted) return false;
     return showSetNotesPasswordDialog(context, service);
   }
   if (await service.isUnlocked()) return true;
   if (await service.biometricsEnabled() &&
-      await service.unlockWithBiometrics() &&
+      await service.unlockWithBiometrics(reason: reason) &&
       await service.isUnlocked()) {
     return true;
   }
@@ -69,23 +69,20 @@ Future<void> offerBiometrics(
       !context.mounted) {
     return;
   }
-  final name = biometricName(Theme.of(context).platform);
+  final name = biometricName(context.l10n, Theme.of(context).platform);
   final yes = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('Use $name to unlock?'),
-      content: Text(
-        'Open locked notes with $name instead of typing the password. '
-        'The password still works.',
-      ),
+      title: Text(context.l10n.lockOfferTitle(name)),
+      content: Text(context.l10n.lockOfferBody(name)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Not now'),
+          child: Text(context.l10n.lockNotNow),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: Text('Use $name'),
+          child: Text(context.l10n.lockUseBiometric(name)),
         ),
       ],
     ),
@@ -107,7 +104,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   final _hint = TextEditingController();
-  String? _error;
+  String Function(AppLocalizations)? _error;
   bool _busy = false;
 
   @override
@@ -121,13 +118,11 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
   Future<void> _submit() async {
     if (_busy) return;
     if (_password.text.length < minNotesPasswordLength) {
-      setState(
-        () => _error = 'Use at least $minNotesPasswordLength characters.',
-      );
+      setState(() => _error = (l) => l.lockMinLength(minNotesPasswordLength));
       return;
     }
     if (_password.text != _confirm.text) {
-      setState(() => _error = 'The passwords don\'t match.');
+      setState(() => _error = (l) => l.lockMismatch);
       return;
     }
     setState(() {
@@ -149,7 +144,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
     final c = theme.colorScheme;
     return AlertDialog(
       title: Text(
-        widget.reset ? 'Reset notes password' : 'Set a notes password',
+        widget.reset ? context.l10n.lockResetTitle : context.l10n.lockSetTitle,
       ),
       content: SizedBox(
         width: 380,
@@ -165,7 +160,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  forgottenPasswordWarning,
+                  context.l10n.lockForgottenWarning,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: c.onErrorContainer,
                   ),
@@ -176,28 +171,32 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
                 controller: _password,
                 autofocus: true,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockPassword,
+                ),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _confirm,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirm'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockConfirm,
+                ),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _hint,
-                decoration: const InputDecoration(
-                  labelText: 'Hint (optional)',
-                  helperText: 'Shown on the lock screen. Not the password!',
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockHintOptional,
+                  helperText: context.l10n.lockHintHelper,
                 ),
                 onSubmitted: (_) => _submit(),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!, style: TextStyle(color: c.error)),
+                Text(_error!(context.l10n), style: TextStyle(color: c.error)),
               ],
             ],
           ),
@@ -206,11 +205,15 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: Text(widget.reset ? 'Reset password' : 'Set password'),
+          child: Text(
+            widget.reset
+                ? context.l10n.lockResetPassword
+                : context.l10n.lockSetPassword,
+          ),
         ),
       ],
     );
@@ -222,7 +225,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
 Future<bool> showUnlockNotesDialog(
   BuildContext context,
   NoteLockService service, {
-  String message = 'Enter your notes password.',
+  String? message,
 }) async {
   final ok = await showDialog<bool>(
     context: context,
@@ -235,7 +238,7 @@ class _UnlockDialog extends StatefulWidget {
   const _UnlockDialog({required this.service, required this.message});
 
   final NoteLockService service;
-  final String message;
+  final String? message;
 
   @override
   State<_UnlockDialog> createState() => _UnlockDialogState();
@@ -243,7 +246,7 @@ class _UnlockDialog extends StatefulWidget {
 
 class _UnlockDialogState extends State<_UnlockDialog> {
   final _password = TextEditingController();
-  String? _error;
+  bool _wrong = false;
   String? _hint;
   bool _busy = false;
 
@@ -271,7 +274,7 @@ class _UnlockDialogState extends State<_UnlockDialog> {
     } else {
       setState(() {
         _busy = false;
-        _error = 'Wrong password';
+        _wrong = true;
       });
     }
   }
@@ -280,23 +283,25 @@ class _UnlockDialogState extends State<_UnlockDialog> {
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: const Text('Notes password'),
+      title: Text(context.l10n.lockNotesPassword),
       content: SizedBox(
         width: 340,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.message),
+            Text(widget.message ?? context.l10n.lockEnterPassword),
             const SizedBox(height: 12),
             TextField(
               controller: _password,
               autofocus: true,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'Password',
-                errorText: _error,
-                helperText: _hint == null ? null : 'Hint: $_hint',
+                labelText: context.l10n.lockPassword,
+                errorText: _wrong ? context.l10n.lockWrongPassword : null,
+                helperText: _hint == null
+                    ? null
+                    : context.l10n.lockHint(_hint!),
               ),
               onSubmitted: (_) => _submit(),
             ),
@@ -306,7 +311,7 @@ class _UnlockDialogState extends State<_UnlockDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
@@ -319,7 +324,7 @@ class _UnlockDialogState extends State<_UnlockDialog> {
                     color: c.onPrimary,
                   ),
                 )
-              : const Text('Unlock'),
+              : Text(context.l10n.lockUnlock),
         ),
       ],
     );
@@ -352,7 +357,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   final _new = TextEditingController();
   final _confirm = TextEditingController();
   final _hint = TextEditingController();
-  String? _error;
+  String Function(AppLocalizations)? _error;
   bool _busy = false;
 
   @override
@@ -375,13 +380,11 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   Future<void> _submit() async {
     if (_busy) return;
     if (_new.text.length < minNotesPasswordLength) {
-      setState(
-        () => _error = 'Use at least $minNotesPasswordLength characters.',
-      );
+      setState(() => _error = (l) => l.lockMinLength(minNotesPasswordLength));
       return;
     }
     if (_new.text != _confirm.text) {
-      setState(() => _error = 'The new passwords don\'t match.');
+      setState(() => _error = (l) => l.lockNewMismatch);
       return;
     }
     setState(() {
@@ -399,7 +402,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     } else {
       setState(() {
         _busy = false;
-        _error = 'The current password is wrong.';
+        _error = (l) => l.lockCurrentWrong;
       });
     }
   }
@@ -408,7 +411,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: const Text('Change notes password'),
+      title: Text(context.l10n.lockChangeTitle),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
@@ -419,31 +422,37 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _old,
                 autofocus: true,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Current password',
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockCurrentPassword,
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _new,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'New password'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockNewPassword,
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _confirm,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirm'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockConfirm,
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _hint,
-                decoration: const InputDecoration(labelText: 'Hint (optional)'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.lockHintOptional,
+                ),
                 onSubmitted: (_) => _submit(),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!, style: TextStyle(color: c.error)),
+                Text(_error!(context.l10n), style: TextStyle(color: c.error)),
               ],
             ],
           ),
@@ -452,11 +461,11 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: const Text('Change password'),
+          child: Text(context.l10n.lockChangePassword),
         ),
       ],
     );
@@ -470,12 +479,17 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
 Future<bool> requestNotesUnlock(
   BuildContext context,
   NoteLockService service, {
-  String reason = 'Unlock your locked notes to continue.',
+  String? reason,
 }) async {
+  final l10n = context.l10n;
   if (await service.biometricsEnabled() &&
-      await service.unlockWithBiometrics()) {
+      await service.unlockWithBiometrics(reason: l10n.lockBiometricReason)) {
     return true;
   }
   if (!context.mounted) return false;
-  return showUnlockNotesDialog(context, service, message: reason);
+  return showUnlockNotesDialog(
+    context,
+    service,
+    message: reason ?? l10n.lockUnlockToContinue,
+  );
 }

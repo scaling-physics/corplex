@@ -22,10 +22,18 @@ const _dbName = 'corplex.sqlite';
 const _docsMarker = '@docs/';
 const _stagingDir = 'restore_staging';
 
+/// Why a backup was refused, so the UI can show it in the user's language
+/// (`message` stays English, for logs and tests).
+enum BackupProblem { notABackup, unsupportedVersion, newerVersion }
+
 class BackupException implements Exception {
-  const BackupException(this.message);
+  const BackupException(
+    this.message, [
+    this.problem = BackupProblem.notABackup,
+  ]);
 
   final String message;
+  final BackupProblem problem;
 
   @override
   String toString() => message;
@@ -86,6 +94,8 @@ Future<File> createBackup(
       // Recognised text is derived from the PDFs too.
       copy.execute('DELETE FROM ocr_pages');
       copy.execute('DELETE FROM ocr_papers');
+      // Note list previews are derived too (rebuilt on first load).
+      copy.execute('DELETE FROM note_previews');
     } finally {
       copy.close();
     }
@@ -162,12 +172,16 @@ BackupInfo inspectBackup(File zip, {required int currentSchemaVersion}) {
   final manifest =
       jsonDecode(utf8.decode(manifestFile.content)) as Map<String, dynamic>;
   if (manifest['format'] != backupFormat) {
-    throw const BackupException('This backup is from an unsupported version.');
+    throw const BackupException(
+      'This backup is from an unsupported version.',
+      BackupProblem.unsupportedVersion,
+    );
   }
   if ((manifest['schemaVersion'] as int) > currentSchemaVersion) {
     throw const BackupException(
       'This backup was made by a newer version of Corplex. Update the app '
       'first.',
+      BackupProblem.newerVersion,
     );
   }
   final counts = (manifest['counts'] as Map).cast<String, int>();

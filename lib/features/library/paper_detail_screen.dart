@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -226,7 +227,13 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     } else {
       Navigator.of(context).pop();
     }
-    await deletePaperWithUndo(ref, messenger, widget.paperId, title);
+    await deletePaperWithUndo(
+      ref,
+      messenger,
+      widget.paperId,
+      title,
+      l10n: context.l10n,
+    );
   }
 
   /// Fills empty details from the DOI or arXiv ID in the DOI field.
@@ -241,10 +248,11 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
     final messenger = ScaffoldMessenger.of(context);
     if (id == null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Enter a DOI, arXiv or PubMed ID first.')),
+        SnackBar(content: Text(context.l10n.paperEnterIdentifier)),
       );
       return;
     }
+    final l10n = context.l10n;
     setState(() => _lookingUp = true);
     try {
       await _save();
@@ -252,7 +260,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       if (!mounted) return;
       if (meta == null) {
         messenger.showSnackBar(
-          SnackBar(content: Text('No paper found for ${id.value}.')),
+          SnackBar(content: Text(l10n.libraryNoPaperFound(id.value))),
         );
         return;
       }
@@ -265,16 +273,12 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
       _showPaper(paper);
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            changed
-                ? 'Filled in the missing details.'
-                : 'Nothing new to fill in.',
-          ),
+          content: Text(changed ? l10n.paperFilledIn : l10n.paperNothingNew),
         ),
       );
     } on LookupFailed {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Couldn\'t reach the lookup service.')),
+        SnackBar(content: Text(l10n.paperLookupUnreachable)),
       );
     } finally {
       if (mounted) setState(() => _lookingUp = false);
@@ -393,8 +397,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                         onSubmitted: isDesktop(context)
                             ? (_) => _editAuthors()
                             : null,
-                        decoration: const InputDecoration(
-                          hintText: 'Title',
+                        decoration: InputDecoration(
+                          hintText: context.l10n.paperTitleHint,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -422,7 +426,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                             // "Vaswani, Ashish; Shazeer, Noam; …".
                             return Semantics(
                               button: true,
-                              hint: 'Edit authors',
+                              hint: context.l10n.paperEditAuthors,
                               child: InkWell(
                                 onTap: _editAuthors,
                                 borderRadius: BorderRadius.circular(8),
@@ -449,9 +453,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                                 ? (_) => FocusScope.of(context).nextFocus()
                                 : null,
                             decoration: InputDecoration(
-                              hintText: 'Authors',
+                              hintText: context.l10n.paperAuthorsHint,
                               helperText: _authorsFocus.hasFocus
-                                  ? 'Separate authors with ;'
+                                  ? context.l10n.paperAuthorsHelper
                                   : null,
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
@@ -482,10 +486,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
           final e5 = <Widget>[_HighlightsSection(paper: paperAsync.value)];
           final e6 = <Widget>[
             _Section(
-              title: 'Attachments',
+              title: context.l10n.attachmentsTitle,
               trailing: TextButton.icon(
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add'),
+                label: Text(context.l10n.commonAdd),
                 onPressed: () => showAddAttachmentSheet(
                   context,
                   ref,
@@ -494,13 +498,14 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
               ),
               child: attachmentsAsync.when(
                 loading: () => const SizedBox(height: 56),
-                error: (error, _) => Text('Could not load attachments: $error'),
+                error: (error, _) =>
+                    Text(context.l10n.paperAttachmentsError('$error')),
                 data: (attachments) {
                   if (attachments.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
-                        'Podcasts, images, links or files for this paper.',
+                        context.l10n.paperAttachmentsEmpty,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -518,7 +523,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
           ];
           final e7 = <Widget>[
             _Section(
-              title: 'Details',
+              title: context.l10n.paperDetails,
               trailing: TextButton.icon(
                 icon: _lookingUp
                     ? const SizedBox(
@@ -527,7 +532,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.travel_explore, size: 18),
-                label: const Text('Look up'),
+                label: Text(context.l10n.paperLookUp),
                 onPressed: _lookingUp ? null : _lookUp,
               ),
               child: Padding(
@@ -540,8 +545,8 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                       textInputAction: isDesktop(context)
                           ? TextInputAction.next
                           : null,
-                      decoration: const InputDecoration(
-                        labelText: 'DOI, arXiv or PubMed ID',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.paperIdentifierLabel,
                       ),
                     ),
                     if (_showPmid) ...[
@@ -550,10 +555,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                         controller: _pmidController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          labelText: 'PubMed ID',
+                          labelText: context.l10n.paperPubmedId,
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.open_in_new, size: 18),
-                            tooltip: 'Open in PubMed',
+                            tooltip: context.l10n.paperOpenInPubmed,
                             onPressed: () => _open(
                               'https://pubmed.ncbi.nlm.nih.gov/'
                               '${_pmidController.text.trim()}/',
@@ -570,10 +575,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                         controller: _urlController,
                         keyboardType: TextInputType.url,
                         decoration: InputDecoration(
-                          labelText: 'Link',
+                          labelText: context.l10n.paperLink,
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.open_in_new, size: 18),
-                            tooltip: 'Open link',
+                            tooltip: context.l10n.paperOpenLink,
                             onPressed: () => _open(_urlController.text.trim()),
                           ),
                         ),
@@ -586,15 +591,17 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                       textInputAction: isDesktop(context)
                           ? TextInputAction.next
                           : null,
-                      decoration: const InputDecoration(
-                        labelText: 'Journal or conference',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.paperVenue,
                       ),
                     ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: _yearController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Year'),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.paperYear,
+                      ),
                     ),
                   ],
                 ),
@@ -604,7 +611,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
           final e7b = <Widget>[
             if (_showAbstract)
               _Section(
-                title: 'Abstract',
+                title: context.l10n.paperAbstract,
                 child: _AbstractBox(controller: _abstractController),
               ),
           ];
@@ -620,10 +627,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
           final e10 = <Widget>[
             if (paperAsync.value case final paper?)
               _Section(
-                title: 'Citation',
+                title: context.l10n.paperCitation,
                 trailing: IconButton(
                   icon: const Icon(Icons.copy_outlined, size: 20),
-                  tooltip: 'Copy citation',
+                  tooltip: context.l10n.libraryCopyCitation,
                   onPressed: () {
                     Clipboard.setData(
                       ClipboardData(
@@ -631,7 +638,9 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                       ),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Citation copied')),
+                      SnackBar(
+                        content: Text(context.l10n.libraryCitationCopied),
+                      ),
                     );
                   },
                 ),
@@ -660,13 +669,13 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                               onSelected: (_) => _useCitationStyle(style),
                             ),
                           ActionChip(
-                            label: const Text('More…'),
+                            label: Text(context.l10n.paperMoreStyles),
                             visualDensity: VisualDensity.compact,
                             onPressed: () async {
                               final style = await pickCitationStyle(
                                 context,
                                 includeBibtex: true,
-                                title: 'Citation style',
+                                title: context.l10n.paperCitationStyle,
                               );
                               if (style != null) {
                                 _useCitationStyle(style);
@@ -692,14 +701,16 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
           final e11 = <Widget>[
             if (notesAsync.value case final notes? when notes.isNotEmpty)
               _Section(
-                title: 'Referenced in notes',
+                title: context.l10n.paperReferencedInNotes,
                 child: Column(
                   children: notes
                       .map(
                         (note) => ListTile(
                           leading: const Icon(Icons.edit_note_outlined),
                           title: Text(
-                            note.title.isEmpty ? 'Untitled' : note.title,
+                            note.title.isEmpty
+                                ? context.l10n.commonUntitled
+                                : note.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -741,7 +752,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                 ),
                 actions: [
                   PopupMenuButton<String>(
-                    tooltip: 'More',
+                    tooltip: context.l10n.commonMore,
                     onSelected: (v) {
                       if (v == 'trash') _moveToTrash();
                       if (v == 'annotated' && paper != null) {
@@ -750,18 +761,18 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                     },
                     itemBuilder: (_) => [
                       if (paper?.pdfPath != null && hasMarks)
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'annotated',
                           child: ListTile(
-                            leading: Icon(Icons.ios_share),
-                            title: Text('Export with highlights'),
+                            leading: const Icon(Icons.ios_share),
+                            title: Text(context.l10n.paperExportWithHighlights),
                           ),
                         ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'trash',
                         child: ListTile(
-                          leading: Icon(Icons.delete_outline),
-                          title: Text('Move to trash'),
+                          leading: const Icon(Icons.delete_outline),
+                          title: Text(context.l10n.commonMoveToTrash),
                         ),
                       ),
                     ],
@@ -871,6 +882,7 @@ class _PdfButtonState extends ConsumerState<_PdfButton> {
   Future<void> _download() async {
     setState(() => _downloading = true);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     final ok = await ref
         .read(syncServiceProvider)
         .downloadFile(paperId: widget.paperId);
@@ -878,7 +890,7 @@ class _PdfButtonState extends ConsumerState<_PdfButton> {
     setState(() => _downloading = false);
     if (!ok) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Couldn\'t download the PDF. Try again.')),
+        SnackBar(content: Text(l10n.paperDownloadPdfFailed)),
       );
     }
     // On success the paper row updates with its local path, which rebuilds
@@ -894,7 +906,9 @@ class _PdfButtonState extends ConsumerState<_PdfButton> {
       final open = FilledButton.tonalIcon(
         icon: const Icon(Icons.menu_book_outlined),
         label: Text(
-          resume ? 'Continue reading · p. ${paper.lastPage}' : 'Open PDF',
+          resume
+              ? context.l10n.paperContinueReading(paper.lastPage!)
+              : context.l10n.libraryOpenPdf,
         ),
         onPressed: () => _open(pdfPath, paper.lastPage),
       );
@@ -907,7 +921,7 @@ class _PdfButtonState extends ConsumerState<_PdfButton> {
           open,
           OutlinedButton.icon(
             icon: const Icon(Icons.vertical_split_outlined),
-            label: const Text('Read with a note'),
+            label: Text(context.l10n.paperReadWithNote),
             onPressed: () => openSplitReader(context, ref, paper),
           ),
         ],
@@ -922,7 +936,11 @@ class _PdfButtonState extends ConsumerState<_PdfButton> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(Icons.cloud_download_outlined),
-        label: Text(_downloading ? 'Downloading…' : 'Download PDF'),
+        label: Text(
+          _downloading
+              ? context.l10n.paperDownloading
+              : context.l10n.paperDownloadPdf,
+        ),
         onPressed: _downloading ? null : _download,
       );
     }
@@ -960,7 +978,11 @@ class _ProjectChips extends ConsumerWidget {
             ),
           ActionChip(
             avatar: const Icon(Icons.add, size: 16),
-            label: Text(projects.isEmpty ? 'Add to project' : 'Project'),
+            label: Text(
+              projects.isEmpty
+                  ? context.l10n.paperAddToProject
+                  : context.l10n.paperProject,
+            ),
             onPressed: () => showProjectPickerSheet(context, paperId: paperId),
           ),
         ],
@@ -975,12 +997,6 @@ class _ReadingStatusRow extends ConsumerWidget {
 
   final Paper? paper;
 
-  static const _labels = {
-    ReadingStatus.toRead: 'To read',
-    ReadingStatus.reading: 'Reading',
-    ReadingStatus.done: 'Done',
-  };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final paper = this.paper;
@@ -992,7 +1008,7 @@ class _ReadingStatusRow extends ConsumerWidget {
         children: [
           for (final status in ReadingStatus.values)
             ChoiceChip(
-              label: Text(_labels[status]!),
+              label: Text(readingStatusLabel(context.l10n, status)),
               selected: paper.readingStatus == status,
               // The fill eases between chips instead of jumping.
               chipAnimationStyle: ChipAnimationStyle(
@@ -1157,7 +1173,7 @@ class _HighlightsSection extends ConsumerWidget {
     if (highlights.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return _Section(
-      title: 'Highlights',
+      title: context.l10n.paperHighlights,
       child: Column(
         children: [
           for (final h in highlights)
@@ -1183,7 +1199,10 @@ class _HighlightsSection extends ConsumerWidget {
                   ),
                 ),
                 subtitle: Text(
-                  ['p. ${h.pageNumber}', ?h.comment].join(' · '),
+                  [
+                    context.l10n.paperPageShort(h.pageNumber),
+                    ?h.comment,
+                  ].join(' · '),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1280,7 +1299,7 @@ class _AbstractBoxState extends State<_AbstractBox> {
                   alignment: Alignment.centerLeft,
                   child: TextButton(
                     onPressed: () => setState(() => _open = false),
-                    child: const Text('Less'),
+                    child: Text(context.l10n.commonLess),
                   ),
                 ),
               ],
@@ -1310,7 +1329,11 @@ class _AbstractBoxState extends State<_AbstractBox> {
                         alignment: Alignment.centerLeft,
                         child: TextButton(
                           onPressed: () => setState(() => _open = true),
-                          child: Text(overflows ? 'More' : 'Edit'),
+                          child: Text(
+                            overflows
+                                ? context.l10n.commonMore
+                                : context.l10n.commonEdit,
+                          ),
                         ),
                       ),
                     ],
@@ -1396,12 +1419,13 @@ class _AttachmentTile extends ConsumerWidget {
     required bool audio,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     final playback = ref.read(audioPlaybackProvider);
     final db = ref.read(databaseProvider);
     messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Downloading…'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(l10n.paperDownloading),
+        duration: const Duration(seconds: 2),
       ),
     );
     final ok = await ref
@@ -1409,9 +1433,7 @@ class _AttachmentTile extends ConsumerWidget {
         .downloadFile(attachmentId: attachment.id);
     if (!ok) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Couldn\'t download the file. Try again.'),
-        ),
+        SnackBar(content: Text(l10n.paperDownloadFileFailed)),
       );
       return;
     }
@@ -1439,7 +1461,7 @@ class _AttachmentTile extends ConsumerWidget {
       ),
     );
     final markUp = ContextMenuAction(
-      label: 'Mark up',
+      label: context.l10n.attachmentsMarkUp,
       icon: Icons.edit_outlined,
       onSelected: () => openImageMarkup(context, a),
     );
@@ -1507,7 +1529,9 @@ class _CompactTitle extends StatelessWidget {
             child: Transform.translate(
               offset: Offset(0, reduced ? 0 : (1 - shown) * 8),
               child: Text(
-                value.text.trim().isEmpty ? 'Untitled' : value.text.trim(),
+                value.text.trim().isEmpty
+                    ? context.l10n.commonUntitled
+                    : value.text.trim(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium,
@@ -1547,7 +1571,7 @@ class _CoverButton extends StatelessWidget {
     );
     return Semantics(
       button: true,
-      label: 'Open PDF',
+      label: context.l10n.libraryOpenPdf,
       child: ExcludeSemantics(
         child: OpenContainer(
           transitionDuration: AppMotion.of(context, AppMotion.long),

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:quick_actions/quick_actions.dart';
 
+import '../../l10n/l10n.dart';
+
 /// The two app shortcuts (long-press the icon).
 const quickNewNote = 'new_note';
 const quickImportPdf = 'import_pdf';
@@ -19,9 +21,14 @@ class PluginQuickActionSource implements QuickActionSource {
     try {
       const quick = QuickActions();
       await quick.initialize(onAction);
-      await quick.setShortcutItems(const [
-        ShortcutItem(type: quickNewNote, localizedTitle: 'New note'),
-        ShortcutItem(type: quickImportPdf, localizedTitle: 'Import PDF'),
+      // No context here: the device language stands in for the app's.
+      final l10n = deviceL10n();
+      await quick.setShortcutItems([
+        ShortcutItem(type: quickNewNote, localizedTitle: l10n.commonNewNote),
+        ShortcutItem(
+          type: quickImportPdf,
+          localizedTitle: l10n.commonImportPdf,
+        ),
       ]);
     } catch (_) {
       // No shortcuts on this platform; nothing else depends on them.

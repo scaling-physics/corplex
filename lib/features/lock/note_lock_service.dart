@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import 'note_crypto.dart';
 
 export 'note_crypto.dart'
@@ -275,11 +276,11 @@ class NoteLockService extends ChangeNotifier {
 
   /// Unlocks with Face ID / Touch ID / fingerprint. False if cancelled,
   /// failed or not set up.
-  Future<bool> unlockWithBiometrics({
-    String reason = 'Unlock your locked notes',
-  }) async {
+  Future<bool> unlockWithBiometrics({String? reason}) async {
     if (!await _biometrics.enabled()) return false;
-    final stored = await _biometrics.read(reason: reason);
+    final stored = await _biometrics.read(
+      reason: reason ?? deviceL10n().lockBiometricReason,
+    );
     if (stored == null || stored.isEmpty) return false;
     final ids = {for (final r in await _rows()) r.id};
     stored.removeWhere((id, _) => !ids.contains(id));

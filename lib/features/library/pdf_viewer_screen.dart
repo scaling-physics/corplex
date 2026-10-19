@@ -11,6 +11,7 @@ import 'package:pdfrx/pdfrx.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/context_menu.dart';
 import '../../theme/haptics.dart';
@@ -228,7 +229,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     if (count == null) return;
     if (!speaker.available) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Reading aloud isn't available here")),
+        SnackBar(content: Text(context.l10n.viewerReadAloudUnavailable)),
       );
       return;
     }
@@ -573,14 +574,14 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     final from = _globalRect(params.anchorA, params.anchorB);
     items.insertAll(0, [
       ContextMenuButtonItem(
-        label: 'Highlight',
+        label: context.l10n.highlightsHighlight,
         onPressed: () {
           params.dismissContextMenu();
           _highlightSelection(selection);
         },
       ),
       ContextMenuButtonItem(
-        label: 'Quote to note',
+        label: context.l10n.highlightsQuoteToNote,
         onPressed: () async {
           params.dismissContextMenu();
           final made = await _highlightSelection(selection);
@@ -617,9 +618,8 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     }
     if (!mounted) return;
     if (outline.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This PDF has no table of contents.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.viewerNoContents)));
       return;
     }
     final page = await showModalBottomSheet<int>(
@@ -692,7 +692,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
     final document = _document;
     final ocr = ref.watch(ocrProgressProvider(widget.paperId)).value;
     final reading = ocr != null && !ocr.isDone
-        ? 'Reading text… ${(ocr.fraction * 100).floor()}%'
+        ? context.l10n.ocrReadingText((ocr.fraction * 100).floor())
         : null;
 
     final body = Stack(
@@ -936,33 +936,38 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                             icon: const Icon(
                                               Icons.keyboard_arrow_up,
                                             ),
-                                            tooltip: 'Previous match',
+                                            tooltip: context
+                                                .l10n
+                                                .viewerPreviousMatch,
                                             onPressed: () => _findStep(-1),
                                           ),
                                           IconButton(
                                             icon: const Icon(
                                               Icons.keyboard_arrow_down,
                                             ),
-                                            tooltip: 'Next match',
+                                            tooltip:
+                                                context.l10n.viewerNextMatch,
                                             onPressed: () => _findStep(1),
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.close),
-                                            tooltip: 'Close search',
+                                            tooltip:
+                                                context.l10n.viewerCloseSearch,
                                             onPressed: _closeSearch,
                                           ),
                                         ]
                                       : [
                                           IconButton(
                                             icon: const Icon(Icons.search),
-                                            tooltip: 'Find in document',
+                                            tooltip: context.l10n.viewerFind,
                                             onPressed: _openSearch,
                                           ),
                                           IconButton(
                                             icon: const Icon(
                                               Icons.format_quote_outlined,
                                             ),
-                                            tooltip: 'Highlights',
+                                            tooltip:
+                                                context.l10n.highlightsTooltip,
                                             onPressed: _showHighlightsList,
                                           ),
                                           IconButton(
@@ -974,8 +979,8 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                               Icons.draw,
                                             ),
                                             tooltip: _inkMode
-                                                ? 'Stop drawing'
-                                                : 'Draw on the page',
+                                                ? context.l10n.viewerStopDrawing
+                                                : context.l10n.viewerDrawOnPage,
                                             onPressed: () {
                                               AppHaptics.selection();
                                               setState(
@@ -984,7 +989,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                             },
                                           ),
                                           PopupMenuButton<String>(
-                                            tooltip: 'More',
+                                            tooltip: context.l10n.commonMore,
                                             onSelected: (v) {
                                               if (v == 'snapshot') {
                                                 setState(
@@ -1021,34 +1026,44 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                             itemBuilder: (_) => [
                                               if (_pageCount != null &&
                                                   _pageCount! > 1)
-                                                const PopupMenuItem(
+                                                PopupMenuItem(
                                                   value: 'pages',
                                                   child: ListTile(
-                                                    leading: Icon(
+                                                    leading: const Icon(
                                                       Icons
                                                           .view_carousel_outlined,
                                                     ),
-                                                    title: Text('Page strip'),
+                                                    title: Text(
+                                                      context
+                                                          .l10n
+                                                          .viewerPageStrip,
+                                                    ),
                                                   ),
                                                 ),
-                                              const PopupMenuItem(
+                                              PopupMenuItem(
                                                 value: 'find',
                                                 child: ListTile(
-                                                  leading: Icon(Icons.search),
+                                                  leading: const Icon(
+                                                    Icons.search,
+                                                  ),
                                                   title: Text(
-                                                    'Find in document',
+                                                    context.l10n.viewerFind,
                                                   ),
                                                 ),
                                               ),
-                                              const PopupMenuItem(
+                                              PopupMenuItem(
                                                 value: 'focus',
                                                 child: ListTile(
-                                                  leading: Icon(
+                                                  leading: const Icon(
                                                     Icons.fullscreen,
                                                   ),
-                                                  title: Text('Focus'),
+                                                  title: Text(
+                                                    context.l10n.viewerFocus,
+                                                  ),
                                                   subtitle: Text(
-                                                    'Tap the page to bring back',
+                                                    context
+                                                        .l10n
+                                                        .viewerFocusHint,
                                                   ),
                                                 ),
                                               ),
@@ -1063,31 +1078,43 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                                   ),
                                                   title: Text(
                                                     _read == null
-                                                        ? 'Read aloud'
-                                                        : 'Stop reading aloud',
+                                                        ? context
+                                                              .l10n
+                                                              .viewerReadAloud
+                                                        : context
+                                                              .l10n
+                                                              .viewerStopReadAloud,
                                                   ),
                                                 ),
                                               ),
-                                              const PopupMenuItem(
+                                              PopupMenuItem(
                                                 value: 'contents',
                                                 child: ListTile(
-                                                  leading: Icon(Icons.toc),
-                                                  title: Text('Contents'),
+                                                  leading: const Icon(
+                                                    Icons.toc,
+                                                  ),
+                                                  title: Text(
+                                                    context.l10n.viewerContents,
+                                                  ),
                                                 ),
                                               ),
                                               if (_lacksText && ocr == null)
-                                                const PopupMenuItem(
+                                                PopupMenuItem(
                                                   value: 'ocr',
                                                   child: ListTile(
-                                                    leading: Icon(
+                                                    leading: const Icon(
                                                       Icons
                                                           .document_scanner_outlined,
                                                     ),
                                                     title: Text(
-                                                      'Recognise text',
+                                                      context
+                                                          .l10n
+                                                          .ocrRecogniseText,
                                                     ),
                                                     subtitle: Text(
-                                                      'Search and highlight a scan',
+                                                      context
+                                                          .l10n
+                                                          .ocrRecogniseTextHint,
                                                     ),
                                                   ),
                                                 ),
@@ -1103,22 +1130,27 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen>
                                                           .reading ==
                                                       theme,
                                                   child: Text(
-                                                    '${theme.label} page',
+                                                    _readingPageLabel(
+                                                      context,
+                                                      theme,
+                                                    ),
                                                   ),
                                                 ),
                                               const PopupMenuDivider(),
                                               PopupMenuItem(
                                                 value: 'snapshot',
                                                 enabled: !_extracting,
-                                                child: const ListTile(
-                                                  leading: Icon(
+                                                child: ListTile(
+                                                  leading: const Icon(
                                                     Icons.crop_free,
                                                   ),
                                                   title: Text(
-                                                    'Snapshot to a note',
+                                                    context.l10n.viewerSnapshot,
                                                   ),
                                                   subtitle: Text(
-                                                    'For figures and tables',
+                                                    context
+                                                        .l10n
+                                                        .viewerSnapshotHint,
                                                   ),
                                                 ),
                                               ),
@@ -1812,7 +1844,10 @@ class _HighlightSheetState extends ConsumerState<HighlightSheet> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text('Page ${h.pageNumber}', style: theme.textTheme.labelMedium),
+              Text(
+                context.l10n.viewerPageLong(h.pageNumber),
+                style: theme.textTheme.labelMedium,
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -1850,7 +1885,9 @@ class _HighlightSheetState extends ConsumerState<HighlightSheet> {
                 minLines: 1,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(hintText: 'Add a comment'),
+                decoration: InputDecoration(
+                  hintText: context.l10n.highlightsAddComment,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -1859,7 +1896,7 @@ class _HighlightSheetState extends ConsumerState<HighlightSheet> {
                 children: [
                   FilledButton.tonalIcon(
                     icon: const Icon(Icons.note_add_outlined),
-                    label: const Text('Quote to note'),
+                    label: Text(context.l10n.highlightsQuoteToNote),
                     onPressed: () async {
                       final comment = _comment.text.trim();
                       await updateHighlight(_db, h.id, comment: comment);
@@ -1874,7 +1911,7 @@ class _HighlightSheetState extends ConsumerState<HighlightSheet> {
                   ),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.copy_outlined),
-                    label: const Text('Copy'),
+                    label: Text(context.l10n.commonCopy),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: h.quote));
                       Navigator.pop(context);
@@ -1882,7 +1919,7 @@ class _HighlightSheetState extends ConsumerState<HighlightSheet> {
                   ),
                   TextButton.icon(
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete'),
+                    label: Text(context.l10n.commonDelete),
                     onPressed: () async {
                       _h = null; // nothing left to save on close
                       await deleteHighlight(_db, h.id);
@@ -1919,7 +1956,7 @@ class _HighlightsList extends ConsumerWidget {
             ? Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
                 child: Text(
-                  'Select text on a page, then tap Highlight.',
+                  context.l10n.highlightsSelectHint,
                   style: theme.textTheme.bodyMedium,
                 ),
               )
@@ -1942,7 +1979,10 @@ class _HighlightsList extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
-                        ['p. ${h.pageNumber}', ?h.comment].join(' · '),
+                        [
+                          context.l10n.viewerPageShort(h.pageNumber),
+                          ?h.comment,
+                        ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -2111,7 +2151,7 @@ class FindField extends StatelessWidget {
           focusNode.requestFocus();
         },
         decoration: InputDecoration(
-          hintText: 'Find in document',
+          hintText: context.l10n.viewerFind,
           filled: false,
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
@@ -2124,7 +2164,7 @@ class FindField extends StatelessWidget {
               child: Center(
                 widthFactor: 1,
                 child: Text(
-                  search.summary,
+                  search.summaryIn(context.l10n),
                   key: const ValueKey('find-count'),
                   style: t.labelMedium?.copyWith(color: c.onSurfaceVariant),
                 ),
@@ -2136,6 +2176,13 @@ class FindField extends StatelessWidget {
     );
   }
 }
+
+String _readingPageLabel(BuildContext context, ReadingTheme theme) =>
+    switch (theme) {
+      ReadingTheme.paper => context.l10n.viewerPaperPage,
+      ReadingTheme.sepia => context.l10n.viewerSepiaPage,
+      ReadingTheme.night => context.l10n.viewerNightPage,
+    };
 
 /// A colour swatch in the viewer's bottom bar: a hand cursor and a label
 /// with a mouse.
@@ -2151,7 +2198,7 @@ class _InkSwatchTap extends StatelessWidget {
     if (!isDesktop(context)) return tap;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: Tooltip(message: 'Highlight colour', child: tap),
+      child: Tooltip(message: context.l10n.viewerHighlightColour, child: tap),
     );
   }
 }
@@ -2165,11 +2212,17 @@ List<ContextMenuAction?> highlightContextActions(
 }) {
   final db = ref.read(databaseProvider);
   final current = highlight.colorHex.toLowerCase();
-  const names = ['Butter', 'Sage', 'Rose', 'Mist'];
+  final l = context.l10n;
+  final names = [
+    l.highlightsButter,
+    l.highlightsSage,
+    l.highlightsRose,
+    l.highlightsMist,
+  ];
   return [
     for (final (i, ink) in highlightInks.indexed)
       ContextMenuAction(
-        label: '${names[i]} highlight',
+        label: names[i],
         icon: colorToHex(ink) == current
             ? Icons.check_circle
             : Icons.circle_outlined,
@@ -2177,18 +2230,20 @@ List<ContextMenuAction?> highlightContextActions(
       ),
     null,
     ContextMenuAction(
-      label: highlight.comment == null ? 'Add a comment…' : 'Edit comment…',
+      label: highlight.comment == null
+          ? l.highlightsAddCommentMenu
+          : l.highlightsEditCommentMenu,
       icon: Icons.comment_outlined,
       onSelected: onComment,
     ),
     ContextMenuAction(
-      label: 'Copy',
+      label: l.commonCopy,
       icon: Icons.copy_outlined,
       onSelected: () => Clipboard.setData(ClipboardData(text: highlight.quote)),
     ),
     null,
     ContextMenuAction(
-      label: 'Delete highlight',
+      label: l.highlightsDelete,
       icon: Icons.delete_outline,
       destructive: true,
       onSelected: () => deleteHighlight(db, highlight.id),

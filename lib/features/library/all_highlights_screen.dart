@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show TableUpdateQuery;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../home/adaptive.dart' show ReadableColumn;
 import '../platform/mac_window.dart';
 import '../../theme/context_menu.dart';
@@ -168,7 +169,7 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
         ),
         subtitle: Text(
           [
-            'p. ${e.highlight.pageNumber}',
+            context.l10n.viewerPageShort(e.highlight.pageNumber),
             if ((e.highlight.comment ?? '').trim().isNotEmpty)
               e.highlight.comment!.trim(),
           ].join(' · '),
@@ -188,7 +189,7 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
                 // The desktop's long-press: recolour, comment, copy, delete.
                 actions: [
                   ContextMenuAction(
-                    label: 'Open',
+                    label: context.l10n.commonOpen,
                     icon: Icons.open_in_new,
                     onSelected: () => _open(e),
                   ),
@@ -218,8 +219,8 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
         title: TextField(
           autofocus: false,
           onChanged: (v) => setState(() => _query = v),
-          decoration: const InputDecoration(
-            hintText: 'Search your highlights',
+          decoration: InputDecoration(
+            hintText: context.l10n.highlightsSearchHint,
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -230,7 +231,7 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.replay),
-            tooltip: 'Revisit highlights',
+            tooltip: context.l10n.highlightsRevisit,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const ReviewScreen()),
             ),
@@ -240,15 +241,13 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
       body: _fill(
         mac,
         child: all.isEmpty
-            ? const EmptyState(
+            ? EmptyState(
                 icon: Icons.format_quote_outlined,
-                title: 'No highlights yet',
-                message:
-                    'Select text in a PDF and choose Highlight; it will '
-                    'collect here.',
+                title: context.l10n.highlightsEmptyTitle,
+                message: context.l10n.highlightsEmptyMessage,
               )
             : shown.isEmpty
-            ? const Center(child: Text('No matches.'))
+            ? Center(child: Text(context.l10n.highlightsNoMatches))
             : ListView(
                 padding: EdgeInsets.fromLTRB(
                   mac ? _side(context) : 0,

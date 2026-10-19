@@ -1,0 +1,16 @@
+{
+  "@@locale": "de",
+  "searchHint": "Notizen, Paper und Markierungen durchsuchen",
+  "searchClear": "Löschen",
+  "searchAttachments": "Anhänge",
+  "searchMap": "Karte",
+  "searchEmptyTitle": "Alles durchsuchen",
+  "searchEmptyMessage": "Eine Notiz, ein Paper oder eine markierte Passage finden.",
+  "searchNoMatches": "Keine Treffer",
+  "searchNoMatchesHint": "Weniger oder andere Wörter versuchen.",
+  "searchKindPapers": "Paper",
+  "searchKindHighlights": "Markierungen",
+  "searchKindInPapers": "In Papern",
+  "searchIndexing": "Paper werden indexiert…",
+  "searchPage": "S. {page}"
+}

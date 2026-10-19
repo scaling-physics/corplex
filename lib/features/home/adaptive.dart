@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../library/paper_detail_screen.dart';
 import '../notes/note_editor_screen.dart';
@@ -112,10 +113,10 @@ class DetailPane extends ConsumerWidget {
               onClose: () =>
                   ref.read(selectedNoteProvider.notifier).state = null,
             )
-          : const _Placeholder(
-              key: ValueKey('note-none'),
+          : _Placeholder(
+              key: const ValueKey('note-none'),
               icon: Icons.edit_note_outlined,
-              text: 'Pick a note, or start a new one.',
+              text: context.l10n.homePickNote,
             );
     } else {
       final id = ref.watch(selectedPaperProvider);
@@ -130,10 +131,10 @@ class DetailPane extends ConsumerWidget {
               onClose: () =>
                   ref.read(selectedPaperProvider.notifier).state = null,
             )
-          : const _Placeholder(
-              key: ValueKey('paper-none'),
+          : _Placeholder(
+              key: const ValueKey('paper-none'),
               icon: Icons.library_books_outlined,
-              text: 'Pick a paper to read, annotate and cite.',
+              text: context.l10n.homePickPaper,
             );
     }
     // Cross-fade when the selection changes (or empties).

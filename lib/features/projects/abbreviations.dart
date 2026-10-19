@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show innerJoin;
 import 'package:flutter/services.dart' show TextSelection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database_provider.dart';
 import '../export/export_model.dart';
 import '../lock/note_lock_service.dart';
@@ -247,6 +248,8 @@ class AbbreviationIssue {
   final int length;
 
   String get message => "$sf is used before it's spelled out";
+
+  String messageIn(AppLocalizations l10n) => l10n.projectsAbbrUsedBefore(sf);
 
   TextSelection get selection =>
       TextSelection(baseOffset: offset, extentOffset: offset + length);

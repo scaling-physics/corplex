@@ -11,6 +11,7 @@ import '../auth/auth_service.dart';
 import '../auth/sign_in_screen.dart';
 import '../../data/database_provider.dart';
 import '../../data/trash.dart';
+import '../../l10n/l10n.dart';
 import '../audio/audio_player_bar.dart';
 import '../capture/quick_capture.dart';
 import '../capture/quick_capture_actions.dart';
@@ -25,6 +26,7 @@ import 'adaptive.dart';
 import '../trash/trash_actions.dart';
 import 'keyboard_shortcuts.dart';
 import 'mac_sidebar.dart';
+import '../sync/sync_messages.dart';
 import '../sync/sync_ring.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
@@ -213,6 +215,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.addComment:
       case MenuCommand.linkNote:
       case MenuCommand.citePaper:
+      case MenuCommand.collapseSections:
+      case MenuCommand.expandSections:
+        // Editor commands; no note editor has focus, so nothing to format.
+        // (An empty case falls through, so these need their own body:
+        // they once fell into lockAllNotes and ⌘B locked every note.)
+        break;
       case MenuCommand.lockAllNotes:
         ref.read(noteLockServiceProvider).lockNow();
       case MenuCommand.lockNote:
@@ -247,6 +255,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Future<void> _moveOpenItemToTrash() async {
     final db = ref.read(databaseProvider);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     if (_index == 0) {
       final id = ref.read(selectedNoteProvider);
       if (id == null) return;
@@ -255,7 +264,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           .getSingleOrNull();
       if (note == null) return;
       ref.read(selectedNoteProvider.notifier).state = null;
-      await deleteNoteWithUndo(ref, messenger, id, note.title);
+      await deleteNoteWithUndo(
+        ref,
+        messenger,
+        id,
+        note.title,
+        l10n: l10n,
+      );
     } else {
       final id = ref.read(selectedPaperProvider);
       if (id == null) return;
@@ -264,7 +279,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           .getSingleOrNull();
       if (paper == null) return;
       ref.read(selectedPaperProvider.notifier).state = null;
-      await deletePaperWithUndo(ref, messenger, id, paper.title);
+      await deletePaperWithUndo(
+        ref,
+        messenger,
+        id,
+        paper.title,
+        l10n: l10n,
+      );
     }
   }
 
@@ -290,7 +311,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           .push(MaterialPageRoute(builder: (_) => const TrashScreen()));
 
   static const _screens = [NotesScreen(), LibraryScreen()];
-  static const _titles = ['Notes', 'Library'];
 
   @override
   Widget build(BuildContext context) {
@@ -429,7 +449,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final sidebarButton = MacToolbarButton(
       key: const ValueKey('mac-show-sidebar'),
       icon: Icons.view_sidebar_outlined,
-      tooltip: 'Show Sidebar (⌃⌘S)',
+      tooltip: context.l10n.homeShowSidebarTooltip,
       onPressed: toggleSidebar,
     );
     // The space's main action: New note / Import PDF, first in the pane's
@@ -437,7 +457,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final primary = MacToolbarButton(
       key: const ValueKey('mac-primary-action'),
       icon: _index == 0 ? Icons.edit_square : Icons.upload_file_outlined,
-      tooltip: _index == 0 ? 'New Note (⌘N)' : 'Import PDF (⌘O)',
+      tooltip: _index == 0
+          ? context.l10n.homeNewNoteTooltip
+          : context.l10n.homeImportPdfTooltip,
       onPressed: () =>
           _index == 0 ? createNote(context, ref) : importPaper(context, ref),
     );
@@ -453,43 +475,40 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final String title;
     final String subtitle;
     if (searching) {
-      title = 'Search';
-      subtitle = 'Notes, papers and highlights';
+      title = context.l10n.commonSearch;
+      subtitle = context.l10n.homeSearchSubtitle;
     } else if (_index == 0) {
       title = notesFilterTitle(
         ref.watch(notesFilterProvider),
         folders: ref.watch(foldersListProvider).value ?? const [],
         projects: ref.watch(projectsListProvider).value ?? const [],
         tags: ref.watch(tagsListProvider).value ?? const [],
+        l10n: context.l10n,
       );
-      subtitle = countLabel(
+      subtitle = context.l10n.homeCountNotes(
         ref.watch(visibleNotesProvider).value?.length ?? 0,
-        'note',
-        'notes',
       );
     } else {
-      title = 'Library';
-      subtitle = countLabel(
+      title = context.l10n.commonLibrary;
+      subtitle = context.l10n.homeCountPapers(
         ref.watch(filteredPapersProvider).value?.length ?? 0,
-        'paper',
-        'papers',
       );
     }
     final listMenu = _index == 0
         ? PopupMenuButton<String>(
             key: const ValueKey('mac-list-menu'),
-            tooltip: 'More',
+            tooltip: context.l10n.commonMore,
             icon: const Icon(Icons.more_horiz, size: 19),
             onSelected: (v) {
               if (v == 'attachments') _showMacAttachments();
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'attachments',
                 child: ListTile(
-                  leading: Icon(Icons.attach_file),
-                  title: Text('Show Attachments'),
-                  trailing: Text('⌘3'),
+                  leading: const Icon(Icons.attach_file),
+                  title: Text(context.l10n.homeShowAttachments),
+                  trailing: const Text('⌘3'),
                 ),
               ),
             ],
@@ -551,17 +570,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           MacToolbarRow(
             leadingInset: sidebarOn ? 0 : lights,
             leading: [if (!sidebarOn) sidebarButton],
-            title: 'Attachments',
-            subtitle: countLabel(
+            title: context.l10n.homeAttachments,
+            subtitle: context.l10n.homeCountItems(
               ref.watch(allAttachmentsProvider).value?.length ?? 0,
-              'item',
-              'items',
             ),
             actions: [
               TextButton(
                 key: const ValueKey('mac-attachments-done'),
                 onPressed: () => setState(() => _attachments = false),
-                child: const Text('Done'),
+                child: Text(context.l10n.commonDone),
               ),
               search(200),
             ],
@@ -691,7 +708,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           children: [...previous, ?current],
         ),
         child: Text(
-          _titles[_index],
+          _index == 0 ? context.l10n.commonNotes : context.l10n.commonLibrary,
           key: ValueKey(_index),
           style: theme.textTheme.headlineMedium,
         ),
@@ -699,7 +716,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       actions: [
         IconButton(
           icon: const Icon(Icons.search),
-          tooltip: 'Search',
+          tooltip: context.l10n.commonSearch,
           onPressed: () => Navigator.of(context)
               .push(MaterialPageRoute(builder: (_) => const SearchScreen())),
         ),
@@ -728,16 +745,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             selectedIndex: _index,
             animationDuration: AppMotion.medium,
             onDestinationSelected: (value) => setState(() => _index = value),
-            destinations: const [
+            destinations: [
               NavigationDestination(
-                icon: Icon(Icons.edit_note_outlined),
-                selectedIcon: Icon(Icons.edit_note),
-                label: 'Notes',
+                icon: const Icon(Icons.edit_note_outlined),
+                selectedIcon: const Icon(Icons.edit_note),
+                label: context.l10n.commonNotes,
               ),
               NavigationDestination(
-                icon: Icon(Icons.library_books_outlined),
-                selectedIcon: Icon(Icons.library_books),
-                label: 'Library',
+                icon: const Icon(Icons.library_books_outlined),
+                selectedIcon: const Icon(Icons.library_books),
+                label: context.l10n.commonLibrary,
               ),
             ],
           ),
@@ -751,203 +768,208 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Future<void> _showAccountMenu(BuildContext context) async {
     final sync = ref.read(syncServiceProvider);
     final user = ref.read(authServiceProvider).currentUser;
-    Widget content(BuildContext context) => SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (user == null)
-            ListTile(
-              leading: const Icon(Icons.account_circle_outlined),
-              title: const Text('Sign in'),
-              subtitle: const Text('Sync your library across devices'),
-              onTap: () => Navigator.pop(context, 'signin'),
-            )
-          else ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-              child: Text(
-                user.email,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-            ),
-            // Sync detail lives here, not on the main screens: it's
-            // background plumbing until the user goes looking for it.
-            Consumer(
-              builder: (context, ref, _) {
-                final status =
-                    ref.watch(syncStatusProvider).value ?? sync.currentStatus;
-                return ListTile(
-                  leading: const Icon(Icons.sync),
-                  title: const Text('Sync now'),
-                  subtitle: Text(_syncLabel(status, sync.lastError)),
-                  enabled: status != SyncStatus.offline,
-                  onTap: sync.syncNow,
-                );
-              },
-            ),
-            if (sync.accountMismatch)
+    Widget content(BuildContext context) {
+      final l10n = context.l10n;
+      return SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (user == null)
               ListTile(
-                leading: const Icon(Icons.swap_horiz),
-                title: const Text('Use this account on this device'),
-                subtitle: const Text(
-                  'Replaces what\'s on this device with this account\'s data.',
+                leading: const Icon(Icons.account_circle_outlined),
+                title: Text(l10n.settingsSignIn),
+                subtitle: Text(l10n.settingsSignInSubtitle),
+                onTap: () => Navigator.pop(context, 'signin'),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Text(
+                  user.email,
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-                onTap: () => Navigator.pop(context, 'switch'),
               ),
-            Consumer(
-              builder: (context, ref, _) {
-                final t = ref.watch(transferSettingsProvider);
-                return Column(
-                  children: [
-                    SwitchListTile(
-                      secondary: const Icon(Icons.wifi),
-                      title: const Text('Send files on Wi-Fi only'),
-                      subtitle: const Text(
-                        'Notes always sync. Opening a file downloads it '
-                        'on any network.',
-                      ),
-                      value: t.wifiOnly,
-                      onChanged: t.setWifiOnly,
-                    ),
-                    SwitchListTile(
-                      secondary: const Icon(Icons.cloud_download_outlined),
-                      title: const Text('Download files when opened'),
-                      subtitle: const Text(
-                        'Otherwise papers and audio download in the '
-                        'background.',
-                      ),
-                      value: t.onDemand,
-                      onChanged: t.setOnDemand,
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-          const Divider(),
-          Consumer(
-            builder: (context, ref, _) {
-              final settings = ref.watch(appearanceSettingsProvider);
-              return ListTile(
-                leading: const Icon(Icons.brightness_6_outlined),
-                title: const Text('Appearance'),
-                trailing: SegmentedButton<ThemeMode>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
-                    ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-                    ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
-                  ],
-                  selected: {settings.themeMode},
-                  onSelectionChanged: (s) => settings.setThemeMode(s.single),
+              // Sync detail lives here, not on the main screens: it's
+              // background plumbing until the user goes looking for it.
+              Consumer(
+                builder: (context, ref, _) {
+                  final status =
+                      ref.watch(syncStatusProvider).value ?? sync.currentStatus;
+                  return ListTile(
+                    leading: const Icon(Icons.sync),
+                    title: Text(l10n.settingsSyncNow),
+                    subtitle: Text(_syncLabel(l10n, status, sync.lastError)),
+                    enabled: status != SyncStatus.offline,
+                    onTap: sync.syncNow,
+                  );
+                },
+              ),
+              if (sync.accountMismatch)
+                ListTile(
+                  leading: const Icon(Icons.swap_horiz),
+                  title: Text(l10n.settingsUseThisAccount),
+                  subtitle: Text(l10n.settingsUseThisAccountSubtitle),
+                  onTap: () => Navigator.pop(context, 'switch'),
                 ),
-              );
-            },
-          ),
-          // Desktop only: the whole interface's size, for big or
-          // low-density displays (View → Interface Size, ⌥⌘+ / ⌥⌘−).
-          if (isDesktop(context))
+              Consumer(
+                builder: (context, ref, _) {
+                  final t = ref.watch(transferSettingsProvider);
+                  return Column(
+                    children: [
+                      SwitchListTile(
+                        secondary: const Icon(Icons.wifi),
+                        title: Text(l10n.settingsWifiOnly),
+                        subtitle: Text(l10n.settingsWifiOnlySubtitle),
+                        value: t.wifiOnly,
+                        onChanged: t.setWifiOnly,
+                      ),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.cloud_download_outlined),
+                        title: Text(l10n.settingsOnDemand),
+                        subtitle: Text(l10n.settingsOnDemandSubtitle),
+                        value: t.onDemand,
+                        onChanged: t.setOnDemand,
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+            const Divider(),
             Consumer(
               builder: (context, ref, _) {
                 final settings = ref.watch(appearanceSettingsProvider);
                 return ListTile(
-                  leading: const Icon(Icons.format_size),
-                  title: const Text('Interface size'),
-                  subtitle: const Text('For large or ultrawide displays'),
-                  trailing: DropdownButton<double>(
-                    value: settings.interfaceScale,
-                    underline: const SizedBox.shrink(),
-                    borderRadius: const BorderRadius.all(Radius.circular(8)),
-                    items: [
-                      for (final s in AppearanceSettings.interfaceScales)
-                        DropdownMenuItem(
-                          value: s,
-                          child: Text('${(s * 100).round()}%'),
-                        ),
+                  leading: const Icon(Icons.brightness_6_outlined),
+                  title: Text(l10n.settingsAppearance),
+                  trailing: SegmentedButton<ThemeMode>(
+                    showSelectedIcon: false,
+                    segments: [
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        label: Text(l10n.settingsThemeAuto),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        label: Text(l10n.settingsThemeLight),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        label: Text(l10n.settingsThemeDark),
+                      ),
                     ],
-                    onChanged: (s) {
-                      if (s != null) settings.setInterfaceScale(s);
-                    },
+                    selected: {settings.themeMode},
+                    onSelectionChanged: (s) => settings.setThemeMode(s.single),
                   ),
                 );
               },
             ),
-          if (isMac(context))
+            // Desktop only: the whole interface's size, for big or
+            // low-density displays (View → Interface Size, ⌥⌘+ / ⌥⌘−).
+            if (isDesktop(context))
+              Consumer(
+                builder: (context, ref, _) {
+                  final settings = ref.watch(appearanceSettingsProvider);
+                  return ListTile(
+                    leading: const Icon(Icons.format_size),
+                    title: Text(l10n.settingsInterfaceSize),
+                    subtitle: Text(l10n.settingsInterfaceSizeSubtitle),
+                    trailing: DropdownButton<double>(
+                      value: settings.interfaceScale,
+                      underline: const SizedBox.shrink(),
+                      borderRadius: const BorderRadius.all(Radius.circular(8)),
+                      items: [
+                        for (final s in AppearanceSettings.interfaceScales)
+                          DropdownMenuItem(
+                            value: s,
+                            child: Text('${(s * 100).round()}%'),
+                          ),
+                      ],
+                      onChanged: (s) {
+                        if (s != null) settings.setInterfaceScale(s);
+                      },
+                    ),
+                  );
+                },
+              ),
+            if (isMac(context))
+              Consumer(
+                builder: (context, ref, _) {
+                  final settings = ref.watch(appearanceSettingsProvider);
+                  return SwitchListTile(
+                    secondary: const Icon(Icons.keyboard_command_key),
+                    title: Text(l10n.settingsQuickNote),
+                    subtitle: Text(l10n.settingsQuickNoteSubtitle),
+                    value: settings.quickNoteHotKey,
+                    onChanged: settings.setQuickNoteHotKey,
+                  );
+                },
+              ),
             Consumer(
               builder: (context, ref, _) {
                 final settings = ref.watch(appearanceSettingsProvider);
+                if (!ref.watch(spellCheckerProvider).available) {
+                  return const SizedBox.shrink();
+                }
                 return SwitchListTile(
-                  secondary: const Icon(Icons.keyboard_command_key),
-                  title: const Text('Quick note shortcut (⌃⌥N)'),
-                  subtitle: const Text('Start a note from any app'),
-                  value: settings.quickNoteHotKey,
-                  onChanged: settings.setQuickNoteHotKey,
+                  secondary: const Icon(Icons.spellcheck),
+                  title: Text(l10n.settingsSpellCheck),
+                  value: settings.spellCheck,
+                  onChanged: settings.setSpellCheck,
                 );
               },
             ),
-          Consumer(
-            builder: (context, ref, _) {
-              final settings = ref.watch(appearanceSettingsProvider);
-              if (!ref.watch(spellCheckerProvider).available) {
-                return const SizedBox.shrink();
-              }
-              return SwitchListTile(
-                secondary: const Icon(Icons.spellcheck),
-                title: const Text('Check spelling while typing'),
-                value: settings.spellCheck,
-                onChanged: settings.setSpellCheck,
-              );
-            },
-          ),
-          const NotesPasswordSettings(),
-          Consumer(
-            builder: (context, ref, _) {
-              final count = ref.watch(trashItemsProvider).value?.length ?? 0;
-              return ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Trash'),
-                subtitle: count == 0
-                    ? null
-                    : Text('$count item${count == 1 ? '' : 's'}'),
-                onTap: () => Navigator.pop(context, 'trash'),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.save_alt_outlined),
-            title: const Text('Back up to a file'),
-            subtitle: const Text('Notes, papers and files in one zip'),
-            onTap: () => Navigator.pop(context, 'backup'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.folder_zip_outlined),
-            title: const Text('Export as Markdown'),
-            subtitle: const Text('A folder of notes for Obsidian'),
-            onTap: () => Navigator.pop(context, 'markdown'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings_backup_restore),
-            title: const Text('Restore from a backup'),
-            onTap: () => Navigator.pop(context, 'restore'),
-          ),
-          if (user != null) ...[
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Sign out'),
-              onTap: () => Navigator.pop(context, 'signout'),
+            const NotesPasswordSettings(),
+            Consumer(
+              builder: (context, ref, _) {
+                final count = ref.watch(trashItemsProvider).value?.length ?? 0;
+                return ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: Text(l10n.commonTrash),
+                  subtitle: count == 0
+                      ? null
+                      : Text(l10n.settingsTrashCount(count)),
+                  onTap: () => Navigator.pop(context, 'trash'),
+                );
+              },
             ),
-            if (sync.currentStatus != SyncStatus.offline)
+            ListTile(
+              leading: const Icon(Icons.save_alt_outlined),
+              title: Text(l10n.settingsBackUp),
+              subtitle: Text(l10n.settingsBackUpSubtitle),
+              onTap: () => Navigator.pop(context, 'backup'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_zip_outlined),
+              title: Text(l10n.settingsExportMarkdown),
+              subtitle: Text(l10n.settingsExportMarkdownSubtitle),
+              onTap: () => Navigator.pop(context, 'markdown'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_backup_restore),
+              title: Text(l10n.settingsRestoreFromBackup),
+              onTap: () => Navigator.pop(context, 'restore'),
+            ),
+            if (user != null) ...[
+              const Divider(),
               ListTile(
-                leading: const Icon(Icons.layers_clear_outlined),
-                title: const Text('Sign out and clear this device'),
-                onTap: () => Navigator.pop(context, 'clear'),
+                leading: const Icon(Icons.logout),
+                title: Text(l10n.settingsSignOut),
+                onTap: () => Navigator.pop(context, 'signout'),
               ),
+              if (sync.currentStatus != SyncStatus.offline)
+                ListTile(
+                  leading: const Icon(Icons.layers_clear_outlined),
+                  title: Text(l10n.settingsSignOutClear),
+                  onTap: () => Navigator.pop(context, 'clear'),
+                ),
+            ],
           ],
-        ],
-      ),
-    );
+        ),
+      );
+    }
+
     final String? action;
     if (isDesktop(context)) {
       // Settings: a centred dialog on the desktop.
@@ -964,7 +986,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                   child: Text(
-                    'Settings',
+                    context.l10n.commonSettings,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -1021,24 +1043,27 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          signOutAfter ? 'Clear this device?' : 'Replace this device\'s data?',
+          signOutAfter
+              ? context.l10n.settingsClearTitle
+              : context.l10n.settingsReplaceTitle,
         ),
         content: Text(
           pending == 0
-              ? 'Notes, papers and files on this device will be removed. '
-                    'Everything is safe in your account.'
-              : '$pending change${pending == 1 ? '' : 's'} on this device '
-                    'haven\'t synced and will be lost for good. Everything '
-                    'else is safe in your account.',
+              ? context.l10n.settingsEraseSafe
+              : context.l10n.settingsErasePending(pending),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(signOutAfter ? 'Clear and sign out' : 'Replace'),
+            child: Text(
+              signOutAfter
+                  ? context.l10n.settingsClearAndSignOut
+                  : context.l10n.settingsReplace,
+            ),
           ),
         ],
       ),
@@ -1054,13 +1079,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
   }
 
-  static String _syncLabel(SyncStatus status, String? error) =>
-      switch (status) {
-        SyncStatus.offline => 'Not syncing',
-        SyncStatus.syncing => 'Syncing…',
-        SyncStatus.upToDate => 'Up to date',
-        SyncStatus.error => error ?? 'Sync failed',
-      };
+  static String _syncLabel(
+    AppLocalizations l10n,
+    SyncStatus status,
+    String? error,
+  ) => switch (status) {
+    SyncStatus.offline => l10n.settingsSyncOffline,
+    SyncStatus.syncing => l10n.settingsSyncSyncing,
+    SyncStatus.upToDate => l10n.settingsSyncUpToDate,
+    SyncStatus.error => localizedSyncError(l10n, error),
+  };
 }
 
 /// The one main action for the current tab, labelled so it's obvious what
@@ -1073,8 +1101,12 @@ class _PrimaryAction extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final (icon, label, action) = switch (index) {
-      0 => (Icons.add, 'New note', createNote),
-      _ => (Icons.upload_file_outlined, 'Import PDF', importPaper),
+      0 => (Icons.add, context.l10n.commonNewNote, createNote),
+      _ => (
+        Icons.upload_file_outlined,
+        context.l10n.commonImportPdf,
+        importPaper,
+      ),
     };
     return FloatingActionButton.extended(
       heroTag: null,
@@ -1108,7 +1140,7 @@ class _AccountButton extends StatelessWidget {
     final c = Theme.of(context).colorScheme;
     final email = this.email;
     return IconButton(
-      tooltip: email ?? 'Sign in',
+      tooltip: email ?? context.l10n.settingsSignIn,
       onPressed: onPressed,
       icon: SyncRing(
         child: AnimatedSwitcher(
@@ -1148,8 +1180,12 @@ class _Rail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final (icon, label, action) = switch (index) {
-      0 => (Icons.add, 'New note', createNote),
-      _ => (Icons.upload_file_outlined, 'Import PDF', importPaper),
+      0 => (Icons.add, context.l10n.commonNewNote, createNote),
+      _ => (
+        Icons.upload_file_outlined,
+        context.l10n.commonImportPdf,
+        importPaper,
+      ),
     };
     return NavigationRail(
       selectedIndex: index,
@@ -1181,16 +1217,16 @@ class _Rail extends ConsumerWidget {
                 ),
               ),
       ),
-      destinations: const [
+      destinations: [
         NavigationRailDestination(
-          icon: Icon(Icons.edit_note_outlined),
-          selectedIcon: Icon(Icons.edit_note),
-          label: Text('Notes'),
+          icon: const Icon(Icons.edit_note_outlined),
+          selectedIcon: const Icon(Icons.edit_note),
+          label: Text(context.l10n.commonNotes),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.library_books_outlined),
-          selectedIcon: Icon(Icons.library_books),
-          label: Text('Library'),
+          icon: const Icon(Icons.library_books_outlined),
+          selectedIcon: const Icon(Icons.library_books),
+          label: Text(context.l10n.commonLibrary),
         ),
       ],
     );

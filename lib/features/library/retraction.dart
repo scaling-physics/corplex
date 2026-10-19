@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../l10n/l10n.dart';
 import 'metadata_lookup.dart';
 import 'openalex.dart' show normalizeCitationDoi;
 
@@ -18,6 +20,15 @@ extension NoticeKindText on NoticeKind {
   bool get isSerious =>
       this == NoticeKind.retraction || this == NoticeKind.withdrawal;
 
+  /// In the reader's language.
+  String nounFor(AppLocalizations l10n) => switch (this) {
+    NoticeKind.retraction => l10n.libraryNoticeRetracted,
+    NoticeKind.withdrawal => l10n.libraryNoticeWithdrawn,
+    NoticeKind.expressionOfConcern => l10n.libraryNoticeConcern,
+    NoticeKind.correction => l10n.libraryNoticeCorrected,
+  };
+
+  /// English, for logs and tests.
   String get noun => switch (this) {
     NoticeKind.retraction => 'Retracted',
     NoticeKind.withdrawal => 'Withdrawn',
@@ -58,7 +69,19 @@ class UpdateNotice {
     date: j['date'] == null ? null : DateTime.parse(j['date'] as String),
   );
 
-  /// "Retracted on 12 March 2024 — see the notice".
+  /// "Retracted on 12 March 2024 — see the notice", in the reader's
+  /// language. [locale] is the app's, for the month name.
+  String messageFor(AppLocalizations l10n, String locale) {
+    final d = date;
+    final kindText = kind.nounFor(l10n);
+    if (d == null) return l10n.libraryNoticeUndated(kindText);
+    return l10n.libraryNoticeOn(
+      kindText,
+      DateFormat(l10n.libraryNoticeDatePattern, locale).format(d),
+    );
+  }
+
+  /// The same in English, for tests.
   String get message {
     final d = date;
     final on = d == null

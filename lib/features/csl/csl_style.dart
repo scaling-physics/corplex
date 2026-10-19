@@ -2,11 +2,30 @@ import 'package:xml/xml.dart';
 
 import 'csl_locale.dart';
 
-/// Thrown for a `.csl` file that can't be used. [message] is meant to be
-/// shown to the reader as is.
+/// Why a `.csl` file can't be used, so the UI can say it in the reader's
+/// language (the English [CslFormatException.message] is the fallback).
+enum CslProblem {
+  notXml,
+  notStyle,
+  noInfo,
+  dependent,
+  wrongVersion,
+  noLayout,
+  noBibliography,
+  undefinedMacro,
+  noTitle,
+  tooLarge,
+  unreadable,
+}
+
+/// Thrown for a `.csl` file that can't be used. [message] is plain English
+/// fit to show; [problem] (with [detail], e.g. the macro name) lets the UI
+/// translate it.
 class CslFormatException implements Exception {
-  const CslFormatException(this.message);
+  const CslFormatException(this.message, {this.problem, this.detail});
   final String message;
+  final CslProblem? problem;
+  final String? detail;
   @override
   String toString() => message;
 }
@@ -23,6 +42,7 @@ class CslStyle {
     required this.locale,
     required this.numeric,
     required this.hasYearSuffixVariable,
+    required this.defaultLocale,
   });
 
   final XmlElement root;
@@ -40,7 +60,24 @@ class CslStyle {
   /// otherwise the processor appends it after the year.
   final bool hasYearSuffixVariable;
 
-  /// Parses [xml]. Throws [CslFormatException] with a plain-language message
+  /// The style's `default-locale` (`en-GB`), or null.
+  final String? defaultLocale;
+
+  /// The `default-locale` of the style in [xml], or null (also for XML that
+  /// can't be read; [parse] reports that properly).
+  static String? defaultLocaleOf(String xml) {
+    try {
+      final v = XmlDocument.parse(xml).rootElement
+          .getAttribute('default-locale');
+      return v == null || v.trim().isEmpty ? null : v.trim();
+    } on XmlException {
+      return null;
+    }
+  }
+
+  /// Parses [xml] against [baseLocale], the composed locale files for the
+  /// language to format in; the style's own `<locale>` blocks for that
+  /// language are layered on top. Throws [CslFormatException] with a plain-language message
   /// if it isn't a usable independent CSL style.
   factory CslStyle.parse(String xml, CslLocale baseLocale) {
     final XmlDocument doc;
@@ -49,18 +86,23 @@ class CslStyle {
     } on XmlException {
       throw const CslFormatException(
         'That file isn\'t valid XML, so it can\'t be a citation style.',
+        problem: CslProblem.notXml,
       );
     }
     final root = doc.rootElement;
     if (root.name.local != 'style') {
       throw const CslFormatException(
         'That file isn\'t a citation style (.csl) file.',
+        problem: CslProblem.notStyle,
       );
     }
     final children = root.childElements.toList();
     final info = children.where((e) => e.name.local == 'info').firstOrNull;
     if (info == null) {
-      throw const CslFormatException('That style has no title or ID block.');
+      throw const CslFormatException(
+        'That style has no title or ID block.',
+        problem: CslProblem.noInfo,
+      );
     }
     final parent = info.childElements.any(
       (e) =>
@@ -71,11 +113,15 @@ class CslStyle {
       throw const CslFormatException(
         'This style is a small variant that points to a parent style. '
         'Import the parent style instead.',
+        problem: CslProblem.dependent,
       );
     }
     final version = root.getAttribute('version') ?? '';
     if (!version.startsWith('1.')) {
-      throw const CslFormatException('Only CSL 1.0 styles are supported.');
+      throw const CslFormatException(
+        'Only CSL 1.0 styles are supported.',
+        problem: CslProblem.wrongVersion,
+      );
     }
     final citation = children
         .where((e) => e.name.local == 'citation')
@@ -87,6 +133,7 @@ class CslStyle {
       if (!part.childElements.any((e) => e.name.local == 'layout')) {
         throw const CslFormatException(
           'That style is missing its layout, so it can\'t format references.',
+          problem: CslProblem.noLayout,
         );
       }
     }
@@ -94,6 +141,7 @@ class CslStyle {
       throw const CslFormatException(
         'That style has no bibliography section, so it can\'t format '
         'reference lists.',
+        problem: CslProblem.noBibliography,
       );
     }
     final macros = {
@@ -104,7 +152,11 @@ class CslStyle {
     for (final e in root.descendantElements) {
       final call = e.name.local == 'text' ? e.getAttribute('macro') : null;
       if (call != null && !macros.containsKey(call)) {
-        throw CslFormatException('That style uses an undefined macro "$call".');
+        throw CslFormatException(
+          'That style uses an undefined macro "$call".',
+          problem: CslProblem.undefinedMacro,
+          detail: call,
+        );
       }
     }
     final title =
@@ -122,18 +174,13 @@ class CslStyle {
             .trim() ??
         '';
     if (title.isEmpty) {
-      throw const CslFormatException('That style has no title.');
+      throw const CslFormatException(
+        'That style has no title.',
+        problem: CslProblem.noTitle,
+      );
     }
     final locale = baseLocale
-        .withOverrides(
-          children.where((e) => e.name.local == 'locale').where((e) {
-            final lang = e.getAttribute(
-              'lang',
-              namespaceUri: 'http://www.w3.org/XML/1998/namespace',
-            );
-            return lang == null || lang.startsWith('en');
-          }),
-        )
+        .withOverrides(children.where((e) => e.name.local == 'locale'))
         .withoutTerms({'advance-online-publication'});
     final category = info.childElements.where(
       (e) =>
@@ -153,6 +200,7 @@ class CslStyle {
       locale: locale,
       numeric: numeric,
       hasYearSuffixVariable: xml.contains('variable="year-suffix"'),
+      defaultLocale: root.getAttribute('default-locale')?.trim(),
     );
   }
 

@@ -13,9 +13,17 @@ import 'dart:typed_data';
 /// stored in object streams. Encrypted or structurally damaged PDFs raise
 /// an [AnnotatedPdfException] with a message fit to show the reader.
 
+enum AnnotatedPdfProblem { notPdf, encrypted, damaged }
+
 class AnnotatedPdfException implements Exception {
-  AnnotatedPdfException(this.message);
+  AnnotatedPdfException(
+    this.message, [
+    this.problem = AnnotatedPdfProblem.damaged,
+  ]);
   final String message;
+
+  /// Which localized explanation the UI shows (the [message] is English).
+  final AnnotatedPdfProblem problem;
   @override
   String toString() => message;
 }
@@ -404,13 +412,17 @@ class _PdfDoc {
       }
     }
     if (start < 0) {
-      throw AnnotatedPdfException("This file isn't a PDF Corplex can read.");
+      throw AnnotatedPdfException(
+        "This file isn't a PDF Corplex can read.",
+        AnnotatedPdfProblem.notPdf,
+      );
     }
     final doc = _PdfDoc._(start == 0 ? input : input.sublist(start));
     doc._loadXrefs();
     if (doc.trailer.containsKey('Encrypt')) {
       throw AnnotatedPdfException(
         'This PDF is encrypted, so highlights can\'t be written into it.',
+        AnnotatedPdfProblem.encrypted,
       );
     }
     return doc;

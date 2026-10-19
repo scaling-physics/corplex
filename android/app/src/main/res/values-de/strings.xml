@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Notiz beginnen oder weiterlesen</string>
+    <string name="widget_continue_reading">Weiterlesen</string>
+    <string name="widget_new_note">Neue Notiz</string>
+</resources>

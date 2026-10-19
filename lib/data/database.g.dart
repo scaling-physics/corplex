@@ -8948,6 +8948,270 @@ class OcrPapersCompanion extends UpdateCompanion<OcrPaper> {
   }
 }
 
+class $NotePreviewsTable extends NotePreviews
+    with TableInfo<$NotePreviewsTable, NotePreview> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NotePreviewsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES notes (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _previewMeta = const VerificationMeta(
+    'preview',
+  );
+  @override
+  late final GeneratedColumn<String> preview = GeneratedColumn<String>(
+    'preview',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _lockedMeta = const VerificationMeta('locked');
+  @override
+  late final GeneratedColumn<bool> locked = GeneratedColumn<bool>(
+    'locked',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("locked" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [noteId, preview, locked];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_previews';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NotePreview> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('preview')) {
+      context.handle(
+        _previewMeta,
+        preview.isAcceptableOrUnknown(data['preview']!, _previewMeta),
+      );
+    }
+    if (data.containsKey('locked')) {
+      context.handle(
+        _lockedMeta,
+        locked.isAcceptableOrUnknown(data['locked']!, _lockedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {noteId};
+  @override
+  NotePreview map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NotePreview(
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      preview: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}preview'],
+      )!,
+      locked: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}locked'],
+      )!,
+    );
+  }
+
+  @override
+  $NotePreviewsTable createAlias(String alias) {
+    return $NotePreviewsTable(attachedDatabase, alias);
+  }
+}
+
+class NotePreview extends DataClass implements Insertable<NotePreview> {
+  final String noteId;
+  final String preview;
+  final bool locked;
+  const NotePreview({
+    required this.noteId,
+    required this.preview,
+    required this.locked,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['note_id'] = Variable<String>(noteId);
+    map['preview'] = Variable<String>(preview);
+    map['locked'] = Variable<bool>(locked);
+    return map;
+  }
+
+  NotePreviewsCompanion toCompanion(bool nullToAbsent) {
+    return NotePreviewsCompanion(
+      noteId: Value(noteId),
+      preview: Value(preview),
+      locked: Value(locked),
+    );
+  }
+
+  factory NotePreview.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NotePreview(
+      noteId: serializer.fromJson<String>(json['noteId']),
+      preview: serializer.fromJson<String>(json['preview']),
+      locked: serializer.fromJson<bool>(json['locked']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'noteId': serializer.toJson<String>(noteId),
+      'preview': serializer.toJson<String>(preview),
+      'locked': serializer.toJson<bool>(locked),
+    };
+  }
+
+  NotePreview copyWith({String? noteId, String? preview, bool? locked}) =>
+      NotePreview(
+        noteId: noteId ?? this.noteId,
+        preview: preview ?? this.preview,
+        locked: locked ?? this.locked,
+      );
+  NotePreview copyWithCompanion(NotePreviewsCompanion data) {
+    return NotePreview(
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      preview: data.preview.present ? data.preview.value : this.preview,
+      locked: data.locked.present ? data.locked.value : this.locked,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotePreview(')
+          ..write('noteId: $noteId, ')
+          ..write('preview: $preview, ')
+          ..write('locked: $locked')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(noteId, preview, locked);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NotePreview &&
+          other.noteId == this.noteId &&
+          other.preview == this.preview &&
+          other.locked == this.locked);
+}
+
+class NotePreviewsCompanion extends UpdateCompanion<NotePreview> {
+  final Value<String> noteId;
+  final Value<String> preview;
+  final Value<bool> locked;
+  final Value<int> rowid;
+  const NotePreviewsCompanion({
+    this.noteId = const Value.absent(),
+    this.preview = const Value.absent(),
+    this.locked = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NotePreviewsCompanion.insert({
+    required String noteId,
+    this.preview = const Value.absent(),
+    this.locked = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : noteId = Value(noteId);
+  static Insertable<NotePreview> custom({
+    Expression<String>? noteId,
+    Expression<String>? preview,
+    Expression<bool>? locked,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (noteId != null) 'note_id': noteId,
+      if (preview != null) 'preview': preview,
+      if (locked != null) 'locked': locked,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NotePreviewsCompanion copyWith({
+    Value<String>? noteId,
+    Value<String>? preview,
+    Value<bool>? locked,
+    Value<int>? rowid,
+  }) {
+    return NotePreviewsCompanion(
+      noteId: noteId ?? this.noteId,
+      preview: preview ?? this.preview,
+      locked: locked ?? this.locked,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (preview.present) {
+      map['preview'] = Variable<String>(preview.value);
+    }
+    if (locked.present) {
+      map['locked'] = Variable<bool>(locked.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotePreviewsCompanion(')
+          ..write('noteId: $noteId, ')
+          ..write('preview: $preview, ')
+          ..write('locked: $locked, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -8971,6 +9235,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TrashItemsTable trashItems = $TrashItemsTable(this);
   late final $OcrPagesTable ocrPages = $OcrPagesTable(this);
   late final $OcrPapersTable ocrPapers = $OcrPapersTable(this);
+  late final $NotePreviewsTable notePreviews = $NotePreviewsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8996,6 +9261,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     trashItems,
     ocrPages,
     ocrPapers,
+    notePreviews,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -9138,6 +9404,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('ocr_papers', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'notes',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('note_previews', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -9566,6 +9839,24 @@ final class $$NotesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$NotePreviewsTable, List<NotePreview>>
+  _notePreviewsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.notePreviews,
+    aliasName: 'notes__id__note_previews__note_id',
+  );
+
+  $$NotePreviewsTableProcessedTableManager get notePreviewsRefs {
+    final manager = $$NotePreviewsTableTableManager(
+      $_db,
+      $_db.notePreviews,
+    ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_notePreviewsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
@@ -9770,6 +10061,31 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
           }) => $$NoteCommentsTableFilterComposer(
             $db: $db,
             $table: $db.noteComments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> notePreviewsRefs(
+    Expression<bool> Function($$NotePreviewsTableFilterComposer f) f,
+  ) {
+    final $$NotePreviewsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.notePreviews,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotePreviewsTableFilterComposer(
+            $db: $db,
+            $table: $db.notePreviews,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10042,6 +10358,31 @@ class $$NotesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> notePreviewsRefs<T extends Object>(
+    Expression<T> Function($$NotePreviewsTableAnnotationComposer a) f,
+  ) {
+    final $$NotePreviewsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.notePreviews,
+      getReferencedColumn: (t) => t.noteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotePreviewsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.notePreviews,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$NotesTableTableManager
@@ -10065,6 +10406,7 @@ class $$NotesTableTableManager
             bool projectNotesRefs,
             bool noteVersionsRefs,
             bool noteCommentsRefs,
+            bool notePreviewsRefs,
           })
         > {
   $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
@@ -10135,6 +10477,7 @@ class $$NotesTableTableManager
                 projectNotesRefs = false,
                 noteVersionsRefs = false,
                 noteCommentsRefs = false,
+                notePreviewsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -10145,6 +10488,7 @@ class $$NotesTableTableManager
                     if (projectNotesRefs) db.projectNotes,
                     if (noteVersionsRefs) db.noteVersions,
                     if (noteCommentsRefs) db.noteComments,
+                    if (notePreviewsRefs) db.notePreviews,
                   ],
                   addJoins:
                       <
@@ -10300,6 +10644,27 @@ class $$NotesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (notePreviewsRefs)
+                        await $_getPrefetchedData<
+                          Note,
+                          $NotesTable,
+                          NotePreview
+                        >(
+                          currentTable: table,
+                          referencedTable: $$NotesTableReferences
+                              ._notePreviewsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$NotesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).notePreviewsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.noteId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -10328,6 +10693,7 @@ typedef $$NotesTableProcessedTableManager =
         bool projectNotesRefs,
         bool noteVersionsRefs,
         bool noteCommentsRefs,
+        bool notePreviewsRefs,
       })
     >;
 typedef $$PapersTableCreateCompanionBuilder = PapersCompanion Function({
@@ -17825,6 +18191,283 @@ typedef $$OcrPapersTableProcessedTableManager =
       OcrPaper,
       PrefetchHooks Function({bool paperId})
     >;
+typedef $$NotePreviewsTableCreateCompanionBuilder =
+    NotePreviewsCompanion Function({
+      required String noteId,
+      Value<String> preview,
+      Value<bool> locked,
+      Value<int> rowid,
+    });
+typedef $$NotePreviewsTableUpdateCompanionBuilder =
+    NotePreviewsCompanion Function({
+      Value<String> noteId,
+      Value<String> preview,
+      Value<bool> locked,
+      Value<int> rowid,
+    });
+
+final class $$NotePreviewsTableReferences
+    extends BaseReferences<_$AppDatabase, $NotePreviewsTable, NotePreview> {
+  $$NotePreviewsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $NotesTable _noteIdTable(_$AppDatabase db) =>
+      db.notes.createAlias('note_previews__note_id__notes__id');
+
+  $$NotesTableProcessedTableManager get noteId {
+    final $_column = $_itemColumn<String>('note_id')!;
+
+    final manager = $$NotesTableTableManager(
+      $_db,
+      $_db.notes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_noteIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$NotePreviewsTableFilterComposer
+    extends Composer<_$AppDatabase, $NotePreviewsTable> {
+  $$NotePreviewsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get preview => $composableBuilder(
+    column: $table.preview,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get locked => $composableBuilder(
+    column: $table.locked,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$NotesTableFilterComposer get noteId {
+    final $$NotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableFilterComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NotePreviewsTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotePreviewsTable> {
+  $$NotePreviewsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get preview => $composableBuilder(
+    column: $table.preview,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get locked => $composableBuilder(
+    column: $table.locked,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$NotesTableOrderingComposer get noteId {
+    final $$NotesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableOrderingComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NotePreviewsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotePreviewsTable> {
+  $$NotePreviewsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get preview =>
+      $composableBuilder(column: $table.preview, builder: (column) => column);
+
+  GeneratedColumn<bool> get locked =>
+      $composableBuilder(column: $table.locked, builder: (column) => column);
+
+  $$NotesTableAnnotationComposer get noteId {
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.noteId,
+      referencedTable: $db.notes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.notes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NotePreviewsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NotePreviewsTable,
+          NotePreview,
+          $$NotePreviewsTableFilterComposer,
+          $$NotePreviewsTableOrderingComposer,
+          $$NotePreviewsTableAnnotationComposer,
+          $$NotePreviewsTableCreateCompanionBuilder,
+          $$NotePreviewsTableUpdateCompanionBuilder,
+          (NotePreview, $$NotePreviewsTableReferences),
+          NotePreview,
+          PrefetchHooks Function({bool noteId})
+        > {
+  $$NotePreviewsTableTableManager(_$AppDatabase db, $NotePreviewsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NotePreviewsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NotePreviewsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NotePreviewsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> noteId = const Value.absent(),
+                Value<String> preview = const Value.absent(),
+                Value<bool> locked = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NotePreviewsCompanion(
+                noteId: noteId,
+                preview: preview,
+                locked: locked,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String noteId,
+                Value<String> preview = const Value.absent(),
+                Value<bool> locked = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NotePreviewsCompanion.insert(
+                noteId: noteId,
+                preview: preview,
+                locked: locked,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$NotePreviewsTable, NotePreview>(table),
+                  $$NotePreviewsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({noteId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (noteId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.noteId,
+                        referencedTable: $$NotePreviewsTableReferences
+                            ._noteIdTable(db),
+                        referencedColumn: $$NotePreviewsTableReferences
+                            ._noteIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$NotePreviewsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NotePreviewsTable,
+      NotePreview,
+      $$NotePreviewsTableFilterComposer,
+      $$NotePreviewsTableOrderingComposer,
+      $$NotePreviewsTableAnnotationComposer,
+      $$NotePreviewsTableCreateCompanionBuilder,
+      $$NotePreviewsTableUpdateCompanionBuilder,
+      (NotePreview, $$NotePreviewsTableReferences),
+      NotePreview,
+      PrefetchHooks Function({bool noteId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -17868,4 +18511,6 @@ class $AppDatabaseManager {
       $$OcrPagesTableTableManager(_db, _db.ocrPages);
   $$OcrPapersTableTableManager get ocrPapers =>
       $$OcrPapersTableTableManager(_db, _db.ocrPapers);
+  $$NotePreviewsTableTableManager get notePreviews =>
+      $$NotePreviewsTableTableManager(_db, _db.notePreviews);
 }

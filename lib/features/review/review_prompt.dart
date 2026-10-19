@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'review_schedule.dart';
 import 'review_screen.dart';
@@ -45,9 +46,7 @@ class ReviewPrompt extends ConsumerWidget {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Text(
-                          count == 1
-                              ? '1 highlight to revisit'
-                              : '$count highlights to revisit',
+                          context.l10n.reviewPrompt(count),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.primary,
                           ),
@@ -57,7 +56,7 @@ class ReviewPrompt extends ConsumerWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    tooltip: 'Dismiss until tomorrow',
+                    tooltip: context.l10n.reviewDismiss,
                     onPressed: settings.dismissPromptToday,
                   ),
                 ],

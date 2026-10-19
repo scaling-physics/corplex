@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/motion_widgets.dart';
 import '../projects/open_from_page.dart';
 import 'graph_model.dart';
@@ -12,10 +13,12 @@ import 'graph_model.dart';
 /// to one project's items. Nodes with no connections are hidden until asked
 /// for.
 class GraphScreen extends ConsumerStatefulWidget {
-  const GraphScreen({super.key, this.projectId, this.title = 'Map'});
+  const GraphScreen({super.key, this.projectId, this.title});
 
   final String? projectId;
-  final String title;
+
+  /// Shown in the bar; "Map" in the app's language when null.
+  final String? title;
 
   @override
   ConsumerState<GraphScreen> createState() => _GraphScreenState();
@@ -45,13 +48,13 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     final layout = ref.watch(graphLayoutProvider(widget.projectId));
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(widget.title ?? context.l10n.graphMap),
         actions: [
           IconButton(
             icon: Icon(_showIsolated ? Icons.blur_on : Icons.blur_off),
             tooltip: _showIsolated
-                ? 'Hide unconnected items'
-                : 'Show unconnected items',
+                ? context.l10n.graphHideUnconnected
+                : context.l10n.graphShowUnconnected,
             onPressed: () => setState(() => _showIsolated = !_showIsolated),
           ),
         ],
@@ -60,10 +63,10 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
         stateKey: layout.hasValue ? 'ready' : 'loading',
         child: layout.when(
           loading: () => const SizedBox.expand(),
-          error: (e, _) => const EmptyState(
+          error: (e, _) => EmptyState(
             icon: Icons.error_outline,
-            title: 'Couldn’t draw the map',
-            message: 'Try again in a moment.',
+            title: context.l10n.graphCouldntDraw,
+            message: context.l10n.graphTryAgainInAMoment,
           ),
           data: (l) => _view(context, l),
         ),
@@ -80,10 +83,10 @@ class _GraphScreenState extends ConsumerState<GraphScreen> {
     if (visible.isEmpty) {
       return EmptyState(
         icon: Icons.hub_outlined,
-        title: data.nodes.isEmpty ? 'Nothing to map yet' : 'Nothing connected',
-        message:
-            'Link notes to each other or to papers, or cite a paper with '
-            '[@, and the connections appear here.',
+        title: data.nodes.isEmpty
+            ? context.l10n.graphNothingToMap
+            : context.l10n.graphNothingConnected,
+        message: context.l10n.graphEmptyMessage,
       );
     }
     final hasConnected = data.degrees.any((d) => d > 0);
@@ -176,6 +179,7 @@ class GraphCanvas extends StatelessWidget {
             edgeColor: c.outlineVariant,
             labelStyle: labelStyle,
             direction: Directionality.of(context),
+            l10n: context.l10n,
           ),
         ),
       ),
@@ -202,6 +206,7 @@ class _GraphPainter extends CustomPainter {
     required this.edgeColor,
     required this.labelStyle,
     required this.direction,
+    required this.l10n,
   });
 
   final GraphLayout layout;
@@ -211,6 +216,7 @@ class _GraphPainter extends CustomPainter {
   final Color edgeColor;
   final TextStyle labelStyle;
   final TextDirection direction;
+  final AppLocalizations l10n;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -255,7 +261,7 @@ class _GraphPainter extends CustomPainter {
       }
       if (labelAll || data.degrees[i] >= 3) {
         final tp = TextPainter(
-          text: TextSpan(text: node.label, style: labelStyle),
+          text: TextSpan(text: node.labelIn(l10n), style: labelStyle),
           textDirection: direction,
           maxLines: 1,
           ellipsis: '…',
@@ -270,6 +276,7 @@ class _GraphPainter extends CustomPainter {
   bool shouldRepaint(_GraphPainter old) =>
       old.layout != layout ||
       old.visible.length != visible.length ||
+      old.l10n != l10n ||
       old.noteColor != noteColor ||
       old.paperColor != paperColor ||
       old.edgeColor != edgeColor;

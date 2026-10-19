@@ -18,6 +18,7 @@ import 'paper_cover.dart';
 import 'retraction_notice.dart';
 import 'paper_detail_screen.dart';
 import '../../data/tables/papers_table.dart';
+import '../../l10n/l10n.dart';
 import '../projects/project_menu.dart';
 import '../projects/projects_providers.dart';
 import '../../theme/context_menu.dart';
@@ -132,7 +133,7 @@ class LibraryScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: SearchBar(
-                      hintText: 'Search papers',
+                      hintText: context.l10n.librarySearchPapers,
                       leading: const Icon(Icons.search),
                       onChanged: (value) =>
                           ref.read(librarySearchProvider.notifier).state =
@@ -189,12 +190,14 @@ class LibraryScreen extends ConsumerWidget {
                                 horizontal: 4,
                               ),
                               child: ChoiceChip(
-                                label: Text(switch (status) {
-                                  null => 'All',
-                                  ReadingStatus.toRead => 'To read',
-                                  ReadingStatus.reading => 'Reading',
-                                  ReadingStatus.done => 'Done',
-                                }),
+                                label: Text(
+                                  status == null
+                                      ? context.l10n.libraryAll
+                                      : readingStatusLabel(
+                                          context.l10n,
+                                          status,
+                                        ),
+                                ),
                                 selected: statusFilter == status,
                                 onSelected: (_) =>
                                     ref
@@ -227,22 +230,22 @@ class LibraryScreen extends ConsumerWidget {
               child: papersAsync.when(
                 loading: () => const SizedBox.shrink(),
                 error: (error, _) =>
-                    Center(child: Text('Something went wrong: $error')),
+                    Center(child: Text(context.l10n.libraryError('$error'))),
                 data: (papers) {
                   if (papers.isEmpty) {
                     if (!searching && ref.watch(isFreshStartProvider)) {
                       return const GettingStarted();
                     }
                     return searching
-                        ? const EmptyState(
+                        ? EmptyState(
                             icon: Icons.search_off,
-                            title: 'No matches',
-                            message: 'Try a different title or author.',
+                            title: context.l10n.libraryNoMatches,
+                            message: context.l10n.libraryNoMatchesHint,
                           )
-                        : const EmptyState(
+                        : EmptyState(
                             icon: Icons.library_books_outlined,
-                            title: 'Your library is empty',
-                            message: 'Tap Import PDF to add a paper, or link one from a note.',
+                            title: context.l10n.libraryEmptyTitle,
+                            message: context.l10n.libraryEmptyMessage,
                           );
                   }
                   if (isMac(context)) return _MacPaperList(papers: papers);
@@ -263,6 +266,7 @@ class LibraryScreen extends ConsumerWidget {
                             ScaffoldMessenger.of(context),
                             papers[index].id,
                             papers[index].title,
+                            l10n: context.l10n,
                           ),
                           child: _PaperCard(paper: papers[index]),
                         ),
@@ -285,7 +289,13 @@ void _trashPaper(BuildContext context, WidgetRef ref, Paper paper) {
   if (ref.read(selectedPaperProvider) == paper.id) {
     ref.read(selectedPaperProvider.notifier).state = null;
   }
-  deletePaperWithUndo(ref, messenger, paper.id, paper.title);
+  deletePaperWithUndo(
+    ref,
+    messenger,
+    paper.id,
+    paper.title,
+    l10n: context.l10n,
+  );
 }
 
 /// The right-click menu of a paper (desktop).
@@ -295,13 +305,13 @@ List<ContextMenuAction?> paperContextActions(
   Paper paper,
 ) => [
   ContextMenuAction(
-    label: 'Open',
+    label: context.l10n.commonOpen,
     icon: Icons.open_in_new,
     onSelected: () => openPaper(context, ref, paper.id),
   ),
   if (paper.pdfPath != null)
     ContextMenuAction(
-      label: 'Open PDF',
+      label: context.l10n.libraryOpenPdf,
       icon: Icons.picture_as_pdf_outlined,
       onSelected: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -314,24 +324,25 @@ List<ContextMenuAction?> paperContextActions(
       ),
     ),
   ContextMenuAction(
-    label: 'Add to project…',
+    label: context.l10n.libraryAddToProject,
     icon: Icons.folder_special_outlined,
     onSelected: () => showProjectPickerSheet(context, paperId: paper.id),
   ),
   ContextMenuAction(
-    label: 'Copy citation',
+    label: context.l10n.libraryCopyCitation,
     icon: Icons.copy_outlined,
     onSelected: () {
       Clipboard.setData(
         ClipboardData(text: formatCitation(paper, CitationStyle.apa)),
       );
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Citation copied')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.libraryCitationCopied)),
+      );
     },
   ),
   null,
   ContextMenuAction(
-    label: 'Move to trash',
+    label: context.l10n.commonMoveToTrash,
     icon: Icons.delete_outline,
     destructive: true,
     onSelected: () => _trashPaper(context, ref, paper),
@@ -593,12 +604,9 @@ class _MacPaperListState extends ConsumerState<_MacPaperList> {
               if (paper.authors.isNotEmpty) displayAuthors(paper.authors),
               if (paper.year case final year?) '$year',
             ].join(' · ');
-            final status = switch (paper.readingStatus) {
-              ReadingStatus.toRead => 'To read',
-              ReadingStatus.reading => 'Reading',
-              ReadingStatus.done => 'Done',
-              null => null,
-            };
+            final status = paper.readingStatus == null
+                ? null
+                : readingStatusLabel(context.l10n, paper.readingStatus!);
             final detail = [
               if (paper.rating != null) '★' * paper.rating!,
               if (byline.isNotEmpty) byline,
@@ -665,7 +673,7 @@ class LibraryMenuButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return PopupMenuButton<String>(
-      tooltip: 'More',
+      tooltip: context.l10n.commonMore,
       icon: onShowAttachments == null
           ? null
           : const Icon(Icons.more_horiz, size: 19),
@@ -682,49 +690,49 @@ class LibraryMenuButton extends ConsumerWidget {
       },
       itemBuilder: (_) => [
         if (onShowAttachments != null)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'attachments',
             child: ListTile(
-              leading: Icon(Icons.attach_file),
-              title: Text('Show Attachments'),
-              trailing: Text('\u23183'),
+              leading: const Icon(Icons.attach_file),
+              title: Text(context.l10n.libraryShowAttachments),
+              trailing: const Text('\u23183'),
             ),
           ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'highlights',
           child: ListTile(
-            leading: Icon(Icons.format_quote_outlined),
-            title: Text('All highlights'),
-            subtitle: Text('Across every paper'),
+            leading: const Icon(Icons.format_quote_outlined),
+            title: Text(context.l10n.libraryAllHighlights),
+            subtitle: Text(context.l10n.libraryAllHighlightsHint),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'doi',
           child: ListTile(
-            leading: Icon(Icons.travel_explore),
-            title: Text('Add by DOI or arXiv ID'),
+            leading: const Icon(Icons.travel_explore),
+            title: Text(context.l10n.libraryAddById),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'import',
           child: ListTile(
-            leading: Icon(Icons.file_download_outlined),
-            title: Text('Import references'),
-            subtitle: Text('BibTeX, RIS or CSL JSON (Zotero, Mendeley)'),
+            leading: const Icon(Icons.file_download_outlined),
+            title: Text(context.l10n.libraryImportReferences),
+            subtitle: Text(context.l10n.libraryImportReferencesHint),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'zotero',
           child: ListTile(
-            leading: Icon(Icons.sync_alt),
-            title: Text('Import from Zotero…'),
+            leading: const Icon(Icons.sync_alt),
+            title: Text(context.l10n.libraryImportZotero),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'export',
           child: ListTile(
-            leading: Icon(Icons.ios_share),
-            title: Text('Export as BibTeX'),
+            leading: const Icon(Icons.ios_share),
+            title: Text(context.l10n.libraryExportBibtex),
           ),
         ),
       ],

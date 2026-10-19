@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "tableAddRowAbove": "Add row above",
+  "tableAddRowBelow": "Add row below",
+  "tableAddColumnLeft": "Add column left",
+  "tableAddColumnRight": "Add column right",
+  "tableDeleteRow": "Delete row",
+  "tableDeleteColumn": "Delete column",
+  "tableHeaderRow": "Header row",
+  "tableDeleteTable": "Delete table",
+  "tableTooltip": "Table"
+}

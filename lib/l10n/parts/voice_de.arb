@@ -1,0 +1,17 @@
+{
+  "@@locale": "de",
+  "voiceNoteTitle": "Sprachnotiz, {date}",
+  "voiceNote": "Sprachnotiz",
+  "voiceDictate": "Diktieren",
+  "voiceFinishing": "Wird abgeschlossen …",
+  "voiceSavingTranscribing": "Wird gesichert und transkribiert …",
+  "voiceStopRecording": "Aufnahme beenden",
+  "voiceStartRecording": "Aufnahme starten",
+  "voiceMicDenied": "Corplex braucht das Mikrofon für Aufnahmen. Du kannst den Zugriff in den Einstellungen erlauben.",
+  "voiceRecordingUnavailable": "Aufnehmen ist hier nicht möglich, daher wurde nichts aufgenommen.",
+  "voiceOpenSettings": "Einstellungen öffnen",
+  "voiceNoSpeechCaught": "Keine Sprache erkannt.",
+  "voiceSavedNoSpeech": "Gesichert. Es wurde keine Sprache gehört.",
+  "voiceSavedCantTranscribe": "Audio gesichert. Dieses Gerät kann es nicht offline transkribieren.",
+  "voiceSavedAllowSpeech": "Audio gesichert. Erlaube die Spracherkennung, um auch Text zu erhalten."
+}

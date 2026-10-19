@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../library/library_screen.dart';
 import '../library/papers_providers.dart';
 import '../notes/notes_providers.dart';
@@ -19,22 +20,14 @@ final isFreshStartProvider = Provider.autoDispose<bool>((ref) {
 class GettingStarted extends ConsumerWidget {
   const GettingStarted({super.key});
 
-  static const _steps = [
-    (
-      Icons.upload_file_outlined,
-      'Import a paper',
-      'A PDF from Files. Its title, authors and year fill in by themselves.',
-    ),
+  static List<(IconData, String, String)> _steps(AppLocalizations l) => [
+    (Icons.upload_file_outlined, l.homeStepImportTitle, l.homeStepImportText),
     (
       Icons.format_quote_outlined,
-      'Highlight as you read',
-      'Press and hold on the text, then Highlight or Quote to note.',
+      l.homeStepHighlightTitle,
+      l.homeStepHighlightText,
     ),
-    (
-      Icons.edit_note_outlined,
-      'Write and cite',
-      'In a note, type / for tools, or [@ to cite a paper.',
-    ),
+    (Icons.edit_note_outlined, l.homeStepWriteTitle, l.homeStepWriteText),
   ];
 
   @override
@@ -50,16 +43,21 @@ class GettingStarted extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Welcome to Corplex', style: theme.textTheme.headlineSmall),
+              Text(
+                context.l10n.homeWelcome,
+                style: theme.textTheme.headlineSmall,
+              ),
               const SizedBox(height: 6),
               Text(
-                'Read, annotate, take notes and cite in one place.',
+                context.l10n.homeWelcomeSubtitle,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: c.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 24),
-              for (final (i, (icon, title, text)) in _steps.indexed)
+              for (final (i, (icon, title, text)) in _steps(
+                context.l10n,
+              ).indexed)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 18),
                   child: Row(
@@ -104,7 +102,7 @@ class GettingStarted extends ConsumerWidget {
               FilledButton.tonalIcon(
                 onPressed: () => importPaper(context, ref),
                 icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Import your first paper'),
+                label: Text(context.l10n.homeImportFirstPaper),
               ),
             ],
           ),

@@ -87,13 +87,35 @@ void main() {
   }
 
   test('list providers', () async {
-    var notes = <Note>[];
-    await _time('notes list: all (pinned first)', () async {
-      container.read(notesFilterProvider.notifier).state = const AllNotes();
-      notes = await first(visibleNotesProvider);
+    var notes = <NoteListItem>[];
+    // Straight from the stream (a provider would hand back its cached
+    // value). First load: no stored previews yet, so one pass computes 60.
+    Future<List<NoteListItem>> load() =>
+        watchNoteList(db, const AllNotes()).first;
+    await _time('notes list: all, first load (no previews)', () async {
+      notes = await load();
     });
     expect(notes.length, lib.noteIds.length);
     expect(notes.first.pinned, isTrue);
+    // The remaining passes, as a few seconds of use would run them.
+    await _time('notes list: store the remaining previews', () async {
+      // A live list, as in the app: each pass stores 60 and wakes the next.
+      final sub = watchNoteList(db, const AllNotes()).listen((l) => notes = l);
+      while ((await db.select(db.notePreviews).get()).length <
+          lib.noteIds.length) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await sub.cancel();
+    });
+    expect((await db.select(db.notePreviews).get()).length, lib.noteIds.length);
+    await _time('notes list: all (pinned first), previews stored', () async {
+      notes = await load();
+    });
+    expect(notes.every((n) => n.locked || n.preview.isNotEmpty), isTrue);
+    container.read(notesFilterProvider.notifier).state = const AllNotes();
+    await _time('notes list: all via provider (as the app)', () async {
+      await first(visibleNotesProvider);
+    });
     await _time('notes list: folder filter', () async {
       container.read(notesFilterProvider.notifier).state = FolderFilter(
         lib.folderIds[3],
@@ -115,17 +137,13 @@ void main() {
     container.read(notesFilterProvider.notifier).state = const AllNotes();
 
     await _time('previews of every note (notePlainTextPreview)', () async {
-      for (final n in notes) {
-        notePlainTextPreview(n.content);
-      }
-    });
-    await _time('previews of 40 notes scrolled back to (cached)', () async {
-      for (final n in notes.reversed.take(40)) {
+      final bodies = await db.select(db.notes).get();
+      for (final n in bodies) {
         notePlainTextPreview(n.content);
       }
     });
     await _time('search text of every note (noteSearchText)', () async {
-      for (final n in notes) {
+      for (final n in await db.select(db.notes).get()) {
         noteSearchText(n.content);
       }
     });

@@ -5,19 +5,12 @@ import '../../data/attachment_label.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/attachments_table.dart';
+import '../../l10n/l10n.dart';
 import '../audio/audio_link.dart';
 import '../lock/note_lock_service.dart';
 
 /// How the browser groups attachments.
-enum AttachmentKind {
-  image('Images'),
-  audio('Audio'),
-  link('Links'),
-  file('Files');
-
-  const AttachmentKind(this.label);
-  final String label;
-}
+enum AttachmentKind { image, audio, link, file }
 
 /// An attachment with the note or paper it belongs to.
 class AttachmentEntry {
@@ -31,7 +24,14 @@ class AttachmentEntry {
   final Attachment attachment;
   final String? noteId;
   final String? paperId;
+
+  /// The note's or paper's own title; empty when it has none (see
+  /// [parentName] for what to show).
   final String parentTitle;
+
+  String parentName(AppLocalizations l10n) => parentTitle.isNotEmpty
+      ? parentTitle
+      : (noteId != null ? l10n.commonUntitled : l10n.attachmentsUntitledPaper);
 
   String get label => attachment.label;
 
@@ -96,9 +96,7 @@ final allAttachmentsProvider =
               attachment: a,
               noteId: noteId,
               paperId: noteId == null ? paperId : null,
-              parentTitle: noteId != null
-                  ? (noteTitle.isEmpty ? 'Untitled' : noteTitle)
-                  : (paperTitle.isEmpty ? 'Untitled paper' : paperTitle),
+              parentTitle: noteId != null ? noteTitle : paperTitle,
             ),
           );
         }

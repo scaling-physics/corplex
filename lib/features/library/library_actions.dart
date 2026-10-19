@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../home/adaptive.dart';
 import 'bibtex.dart';
 import 'reference_import.dart';
@@ -48,24 +49,22 @@ Future<void> addPaperByIdentifier(BuildContext context, WidgetRef ref) async {
   final input = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Add by DOI or arXiv ID'),
+      title: Text(context.l10n.libraryAddById),
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: const InputDecoration(
-          hintText: '10.1038/nature14539, arXiv:1706.03762 or PMID: 9500320',
-        ),
+        decoration: InputDecoration(hintText: context.l10n.libraryAddByIdHint),
         keyboardType: TextInputType.url,
         onSubmitted: (v) => Navigator.pop(context, v),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('Add'),
+          child: Text(context.l10n.commonAdd),
         ),
       ],
     ),
@@ -74,7 +73,7 @@ Future<void> addPaperByIdentifier(BuildContext context, WidgetRef ref) async {
 
   final id = parseIdentifier(input);
   if (id == null) {
-    _say(context, 'That doesn\'t look like a DOI, arXiv or PubMed ID.');
+    _say(context, context.l10n.libraryNotAnIdentifier);
     return;
   }
   await addPaperFromIdentifier(context, ref, id);
@@ -87,13 +86,13 @@ Future<void> addPaperFromIdentifier(
   WidgetRef ref,
   PaperIdentifier id,
 ) async {
-  _say(context, 'Looking it up…');
+  _say(context, context.l10n.libraryLookingUp);
   final db = ref.read(databaseProvider);
   try {
     final meta = await ref.read(metadataLookupProvider).lookup(id);
     if (!context.mounted) return;
     if (meta == null) {
-      _say(context, 'No paper found for ${id.value}.');
+      _say(context, context.l10n.libraryNoPaperFound(id.value));
       return;
     }
     final result = await addPaperFromMetadata(db, meta, id: const Uuid().v4());
@@ -101,9 +100,9 @@ Future<void> addPaperFromIdentifier(
     if (result.existing case final existing?) {
       _say(
         context,
-        'Already in your library.',
+        context.l10n.libraryAlreadyInLibrary,
         action: SnackBarAction(
-          label: 'Open',
+          label: context.l10n.commonOpen,
           onPressed: () => _openPaper(context, existing.id),
         ),
       );
@@ -113,7 +112,7 @@ Future<void> addPaperFromIdentifier(
     _openPaper(context, result.id!);
   } on LookupFailed {
     if (context.mounted) {
-      _say(context, 'Couldn\'t reach the lookup service. Try again online.');
+      _say(context, context.l10n.libraryLookupUnreachable);
     }
   }
 }
@@ -132,7 +131,7 @@ Future<void> importBibtexFile(BuildContext context, WidgetRef ref) async {
   if (!context.mounted) return;
   final entries = parseReferences(text);
   if (entries.isEmpty) {
-    _say(context, 'No references found in that file.');
+    _say(context, context.l10n.libraryNoReferencesFound);
     return;
   }
   final db = ref.read(databaseProvider);
@@ -146,8 +145,8 @@ Future<void> importBibtexFile(BuildContext context, WidgetRef ref) async {
   _say(
     context,
     [
-      'Added $added paper${added == 1 ? '' : 's'}',
-      if (skipped > 0) '$skipped already in your library',
+      context.l10n.libraryAddedPapers(added),
+      if (skipped > 0) context.l10n.libraryAlreadyInLibraryCount(skipped),
     ].join(' · '),
   );
 }
@@ -159,7 +158,7 @@ Future<void> exportLibraryBibtex(BuildContext context, WidgetRef ref) async {
   final papers = await db.select(db.papers).get();
   if (!context.mounted) return;
   if (papers.isEmpty) {
-    _say(context, 'Your library is empty.');
+    _say(context, context.l10n.libraryIsEmpty);
     return;
   }
   await SharePlus.instance.share(
@@ -185,6 +184,7 @@ Future<void> enrichImportedPaper(
   // import may be gone by the time the lookup answers (the first-launch
   // welcome disappears as soon as the paper exists).
   final messenger = ScaffoldMessenger.maybeOf(context);
+  final l10n = context.l10n;
   final lookup = ref.read(metadataLookupProvider);
   final db = ref.read(databaseProvider);
   final ocr = ref.read(ocrServiceProvider);
@@ -235,7 +235,7 @@ Future<void> enrichImportedPaper(
       messenger
         ?..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('Found the details for “${meta.title}”')),
+          SnackBar(content: Text(l10n.libraryFoundDetails(meta.title))),
         );
     }
     if (duplicate != null && messenger != null) {
@@ -243,9 +243,9 @@ Future<void> enrichImportedPaper(
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text('Looks like “${duplicate.title}” is already here.'),
+            content: Text(l10n.libraryLooksDuplicate(duplicate.title)),
             action: SnackBarAction(
-              label: 'Open',
+              label: l10n.commonOpen,
               onPressed: () => _openPaper(messenger.context, duplicate.id),
             ),
           ),

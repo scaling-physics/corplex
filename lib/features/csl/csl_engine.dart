@@ -45,6 +45,32 @@ const cslDateVariables = {
   'available-date',
 };
 
+/// Private-use characters the engine writes around the date (and year
+/// suffix) of a cite when [CslContext.markDates] is on, so the processor
+/// can collapse "Smith, 2019a; Smith, 2019b" into "Smith, 2019a, b".
+const cslDateStart = '\uE000';
+const cslDateEnd = '\uE001';
+
+/// Subsequent-author-substitute state for one bibliography entry: the
+/// previous entry's names in, this entry's names out.
+class AuthorSubstitute {
+  AuthorSubstitute(this.text, this.rule, this.previous);
+
+  /// The replacement text (`———`).
+  final String text;
+
+  /// `complete-all`, `complete-each`, `partial-each` or `partial-first`.
+  final String rule;
+
+  /// The names of the previous entry, or null.
+  final List<String>? previous;
+
+  /// The names this entry printed, or null if it had none (set by the
+  /// engine, before any substitution).
+  List<String>? record;
+  bool done = false;
+}
+
 /// What one render of one item needs besides the item itself.
 class CslContext {
   CslContext(
@@ -58,7 +84,15 @@ class CslContext {
     this.position = 'first',
     this.locator,
     this.locatorLabel = 'page',
+    this.markDates = false,
+    this.substitute,
   });
+
+  /// Write [cslDateStart]/[cslDateEnd] around the date of a cite.
+  final bool markDates;
+
+  /// Bibliography only: replace repeated authors.
+  final AuthorSubstitute? substitute;
 
   /// CSL-JSON, plus `citation-number`.
   final Map<String, dynamic> item;
@@ -380,7 +414,8 @@ class CslEngine {
       o.got = true;
       ctx.emitted.add(variable);
       o.spans.add(CslSpan(v));
-      return _fmt(e, o, ctx);
+      final done = _fmt(e, o, ctx);
+      return ctx.markDates && variable == 'year-suffix' ? _mark(done) : done;
     }
     final term = e.getAttribute('term');
     if (term != null) {
@@ -459,15 +494,17 @@ class CslEngine {
           .replaceAllMapped(RegExp(r'(\d+)|([,&\-–])'), (m) {
             if (m[1] != null) {
               final n = int.parse(m[1]!);
+              final gender = locale.genderOf(v);
               return switch (form) {
-                'ordinal' => '$n${locale.ordinalSuffix(n)}',
+                'ordinal' => '$n${locale.ordinalSuffix(n, gender: gender)}',
                 'long-ordinal' =>
                   (n >= 1 && n <= 10
                           ? locale.term(
                               'long-ordinal-${n.toString().padLeft(2, '0')}',
+                              gender: gender,
                             )
                           : null) ??
-                      '$n${locale.ordinalSuffix(n)}',
+                      '$n${locale.ordinalSuffix(n, gender: gender)}',
                 'roman' => romanNumeral(n),
                 _ => '$n',
               };
@@ -683,7 +720,7 @@ class CslEngine {
 
     final strings = <String>[];
     final inverted = <bool>[];
-    final bool ellipsis = truncated && useLast && n > useFirst + 1;
+    var ellipsis = truncated && useLast && n > useFirst + 1;
     final shown = truncated ? list.take(useFirst).toList() : list;
     for (var i = 0; i < shown.length; i++) {
       strings.add(render(shown[i], i));
@@ -693,6 +730,11 @@ class CslEngine {
       strings.add(render(list.last, n - 1));
       inverted.add(asSort == 'all');
     }
+
+    _substituteAuthors(ctx, strings, truncated, ellipsis, (t, e) {
+      truncated = t;
+      ellipsis = e;
+    });
 
     final res = _Out();
     final k = strings.length;
@@ -765,6 +807,53 @@ class CslEngine {
       }
     }
     return out;
+  }
+
+  /// Applies subsequent-author-substitute to the first names element of a
+  /// bibliography entry: remembers [strings] for the next entry and, when
+  /// they repeat the previous entry's, replaces them in place.
+  void _substituteAuthors(
+    CslContext ctx,
+    List<String> strings,
+    bool truncated,
+    bool ellipsis,
+    void Function(bool truncated, bool ellipsis) setFlags,
+  ) {
+    final sub = ctx.substitute;
+    if (sub == null || sub.done || ctx.sort) return;
+    sub.done = true;
+    final mine = [...strings, if (truncated) '\u0000et-al'];
+    sub.record = mine;
+    final prev = sub.previous;
+    if (prev == null || strings.isEmpty) return;
+    var count = 0;
+    final same =
+        prev.length == mine.length &&
+        [for (var i = 0; i < mine.length; i++) mine[i] == prev[i]]
+            .every((x) => x);
+    switch (sub.rule) {
+      case 'complete-each':
+        if (same) count = strings.length;
+      case 'partial-each':
+        while (count < strings.length &&
+            count < prev.length &&
+            strings[count] == prev[count]) {
+          count++;
+        }
+      case 'partial-first':
+        if (strings.first == prev.first) count = 1;
+      default: // complete-all
+        if (same) {
+          strings
+            ..clear()
+            ..add(sub.text);
+          setFlags(false, false);
+        }
+        return;
+    }
+    for (var i = 0; i < count; i++) {
+      strings[i] = sub.text;
+    }
   }
 
   String _sortName(_Name n) {
@@ -938,7 +1027,10 @@ class CslEngine {
               final f = p.getAttribute('form') ?? 'numeric';
               text = switch (f) {
                 'numeric-leading-zeros' => day.toString().padLeft(2, '0'),
-                'ordinal' => '$day${locale.ordinalSuffix(day)}',
+                'ordinal' =>
+                  locale.limitDayOrdinalsToDay1 && day != 1
+                      ? '$day'
+                      : '$day${locale.ordinalSuffix(day)}',
                 _ => '$day',
               };
             }
@@ -970,7 +1062,21 @@ class CslEngine {
       final c = locale.term('circa', form: 'short') ?? 'ca.';
       o.spans.insert(0, CslSpan('$c '));
     }
-    return _fmt(e, o, ctx);
+    final done = _fmt(e, o, ctx);
+    return ctx.markDates && v == 'issued' ? _mark(done) : done;
+  }
+
+  /// [o] wrapped in the date markers.
+  _Out _mark(_Out o) {
+    if (o.isEmpty) return o;
+    final spans = [...o.spans];
+    final first = spans.indexWhere((s) => s.text.isNotEmpty);
+    spans[first] = spans[first].withText('$cslDateStart${spans[first].text}');
+    final last = spans.lastIndexWhere((s) => s.text.isNotEmpty);
+    spans[last] = spans[last].withText('${spans[last].text}$cslDateEnd');
+    return _Out(spans)
+      ..called = o.called
+      ..got = o.got;
   }
 
   XmlElement _mergeParts(XmlElement base, XmlElement over) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/context_menu.dart';
 import '../../data/database.dart';
 import '../lock/note_lock_service.dart';
@@ -24,13 +25,14 @@ Future<void> lockNoteFromList(
 ) async {
   final service = ref.read(noteLockServiceProvider);
   final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
   if (!await ensureNotesUnlocked(context, service)) return;
   // The editor showing this note saves what's typed first.
   await ref.read(openNoteFlushProvider)[note.id]?.call();
   await service.lockNote(note.id);
   messenger
     ..hideCurrentSnackBar()
-    ..showSnackBar(const SnackBar(content: Text('Note locked')));
+    ..showSnackBar(SnackBar(content: Text(l10n.notesNoteLocked)));
 }
 
 /// Takes the lock off [note] (asking for the password if it isn't unlocked).
@@ -54,19 +56,25 @@ ContextMenuAction lockMenuAction(
   Note note,
 ) => isLockedContent(note.content)
     ? ContextMenuAction(
-        label: 'Remove lock',
+        label: context.l10n.notesRemoveLock,
         icon: Icons.lock_open_outlined,
         onSelected: () => removeLockFromList(context, ref, note),
       )
     : ContextMenuAction(
-        label: 'Lock note',
+        label: context.l10n.notesLockNote,
         icon: Icons.lock_outline,
         onSelected: () => lockNoteFromList(context, ref, note),
       );
 
 /// The right-click item for [note]: Pin to top, or Unpin.
-ContextMenuAction pinMenuAction(WidgetRef ref, Note note) => ContextMenuAction(
-  label: note.pinned ? 'Unpin' : 'Pin to top',
+ContextMenuAction pinMenuAction(
+  WidgetRef ref,
+  Note note, [
+  AppLocalizations? l10n,
+]) => ContextMenuAction(
+  label: note.pinned
+      ? (l10n?.notesUnpin ?? 'Unpin')
+      : (l10n?.notesPinToTop ?? 'Pin to top'),
   icon: note.pinned ? Icons.push_pin : Icons.push_pin_outlined,
   onSelected: () =>
       setNotePinned(ref.read(databaseProvider), note.id, !note.pinned),

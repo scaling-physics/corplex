@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home/adaptive.dart' show readableWidth;
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/haptics.dart';
 import 'audio_link.dart';
@@ -261,7 +262,12 @@ class _BarState extends State<_Bar> {
         ? 0.0
         : position.inMilliseconds / duration.inMilliseconds;
     final title = current.label;
-    final error = playback.error;
+    final l10n = context.l10n;
+    final error = switch (playback.errorKind) {
+      null => null,
+      AudioError.notSynced => l10n.audioNotSynced,
+      AudioError.playFailed => l10n.audioPlayFailed,
+    };
     final label = theme.textTheme.labelSmall?.copyWith(
       color: c.onSurfaceVariant,
       fontFeatures: const [FontFeature.tabularFigures()],
@@ -301,7 +307,7 @@ class _BarState extends State<_Bar> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.close, size: 20),
-                tooltip: 'Close player',
+                tooltip: l10n.audioClosePlayer,
                 onPressed: playback.close,
               ),
             ],
@@ -357,7 +363,7 @@ class _BarState extends State<_Bar> {
                     IconButton(
                       visualDensity: narrow ? VisualDensity.compact : null,
                       icon: const Icon(Icons.replay_10),
-                      tooltip: 'Back 10 seconds',
+                      tooltip: l10n.audioBack10,
                       onPressed: () =>
                           playback.skip(const Duration(seconds: -10)),
                     ),
@@ -369,13 +375,15 @@ class _BarState extends State<_Bar> {
                           key: ValueKey(playback.playing),
                         ),
                       ),
-                      tooltip: playback.playing ? 'Pause' : 'Play',
+                      tooltip: playback.playing
+                          ? l10n.audioPause
+                          : l10n.audioPlay,
                       onPressed: playback.togglePlay,
                     ),
                     IconButton(
                       visualDensity: narrow ? VisualDensity.compact : null,
                       icon: const Icon(Icons.forward_30),
-                      tooltip: 'Forward 30 seconds',
+                      tooltip: l10n.audioForward30,
                       onPressed: () =>
                           playback.skip(const Duration(seconds: 30)),
                     ),
@@ -383,13 +391,13 @@ class _BarState extends State<_Bar> {
                       // No room for the label on a small phone.
                       IconButton(
                         icon: const Icon(Icons.bookmark_add_outlined),
-                        tooltip: 'Mark',
+                        tooltip: l10n.audioMark,
                         onPressed: () => _mark(onMark),
                       )
                     else if (onMark case final onMark?)
                       TextButton.icon(
                         icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                        label: const Text('Mark'),
+                        label: Text(l10n.audioMark),
                         onPressed: () => _mark(onMark),
                       )
                     else ...[

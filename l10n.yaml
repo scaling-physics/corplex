@@ -1,0 +1,11 @@
+# App strings. Edit the parts in lib/l10n/parts/ (one pair per area:
+# <area>_en.arb and <area>_de.arb), never app_*.arb, then run
+#   dart run tool/l10n/build_arb.dart
+# which merges the parts into app_*.arb and runs `flutter gen-l10n`.
+# Both the merged ARBs and lib/l10n/generated/ are committed (CI checks
+# they're current).
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-dir: lib/l10n/generated
+output-class: AppLocalizations

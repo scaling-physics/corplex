@@ -1,0 +1,59 @@
+{
+  "@@locale": "en",
+  "paperEnterIdentifier": "Enter a DOI, arXiv or PubMed ID first.",
+  "paperFilledIn": "Filled in the missing details.",
+  "paperNothingNew": "Nothing new to fill in.",
+  "paperLookupUnreachable": "Couldn't reach the lookup service.",
+  "paperTitleHint": "Title",
+  "paperEditAuthors": "Edit authors",
+  "paperAuthorsHint": "Authors",
+  "paperAuthorsHelper": "Separate authors with ;",
+  "paperAttachmentsError": "Could not load attachments: {error}",
+  "@paperAttachmentsError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "paperAttachmentsEmpty": "Podcasts, images, links or files for this paper.",
+  "paperDetails": "Details",
+  "paperLookUp": "Look up",
+  "paperIdentifierLabel": "DOI, arXiv or PubMed ID",
+  "paperPubmedId": "PubMed ID",
+  "paperOpenInPubmed": "Open in PubMed",
+  "paperLink": "Link",
+  "paperOpenLink": "Open link",
+  "paperVenue": "Journal or conference",
+  "paperYear": "Year",
+  "paperAbstract": "Abstract",
+  "paperCitation": "Citation",
+  "paperMoreStyles": "More…",
+  "paperCitationStyle": "Citation style",
+  "paperReferencedInNotes": "Referenced in notes",
+  "paperExportWithHighlights": "Export with highlights",
+  "paperDownloadPdfFailed": "Couldn't download the PDF. Try again.",
+  "paperContinueReading": "Continue reading · p. {page}",
+  "@paperContinueReading": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "paperReadWithNote": "Read with a note",
+  "paperDownloading": "Downloading…",
+  "paperDownloadPdf": "Download PDF",
+  "paperAddToProject": "Add to project",
+  "paperProject": "Project",
+  "paperHighlights": "Highlights",
+  "paperPageShort": "p. {page}",
+  "@paperPageShort": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "paperDownloadFileFailed": "Couldn't download the file. Try again."
+}

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../../l10n/l10n.dart';
+
 /// The text highlight colours: soft pastels from the family of the PDF
 /// highlighter inks. Stored as Quill's `background` attribute with the hex
 /// value, so a highlight is part of the Delta and syncs/merges with it.
@@ -15,6 +17,15 @@ enum NoteHighlight {
 
   final String label;
   final String hex;
+
+  /// The colour's name in the app's language.
+  String name(AppLocalizations l10n) => switch (this) {
+    yellow => l10n.notesHighlightYellow,
+    green => l10n.notesHighlightGreen,
+    blue => l10n.notesHighlightBlue,
+    pink => l10n.notesHighlightPink,
+    purple => l10n.notesHighlightPurple,
+  };
 
   Color get color => Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
 
@@ -101,15 +112,15 @@ List<PopupMenuEntry<Object>> highlightMenuItems(
                   : null,
             ),
             const SizedBox(width: 12),
-            Text(h.label),
+            Text(h.name(context.l10n)),
           ],
         ),
       ),
     if (current != null) ...[
       const PopupMenuDivider(),
-      const PopupMenuItem<Object>(
+      PopupMenuItem<Object>(
         value: removeHighlightChoice,
-        child: Text('Remove highlight'),
+        child: Text(context.l10n.notesRemoveHighlight),
       ),
     ],
   ];

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../../l10n/l10n.dart';
+import 'heading_fold_controller.dart';
+
 /// Where [query] occurs in [text], ignoring case: start offsets.
 /// Offsets are document offsets, because the editor's plain text has one
 /// character per embed (sketch, citation chip, maths), like the document.
@@ -25,9 +28,15 @@ class NoteFindBar extends StatefulWidget {
     required this.controller,
     required this.onClose,
     this.step,
+    this.folds,
   });
 
   final QuillController controller;
+
+  /// The note's collapsed sections. Find looks through them (a match in
+  /// one opens it before it is selected); without it the editor's document
+  /// is searched as it stands.
+  final HeadingFolds? folds;
   final VoidCallback onClose;
 
   /// Lets the editor's ⌘G / ⇧⌘G move through matches: set by this bar to
@@ -77,16 +86,21 @@ class _NoteFindBarState extends State<NoteFindBar> {
   }
 
   void _recount() {
-    final matches = findMatches(
-      widget.controller.document.toPlainText(),
-      _query.text,
-    );
+    final matches = findMatches(_text(), _query.text);
     if (!mounted) return;
     setState(() {
       _matches = matches;
       if (_current >= matches.length) _current = matches.isEmpty ? -1 : 0;
     });
   }
+
+  /// The whole note's text, hidden sections included; offsets in it are
+  /// the "unfolded" offsets [_at] turns into editor offsets.
+  String _text() =>
+      widget.folds?.unfoldedText() ?? widget.controller.document.toPlainText();
+
+  /// Where a match is in the editor, opening the section that hides it.
+  int _at(int unfolded) => widget.folds?.reveal(unfolded) ?? unfolded;
 
   void _move(int direction) {
     if (_matches.isEmpty) return;
@@ -99,7 +113,7 @@ class _NoteFindBarState extends State<NoteFindBar> {
 
   void _select(int i) {
     setState(() => _current = i);
-    final start = _matches[i];
+    final start = _at(_matches[i]);
     widget.controller.updateSelection(
       TextSelection(
         baseOffset: start,
@@ -111,7 +125,7 @@ class _NoteFindBarState extends State<NoteFindBar> {
 
   void _replaceOne() {
     if (_current < 0 || _matches.isEmpty) return _move(1);
-    final start = _matches[_current];
+    final start = _at(_matches[_current]);
     widget.controller.replaceText(
       start,
       _query.text.length,
@@ -124,7 +138,8 @@ class _NoteFindBarState extends State<NoteFindBar> {
 
   void _replaceAll() {
     // Back to front, so earlier offsets stay valid.
-    for (final start in _matches.reversed) {
+    for (final unfolded in _matches.reversed) {
+      final start = _at(unfolded);
       widget.controller.replaceText(
         start,
         _query.text.length,
@@ -139,11 +154,12 @@ class _NoteFindBarState extends State<NoteFindBar> {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final count = _query.text.isEmpty
         ? ''
         : _matches.isEmpty
-        ? 'Not found'
-        : '${_current < 0 ? 0 : _current + 1} of ${_matches.length}';
+        ? l10n.findNotFound
+        : l10n.findCount(_current < 0 ? 0 : _current + 1, _matches.length);
     InputDecoration field(String hint) => InputDecoration(
       hintText: hint,
       isDense: true,
@@ -169,7 +185,7 @@ class _NoteFindBarState extends State<NoteFindBar> {
                       controller: _query,
                       focusNode: _focus,
                       autofocus: true,
-                      decoration: field('Find in note'),
+                      decoration: field(l10n.editorFindInNote),
                       textInputAction: TextInputAction.search,
                       onChanged: (_) {
                         _current = -1;
@@ -191,24 +207,24 @@ class _NoteFindBarState extends State<NoteFindBar> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Previous',
+                    tooltip: l10n.findPrevious,
                     icon: const Icon(Icons.keyboard_arrow_up),
                     onPressed: _matches.isEmpty ? null : () => _move(-1),
                   ),
                   IconButton(
-                    tooltip: 'Next',
+                    tooltip: l10n.findNext,
                     icon: const Icon(Icons.keyboard_arrow_down),
                     onPressed: _matches.isEmpty ? null : () => _move(1),
                   ),
                   IconButton(
-                    tooltip: _replace ? 'Hide replace' : 'Replace',
+                    tooltip: _replace ? l10n.findHideReplace : l10n.findReplace,
                     icon: Icon(
                       _replace ? Icons.unfold_less : Icons.find_replace,
                     ),
                     onPressed: () => setState(() => _replace = !_replace),
                   ),
                   IconButton(
-                    tooltip: 'Done',
+                    tooltip: l10n.commonDone,
                     icon: const Icon(Icons.close),
                     onPressed: widget.onClose,
                   ),
@@ -222,18 +238,18 @@ class _NoteFindBarState extends State<NoteFindBar> {
                       Expanded(
                         child: TextField(
                           controller: _replacement,
-                          decoration: field('Replace with'),
+                          decoration: field(l10n.findReplaceWith),
                           onSubmitted: (_) => _replaceOne(),
                         ),
                       ),
                       const SizedBox(width: 8),
                       TextButton(
                         onPressed: _matches.isEmpty ? null : _replaceOne,
-                        child: const Text('Replace'),
+                        child: Text(l10n.findReplace),
                       ),
                       TextButton(
                         onPressed: _matches.isEmpty ? null : _replaceAll,
-                        child: const Text('All'),
+                        child: Text(l10n.findReplaceAll),
                       ),
                     ],
                   ),

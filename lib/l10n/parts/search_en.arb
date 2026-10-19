@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "searchHint": "Search notes, papers and highlights",
+  "searchClear": "Clear",
+  "searchAttachments": "Attachments",
+  "searchMap": "Map",
+  "searchEmptyTitle": "Search everything",
+  "searchEmptyMessage": "Find a note, a paper, or a passage you highlighted.",
+  "searchNoMatches": "No matches",
+  "searchNoMatchesHint": "Try fewer or different words.",
+  "searchKindPapers": "Papers",
+  "searchKindHighlights": "Highlights",
+  "searchKindInPapers": "In papers",
+  "searchIndexing": "Indexing papers…",
+  "searchPage": "p. {page}",
+  "@searchPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  }
+}

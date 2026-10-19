@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../platform/share_origin.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,11 +101,12 @@ Future<void> exportAnnotatedPdf(
   final messenger = ScaffoldMessenger.of(context);
   final origin = shareOrigin(context);
   final db = ref.read(databaseProvider);
+  final l = context.l10n;
   void say(String m) => messenger.showSnackBar(SnackBar(content: Text(m)));
 
   final path = paper.pdfPath;
   if (path == null || !File(path).existsSync()) {
-    say('This paper’s PDF isn’t on this device.');
+    say(l.viewerExportNoPdf);
     return;
   }
   try {
@@ -112,7 +114,7 @@ Future<void> exportAnnotatedPdf(
     final pdf = await File(path).readAsBytes();
     final result = await compute(_run, _Job(pdf, marks.highlights, marks.ink));
     if (result.written == 0) {
-      say('Nothing to export: the marks don’t match this PDF’s pages.');
+      say(l.viewerExportNothing);
       return;
     }
     final dir = await getTemporaryDirectory();
@@ -128,8 +130,12 @@ Future<void> exportAnnotatedPdf(
       ),
     );
   } on AnnotatedPdfException catch (e) {
-    say(e.message);
+    say(switch (e.problem) {
+      AnnotatedPdfProblem.notPdf => l.viewerExportNotPdf,
+      AnnotatedPdfProblem.encrypted => l.viewerExportEncrypted,
+      AnnotatedPdfProblem.damaged => l.viewerExportDamaged,
+    });
   } catch (_) {
-    say('Couldn’t export this PDF.');
+    say(l.viewerExportFailed);
   }
 }

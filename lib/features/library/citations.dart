@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import 'authors.dart';
 import 'citation_formatter.dart';
@@ -144,7 +145,20 @@ String locatorAbbreviation(String label, {bool plural = false}) =>
       _ => label,
     };
 
-/// "Page", "Chapter" … for a picker.
+/// "Page", "Chapter" … for a picker, in the reader's language.
+String locatorLabelName(AppLocalizations l10n, String label) => switch (label) {
+  'page' => l10n.libraryLocatorPage,
+  'chapter' => l10n.libraryLocatorChapter,
+  'section' => l10n.libraryLocatorSection,
+  'figure' => l10n.libraryLocatorFigure,
+  'paragraph' => l10n.libraryLocatorParagraph,
+  'volume' => l10n.libraryLocatorVolume,
+  'line' => l10n.libraryLocatorLine,
+  'note' => l10n.libraryLocatorNote,
+  _ => locatorName(label),
+};
+
+/// "Page", "Chapter" … in English.
 String locatorName(String label) =>
     label.isEmpty ? label : '${label[0].toUpperCase()}${label.substring(1)}';
 

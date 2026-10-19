@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import '../../data/local_files.dart';
+import '../../l10n/l10n.dart';
 import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../library/metadata_lookup.dart';
@@ -99,9 +100,20 @@ List<ZoteroCollection> parseCollections(List<Map<String, dynamic>> raw) {
   return out;
 }
 
+/// What the import is doing, for the dialog to word.
+enum ZoteroPhase { library, items, attachments, importing, done }
+
 class ZoteroProgress {
-  const ZoteroProgress(this.phase, {this.done = 0, this.total = 0});
-  final String phase;
+  const ZoteroProgress(
+    this.phase, {
+    this.title = '',
+    this.done = 0,
+    this.total = 0,
+  });
+  final ZoteroPhase phase;
+
+  /// The item being imported ([ZoteroPhase.importing] only).
+  final String title;
   final int done;
   final int total;
 }
@@ -139,24 +151,18 @@ class ZoteroImportSummary {
       ..addAll(s[6] as Set<String>);
   }
 
-  String get message {
-    String n(int v, String one, [String? many]) =>
-        '$v ${v == 1 ? one : (many ?? '${one}s')}';
-    final parts = <String>[
-      'Imported ${n(papers, 'paper')}',
-      n(pdfs, 'PDF'),
-      '${n(highlights, 'highlight')} into ${n(projects.length, 'project')}',
-    ];
-    var s = '${parts[0]}, ${parts[1]}, ${parts[2]}';
-    if (notes > 0) s += '; ${n(notes, 'note')} added';
+  /// In English, for tests; the dialog words it with [messageFor].
+  String get message => messageFor(lookupAppLocalizations(const Locale('en')));
+
+  String messageFor(AppLocalizations l10n) {
+    var s = l10n.zoteroSummaryMain(papers, pdfs, highlights, projects.length);
+    if (notes > 0) s += '; ${l10n.zoteroSummaryNotes(notes)}';
     if (alreadyInLibrary > 0) {
-      s += '; $alreadyInLibrary already in your library';
+      s += '; ${l10n.zoteroSummaryAlreadyIn(alreadyInLibrary)}';
     }
-    if (pdfsFailed > 0) {
-      s += '; ${n(pdfsFailed, 'PDF')} couldn\'t be downloaded';
-    }
-    if (failedItems > 0) s += '; ${n(failedItems, 'item')} skipped';
-    return cancelled ? 'Stopped. $s.' : '$s.';
+    if (pdfsFailed > 0) s += '; ${l10n.zoteroSummaryPdfsFailed(pdfsFailed)}';
+    if (failedItems > 0) s += '; ${l10n.zoteroSummarySkipped(failedItems)}';
+    return cancelled ? l10n.zoteroSummaryStopped(s) : l10n.zoteroSummaryDone(s);
   }
 }
 
@@ -190,10 +196,16 @@ class ZoteroImporter {
   }) async {
     final summary = ZoteroImportSummary();
     bool cancelled() => (isCancelled?.call() ?? false);
-    void report(String phase, [int done = 0, int total = 0]) =>
-        onProgress?.call(ZoteroProgress(phase, done: done, total: total));
+    void report(
+      ZoteroPhase phase, {
+      String title = '',
+      int done = 0,
+      int total = 0,
+    }) => onProgress?.call(
+      ZoteroProgress(phase, title: title, done: done, total: total),
+    );
 
-    report('Reading your Zotero library…');
+    report(ZoteroPhase.library);
     final collections = parseCollections(await client.collections());
     final byKey = {for (final c in collections) c.key: c};
     // Chosen collections plus everything beneath them.
@@ -212,7 +224,7 @@ class ZoteroImporter {
     }
 
     var items = await client.topItems(
-      onPage: (n, t) => report('Reading items…', n, t ?? 0),
+      onPage: (n, t) => report(ZoteroPhase.items, done: n, total: t ?? 0),
     );
     if (collectionKeys != null) {
       items = [
@@ -227,7 +239,7 @@ class ZoteroImporter {
     if (cancelled()) return summary..cancelled = true;
 
     final keys = {for (final i in items) zoteroKey(i)};
-    report('Reading attachments and annotations…');
+    report(ZoteroPhase.attachments);
     final attachments = [
       for (final a in await client.itemsOfType('attachment'))
         if (keys.contains(zoteroData(a)['parentItem'])) a,
@@ -254,7 +266,12 @@ class ZoteroImporter {
         break;
       }
       final item = items[i];
-      report('Importing “${zoteroData(item)['title'] ?? ''}”', i, items.length);
+      report(
+        ZoteroPhase.importing,
+        title: '${zoteroData(item)['title'] ?? ''}',
+        done: i,
+        total: items.length,
+      );
       try {
         await _importItem(
           item,
@@ -282,7 +299,7 @@ class ZoteroImporter {
         summary.failedItems++;
       }
     }
-    report('Done', items.length, items.length);
+    report(ZoteroPhase.done, done: items.length, total: items.length);
     return summary;
   }
 

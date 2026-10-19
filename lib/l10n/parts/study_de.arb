@@ -1,0 +1,16 @@
+{
+  "@@locale": "de",
+  "studyFieldSpecies": "Spezies / Modell",
+  "studyFieldBrainRegions": "Hirnregionen",
+  "studyFieldTechniques": "Methoden",
+  "studyFieldSampleSize": "Stichprobengröße (n)",
+  "studyFieldParadigm": "Aufgabe / Paradigma",
+  "studyChip": "Studie",
+  "studyChipCount": "Studie · {count}",
+  "studyClearFilter": "Studienfilter löschen",
+  "studyClear": "Zurücksetzen",
+  "studyMinSampleSize": "Minimale Stichprobengröße (n)",
+  "studyAdd": "Studiendetails hinzufügen",
+  "studyDetails": "Studiendetails",
+  "studyListHint": "Zum Hinzufügen Eingabe oder Komma drücken"
+}

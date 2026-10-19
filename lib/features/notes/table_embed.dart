@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill/quill_delta.dart';
 
+import '../../l10n/l10n.dart';
 import 'note_table.dart';
 
 export 'note_table.dart' show tableEmbedType;
@@ -289,17 +290,25 @@ class _StaticTable extends StatelessWidget {
 }
 
 enum _TableAction {
-  rowAbove('Add row above'),
-  rowBelow('Add row below'),
-  columnLeft('Add column left'),
-  columnRight('Add column right'),
-  deleteRow('Delete row'),
-  deleteColumn('Delete column'),
-  header('Header row'),
-  deleteTable('Delete table');
+  rowAbove,
+  rowBelow,
+  columnLeft,
+  columnRight,
+  deleteRow,
+  deleteColumn,
+  header,
+  deleteTable;
 
-  const _TableAction(this.label);
-  final String label;
+  String label(AppLocalizations l10n) => switch (this) {
+    rowAbove => l10n.tableAddRowAbove,
+    rowBelow => l10n.tableAddRowBelow,
+    columnLeft => l10n.tableAddColumnLeft,
+    columnRight => l10n.tableAddColumnRight,
+    deleteRow => l10n.tableDeleteRow,
+    deleteColumn => l10n.tableDeleteColumn,
+    header => l10n.tableHeaderRow,
+    deleteTable => l10n.tableDeleteTable,
+  };
 }
 
 // Letters the note editor binds to formatting; cells are plain text, so
@@ -647,7 +656,7 @@ class _EditableTableState extends State<_EditableTable> {
             CheckedPopupMenuItem(
               value: a,
               checked: t.header,
-              child: Text(a.label),
+              child: Text(a.label(context.l10n)),
             )
           else
             PopupMenuItem(
@@ -657,7 +666,7 @@ class _EditableTableState extends State<_EditableTable> {
                 _TableAction.deleteColumn => t.columns > 1,
                 _ => true,
               },
-              child: Text(a.label),
+              child: Text(a.label(context.l10n)),
             ),
         ],
       ],
@@ -732,7 +741,7 @@ class _EditableTableState extends State<_EditableTable> {
             Builder(
               builder: (handle) => IconButton(
                 key: const ValueKey('table-menu'),
-                tooltip: 'Table',
+                tooltip: context.l10n.tableTooltip,
                 visualDensity: VisualDensity.compact,
                 iconSize: 18,
                 constraints: const BoxConstraints.tightFor(

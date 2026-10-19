@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/context_menu.dart';
 import '../notes/folders_providers.dart';
 import '../notes/notes_providers.dart';
@@ -186,15 +187,18 @@ String notesFilterTitle(
   required List<Folder> folders,
   required List<Project> projects,
   required List<Tag> tags,
+  required AppLocalizations l10n,
 }) => switch (filter) {
-  AllNotes() => 'Notes',
+  AllNotes() => l10n.commonNotes,
   FolderFilter(:final folderId) =>
-    folders.where((f) => f.id == folderId).firstOrNull?.name ?? 'Notes',
+    folders.where((f) => f.id == folderId).firstOrNull?.name ??
+        l10n.commonNotes,
   ProjectFilter(:final projectId) =>
-    projects.where((p) => p.id == projectId).firstOrNull?.name ?? 'Notes',
+    projects.where((p) => p.id == projectId).firstOrNull?.name ??
+        l10n.commonNotes,
   TagFilter(:final tagId) => switch (tags.where((t) => t.id == tagId)) {
     final found when found.isNotEmpty => '#${found.first.name}',
-    _ => 'Notes',
+    _ => l10n.commonNotes,
   },
 };
 
@@ -232,6 +236,7 @@ class MacSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final db = ref.read(databaseProvider);
     final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
     final folders = ref.watch(foldersListProvider).value ?? const <Folder>[];
@@ -259,21 +264,23 @@ class MacSidebar extends ConsumerWidget {
     Future<void> newFolder() async {
       final name = await _askName(
         context,
-        title: 'New folder',
-        action: 'Create',
+        title: l10n.macNewFolderTitle,
+        action: l10n.macCreate,
       );
       if (name == null) return;
       final id = await createFolder(db, name);
       show(FolderFilter(id));
     }
 
-    Widget section(String title) {
-      final folded = collapsed.contains(title);
+    // [id] is the stable, English key the folded state is stored under;
+    // [title] is what the reader sees.
+    Widget section(String id, String title) {
+      final folded = collapsed.contains(id);
       return _SectionHeader(
         title: title,
         folded: folded,
         onToggle: () => ref.read(macSidebarCollapsedProvider.notifier).state =
-            folded ? ({...collapsed}..remove(title)) : {...collapsed, title},
+            folded ? ({...collapsed}..remove(id)) : {...collapsed, id},
       );
     }
 
@@ -293,13 +300,13 @@ class MacSidebar extends ConsumerWidget {
               MacToolbarButton(
                 key: const ValueKey('mac-new-folder'),
                 icon: Icons.create_new_folder_outlined,
-                tooltip: 'New Folder',
+                tooltip: l10n.macNewFolderTooltip,
                 onPressed: newFolder,
               ),
               MacToolbarButton(
                 key: const ValueKey('mac-toggle-sidebar'),
                 icon: Icons.view_sidebar_outlined,
-                tooltip: 'Hide Sidebar (\u2303\u2318S)',
+                tooltip: l10n.macHideSidebarTooltip,
                 onPressed: onToggleSidebar,
               ),
             ],
@@ -310,13 +317,13 @@ class MacSidebar extends ConsumerWidget {
               key: const ValueKey('mac-source-list'),
               padding: EdgeInsets.zero,
               children: [
-                section('Notes'),
+                section('Notes', l10n.commonNotes),
                 if (!collapsed.contains('Notes')) ...[
                   _SidebarRow(
                     key: const ValueKey('mac-all-notes'),
                     icon: Icons.edit_note_outlined,
                     selectedIcon: Icons.edit_note,
-                    label: 'All Notes',
+                    label: l10n.macAllNotes,
                     count: total,
                     selected: shown(const AllNotes()),
                     onTap: () => show(const AllNotes()),
@@ -336,14 +343,14 @@ class MacSidebar extends ConsumerWidget {
                           setNoteFolder(db, noteId: note.id, folderId: f.id),
                       contextActions: [
                         ContextMenuAction(
-                          label: 'Rename Folder…',
+                          label: l10n.macRenameFolder,
                           icon: Icons.edit_outlined,
                           onSelected: () async {
                             final name = await _askName(
                               context,
-                              title: 'Rename folder',
+                              title: l10n.macRenameFolderTitle,
                               initial: f.name,
-                              action: 'Rename',
+                              action: l10n.commonRename,
                             );
                             if (name != null) {
                               await renameFolder(db, f.id, name);
@@ -351,7 +358,7 @@ class MacSidebar extends ConsumerWidget {
                           },
                         ),
                         ContextMenuAction(
-                          label: 'Delete Folder…',
+                          label: l10n.macDeleteFolder,
                           icon: Icons.delete_outline,
                           destructive: true,
                           onSelected: () =>
@@ -360,19 +367,19 @@ class MacSidebar extends ConsumerWidget {
                       ],
                     ),
                 ],
-                section('Library'),
+                section('Library', l10n.commonLibrary),
                 if (!collapsed.contains('Library'))
                   _SidebarRow(
                     key: const ValueKey('mac-library'),
                     icon: Icons.library_books_outlined,
                     selectedIcon: Icons.library_books,
-                    label: 'All Papers',
+                    label: l10n.macAllPapers,
                     count: paperCount,
                     selected: selectionShown && index == 1,
                     onTap: () => onSelected(1),
                   ),
                 if (projects.isNotEmpty) ...[
-                  section('Projects'),
+                  section('Projects', l10n.commonProjects),
                   if (!collapsed.contains('Projects'))
                     for (final p in projects)
                       _SidebarRow(
@@ -390,7 +397,7 @@ class MacSidebar extends ConsumerWidget {
                         ),
                         contextActions: [
                           ContextMenuAction(
-                            label: 'Open Project Page',
+                            label: l10n.macOpenProjectPage,
                             icon: Icons.open_in_new,
                             onSelected: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
@@ -399,7 +406,7 @@ class MacSidebar extends ConsumerWidget {
                             ),
                           ),
                           ContextMenuAction(
-                            label: 'More…',
+                            label: l10n.macMoreMenu,
                             icon: Icons.more_horiz,
                             onSelected: () => showProjectMenu(context, ref, p),
                           ),
@@ -407,7 +414,7 @@ class MacSidebar extends ConsumerWidget {
                       ),
                 ],
                 if (tags.isNotEmpty) ...[
-                  section('Tags'),
+                  section('Tags', l10n.macTags),
                   if (!collapsed.contains('Tags'))
                     for (final t in tags)
                       _SidebarRow(
@@ -420,7 +427,7 @@ class MacSidebar extends ConsumerWidget {
                             addTagToNote(db, noteId: note.id, tagId: t.id),
                         contextActions: [
                           ContextMenuAction(
-                            label: 'Delete Tag…',
+                            label: l10n.macDeleteTag,
                             icon: Icons.delete_outline,
                             destructive: true,
                             onSelected: () => confirmDeleteTag(context, ref, t),
@@ -433,7 +440,7 @@ class MacSidebar extends ConsumerWidget {
           ),
           _SidebarRow(
             icon: Icons.delete_outline,
-            label: 'Trash',
+            label: l10n.commonTrash,
             selected: false,
             onTap: onTrash,
           ),
@@ -454,7 +461,7 @@ class MacSidebar extends ConsumerWidget {
                       ),
                     ),
             ),
-            label: email ?? 'Settings',
+            label: email ?? l10n.commonSettings,
             selected: false,
             onTap: onSettings,
           ),
@@ -510,13 +517,13 @@ class _NameDialogState extends State<_NameDialog> {
     content: TextField(
       controller: _controller,
       autofocus: true,
-      decoration: const InputDecoration(hintText: 'Folder name'),
+      decoration: InputDecoration(hintText: context.l10n.macFolderNameHint),
       onSubmitted: (v) => Navigator.pop(context, v),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(context.l10n.commonCancel),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, _controller.text),
@@ -545,7 +552,9 @@ class _SectionHeader extends StatelessWidget {
     return Semantics(
       header: true,
       button: true,
-      label: '$title, ${folded ? 'collapsed' : 'expanded'}',
+      label: folded
+          ? context.l10n.macSectionCollapsed(title)
+          : context.l10n.macSectionExpanded(title),
       excludeSemantics: true,
       child: InkWell(
         onTap: onToggle,

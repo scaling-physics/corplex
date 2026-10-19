@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/motion_widgets.dart';
 import '../export/unlock_for_export.dart' show requestUnlock;
 import '../home/adaptive.dart' show ReadableColumn;
@@ -26,16 +27,21 @@ Future<void> showNoteVersions(
   );
 }
 
-String _when(DateTime t) => DateFormat.yMMMd().add_jm().format(t);
+String _when(BuildContext context, DateTime t) =>
+    DateFormat.yMMMd(Localizations.localeOf(context).toString())
+        .add_jm()
+        .format(t);
 
-String _signed(int n) => n > 0 ? '+$n' : (n < 0 ? '−${-n}' : '0');
+String _signed(BuildContext context, int n) {
+  final fmt = NumberFormat.decimalPattern(
+    Localizations.localeOf(context).toString(),
+  );
+  return n > 0 ? '+${fmt.format(n)}' : (n < 0 ? '−${fmt.format(-n)}' : '0');
+}
 
 /// " · +340 since" / " · −120 since"; nothing when the length is the same.
-String _since(int n) => n > 0
-    ? ' · +$n since'
-    : n < 0
-    ? ' · −${-n} since'
-    : '';
+String _since(BuildContext context, int n) =>
+    n == 0 ? '' : ' · ${context.l10n.notesVersionsSince(_signed(context, n))}';
 
 /// Asks for an optional name; null means cancelled, empty means no name.
 Future<String?> _askLabel(
@@ -53,13 +59,15 @@ Future<String?> _askLabel(
         controller: controller,
         autofocus: true,
         textCapitalization: TextCapitalization.sentences,
-        decoration: const InputDecoration(hintText: 'Name (optional)'),
+        decoration: InputDecoration(
+          hintText: context.l10n.notesVersionNameHint,
+        ),
         onSubmitted: (v) => Navigator.pop(context, v),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
@@ -96,8 +104,8 @@ class NoteVersionsScreen extends ConsumerWidget {
     Future<void> save() async {
       final label = await _askLabel(
         context,
-        title: 'Save a version',
-        action: 'Save',
+        title: context.l10n.notesSaveAVersion,
+        action: context.l10n.commonSave,
       );
       if (label == null) return;
       await flush();
@@ -106,37 +114,35 @@ class NoteVersionsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Versions'),
+        title: Text(context.l10n.notesVersions),
         actions: [
           TextButton.icon(
             onPressed: note == null ? null : save,
             icon: const Icon(Icons.add),
-            label: const Text('Save a version now'),
+            label: Text(context.l10n.notesSaveVersionNow),
           ),
         ],
       ),
       body: ReadableColumn(
         child: versions.isEmpty
-            ? const EmptyState(
+            ? EmptyState(
                 icon: Icons.history,
-                title: 'No versions yet',
-                message:
-                    'A version is a saved copy of this note. One is kept '
-                    'automatically when a chapter goes to your supervisor, '
-                    'and you can save one any time.',
+                title: context.l10n.notesVersionsEmptyTitle,
+                message: context.l10n.notesVersionsEmptyMessage,
               )
             : ListView(
                 padding: const EdgeInsets.only(bottom: 32),
                 children: [
                   for (final v in versions)
                     ListTile(
-                      title: Text(v.label ?? 'Saved version'),
+                      title: Text(v.label ?? context.l10n.notesSavedVersion),
                       subtitle: Text(
                         texts[v.id] == null
-                            ? '${_when(v.createdAt)} · Locked'
-                            : '${_when(v.createdAt)} · '
-                                  '${noteWordCount(texts[v.id]!)} words'
-                                  '${nowWords == null ? '' : _since(nowWords - noteWordCount(texts[v.id]!))}',
+                            ? '${_when(context, v.createdAt)} · '
+                                  '${context.l10n.commonLocked}'
+                            : '${_when(context, v.createdAt)} · '
+                                  '${context.l10n.notesVersionsWords(noteWordCount(texts[v.id]!))}'
+                                  '${nowWords == null ? '' : _since(context, nowWords - noteWordCount(texts[v.id]!))}',
                         style: TextStyle(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -151,13 +157,13 @@ class NoteVersionsScreen extends ConsumerWidget {
                         ),
                       ),
                       trailing: PopupMenuButton<String>(
-                        tooltip: 'Version options',
+                        tooltip: context.l10n.notesVersionOptions,
                         onSelected: (choice) async {
                           if (choice == 'rename') {
                             final label = await _askLabel(
                               context,
-                              title: 'Rename version',
-                              action: 'Rename',
+                              title: context.l10n.notesRenameVersion,
+                              action: context.l10n.commonRename,
                               initial: v.label ?? '',
                             );
                             if (label != null) {
@@ -170,9 +176,11 @@ class NoteVersionsScreen extends ConsumerWidget {
                               ..hideCurrentSnackBar()
                               ..showSnackBar(
                                 SnackBar(
-                                  content: const Text('Version deleted'),
+                                  content: Text(
+                                    context.l10n.notesVersionDeleted,
+                                  ),
                                   action: SnackBarAction(
-                                    label: 'Undo',
+                                    label: context.l10n.commonUndo,
                                     onPressed: () =>
                                         undoDeleteNoteVersion(db, row),
                                   ),
@@ -180,9 +188,15 @@ class NoteVersionsScreen extends ConsumerWidget {
                               );
                           }
                         },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'rename', child: Text('Rename')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'rename',
+                            child: Text(context.l10n.commonRename),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(context.l10n.commonDelete),
+                          ),
                         ],
                       ),
                     ),
@@ -218,7 +232,7 @@ class NoteVersionCompareScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     if (version == null || note == null) {
-      return Scaffold(appBar: AppBar(title: const Text('Compare')));
+      return Scaffold(appBar: AppBar(title: Text(context.l10n.notesCompare)));
     }
 
     // Locked bodies are readable only while unlocked (the provider
@@ -228,20 +242,22 @@ class NoteVersionCompareScreen extends ConsumerWidget {
     final noteText = texts?['note'];
     if (texts == null || versionText == null || noteText == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(version.label ?? 'Saved version')),
+        appBar: AppBar(
+          title: Text(version.label ?? context.l10n.notesSavedVersion),
+        ),
         body: texts == null
             ? const SizedBox.shrink()
             : EmptyState(
                 icon: Icons.lock_outline,
-                title: 'Locked',
-                message: 'Unlock this note to compare or restore versions.',
+                title: context.l10n.commonLocked,
+                message: context.l10n.notesUnlockToCompareOrRestore,
                 action: FilledButton(
                   onPressed: () => requestUnlock(
                     context,
                     lock,
-                    reason: 'Unlock this note to compare its versions.',
+                    reason: context.l10n.notesUnlockToCompare,
                   ),
-                  child: const Text('Unlock'),
+                  child: Text(context.l10n.notesUnlock),
                 ),
               ),
       );
@@ -258,23 +274,23 @@ class NoteVersionCompareScreen extends ConsumerWidget {
     final removed = diff.where((l) => l.kind == DiffKind.removed).length;
     final words = noteWordCount(noteText) - noteWordCount(versionText);
 
+    final l10n = context.l10n;
     Future<void> restore() async {
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Restore this version?'),
-          content: const Text(
-            'The note goes back to this version. What is there now is '
-            'saved first as "$beforeRestoringLabel".',
+          title: Text(l10n.notesRestoreVersionTitle),
+          content: Text(
+            l10n.notesRestoreVersionMessage(l10n.notesBeforeRestoring),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(l10n.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Restore'),
+              child: Text(l10n.notesRestore),
             ),
           ],
         ),
@@ -282,18 +298,17 @@ class NoteVersionCompareScreen extends ConsumerWidget {
       if (ok != true) return;
       await flush();
       try {
-        await restoreNoteVersion(db, versionId, lock: lock);
+        await restoreNoteVersion(db, versionId, lock: lock, l10n: l10n);
       } on NoteLockedException {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unlock the note to restore it.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.notesUnlockToRestore)));
         return;
       }
       if (!context.mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Version restored')));
+          .showSnackBar(SnackBar(content: Text(l10n.notesVersionRestored)));
     }
 
     // Fold runs of more than 4 unchanged lines.
@@ -305,7 +320,7 @@ class NoteVersionCompareScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
-              '${run.length} unchanged lines',
+              l10n.notesUnchangedLines(run.length),
               style: TextStyle(color: scheme.outline),
             ),
           ),
@@ -328,11 +343,11 @@ class NoteVersionCompareScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(version.label ?? 'Saved version'),
+        title: Text(version.label ?? l10n.notesSavedVersion),
         actions: [
           TextButton(
             onPressed: restore,
-            child: const Text('Restore this version'),
+            child: Text(l10n.notesRestoreThisVersion),
           ),
         ],
       ),
@@ -344,10 +359,13 @@ class NoteVersionCompareScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Text(
                 diff.isEmpty
-                    ? '${_when(version.createdAt)} · the same as now'
-                    : '${_when(version.createdAt)} · now has '
-                          '${_signed(words)} words · '
-                          '$added added, $removed removed',
+                    ? l10n.notesCompareSame(_when(context, version.createdAt))
+                    : l10n.notesCompareChanged(
+                        _when(context, version.createdAt),
+                        _signed(context, words),
+                        added,
+                        removed,
+                      ),
                 style: Theme.of(context).textTheme.bodySmall
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),

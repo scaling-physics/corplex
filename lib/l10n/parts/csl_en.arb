@@ -1,0 +1,39 @@
+{
+  "cslReferenceStyle": "Reference style",
+  "cslAddStyle": "Add a style…",
+  "cslStyleCantBeUsed": "That style can't be used",
+  "cslCitationLanguage": "Citation language",
+  "@cslCitationLanguage": {
+    "description": "Title of the list of languages that citation text (month names, \"et al.\", quotes) can be written in."
+  },
+  "cslCitationLanguageRow": "Citation language: {language}",
+  "@cslCitationLanguageRow": {
+    "description": "A quiet row in the reference style picker showing the current citation language.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+  "cslAutomatic": "Automatic",
+  "cslAutomaticWith": "Automatic ({language})",
+  "@cslAutomaticWith": {
+    "placeholders": {
+      "language": {"type": "String", "example": "English (US)"}
+    }
+  },
+  "cslProblemNotXml": "That file isn't valid XML, so it can't be a citation style.",
+  "cslProblemNotStyle": "That file isn't a citation style (.csl) file.",
+  "cslProblemNoInfo": "That style has no title or ID block.",
+  "cslProblemDependent": "This style is a small variant that points to a parent style. Import the parent style instead.",
+  "cslProblemWrongVersion": "Only CSL 1.0 styles are supported.",
+  "cslProblemNoLayout": "That style is missing its layout, so it can't format references.",
+  "cslProblemNoBibliography": "That style has no bibliography section, so it can't format reference lists.",
+  "cslProblemUndefinedMacro": "That style uses an undefined macro \"{name}\".",
+  "@cslProblemUndefinedMacro": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "cslProblemNoTitle": "That style has no title.",
+  "cslProblemTooLarge": "That file is too large to be a style.",
+  "cslProblemUnreadable": "Couldn't read that file."
+}

@@ -1,0 +1,9 @@
+{
+  "@@locale": "de",
+  "shareAddedToLibrary": "„{name}“ zur Bibliothek hinzugefügt",
+  "shareSavedLink": "Link als Notiz gesichert",
+  "shareSavedAsNote": "Als Notiz gesichert",
+  "shareAudioAttached": "Audio angehängt",
+  "shareAttachTo": "„{name}“ anhängen an …",
+  "shareNewNote": "Eine neue Notiz"
+}

@@ -2,6 +2,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 
 import 'citation_embed.dart';
 import 'figure_markers.dart';
+import 'heading_fold.dart';
 import 'math_markers.dart';
 import 'note_content.dart';
 
@@ -18,6 +19,15 @@ Document editorDocument(String stored) =>
 
 /// The editor's document back to stored content (the inverse of
 /// [editorDocument]), normalised the way the editor saves notes.
-String storedFromEditor(Document document) => citationEmbedsToText(
-  figureEmbedsToText(mathEmbedsToText(encodeNoteContent(document))),
-);
+///
+/// Collapsed sections (`heading_fold.dart`) exist only in the editor: they
+/// are expanded first, so everything downstream sees the whole note.
+String storedFromEditor(Document document) {
+  final delta = document.toDelta();
+  final whole = deltaHasFolds(delta)
+      ? Document.fromDelta(unfoldDelta(delta))
+      : document;
+  return citationEmbedsToText(
+    figureEmbedsToText(mathEmbedsToText(encodeNoteContent(whole))),
+  );
+}

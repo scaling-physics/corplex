@@ -1,0 +1,11 @@
+{
+  "@@locale": "de",
+  "findNotFound": "Nicht gefunden",
+  "findCount": "{current} von {total}",
+  "findPrevious": "Vorheriger Treffer",
+  "findNext": "Nächster Treffer",
+  "findReplace": "Ersetzen",
+  "findHideReplace": "Ersetzen ausblenden",
+  "findReplaceWith": "Ersetzen durch",
+  "findReplaceAll": "Alle"
+}

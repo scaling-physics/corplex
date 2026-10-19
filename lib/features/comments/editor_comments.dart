@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../lock/note_lock_service.dart';
+import '../notes/heading_fold_controller.dart';
 import 'comment_anchor.dart';
 import 'comment_dialogs.dart';
 import 'comment_marks.dart';
@@ -17,7 +19,8 @@ class EditorComments {
     required this.noteId,
     required this.controller,
     required this.ref,
-  }) : marks = CommentMarks(controller) {
+    this.folds,
+  }) : marks = CommentMarks(controller, folds: folds) {
     controller.addListener(_selectionChanged);
     _selectionChanged();
   }
@@ -26,6 +29,14 @@ class EditorComments {
   final QuillController controller;
   final WidgetRef ref;
   final CommentMarks marks;
+
+  /// Collapsed sections: comments are located in, and anchored to, the
+  /// whole note's text (offsets as `editorDocument` counts them), whatever
+  /// is collapsed.
+  final HeadingFolds? folds;
+
+  String _wholeText() =>
+      folds?.unfoldedText() ?? controller.document.toPlainText();
 
   /// Whether text is selected (the panel's + follows it).
   final hasSelection = ValueNotifier<bool>(false);
@@ -47,13 +58,18 @@ class EditorComments {
     marks.setComments(views.value ?? const []);
   }
 
-  CommentSpan? locate(CommentView c) =>
-      CommentMarks.locate(controller.document.toPlainText(), c);
+  CommentSpan? locate(CommentView c) => CommentMarks.locate(_wholeText(), c);
 
-  /// Selects the passage (the editor scrolls to its selection).
+  /// Selects the passage (the editor scrolls to its selection), opening
+  /// the collapsed section that hides it.
   void select(CommentSpan span) {
+    final start = folds?.reveal(span.start) ?? span.start;
+    final max = controller.document.length - 1;
     controller.updateSelection(
-      TextSelection(baseOffset: span.start, extentOffset: span.end),
+      TextSelection(
+        baseOffset: start.clamp(0, max),
+        extentOffset: (start + span.end - span.start).clamp(0, max),
+      ),
       ChangeSource.local,
     );
   }
@@ -63,9 +79,12 @@ class EditorComments {
   Future<bool> addFromSelection(BuildContext context) async {
     final sel = controller.selection;
     if (!sel.isValid || sel.isCollapsed) return false;
-    final text = controller.document.toPlainText();
-    var start = sel.start.clamp(0, text.length);
-    var end = sel.end.clamp(0, text.length);
+    final text = _wholeText();
+    var start = (folds?.unfoldedOffset(sel.start) ?? sel.start).clamp(
+      0,
+      text.length,
+    );
+    var end = (folds?.unfoldedOffset(sel.end) ?? sel.end).clamp(0, text.length);
     bool blank(int i) => text[i].trim().isEmpty && text[i] != '￼';
     // Trim blanks at the edges so the quote is the passage that reads as
     // selected; the anchor moves with it.
@@ -97,7 +116,7 @@ class EditorComments {
     } on NoteLockedException {
       if (context.mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(content: Text('Unlock your notes to add a comment.')),
+          SnackBar(content: Text(context.l10n.commentsUnlockToAdd)),
         );
       }
     }
@@ -149,9 +168,9 @@ class EditorComments {
           if (context.mounted) {
             ScaffoldMessenger.maybeOf(context)?.showSnackBar(
               SnackBar(
-                content: const Text('Comment deleted'),
+                content: Text(context.l10n.commentsDeleted),
                 action: SnackBarAction(
-                  label: 'Undo',
+                  label: context.l10n.commonUndo,
                   onPressed: () => store.restore(r.comment.row),
                 ),
               ),
@@ -180,7 +199,7 @@ class EditorComments {
         buttonItems: [
           ...state.contextMenuButtonItems,
           ContextMenuButtonItem(
-            label: 'Add comment',
+            label: context.l10n.commentsAddComment,
             onPressed: () {
               state.hideToolbar();
               addFromSelection(context);

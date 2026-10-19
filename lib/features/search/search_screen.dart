@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/motion_widgets.dart';
 import '../attachments/attachments_browser.dart';
 import '../graph/graph_screen.dart';
@@ -85,7 +86,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           textInputAction: TextInputAction.search,
           onChanged: _onChanged,
           decoration: InputDecoration(
-            hintText: 'Search notes, papers and highlights',
+            hintText: context.l10n.searchHint,
             filled: false,
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
@@ -94,7 +95,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.close),
-                    tooltip: 'Clear',
+                    tooltip: context.l10n.searchClear,
                     onPressed: () {
                       _controller.clear();
                       _onChanged('');
@@ -107,12 +108,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           if (!isDesktop(context))
             IconButton(
               icon: const Icon(Icons.attach_file),
-              tooltip: 'Attachments',
+              tooltip: context.l10n.searchAttachments,
               onPressed: () => showAttachmentsBrowser(context),
             ),
           IconButton(
             icon: const Icon(Icons.hub_outlined),
-            tooltip: 'Map',
+            tooltip: context.l10n.searchMap,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const GraphScreen()),
             ),
@@ -121,10 +122,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: ReadableColumn(
         child: _results == null
-            ? const EmptyState(
+            ? EmptyState(
                 icon: Icons.search,
-                title: 'Search everything',
-                message: 'Find a note, a paper, or a passage you highlighted.',
+                title: context.l10n.searchEmptyTitle,
+                message: context.l10n.searchEmptyMessage,
               )
             : FutureBuilder<List<SearchHit>>(
                 future: _results,
@@ -132,10 +133,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   final hits = snapshot.data;
                   if (hits == null) return const SizedBox.shrink();
                   if (hits.isEmpty) {
-                    return const EmptyState(
+                    return EmptyState(
                       icon: Icons.search_off,
-                      title: 'No matches',
-                      message: 'Try fewer or different words.',
+                      title: context.l10n.searchNoMatches,
+                      message: context.l10n.searchNoMatchesHint,
                     );
                   }
                   return SearchResultsList(
@@ -248,10 +249,10 @@ class _SearchResultsViewState extends ConsumerState<SearchResultsView> {
       final hits = snapshot.data;
       if (hits == null) return const SizedBox.shrink();
       if (hits.isEmpty) {
-        return const EmptyState(
+        return EmptyState(
           icon: Icons.search_off,
-          title: 'No matches',
-          message: 'Try fewer or different words.',
+          title: context.l10n.searchNoMatches,
+          message: context.l10n.searchNoMatchesHint,
         );
       }
       return SearchResultsList(
@@ -283,16 +284,17 @@ class SearchResultsList extends StatelessWidget {
   /// Whether papers' text is still being indexed (results may be partial).
   final Future<bool>? indexing;
 
-  static const _labels = {
-    SearchKind.note: 'Notes',
-    SearchKind.paper: 'Papers',
-    SearchKind.highlight: 'Highlights',
-    SearchKind.pdfText: 'In papers',
+  static Map<SearchKind, String> _labels(AppLocalizations l10n) => {
+    SearchKind.note: l10n.commonNotes,
+    SearchKind.paper: l10n.searchKindPapers,
+    SearchKind.highlight: l10n.searchKindHighlights,
+    SearchKind.pdfText: l10n.searchKindInPapers,
   };
 
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[];
+    final labels = _labels(context.l10n);
     for (final kind in SearchKind.values) {
       final ofKind = hits.where((h) => h.kind == kind).toList();
       if (ofKind.isEmpty) continue;
@@ -302,7 +304,7 @@ class SearchResultsList extends StatelessWidget {
               ? const EdgeInsets.fromLTRB(16, 12, 16, 2)
               : const EdgeInsets.fromLTRB(20, 16, 20, 4),
           child: Text(
-            _labels[kind]!,
+            labels[kind]!,
             style: Theme.of(context).textTheme.titleSmall,
           ),
         ),
@@ -325,7 +327,7 @@ class SearchResultsList extends StatelessWidget {
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   child: Text(
-                    'Indexing papers…',
+                    context.l10n.searchIndexing,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -388,7 +390,7 @@ class _HitTile extends StatelessWidget {
       leading: Icon(icon, color: theme.colorScheme.primary),
       title: _marked(
         context,
-        title.isEmpty ? 'Untitled' : title,
+        title.isEmpty ? context.l10n.commonUntitled : title,
         dense ? theme.textTheme.titleSmall : theme.textTheme.titleMedium,
       ),
       subtitle: hit.snippet.isEmpty && hit.page == null
@@ -398,7 +400,7 @@ class _HitTile extends StatelessWidget {
               child: _marked(
                 context,
                 [
-                  if (hit.page != null) 'p. ${hit.page}',
+                  if (hit.page != null) context.l10n.searchPage(hit.page!),
                   if (hit.snippet.isNotEmpty) hit.snippet,
                 ].join(' · '),
                 (dense ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)

@@ -1,0 +1,24 @@
+{
+  "@@locale": "en",
+  "findNotFound": "Not found",
+  "findCount": "{current} of {total}",
+  "@findCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "findPrevious": "Previous",
+  "findNext": "Next",
+  "findReplace": "Replace",
+  "findHideReplace": "Hide replace",
+  "findReplaceWith": "Replace with",
+  "findReplaceAll": "All",
+  "@findReplaceAll": {
+    "description": "Button: replace every match"
+  }
+}

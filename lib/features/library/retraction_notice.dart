@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/l10n.dart';
 import 'retraction.dart';
 
 /// On the paper screen: one quiet line per notice that updates this paper
@@ -49,9 +50,13 @@ class _NoticeRow extends StatelessWidget {
     final serious = notice.kind.isSerious;
     final bg = serious ? scheme.errorContainer : scheme.surfaceContainerHighest;
     final fg = serious ? scheme.onErrorContainer : scheme.onSurfaceVariant;
+    final text = notice.messageFor(
+      context.l10n,
+      Localizations.localeOf(context).toString(),
+    );
     return Semantics(
       link: true,
-      label: notice.message,
+      label: text,
       child: Material(
         color: bg,
         borderRadius: BorderRadius.circular(12),
@@ -73,7 +78,7 @@ class _NoticeRow extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    notice.message,
+                    text,
                     style: Theme.of(context).textTheme.bodyMedium
                         ?.copyWith(color: fg),
                   ),
@@ -106,11 +111,11 @@ class RetractionMarker extends ConsumerWidget {
     );
     if (!serious) return const SizedBox.shrink();
     return Tooltip(
-      message: 'Retracted',
+      message: context.l10n.libraryNoticeRetracted,
       child: Icon(
         Icons.warning_amber_rounded,
         size: size,
-        semanticLabel: 'Retracted',
+        semanticLabel: context.l10n.libraryNoticeRetracted,
         color: Theme.of(context).colorScheme.error,
       ),
     );

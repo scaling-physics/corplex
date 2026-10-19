@@ -1,0 +1,4 @@
+/* Permission prompts and the Services entry, German. English lives in Info.plist. */
+"NSMicrophoneUsageDescription" = "Corplex nutzt das Mikrofon, um Sprachnotizen aufzunehmen.";
+"NSSpeechRecognitionUsageDescription" = "Corplex wandelt deine Sprachnotizen auf diesem Mac in Text um.";
+"New Corplex Note" = "Neue Corplex-Notiz";

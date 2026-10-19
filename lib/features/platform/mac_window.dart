@@ -100,6 +100,8 @@ enum MenuCommand {
   showAttachments,
   search,
   toggleSidebar,
+  collapseSections,
+  expandSections,
   zoomIn,
   zoomOut,
   actualSize,

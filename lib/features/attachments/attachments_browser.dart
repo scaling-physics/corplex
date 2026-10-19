@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/context_menu.dart';
 import '../../theme/mac_list_row.dart';
 import '../../theme/motion_widgets.dart';
@@ -79,7 +80,9 @@ class _AttachmentsBrowserScreenState
                   },
                   icon: const Icon(Icons.north_west, size: 18),
                   label: Text(
-                    e.noteId != null ? 'Show in note' : 'Show in paper',
+                    e.noteId != null
+                        ? context.l10n.attachmentsShowInNote
+                        : context.l10n.attachmentsShowInPaper,
                   ),
                 ),
               ],
@@ -113,35 +116,41 @@ class _AttachmentsBrowserScreenState
     await SharePlus.instance.share(params);
   }
 
-  List<ContextMenuAction?> _actions(AttachmentEntry e) => [
-    ContextMenuAction(
-      label: e.noteId != null ? 'Show in note' : 'Show in paper',
-      icon: Icons.north_west,
-      onSelected: () => _show(e),
-    ),
-    if (e.kind == AttachmentKind.image && e.attachment.path != null)
+  List<ContextMenuAction?> _actions(AttachmentEntry e) {
+    final l10n = context.l10n;
+    return [
       ContextMenuAction(
-        label: 'Mark up',
-        icon: Icons.edit_outlined,
-        onSelected: () => openImageMarkup(context, e.attachment),
+        label: e.noteId != null
+            ? l10n.attachmentsShowInNote
+            : l10n.attachmentsShowInPaper,
+        icon: Icons.north_west,
+        onSelected: () => _show(e),
       ),
-    ContextMenuAction(
-      label: 'Share',
-      icon: Icons.ios_share,
-      onSelected: () => _share(e),
-    ),
-    ContextMenuAction(
-      label: 'Copy name',
-      icon: Icons.copy,
-      onSelected: () => Clipboard.setData(ClipboardData(text: e.label)),
-    ),
-  ];
+      if (e.kind == AttachmentKind.image && e.attachment.path != null)
+        ContextMenuAction(
+          label: l10n.attachmentsMarkUp,
+          icon: Icons.edit_outlined,
+          onSelected: () => openImageMarkup(context, e.attachment),
+        ),
+      ContextMenuAction(
+        label: l10n.commonShare,
+        icon: Icons.ios_share,
+        onSelected: () => _share(e),
+      ),
+      ContextMenuAction(
+        label: l10n.attachmentsCopyName,
+        icon: Icons.copy,
+        onSelected: () => Clipboard.setData(ClipboardData(text: e.label)),
+      ),
+    ];
+  }
 
   Future<void> _menuAt(AttachmentEntry e, Offset at) =>
       showContextMenuAt(context, at, _actions(e));
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final all = ref.watch(allAttachmentsProvider).value ?? const [];
     final kinds = [
       for (final k in AttachmentKind.values)
@@ -154,7 +163,7 @@ class _AttachmentsBrowserScreenState
         if ((kind == null || e.kind == kind) &&
             (q.isEmpty ||
                 e.label.toLowerCase().contains(q) ||
-                e.parentTitle.toLowerCase().contains(q)))
+                e.parentName(l10n).toLowerCase().contains(q)))
           e,
     ];
     final mac = isDesktop(context);
@@ -183,9 +192,9 @@ class _AttachmentsBrowserScreenState
                     if (all.length > 1)
                       TextField(
                         key: const ValueKey('attachments-search'),
-                        decoration: const InputDecoration(
-                          hintText: 'Search attachments',
-                          prefixIcon: Icon(Icons.search),
+                        decoration: InputDecoration(
+                          hintText: l10n.attachmentsSearch,
+                          prefixIcon: const Icon(Icons.search),
                         ),
                         onChanged: (v) => setState(() => _query = v),
                       ),
@@ -195,13 +204,13 @@ class _AttachmentsBrowserScreenState
                         spacing: 8,
                         children: [
                           ChoiceChip(
-                            label: const Text('All'),
+                            label: Text(l10n.attachmentsAll),
                             selected: kind == null,
                             onSelected: (_) => setState(() => _kind = null),
                           ),
                           for (final k in kinds)
                             ChoiceChip(
-                              label: Text(k.label),
+                              label: Text(_kindLabel(l10n, k)),
                               selected: kind == k,
                               onSelected: (_) => setState(() => _kind = k),
                             ),
@@ -217,11 +226,12 @@ class _AttachmentsBrowserScreenState
                 hasScrollBody: false,
                 child: EmptyState(
                   icon: Icons.attach_file,
-                  title: all.isEmpty ? 'No attachments yet' : 'Nothing found',
+                  title: all.isEmpty
+                      ? l10n.attachmentsEmptyTitle
+                      : l10n.attachmentsNothingFound,
                   message: all.isEmpty
-                      ? 'Images, recordings, links and files you attach to '
-                            'notes and papers appear here.'
-                      : 'No attachment matches.',
+                      ? l10n.attachmentsEmptyMessage
+                      : l10n.attachmentsNoMatch,
                 ),
               ),
             if (images.isNotEmpty)
@@ -268,7 +278,7 @@ class _AttachmentsBrowserScreenState
 
     if (widget.embedded) return body;
     return Scaffold(
-      appBar: AppBar(title: const Text('Attachments')),
+      appBar: AppBar(title: Text(l10n.attachmentsTitle)),
       body: mac ? body : ReadableColumn(child: body),
     );
   }
@@ -281,7 +291,15 @@ IconData _iconFor(AttachmentEntry e) => switch (e.kind) {
   AttachmentKind.file => Icons.attach_file,
 };
 
-String _date(DateTime d) => DateFormat.yMMMd().format(d);
+String _kindLabel(AppLocalizations l10n, AttachmentKind k) => switch (k) {
+  AttachmentKind.image => l10n.attachmentsKindImages,
+  AttachmentKind.audio => l10n.attachmentsKindAudio,
+  AttachmentKind.link => l10n.attachmentsKindLinks,
+  AttachmentKind.file => l10n.attachmentsKindFiles,
+};
+
+String _date(BuildContext context, DateTime d) =>
+    DateFormat.yMMMd(Localizations.localeOf(context).toString()).format(d);
 
 class _Thumb extends StatelessWidget {
   const _Thumb({
@@ -300,7 +318,10 @@ class _Thumb extends StatelessWidget {
     final path = entry.attachment.path;
     return Semantics(
       button: true,
-      label: 'Image ${entry.label}, from ${entry.parentTitle}',
+      label: context.l10n.attachmentsImageFrom(
+        entry.label,
+        entry.parentName(context.l10n),
+      ),
       child: GestureDetector(
         onTap: onTap,
         onSecondaryTapUp: (d) => onMenu(d.globalPosition),
@@ -345,12 +366,13 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
     final icon = Icon(_iconFor(entry), color: c.onSurfaceVariant, size: 22);
-    final date = _date(entry.attachment.createdAt);
+    final date = _date(context, entry.attachment.createdAt);
+    final parent = entry.parentName(context.l10n);
     final child = mac
         ? MacListRow(
             leading: icon,
             title: Text(entry.label),
-            subtitle: Text('${entry.parentTitle}  ·  $date'),
+            subtitle: Text('$parent  ·  $date'),
             onTap: onTap,
           )
         : ListTile(
@@ -361,7 +383,7 @@ class _Row extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
-              '${entry.parentTitle}  ·  $date',
+              '$parent  ·  $date',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

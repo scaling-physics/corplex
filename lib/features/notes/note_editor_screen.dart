@@ -49,7 +49,10 @@ import '../spell/spell_checker.dart';
 import '../trash/trash_actions.dart';
 import '../settings/appearance_settings.dart';
 import '../library/metadata_lookup.dart';
+import '../../l10n/l10n.dart';
 import 'editor_document.dart';
+import 'heading_fold_controller.dart';
+import 'heading_fold_ui.dart';
 import 'figure_embed.dart';
 import 'figure_markers.dart';
 import '../projects/figures.dart';
@@ -215,6 +218,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     noteId: widget.noteId,
     controller: _quillController,
     ref: ref,
+    folds: _folds,
   );
 
   /// The comments panel is open beside the note (wide windows; on phones it
@@ -316,6 +320,17 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   /// Figure and table numbers for the chips in this note.
   final _figures = FigureScope();
 
+  /// Collapsed sections: they exist only in the editor's document (see
+  /// `heading_fold.dart`); everything that reads the whole note goes
+  /// through [_stored] or [HeadingFolds.unfoldedDocument].
+  late final HeadingFolds _folds = HeadingFolds(noteId: widget.noteId);
+
+  /// Where the pointer is over the page, for the heading chevrons.
+  final _hoverY = ValueNotifier<double?>(null);
+
+  /// The figures index counts the whole note, hidden sections included.
+  void _figuresChanged() => _figures.documentChanged(_folds.unfoldedDocument());
+
   // Owned here, not left to QuillEditor.basic: it makes a fresh FocusNode on
   // every build, so any rebuild (e.g. after an autosave) dropped the body's
   // focus and the keyboard jumped to the title mid-sentence.
@@ -396,10 +411,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
         return;
       }
       ref.read(pendingNoteSelectionProvider.notifier).state = null;
-      _quillController.updateSelection(
-        _initialSelection(_quillController.document, request.selection),
-        ChangeSource.local,
-      );
+      _selectUnfolded(request.selection);
       _revealInitialSelection();
     });
   }
@@ -457,12 +469,19 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
         if (mounted) setState(() {});
       },
     );
+    // Folding moves lines about: put the drawing tools away first.
+    _folds.addListener(() {
+      if (_ink?.active != null) _ink!.deactivate();
+    });
     // Tapping back into the text puts the drawing tools away.
     _bodyFocus.addListener(_leaveDrawingIfTyping);
     _quillController.addListener(_leaveDrawingIfTyping);
     if (note != null && mounted) {
       _titleController.text = note.title;
     }
+    // Sections folded when the note was last open, except the one the
+    // selection is about to land in.
+    _folds.attach(_quillController);
     _savedTitle = _titleController.text;
     _savedContent = _stored();
     // Attached after the initial text is in place, so loading isn't an edit.
@@ -470,12 +489,28 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _quillController.addListener(_scheduleSave);
     _quillController.addListener(_followCursor);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
-    _figures.documentChanged(document);
+    _figuresChanged();
     widget.handle?.appendQuote = _appendQuoteHere;
     if (mounted) setState(() => _loaded = true);
     _openCommentsIfAsked();
     if (want != null) _revealInitialSelection();
     _restoreRescued();
+    unawaited(_restoreFolds());
+  }
+
+  /// Folds the sections that were collapsed when the note was last open
+  /// (read from preferences after the note is on screen, so a slow or
+  /// missing store never delays opening it), except the one the selection
+  /// is in.
+  Future<void> _restoreFolds() async {
+    final keys = await _folds.store.load(widget.noteId);
+    if (!mounted || _blocked) return;
+    _folds.loaded(keys);
+    if (keys.isEmpty || _folds.touched) return;
+    _folds.applyKeys(
+      keys,
+      protectOffset: _folds.unfoldedOffset(_quillController.selection.start),
+    );
   }
 
   /// Typing that was cut off when the notes locked: back into the editor
@@ -489,10 +524,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     }
     if (rescued.content != _stored()) {
       _docChanges?.cancel();
+      final keys = _folds.collapsedKeys();
       final document = _editable(rescued.content);
       _quillController.document = document;
       _docChanges = document.changes.listen(_watchForWikilink);
-      _figures.documentChanged(document);
+      _folds.applyKeys(keys);
+      _figuresChanged();
     }
     if (rescued.title != _titleController.text) {
       _titleController.text = rescued.title;
@@ -597,9 +634,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       comment: comment,
     );
     await _docChanges?.cancel();
+    final keys = _folds.collapsedKeys();
     _quillController.document = _editable(content);
     _docChanges = _quillController.document.changes.listen(_watchForWikilink);
-    _figures.documentChanged(_quillController.document);
+    // The quote lands at the end: don't hide it in a collapsed last section.
+    _folds.applyKeys(keys, protectTail: true);
+    _figuresChanged();
     await linkPaperToNote(_db, noteId: widget.noteId, paperId: paperId);
     _scheduleSave();
   }
@@ -621,6 +661,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
 
   Future<void> _save() {
     _debounce?.cancel();
+    if (_loaded) unawaited(_folds.persist());
     // Read now: dispose() calls this and then tears the controllers down.
     final title = _titleController.text;
     final content = _blocked ? '' : _stored();
@@ -760,20 +801,26 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _savedContent = theirs;
     if (merged == current) return;
 
+    // Collapsed sections stay collapsed, and the cursor is kept in the
+    // whole note's offsets while the document is swapped.
     final cursor = _quillController.selection;
+    final keys = _folds.collapsedKeys();
+    final base = _folds.unfoldedOffset(cursor.baseOffset);
+    final extent = _folds.unfoldedOffset(cursor.extentOffset);
     _docChanges?.cancel();
     final document = _editable(merged);
     _quillController.document = document;
     _docChanges = document.changes.listen(_watchForWikilink);
-    _figures.documentChanged(document);
     final max = document.length - 1;
     _quillController.updateSelection(
       TextSelection(
-        baseOffset: cursor.baseOffset.clamp(0, max),
-        extentOffset: cursor.extentOffset.clamp(0, max),
+        baseOffset: base.clamp(0, max),
+        extentOffset: extent.clamp(0, max),
       ),
       ChangeSource.silent,
     );
+    _folds.applyKeys(keys);
+    _figuresChanged();
   }
 
   Future<void> _attach(BuildContext context) async {
@@ -813,7 +860,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (result.attachmentId case final id?) {
       _insertTimestamp(id, Duration.zero);
     }
-    insertVoiceText(_quillController, result);
+    insertVoiceText(_quillController, result, l10n: context.l10n);
     reportVoiceResult(context, ref, result);
   }
 
@@ -827,7 +874,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (paper == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('That paper was removed.')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.editorPaperRemoved)));
       return;
     }
     await Navigator.of(context).push(
@@ -851,7 +898,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (!mounted) return;
     if (attachment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('That recording was removed.')),
+        SnackBar(content: Text(context.l10n.editorRecordingRemoved)),
       );
       return;
     }
@@ -905,7 +952,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   /// Typing "[[" opens the note picker, like a wiki link; "[@" opens the
   /// paper picker for a citation.
   void _watchForWikilink(DocChange change) {
-    _figures.documentChanged(_quillController.document);
+    _folds.onChange(change);
+    _figuresChanged();
     if (change.source != ChangeSource.local) return;
     // Where the change inserted a single "[", from the change itself
     // rather than the cursor (which may not have moved yet).
@@ -965,15 +1013,17 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (messenger == null) return;
     final db = _db;
     final lookup = ref.read(metadataLookupProvider);
+    final l10n = context.l10n;
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Text('Add this paper and cite it?'),
+          content: Text(l10n.editorAddPaperAndCite),
           duration: const Duration(seconds: 8),
           action: SnackBarAction(
-            label: 'Add',
-            onPressed: () => _citePasted(messenger, db, lookup, at, pasted, id),
+            label: l10n.commonAdd,
+            onPressed: () =>
+                _citePasted(messenger, l10n, db, lookup, at, pasted, id),
           ),
         ),
       );
@@ -981,6 +1031,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
 
   Future<void> _citePasted(
     ScaffoldMessengerState messenger,
+    AppLocalizations l10n,
     AppDatabase db,
     MetadataLookup lookup,
     int at,
@@ -994,11 +1045,11 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     try {
       paperId = await paperIdForIdentifier(db, lookup, id);
     } on LookupFailed {
-      say('Couldn\'t reach the lookup service. The link is unchanged.');
+      say(l10n.editorLookupUnreachable);
       return;
     }
     if (paperId == null) {
-      say('No paper found for ${id.value}.');
+      say(l10n.editorNoPaperFound(id.value));
       return;
     }
     final key = await ensureCitekey(db, paperId);
@@ -1042,8 +1093,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               if (c != _Command.dictate || ref.read(dictationOfferedProvider))
                 ListTile(
                   leading: Icon(c.icon),
-                  title: Text(c.label),
-                  subtitle: Text(c.hint),
+                  title: Text(c.label(context.l10n)),
+                  subtitle: Text(c.hint(context.l10n)),
                   dense: isDesktop(context),
                   onTap: () => Navigator.pop(context, c),
                 ),
@@ -1182,11 +1233,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       // After the tap itself, which also places the caret under the chip.
       await Future<void>.delayed(Duration.zero);
       if (!mounted) return;
-      for (final d in figureDefsIn(_quillController.document.toDelta())) {
+      for (final d in figureDefsIn(_folds.unfoldedDocument().toDelta())) {
         if (d.kind != kind || d.label != label) continue;
-        _quillController.updateSelection(
+        _selectUnfolded(
           TextSelection(baseOffset: d.offset, extentOffset: d.offset + 1),
-          ChangeSource.local,
         );
         _revealInitialSelection();
         return;
@@ -1229,6 +1279,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     insertLiteratureTemplate(
       controller,
       cursor < 0 || cursor > docEnd ? docEnd : cursor,
+      l10n: context.l10n,
     );
   }
 
@@ -1236,6 +1287,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     final style = await pickCitationStyle(context);
     if (style == null || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    // It reads the citations from the editor's document: open every
+    // section so none is missed.
+    _folds.expandAll();
     final n = await insertBibliography(
       _quillController,
       ref.read(databaseProvider),
@@ -1244,9 +1299,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          n == 0
-              ? 'No citations to list yet. Type [@ to cite a paper.'
-              : 'Added $n reference${n == 1 ? '' : 's'}',
+          n == 0 ? l10n.editorNoCitations : l10n.editorAddedReferences(n),
         ),
       ),
     );
@@ -1296,7 +1349,13 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     } else {
       Navigator.of(context).pop();
     }
-    await deleteNoteWithUndo(ref, messenger, widget.noteId, title);
+    await deleteNoteWithUndo(
+      ref,
+      messenger,
+      widget.noteId,
+      title,
+      l10n: context.l10n,
+    );
   }
 
   /// Locks this note: asks for (or first sets) the notes password, saves
@@ -1307,6 +1366,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     final ok = await ensureNotesUnlocked(context, _lock);
     if (!ok || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     final attachments = await (_db.select(
       _db.attachments,
     )..where((a) => a.noteId.equals(widget.noteId))).get();
@@ -1329,9 +1389,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
         SnackBar(
           content: Text(
             attachments.isEmpty
-                ? 'Note locked'
-                : 'Note locked. Attached files (images, audio, PDFs) '
-                      'aren\'t encrypted — only the note\'s text and sketches.',
+                ? l10n.notesNoteLocked
+                : l10n.editorNoteLockedFiles,
           ),
         ),
       );
@@ -1376,7 +1435,13 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   /// A tap in the blank space under the text: type at the end, as Notes does.
   void _focusEnd() {
     if (!_loaded) return;
-    final end = _quillController.document.length - 1;
+    var end = _quillController.document.length - 1;
+    // A collapsed last section ends the note with its "…": start a line of
+    // its own under it rather than typing beside it.
+    if (_folds.lines.last.isFold) {
+      _quillController.replaceText(end, 0, '\n', null);
+      end += 1;
+    }
     _quillController.updateSelection(
       TextSelection.collapsed(offset: end),
       ChangeSource.local,
@@ -1384,8 +1449,24 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _bodyFocus.requestFocus();
   }
 
+  /// Selects a range given in the whole note's offsets (to-dos, citations,
+  /// figure definitions, find), opening whatever sections hide it first.
+  void _selectUnfolded(TextSelection want) {
+    if (!want.isValid) return;
+    final start = _folds.reveal(want.start);
+    final length = want.end - want.start;
+    final max = _quillController.document.length - 1;
+    _quillController.updateSelection(
+      TextSelection(
+        baseOffset: start.clamp(0, max),
+        extentOffset: (start + length).clamp(0, max),
+      ),
+      ChangeSource.local,
+    );
+  }
+
   Future<void> _showWordCount(BuildContext context) async {
-    final stats = noteStats(_quillController.document);
+    final stats = noteStats(_folds.unfoldedDocument());
     final linked = await ref.read(
       linkedPapersForNoteProvider(widget.noteId).future,
     );
@@ -1417,6 +1498,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   @override
   void dispose() {
     _findStep.dispose();
+    _hoverY.dispose();
     _spellHelper?.dispose();
     _commentsHelper?.dispose();
     widget.handle?.appendQuote = null;
@@ -1430,6 +1512,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _debounce?.cancel();
     _titleController.dispose();
     _figures.dispose();
+    _folds.dispose();
     _bodyFocus.removeListener(_leaveDrawingIfTyping);
     if (_loaded) _quillController.removeListener(_leaveDrawingIfTyping);
     _bodyFocus.dispose();
@@ -1503,32 +1586,32 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           if (_locked)
             IconButton(
               icon: const Icon(Icons.lock_outline),
-              tooltip: 'Locked — tap to lock now',
+              tooltip: context.l10n.editorLockedTapToLock,
               onPressed: _lock.lockNow,
             ),
           IconButton(
             icon: const Icon(Icons.folder_outlined),
-            tooltip: folderName ?? 'Move to folder',
+            tooltip: folderName ?? context.l10n.editorMoveToFolder,
             onPressed: () =>
                 showFolderPickerSheet(context, ref, widget.noteId, folderId),
           ),
           IconButton(
             icon: const Icon(Icons.tag),
-            tooltip: 'Tags',
+            tooltip: context.l10n.editorTags,
             onPressed: () => showTagPickerSheet(context, ref, widget.noteId),
           ),
           IconButton(
             icon: const Icon(Icons.link),
-            tooltip: 'Link a paper',
+            tooltip: context.l10n.editorLinkPaper,
             onPressed: () => showLinkPaperSheet(context, ref, widget.noteId),
           ),
           IconButton(
             icon: const Icon(Icons.attach_file),
-            tooltip: 'Attach audio, image or file',
+            tooltip: context.l10n.editorAttach,
             onPressed: () => _attach(context),
           ),
           PopupMenuButton<String>(
-            tooltip: 'More',
+            tooltip: context.l10n.commonMore,
             onSelected: (v) => switch (v) {
               'project' => showProjectPickerSheet(
                 context,
@@ -1560,6 +1643,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     false),
               ),
               'find' => _openFind(),
+              'collapse' => _folds.collapseAll(),
+              'expand' => _folds.expandAll(),
               'comments' => _openComments(),
               'duplicate' => duplicateNoteAndOpen(context, ref, widget.noteId),
               'print' => printNote(context, ref, widget.noteId),
@@ -1567,146 +1652,162 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               _ => null,
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'project',
                 child: ListTile(
                   leading: Icon(Icons.folder_special_outlined),
-                  title: Text('Add to project'),
+                  title: Text(context.l10n.editorAddToProject),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'link',
                 child: ListTile(
                   leading: Icon(Icons.add_link),
-                  title: Text('Link to a note'),
-                  subtitle: Text('Or type [[ while writing'),
+                  title: Text(context.l10n.editorLinkToNote),
+                  subtitle: Text(context.l10n.editorLinkToNoteHint),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'cite',
                 child: ListTile(
                   leading: Icon(Icons.format_quote),
-                  title: Text('Cite a paper'),
-                  subtitle: Text('Or type [@ while writing'),
+                  title: Text(context.l10n.notesCiteAPaper),
+                  subtitle: Text(context.l10n.editorCiteHint),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'template',
                 child: ListTile(
                   leading: Icon(Icons.article_outlined),
-                  title: Text('Literature note template'),
-                  subtitle: Text('Summary, method, findings, critique'),
+                  title: Text(context.l10n.editorTemplate),
+                  subtitle: Text(context.l10n.editorTemplateHint),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'bibliography',
                 child: ListTile(
                   leading: Icon(Icons.list_alt),
-                  title: Text('Add bibliography'),
+                  title: Text(context.l10n.editorAddBibliography),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'export',
                 child: ListTile(
                   leading: Icon(Icons.ios_share),
-                  title: Text('Export'),
-                  subtitle: Text('Markdown, Word or PDF, with references'),
+                  title: Text(context.l10n.editorExport),
+                  subtitle: Text(context.l10n.editorExportHint),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'words',
                 child: ListTile(
                   leading: Icon(Icons.format_list_numbered),
-                  title: Text('Word count'),
-                  subtitle: Text('And reading time'),
+                  title: Text(context.l10n.editorWordCount),
+                  subtitle: Text(context.l10n.editorWordCountHint),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'versions',
                 child: ListTile(
                   leading: Icon(Icons.history),
-                  title: Text('Versions'),
+                  title: Text(context.l10n.notesVersions),
                 ),
               ),
               PopupMenuItem(
                 value: 'typewriter',
                 child: ListTile(
                   leading: const Icon(Icons.vertical_align_center),
-                  title: const Text('Typewriter scrolling'),
-                  subtitle: const Text('Keep the line you type centred'),
+                  title: Text(context.l10n.editorTypewriter),
+                  subtitle: Text(context.l10n.editorTypewriterHint),
                   trailing: ref.read(appearanceSettingsProvider).typewriter
                       ? const Icon(Icons.check)
                       : null,
                 ),
               ),
               if (_locked)
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'unlock',
                   child: ListTile(
                     leading: Icon(Icons.lock_open_outlined),
-                    title: Text('Remove lock'),
+                    title: Text(context.l10n.notesRemoveLock),
                   ),
                 )
               else
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'lock',
                   child: ListTile(
                     leading: Icon(Icons.lock_outline),
-                    title: Text('Lock note'),
-                    subtitle: Text('Needs your notes password to open'),
+                    title: Text(context.l10n.notesLockNote),
+                    subtitle: Text(context.l10n.editorLockHint),
                   ),
                 ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'comments',
                 child: ListTile(
                   leading: Icon(Icons.comment_outlined),
-                  title: Text('Comments'),
+                  title: Text(context.l10n.commentsTitle),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'find',
                 child: ListTile(
                   leading: Icon(Icons.search),
-                  title: Text('Find in note'),
+                  title: Text(context.l10n.editorFindInNote),
                 ),
               ),
+              if (_loaded && _folds.headings().any((h) => !h.folded))
+                PopupMenuItem(
+                  value: 'collapse',
+                  child: ListTile(
+                    leading: const Icon(Icons.unfold_less),
+                    title: Text(context.l10n.foldCollapseAll),
+                  ),
+                ),
+              if (_loaded && _folds.headings().any((h) => h.folded))
+                PopupMenuItem(
+                  value: 'expand',
+                  child: ListTile(
+                    leading: const Icon(Icons.unfold_more),
+                    title: Text(context.l10n.foldExpandAll),
+                  ),
+                ),
               if (ref.read(noteByIdProvider(widget.noteId)).value?.pinned ??
                   false)
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'pin',
                   child: ListTile(
                     leading: Icon(Icons.push_pin),
-                    title: Text('Unpin'),
+                    title: Text(context.l10n.notesUnpin),
                   ),
                 )
               else
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'pin',
                   child: ListTile(
                     leading: Icon(Icons.push_pin_outlined),
-                    title: Text('Pin to top'),
+                    title: Text(context.l10n.notesPinToTop),
                   ),
                 ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'duplicate',
                 child: ListTile(
                   leading: Icon(Icons.copy_outlined),
-                  title: Text('Duplicate'),
+                  title: Text(context.l10n.notesDuplicate),
                 ),
               ),
               if (isMac(context))
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'print',
                   child: ListTile(
                     leading: Icon(Icons.print_outlined),
-                    title: Text('Print…'),
+                    title: Text(context.l10n.editorPrint),
                   ),
                 ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'trash',
                 child: ListTile(
                   leading: Icon(Icons.delete_outline),
-                  title: Text('Move to trash'),
+                  title: Text(context.l10n.commonMoveToTrash),
                 ),
               ),
             ],
@@ -1714,346 +1815,391 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           ?chrome?.trailing,
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, box) => !_loaded
-                  ? const SizedBox.shrink()
-                  : ListView(
-                      key: _viewportKey,
-                      controller: _pageScroll,
-                      // Centred at a readable width on a tablet. In typewriter
-                      // mode the end of the note can rise to the caret line.
-                      padding: EdgeInsets.fromLTRB(
-                        _sideMargin(box.maxWidth, desktop),
-                        0,
-                        _sideMargin(box.maxWidth, desktop),
-                        ref.watch(appearanceSettingsProvider).typewriter
-                            ? box.maxHeight * 0.6
-                            : 32,
-                      ),
-                      children: [
-                        if (desktop && noteAsync.value != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 14),
-                            child: Center(
-                              child: Text(
-                                DateFormat("d MMMM y 'at' HH:mm")
-                                    .format(noteAsync.value!.updatedAt),
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                              ),
-                            ),
-                          ),
-                        // Tab goes on into the body, as Return does.
-                        Focus(
-                          canRequestFocus: false,
-                          skipTraversal: true,
-                          onKeyEvent: (_, e) {
-                            if (desktop &&
-                                e is KeyDownEvent &&
-                                e.logicalKey == LogicalKeyboardKey.tab &&
-                                !HardwareKeyboard.instance.isShiftPressed) {
-                              _bodyFocus.requestFocus();
-                              return KeyEventResult.handled;
-                            }
-                            return KeyEventResult.ignored;
-                          },
-                          child: TextField(
-                            controller: _titleController,
-                            focusNode: _titleFocus,
-                            style: desktop
-                                ? Theme.of(context).textTheme.headlineMedium
-                                      ?.copyWith(
-                                        fontSize: 32 * zoom,
-                                        height: 1.2,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: -0.4,
-                                      )
-                                : Theme.of(context).textTheme.headlineMedium,
-                            textCapitalization: TextCapitalization.sentences,
-                            // A long title wraps rather than scrolling out of
-                            // sight; Return moves on to the body (a title is one
-                            // line of text, even when it wraps).
-                            maxLines: null,
-                            keyboardType: TextInputType.text,
-                            textInputAction: TextInputAction.next,
-                            onSubmitted: (_) => _bodyFocus.requestFocus(),
-                            decoration: const InputDecoration(
-                              hintText: 'Title',
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: false,
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
+      body: MouseRegion(
+        // Where the pointer is on the page, for the heading chevrons (an
+        // ancestor of them, so reaching for one doesn't hide it).
+        onHover: (e) => _hoverY.value = e.position.dy,
+        onExit: (_) => _hoverY.value = null,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, box) => !_loaded
+                    ? const SizedBox.shrink()
+                    : ListView(
+                        key: _viewportKey,
+                        controller: _pageScroll,
+                        // Centred at a readable width on a tablet. In typewriter
+                        // mode the end of the note can rise to the caret line.
+                        padding: EdgeInsets.fromLTRB(
+                          _sideMargin(box.maxWidth, desktop),
+                          0,
+                          _sideMargin(box.maxWidth, desktop),
+                          ref.watch(appearanceSettingsProvider).typewriter
+                              ? box.maxHeight * 0.6
+                              : 32,
                         ),
-                        if (folderName != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: GestureDetector(
-                              onTap: () => showFolderPickerSheet(
-                                context,
-                                ref,
-                                widget.noteId,
-                                folderId,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.folder_outlined,
-                                    size: 16,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .secondary,
+                        children: [
+                          if (desktop && noteAsync.value != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Center(
+                                child: Text(
+                                  context.l10n.editorEditDate(
+                                    DateFormat.yMMMMd(
+                                      Localizations.localeOf(context)
+                                          .toString(),
+                                    ).format(noteAsync.value!.updatedAt),
+                                    DateFormat.Hm().format(
+                                      noteAsync.value!.updatedAt,
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    folderName,
-                                    style: Theme.of(context).textTheme.bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          // Tab goes on into the body, as Return does.
+                          Focus(
+                            canRequestFocus: false,
+                            skipTraversal: true,
+                            onKeyEvent: (_, e) {
+                              if (desktop &&
+                                  e is KeyDownEvent &&
+                                  e.logicalKey == LogicalKeyboardKey.tab &&
+                                  !HardwareKeyboard.instance.isShiftPressed) {
+                                _bodyFocus.requestFocus();
+                                return KeyEventResult.handled;
+                              }
+                              return KeyEventResult.ignored;
+                            },
+                            child: TextField(
+                              controller: _titleController,
+                              focusNode: _titleFocus,
+                              style: desktop
+                                  ? Theme.of(context).textTheme.headlineMedium
                                         ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .secondary,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ...switch (tagsAsync.value) {
-                          null || [] => const [],
-                          final tags => [
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: -8,
-                              children: tags
-                                  .map(
-                                    (tag) => InputChip(
-                                      avatar: const Icon(Icons.tag, size: 16),
-                                      label: Text(tag.name),
-                                      onPressed: () => showTagPickerSheet(
-                                        context,
-                                        ref,
-                                        widget.noteId,
-                                      ),
-                                      onDeleted: () => removeTagFromNote(
-                                        ref.read(databaseProvider),
-                                        noteId: widget.noteId,
-                                        tagId: tag.id,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        },
-                        ...switch (ref
-                            .watch(projectsForNoteProvider(widget.noteId))
-                            .value) {
-                          null || [] => const [],
-                          final projects => [
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: -8,
-                              children: [
-                                for (final project in projects)
-                                  InputChip(
-                                    avatar: const Icon(
-                                      Icons.folder_special_outlined,
-                                      size: 16,
-                                    ),
-                                    label: Text(project.name),
-                                    onPressed: () => showProjectPickerSheet(
-                                      context,
-                                      noteId: widget.noteId,
-                                    ),
-                                    onDeleted: () => removeNoteFromProject(
-                                      ref.read(databaseProvider),
-                                      projectId: project.id,
-                                      noteId: widget.noteId,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        },
-                        ...switch (linkedPapersAsync.value) {
-                          null || [] => const [],
-                          final papers => [
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: -8,
-                              children: papers
-                                  .map(
-                                    (paper) => InputChip(
-                                      avatar: const Icon(
-                                        Icons.article_outlined,
-                                        size: 16,
-                                      ),
-                                      label: Text(
-                                        paper.title,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      onPressed: () => Navigator.of(context)
-                                          .push(
-                                            MaterialPageRoute(
-                                              builder: (_) => PaperDetailScreen(
-                                                paperId: paper.id,
-                                              ),
-                                            ),
-                                          ),
-                                      onDeleted: () => unlinkPaperFromNote(
-                                        ref.read(databaseProvider),
-                                        noteId: widget.noteId,
-                                        paperId: paper.id,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        },
-                        ...switch (attachmentsAsync.value) {
-                          null || [] => const [],
-                          final attachments => [
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: attachments.map((a) {
-                                if (a.type == AttachmentType.image &&
-                                    a.path != null) {
-                                  return _ImagePreview(attachment: a);
-                                }
-                                return _AttachmentChip(attachment: a);
-                              }).toList(),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        },
-                        FigureScopeInherited(
-                          scope: _figures,
-                          child: InkSessionScope(
-                            session: _ink!,
-                            child: InkCatcher(
-                              session: _ink!,
-                              editorKey: _editorKey,
-                              onTapBelow: _focusEnd,
-                              child: QuillEditor.basic(
-                                controller: _quillController,
-                                focusNode: _bodyFocus,
-                                scrollController: _bodyScroll,
-                                config: QuillEditorConfig(
-                                  editorKey: _editorKey,
-                                  textSpanBuilder: _comments.marks.wrap(
-                                    _spellNow().spanBuilder,
-                                  ),
-                                  contextMenuBuilder: (ctx, state) =>
-                                      _comments.contextMenu(
-                                        ctx,
-                                        state,
-                                        _spellNow().contextMenu,
-                                        innerWins: () =>
-                                            _spellNow()
-                                                .misspellingAtSelection() !=
-                                            null,
-                                      ),
-                                  onTapUp: (details, position) => _comments
-                                      .onTapUp(context, details, position),
-                                  scrollable: false,
-                                  padding: EdgeInsets.zero,
-                                  placeholder: 'Start writing…',
-                                  customStyles: desktop
-                                      ? _desktopStyles(context, zoom)
-                                      : _mobileStyles(context),
-                                  customStyleBuilder: noteStyleFor,
-                                  customShortcuts: desktop
-                                      ? _desktopShortcuts
-                                      : null,
-                                  customActions: desktop
-                                      ? {
-                                          _NoteCommandIntent:
-                                              CallbackAction<
-                                                _NoteCommandIntent
-                                              >(
-                                                onInvoke: (i) {
-                                                  _commands[i.command]?.call();
-                                                  return null;
-                                                },
-                                              ),
-                                          _PassKeyIntent: DoNothingAction(
-                                            consumesKey: false,
-                                          ),
-                                        }
-                                      : null,
-                                  // ignore: experimental_member_use
-                                  onKeyPressed: desktop ? _onBodyKey : null,
-                                  customLinkPrefixes: const [audioLinkScheme],
-                                  embedBuilders: const [
-                                    FigureDefEmbedBuilder(),
-                                    FigureRefEmbedBuilder(),
-                                    SketchEmbedBuilder(),
-                                    TableEmbedBuilder(),
-                                    CitationEmbedBuilder(),
-                                    MathInlineEmbedBuilder(),
-                                    MathBlockEmbedBuilder(),
-                                  ],
-                                  // Audio timestamps play on a plain tap; other links
-                                  // keep Quill's default long-press menu.
-                                  customRecognizerBuilder: (attribute, leaf) {
-                                    if (attribute.key != Attribute.link.key) {
-                                      return null;
-                                    }
-                                    final link =
-                                        attribute.value?.toString() ?? '';
-                                    if (parseAudioTimestampLink(link)
-                                        case final t?) {
-                                      return TapGestureRecognizer()
-                                        ..onTap = () =>
-                                            _playFrom(t.attachmentId, t.at);
-                                    }
-                                    if (parsePaperPageLink(link)
-                                        case final p?) {
-                                      return TapGestureRecognizer()
-                                        ..onTap = () =>
-                                            _openPaperAt(p.paperId, p.page);
-                                    }
-                                    if (parseNoteLink(link) case final id?) {
-                                      return TapGestureRecognizer()
-                                        ..onTap = () => _openNote(id);
-                                    }
-                                    return null;
-                                  },
+                                          fontSize: 32 * zoom,
+                                          height: 1.2,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.4,
+                                        )
+                                  : Theme.of(context).textTheme.headlineMedium,
+                              textCapitalization: TextCapitalization.sentences,
+                              // A long title wraps rather than scrolling out of
+                              // sight; Return moves on to the body (a title is one
+                              // line of text, even when it wraps).
+                              maxLines: null,
+                              keyboardType: TextInputType.text,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => _bodyFocus.requestFocus(),
+                              decoration: InputDecoration(
+                                hintText: context.l10n.editorTitleHint,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 8,
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        _Backlinks(noteId: widget.noteId),
-                      ],
-                    ),
+                          if (folderName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: GestureDetector(
+                                onTap: () => showFolderPickerSheet(
+                                  context,
+                                  ref,
+                                  widget.noteId,
+                                  folderId,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.folder_outlined,
+                                      size: 16,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      folderName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ...switch (tagsAsync.value) {
+                            null || [] => const [],
+                            final tags => [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: -8,
+                                children: tags
+                                    .map(
+                                      (tag) => InputChip(
+                                        avatar: const Icon(Icons.tag, size: 16),
+                                        label: Text(tag.name),
+                                        onPressed: () => showTagPickerSheet(
+                                          context,
+                                          ref,
+                                          widget.noteId,
+                                        ),
+                                        onDeleted: () => removeTagFromNote(
+                                          ref.read(databaseProvider),
+                                          noteId: widget.noteId,
+                                          tagId: tag.id,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          },
+                          ...switch (ref
+                              .watch(projectsForNoteProvider(widget.noteId))
+                              .value) {
+                            null || [] => const [],
+                            final projects => [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: -8,
+                                children: [
+                                  for (final project in projects)
+                                    InputChip(
+                                      avatar: const Icon(
+                                        Icons.folder_special_outlined,
+                                        size: 16,
+                                      ),
+                                      label: Text(project.name),
+                                      onPressed: () => showProjectPickerSheet(
+                                        context,
+                                        noteId: widget.noteId,
+                                      ),
+                                      onDeleted: () => removeNoteFromProject(
+                                        ref.read(databaseProvider),
+                                        projectId: project.id,
+                                        noteId: widget.noteId,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          },
+                          ...switch (linkedPapersAsync.value) {
+                            null || [] => const [],
+                            final papers => [
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: -8,
+                                children: papers
+                                    .map(
+                                      (paper) => InputChip(
+                                        avatar: const Icon(
+                                          Icons.article_outlined,
+                                          size: 16,
+                                        ),
+                                        label: Text(
+                                          paper.title,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        onPressed: () => Navigator.of(context)
+                                            .push(
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    PaperDetailScreen(
+                                                      paperId: paper.id,
+                                                    ),
+                                              ),
+                                            ),
+                                        onDeleted: () => unlinkPaperFromNote(
+                                          ref.read(databaseProvider),
+                                          noteId: widget.noteId,
+                                          paperId: paper.id,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          },
+                          ...switch (attachmentsAsync.value) {
+                            null || [] => const [],
+                            final attachments => [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: attachments.map((a) {
+                                  if (a.type == AttachmentType.image &&
+                                      a.path != null) {
+                                    return _ImagePreview(attachment: a);
+                                  }
+                                  return _AttachmentChip(attachment: a);
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          },
+                          HeadingFoldScope(
+                            folds: _folds,
+                            child: FigureScopeInherited(
+                              scope: _figures,
+                              child: InkSessionScope(
+                                session: _ink!,
+                                child: InkCatcher(
+                                  session: _ink!,
+                                  editorKey: _editorKey,
+                                  onTapBelow: _focusEnd,
+                                  child: QuillEditor.basic(
+                                    controller: _quillController,
+                                    focusNode: _bodyFocus,
+                                    scrollController: _bodyScroll,
+                                    config: QuillEditorConfig(
+                                      editorKey: _editorKey,
+                                      textSpanBuilder: _comments.marks.wrap(
+                                        _spellNow().spanBuilder,
+                                      ),
+                                      contextMenuBuilder: (ctx, state) =>
+                                          _comments.contextMenu(
+                                            ctx,
+                                            state,
+                                            _spellNow().contextMenu,
+                                            innerWins: () =>
+                                                _spellNow()
+                                                    .misspellingAtSelection() !=
+                                                null,
+                                          ),
+                                      onTapUp: (details, position) => _comments
+                                          .onTapUp(context, details, position),
+                                      scrollable: false,
+                                      padding: EdgeInsets.zero,
+                                      placeholder:
+                                          context.l10n.editorStartWriting,
+                                      customStyles: desktop
+                                          ? _desktopStyles(context, zoom)
+                                          : _mobileStyles(context),
+                                      customStyleBuilder: noteStyleFor,
+                                      customShortcuts: desktop
+                                          ? _desktopShortcuts
+                                          : null,
+                                      customActions: desktop
+                                          ? {
+                                              _NoteCommandIntent:
+                                                  CallbackAction<
+                                                    _NoteCommandIntent
+                                                  >(
+                                                    onInvoke: (i) {
+                                                      _commands[i.command]
+                                                          ?.call();
+                                                      return null;
+                                                    },
+                                                  ),
+                                              _PassKeyIntent: DoNothingAction(
+                                                consumesKey: false,
+                                              ),
+                                            }
+                                          : null,
+                                      // ignore: experimental_member_use
+                                      onKeyPressed: desktop ? _onBodyKey : null,
+                                      customLinkPrefixes: const [
+                                        audioLinkScheme,
+                                      ],
+                                      embedBuilders: const [
+                                        FoldEmbedBuilder(),
+                                        FigureDefEmbedBuilder(),
+                                        FigureRefEmbedBuilder(),
+                                        SketchEmbedBuilder(),
+                                        TableEmbedBuilder(),
+                                        CitationEmbedBuilder(),
+                                        MathInlineEmbedBuilder(),
+                                        MathBlockEmbedBuilder(),
+                                      ],
+                                      // Audio timestamps play on a plain tap; other links
+                                      // keep Quill's default long-press menu.
+                                      customRecognizerBuilder:
+                                          (attribute, leaf) {
+                                            if (attribute.key !=
+                                                Attribute.link.key) {
+                                              return null;
+                                            }
+                                            final link =
+                                                attribute.value?.toString() ??
+                                                '';
+                                            if (parseAudioTimestampLink(link)
+                                                case final t?) {
+                                              return TapGestureRecognizer()
+                                                ..onTap = () => _playFrom(
+                                                  t.attachmentId,
+                                                  t.at,
+                                                );
+                                            }
+                                            if (parsePaperPageLink(link)
+                                                case final p?) {
+                                              return TapGestureRecognizer()
+                                                ..onTap = () => _openPaperAt(
+                                                  p.paperId,
+                                                  p.page,
+                                                );
+                                            }
+                                            if (parseNoteLink(link)
+                                                case final id?) {
+                                              return TapGestureRecognizer()
+                                                ..onTap = () => _openNote(id);
+                                            }
+                                            return null;
+                                          },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          _Backlinks(noteId: widget.noteId),
+                        ],
+                      ),
+              ),
             ),
-          ),
-          // While a drawing is chosen: pen, inks, eraser, undo, Done.
-          if (_ink != null)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: 12,
-              child: Center(child: InlineInkToolbar(session: _ink!)),
-            ),
-        ],
+            // Fold chevrons in the left margin of the headings.
+            if (_loaded)
+              Positioned.fill(
+                child: HeadingChevrons(
+                  folds: _folds,
+                  controller: _quillController,
+                  editorKey: _editorKey,
+                  scroll: _pageScroll,
+                  hoverY: _hoverY,
+                ),
+              ),
+            // While a drawing is chosen: pen, inks, eraser, undo, Done.
+            if (_ink != null)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Center(child: InlineInkToolbar(session: _ink!)),
+              ),
+          ],
+        ),
       ),
       // A Scaffold leaves its bottom bar under the keyboard; pad it up by the
       // keyboard's height so formatting and Draw stay in reach while typing.
@@ -2066,6 +2212,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                 if (_finding)
                   NoteFindBar(
                     controller: _quillController,
+                    folds: _folds,
                     step: _findStep,
                     onClose: _closeFind,
                   ),
@@ -2082,6 +2229,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                   if (_finding)
                     NoteFindBar(
                       controller: _quillController,
+                      folds: _folds,
                       step: _findStep,
                       onClose: _closeFind,
                     ),
@@ -2115,7 +2263,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                 // the scrolled-off end of the formatting row.
                                 IconButton(
                                   icon: const Icon(Icons.draw_outlined),
-                                  tooltip: 'Draw',
+                                  tooltip: context.l10n.editorDraw,
                                   onPressed: () => _ink?.insertAtCursor(),
                                 ),
                                 Container(
@@ -2173,7 +2321,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (!_loaded) return;
     if (!await _comments.addFromSelection(context) && mounted) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('Select the passage to comment on.')),
+        SnackBar(content: Text(context.l10n.editorSelectPassage)),
       );
     }
   }
@@ -2194,6 +2342,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.monospaced: () => _toggle(Attribute.codeBlock),
     MenuCommand.highlight: _toggleHighlight,
     MenuCommand.insertTable: _insertTable,
+    MenuCommand.collapseSections: () => _folds.collapseAll(),
+    MenuCommand.expandSections: () => _folds.expandAll(),
     MenuCommand.linkNote: () => _linkNote(context),
     MenuCommand.citePaper: () => _citePaper(context),
     MenuCommand.find: _openFind,
@@ -2377,7 +2527,7 @@ class _Backlinks extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Linked from',
+                    context.l10n.editorLinkedFrom,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -2389,7 +2539,9 @@ class _Backlinks extends ConsumerWidget {
                         ActionChip(
                           avatar: const Icon(Icons.north_west, size: 16),
                           label: Text(
-                            n.title.isEmpty ? 'Untitled' : n.title,
+                            n.title.isEmpty
+                                ? context.l10n.commonUntitled
+                                : n.title,
                             overflow: TextOverflow.ellipsis,
                           ),
                           onPressed: () => Navigator.of(context).push(
@@ -2419,7 +2571,7 @@ class _ImagePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Image, tap to enlarge',
+      label: context.l10n.editorImageTapToEnlarge,
       child: GestureDetector(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
@@ -2568,6 +2720,7 @@ class _DesktopFormatBar extends StatelessWidget {
     final c = Theme.of(context).colorScheme;
     final cmd = mac ? '\u2318' : 'Ctrl+';
     final shift = mac ? '\u21e7' : 'Shift+';
+    final l10n = context.l10n;
     Widget toggle(Attribute attribute, String tip) =>
         QuillToolbarToggleStyleButton(
           controller: controller,
@@ -2588,23 +2741,23 @@ class _DesktopFormatBar extends StatelessWidget {
               padding: EdgeInsets.zero,
               iconSize: 18,
               icon: const Icon(Icons.draw_outlined),
-              tooltip: 'Draw',
+              tooltip: context.l10n.editorDraw,
               onPressed: onDraw,
             ),
           ),
           Container(width: 1, height: 20, color: c.outlineVariant),
           const SizedBox(width: 4),
-          toggle(Attribute.bold, 'Bold ${cmd}B'),
-          toggle(Attribute.italic, 'Italic ${cmd}I'),
-          toggle(Attribute.underline, 'Underline ${cmd}U'),
-          toggle(Attribute.ul, 'Bulleted list $shift${cmd}7'),
-          toggle(Attribute.ol, 'Numbered list $shift${cmd}9'),
+          toggle(Attribute.bold, l10n.editorTipBold('${cmd}B')),
+          toggle(Attribute.italic, l10n.editorTipItalic('${cmd}I')),
+          toggle(Attribute.underline, l10n.editorTipUnderline('${cmd}U')),
+          toggle(Attribute.ul, l10n.editorTipBulleted('$shift${cmd}7')),
+          toggle(Attribute.ol, l10n.editorTipNumbered('$shift${cmd}9')),
           QuillToolbarToggleCheckListButton(
             controller: controller,
             options: QuillToolbarToggleCheckListButtonOptions(
               iconSize: 15,
               iconButtonFactor: 1.8,
-              tooltip: 'Checklist $shift${cmd}L',
+              tooltip: l10n.editorTipChecklist('$shift${cmd}L'),
             ),
           ),
           _HighlightButton(controller: controller, onDone: onDone),
@@ -2658,7 +2811,7 @@ class _HighlightButton extends StatelessWidget {
     final cmd = isMac(context) ? '\u2318' : 'Ctrl+';
     final shift = isMac(context) ? '\u21e7' : 'Shift+';
     return PopupMenuButton<Object>(
-      tooltip: 'Highlight $shift${cmd}E',
+      tooltip: context.l10n.editorTipHighlight('$shift${cmd}E'),
       onSelected: (choice) {
         chooseHighlight(controller, choice);
         onDone();
@@ -2677,20 +2830,31 @@ class _HighlightButton extends StatelessWidget {
 }
 
 enum _TextStyle {
-  title('Title', Icons.title),
-  heading('Heading', Icons.text_fields),
-  subheading('Subheading', Icons.short_text),
-  body('Body text', Icons.notes),
-  quote('Quote', Icons.format_quote),
-  strike('Strikethrough', Icons.format_strikethrough),
-  monospaced('Monospaced', Icons.code),
-  highlight('Highlight', Icons.border_color_outlined),
-  table('Table', Icons.grid_on);
+  title(Icons.title),
+  heading(Icons.text_fields),
+  subheading(Icons.short_text),
+  body(Icons.notes),
+  quote(Icons.format_quote),
+  strike(Icons.format_strikethrough),
+  monospaced(Icons.code),
+  highlight(Icons.border_color_outlined),
+  table(Icons.grid_on);
 
-  const _TextStyle(this.label, this.icon);
+  const _TextStyle(this.icon);
 
-  final String label;
   final IconData icon;
+
+  String label(AppLocalizations l10n) => switch (this) {
+    title => l10n.editorStyleTitle,
+    heading => l10n.editorStyleHeading,
+    subheading => l10n.editorStyleSubheading,
+    body => l10n.editorStyleBody,
+    quote => l10n.editorStyleQuote,
+    strike => l10n.editorStyleStrike,
+    monospaced => l10n.editorStyleMonospaced,
+    highlight => l10n.editorStyleHighlight,
+    table => l10n.editorStyleTable,
+  };
 }
 
 /// "Aa": the less frequent formats, as a menu that says which is on.
@@ -2771,7 +2935,7 @@ class _TextStyleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<_TextStyle>(
-      tooltip: 'Text style',
+      tooltip: context.l10n.editorTextStyle,
       onSelected: (style) => style == _TextStyle.highlight
           ? _chooseHighlight(context)
           : _apply(style),
@@ -2786,7 +2950,7 @@ class _TextStyleButton extends StatelessWidget {
             CheckedPopupMenuItem(
               value: style,
               checked: _isOn(style, attrs),
-              child: Text(style.label),
+              child: Text(style.label(context.l10n)),
             ),
           ],
         ];
@@ -2809,49 +2973,59 @@ class _TextStyleButton extends StatelessWidget {
 
 /// What "/" in a note offers.
 enum _Command {
-  cite(
-    'Cite a paper',
-    'Insert a citation from your library',
-    Icons.format_quote,
-  ),
-  equation('Equation', r'LaTeX maths, or type $$', Icons.functions),
-  figure(
-    'Figure caption',
-    'A numbered figure caption for this line',
-    Icons.image_outlined,
-  ),
-  table(
-    'Table caption',
-    'A numbered table caption for this line',
-    Icons.table_chart_outlined,
-  ),
-  refer(
-    'Refer to a figure or table',
-    'Insert its number, kept right as things move',
-    Icons.tag,
-  ),
-  link('Link to a note', 'Or type [[', Icons.link),
-  draw('Draw', 'A sketch, with a pen or finger', Icons.draw_outlined),
-  insertTable('Table', 'Rows and columns, 3 by 3 to start', Icons.grid_on),
-  heading('Heading', 'Make this line a heading', Icons.title),
-  checklist('Checklist', 'Tick-box items', Icons.check_box_outlined),
-  attach('Attach', 'Audio, an image or a file', Icons.attach_file),
-  voice('Voice note', 'Record a thought as you read', Icons.mic_none),
-  dictate('Dictate', 'Speak instead of typing', Icons.keyboard_voice_outlined),
-  template(
-    'Literature note template',
-    'Summary, method, findings, critique',
-    Icons.article_outlined,
-  ),
-  bibliography(
-    'Add bibliography',
-    'A reference list of what this note cites',
-    Icons.list_alt,
-  );
+  cite(Icons.format_quote),
+  equation(Icons.functions),
+  figure(Icons.image_outlined),
+  table(Icons.table_chart_outlined),
+  refer(Icons.tag),
+  link(Icons.link),
+  draw(Icons.draw_outlined),
+  insertTable(Icons.grid_on),
+  heading(Icons.title),
+  checklist(Icons.check_box_outlined),
+  attach(Icons.attach_file),
+  voice(Icons.mic_none),
+  dictate(Icons.keyboard_voice_outlined),
+  template(Icons.article_outlined),
+  bibliography(Icons.list_alt);
 
-  const _Command(this.label, this.hint, this.icon);
+  const _Command(this.icon);
 
-  final String label;
-  final String hint;
   final IconData icon;
+
+  String label(AppLocalizations l) => switch (this) {
+    cite => l.notesCiteAPaper,
+    equation => l.editorCmdEquation,
+    figure => l.editorCmdFigure,
+    table => l.editorCmdTable,
+    refer => l.editorCmdRefer,
+    link => l.editorCmdLink,
+    draw => l.editorCmdDraw,
+    insertTable => l.editorCmdInsertTable,
+    heading => l.editorCmdHeading,
+    checklist => l.editorCmdChecklist,
+    attach => l.editorCmdAttach,
+    voice => l.voiceNote,
+    dictate => l.voiceDictate,
+    template => l.editorCmdTemplate,
+    bibliography => l.editorCmdBibliography,
+  };
+
+  String hint(AppLocalizations l) => switch (this) {
+    cite => l.editorCmdCiteHint,
+    equation => l.editorCmdEquationHint,
+    figure => l.editorCmdFigureHint,
+    table => l.editorCmdTableHint,
+    refer => l.editorCmdReferHint,
+    link => l.editorCmdLinkHint,
+    draw => l.editorCmdDrawHint,
+    insertTable => l.editorCmdInsertTableHint,
+    heading => l.editorCmdHeadingHint,
+    checklist => l.editorCmdChecklistHint,
+    attach => l.editorCmdAttachHint,
+    voice => l.editorCmdVoiceHint,
+    dictate => l.editorCmdDictateHint,
+    template => l.editorCmdTemplateHint,
+    bibliography => l.editorCmdBibliographyHint,
+  };
 }

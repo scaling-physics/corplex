@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../data/tables/papers_table.dart' show ReadingStatus;
@@ -315,10 +316,10 @@ final coverageProvider = StreamProvider.autoDispose
 String _who(Paper paper) =>
     inTextCitation(paper, CitationStyle.apa).replaceAll(RegExp(r'^\(|\)$'), '');
 
-String _statusLabel(ReadingStatus? s) => switch (s) {
-  ReadingStatus.toRead => 'To read',
-  ReadingStatus.reading => 'Reading',
-  ReadingStatus.done => 'Read',
+String _statusLabel(AppLocalizations l10n, ReadingStatus? s) => switch (s) {
+  ReadingStatus.toRead => l10n.projectsStatusToRead,
+  ReadingStatus.reading => l10n.projectsStatusReading,
+  ReadingStatus.done => l10n.projectsStatusRead,
   null => '',
 };
 
@@ -342,6 +343,7 @@ class ChapterCoverageSection extends ConsumerWidget {
         .value;
     if (coverage == null || coverage.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final style = AppMotion.reduced(context)
         ? AnimationStyle.noAnimation
         : null;
@@ -364,10 +366,13 @@ class ChapterCoverageSection extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
-          child: Text('Citations', style: theme.textTheme.titleSmall),
+          child: Text(
+            l10n.projectsCitations,
+            style: theme.textTheme.titleSmall,
+          ),
         ),
         if (coverage.cited.isNotEmpty)
-          group('Cited in chapters (${coverage.cited.length})', [
+          group(l10n.projectsCitedInChapters(coverage.cited.length), [
             for (final c in coverage.cited)
               ListTile(
                 key: ValueKey('cited-${c.paper.id}'),
@@ -391,7 +396,10 @@ class ChapterCoverageSection extends ConsumerWidget {
                             vertical: 2,
                           ),
                           child: Text(
-                            'Ch. ${ch.index + 1} · ${ch.count}×',
+                            l10n.projectsChapterCitations(
+                              ch.index + 1,
+                              ch.count,
+                            ),
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: theme.colorScheme.primary,
                             ),
@@ -404,7 +412,7 @@ class ChapterCoverageSection extends ConsumerWidget {
               ),
           ]),
         if (coverage.readNotCited.isNotEmpty)
-          group('Read but not cited (${coverage.readNotCited.length})', [
+          group(l10n.projectsReadNotCited(coverage.readNotCited.length), [
             for (final u in coverage.readNotCited)
               ListTile(
                 key: ValueKey('uncited-${u.paper.id}'),
@@ -417,9 +425,9 @@ class ChapterCoverageSection extends ConsumerWidget {
                 subtitle: Text(
                   [
                     _who(u.paper),
-                    _statusLabel(u.paper.readingStatus),
+                    _statusLabel(l10n, u.paper.readingStatus),
                     if (u.highlights > 0)
-                      '${u.highlights} highlight${u.highlights == 1 ? '' : 's'}',
+                      l10n.projectsHighlightCount(u.highlights),
                   ].where((s) => s.isNotEmpty).join(' · '),
                 ),
                 onTap: () => openPaper(u.paper.id),
@@ -427,7 +435,7 @@ class ChapterCoverageSection extends ConsumerWidget {
           ]),
         if (coverage.citedOutsideProject.isNotEmpty)
           group(
-            'Cited, not in this project (${coverage.citedOutsideProject.length})',
+            l10n.projectsCitedOutside(coverage.citedOutsideProject.length),
             [
               for (final p in coverage.citedOutsideProject)
                 ListTile(

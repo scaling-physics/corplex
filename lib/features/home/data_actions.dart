@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../platform/share_origin.dart';
 import '../../data/backup.dart';
 import '../../data/database_provider.dart';
@@ -18,7 +19,8 @@ import '../export/vault_export.dart';
 Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
   final messenger = ScaffoldMessenger.of(context);
   final origin = shareOrigin(context);
-  messenger.showSnackBar(const SnackBar(content: Text('Preparing backup…')));
+  final l10n = context.l10n;
+  messenger.showSnackBar(SnackBar(content: Text(l10n.settingsPreparingBackup)));
   try {
     final db = ref.read(databaseProvider);
     final docs = await getApplicationDocumentsDirectory();
@@ -28,16 +30,14 @@ Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(zip.path)],
-        subject: 'Corplex backup',
+        subject: l10n.settingsBackupSubject,
         sharePositionOrigin: origin,
       ),
     );
   } catch (_) {
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Couldn\'t create the backup.')),
-      );
+      ..showSnackBar(SnackBar(content: Text(l10n.settingsBackupFailed)));
   }
 }
 
@@ -45,6 +45,7 @@ Future<void> backUpToFile(BuildContext context, WidgetRef ref) async {
 /// folder (zipped) and opens the share sheet. Asks whether to include PDFs.
 Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
   final origin = shareOrigin(context);
+  final l10n = context.l10n;
   var includePdfs = false;
   // An export is a plain-text copy on disk, so locked notes go out as
   // placeholders (even when unlocked); say so only when there are any.
@@ -54,23 +55,20 @@ Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('Export as Markdown'),
+        title: Text(context.l10n.settingsExportMarkdown),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'One Markdown file per note and paper, with links, highlights '
-              'and a BibTeX file. Open the folder as an Obsidian vault.',
-            ),
+            Text(context.l10n.settingsExportBody),
             if (anyLocked) ...[
               const SizedBox(height: 8),
-              const Text('Locked notes are exported as placeholders.'),
+              Text(context.l10n.settingsExportLocked),
             ],
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Include PDFs'),
-              subtitle: const Text('Makes the export much larger'),
+              title: Text(context.l10n.settingsIncludePdfs),
+              subtitle: Text(context.l10n.settingsIncludePdfsSubtitle),
               value: includePdfs,
               onChanged: (v) => setState(() => includePdfs = v),
             ),
@@ -79,11 +77,11 @@ Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Export'),
+            child: Text(context.l10n.settingsExport),
           ),
         ],
       ),
@@ -114,15 +112,13 @@ Future<void> exportAsMarkdown(BuildContext context, WidgetRef ref) async {
   }
   navigator.pop();
   if (zip == null) {
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Couldn\'t create the export.')),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsExportFailed)));
     return;
   }
   await SharePlus.instance.share(
     ShareParams(
       files: [XFile(zip.path)],
-      subject: 'Corplex notes (Markdown)',
+      subject: l10n.settingsExportSubject,
       sharePositionOrigin: origin,
     ),
   );
@@ -137,13 +133,15 @@ Future<void> restoreFromBackupFile(BuildContext context, WidgetRef ref) async {
   );
   if (picked?.path == null || !context.mounted) return;
 
+  final l10n = context.l10n;
+  final locale = Localizations.localeOf(context).toString();
   final db = ref.read(databaseProvider);
   final zip = File(picked!.path!);
   final BackupInfo info;
   try {
     info = inspectBackup(zip, currentSchemaVersion: db.schemaVersion);
   } on BackupException catch (e) {
-    await _notice(context, 'Can\'t restore', e.message);
+    await _notice(context, l10n.settingsCantRestore, _problemText(l10n, e));
     return;
   }
   if (!context.mounted) return;
@@ -151,22 +149,22 @@ Future<void> restoreFromBackupFile(BuildContext context, WidgetRef ref) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Restore this backup?'),
+      title: Text(l10n.settingsRestoreTitle),
       content: Text(
-        'From ${DateFormat.yMMMd().add_jm().format(info.createdAt)}: '
-        '${info.notes} note${info.notes == 1 ? '' : 's'} and '
-        '${info.papers} paper${info.papers == 1 ? '' : 's'}.\n\n'
-        'It replaces what\'s on this device now. Your current library is '
-        'kept aside in case you change your mind.',
+        l10n.settingsRestoreBody(
+          DateFormat.yMMMd(locale).add_jm().format(info.createdAt),
+          info.notes,
+          info.papers,
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Restore'),
+          child: Text(l10n.settingsRestoreAction),
         ),
       ],
     ),
@@ -181,14 +179,16 @@ Future<void> restoreFromBackupFile(BuildContext context, WidgetRef ref) async {
       currentSchemaVersion: db.schemaVersion,
     );
   } on BackupException catch (e) {
-    if (context.mounted) await _notice(context, 'Can\'t restore', e.message);
+    if (context.mounted) {
+      await _notice(context, l10n.settingsCantRestore, _problemText(l10n, e));
+    }
     return;
   }
   if (!context.mounted) return;
   await _notice(
     context,
-    'One more step',
-    'Close Corplex completely and open it again to finish restoring.',
+    l10n.settingsOneMoreStep,
+    l10n.settingsRestartToFinish,
   );
 }
 
@@ -201,8 +201,15 @@ Future<void> _notice(BuildContext context, String title, String message) =>
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: Text(context.l10n.commonOk),
           ),
         ],
       ),
     );
+
+String _problemText(AppLocalizations l10n, BackupException e) =>
+    switch (e.problem) {
+      BackupProblem.notABackup => l10n.dataNotABackup,
+      BackupProblem.unsupportedVersion => l10n.dataUnsupportedVersion,
+      BackupProblem.newerVersion => l10n.dataNewerVersion,
+    };

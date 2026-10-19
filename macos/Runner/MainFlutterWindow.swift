@@ -3,6 +3,50 @@ import FlutterMacOS
 import PDFKit
 import Carbon.HIToolbox
 
+// MARK: Menu titles
+
+/// German menu titles, picked by the system's first language. A table in
+/// code rather than .strings files: no project-file changes, and the Dart
+/// side (`shortcutSections`, lib/features/home/keyboard_shortcuts.dart) uses
+/// the same wording. English is the key.
+private let germanMenuTitles: [String: String] = [
+  "File": "Ablage", "Edit": "Bearbeiten", "Format": "Format", "View": "Darstellung",
+  "Go": "Gehe zu", "Window": "Fenster", "Help": "Hilfe",
+  "Settings…": "Einstellungen…",
+  "New Note": "Neue Notiz", "Import PDF…": "PDF importieren…",
+  "Import References…": "Literaturangaben importieren…",
+  "Duplicate Note": "Notiz duplizieren", "Back Up to a File…": "In Datei sichern…",
+  "Export as Markdown…": "Als Markdown exportieren…", "Lock Note": "Notiz sperren",
+  "Close All Locked Notes": "Alle gesperrten Notizen schließen",
+  "Move to Trash": "In den Papierkorb legen", "Show Trash": "Papierkorb anzeigen",
+  "Print…": "Drucken…", "Close Window": "Fenster schließen",
+  "Find": "Suchen", "Find…": "Suchen…", "Find Next": "Nächster Treffer",
+  "Find Previous": "Vorheriger Treffer",
+  "Title": "Titel", "Heading": "Überschrift", "Subheading": "Zwischenüberschrift",
+  "Body": "Fließtext", "Monospaced": "Monospace", "Bulleted List": "Aufzählung",
+  "Numbered List": "Nummerierte Liste", "Checklist": "Checkliste",
+  "Block Quote": "Zitatblock", "Table": "Tabelle", "Bold": "Fett", "Italic": "Kursiv",
+  "Underline": "Unterstrichen", "Strikethrough": "Durchgestrichen", "Highlight": "Markieren",
+  "Link to Note…": "Mit Notiz verknüpfen…", "Cite Paper…": "Paper zitieren…",
+  "Add Comment…": "Kommentar hinzufügen…",
+  "Notes": "Notizen", "Library": "Bibliothek", "Attachments": "Anhänge", "Search": "Suchen",
+  "Toggle Sidebar": "Seitenleiste ein-/ausblenden",
+  "Collapse All Sections": "Alle Abschnitte einklappen",
+  "Expand All Sections": "Alle Abschnitte ausklappen", "Zoom In": "Vergrößern",
+  "Zoom Out": "Verkleinern", "Actual Size": "Originalgröße",
+  "Interface Size": "Oberflächengröße", "Larger": "Größer", "Smaller": "Kleiner",
+  "Default Size": "Standardgröße", "Back": "Zurück",
+  "Keyboard Shortcuts": "Tastaturkurzbefehle",
+]
+
+private let usesGerman: Bool =
+  Locale.preferredLanguages.first.map { $0.hasPrefix("de") } ?? false
+
+/// [english] in the system language (English unless it is German).
+func menuTitle(_ english: String) -> String {
+  usesGerman ? (germanMenuTitles[english] ?? english) : english
+}
+
 /// The one Corplex window. Content runs under a transparent title bar (the
 /// Flutter side leaves a `macTitleBarHeight` strip at the top of each
 /// column, so the traffic lights sit on the sidebar and the strip still
@@ -180,7 +224,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     _ title: String, _ id: String, key: String = "",
     modifiers: NSEvent.ModifierFlags = .command
   ) -> NSMenuItem {
-    let item = NSMenuItem(title: title, action: #selector(menuCommand(_:)), keyEquivalent: key)
+    let item = NSMenuItem(
+      title: menuTitle(title), action: #selector(menuCommand(_:)), keyEquivalent: key)
     item.keyEquivalentModifierMask = modifiers
     item.representedObject = id
     item.target = self
@@ -188,8 +233,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   }
 
   private func menu(_ title: String, _ items: [NSMenuItem]) -> NSMenuItem {
-    let top = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-    let menu = NSMenu(title: title)
+    let top = NSMenuItem(title: menuTitle(title), action: nil, keyEquivalent: "")
+    let menu = NSMenu(title: menuTitle(title))
     items.forEach(menu.addItem)
     top.submenu = menu
     return top
@@ -208,7 +253,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     if let appMenu = main.items.first?.submenu,
       let prefs = appMenu.items.first(where: { $0.keyEquivalent == "," })
     {
-      prefs.title = "Settings…"
+      prefs.title = menuTitle("Settings…")
       prefs.action = #selector(menuCommand(_:))
       prefs.target = self
       prefs.representedObject = "settings"
@@ -234,20 +279,24 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Print…", "printNote", key: "p"),
         .separator(),
         NSMenuItem(
-          title: "Close Window", action: #selector(NSWindow.performClose(_:)),
+          title: menuTitle("Close Window"), action: #selector(NSWindow.performClose(_:)),
           keyEquivalent: "w"),
       ])
     main.insertItem(file, at: 1)
 
-    if let edit = main.items.first(where: { $0.title == "Edit" })?.submenu {
+    // The template's menus are found by what they contain, not by title:
+    // AppKit may already have translated the titles.
+    let editItem = main.items.first {
+      $0.submenu?.items.contains { $0.action == #selector(NSText.copy(_:)) } ?? false
+    }
+    if let edit = editItem?.submenu {
+      editItem?.title = menuTitle("Edit")
+      edit.title = menuTitle("Edit")
       // Spelling, substitutions, transformations and speech act on AppKit
       // text views, which Flutter's editors aren't; AppKit's Find is
-      // replaced by ours, which reaches the focused document.
-      for title in ["Find", "Spelling and Grammar", "Substitutions", "Transformations", "Speech"] {
-        if let found = edit.items.first(where: { $0.title == title }) {
-          edit.removeItem(found)
-        }
-      }
+      // replaced by ours, which reaches the focused document. All of them
+      // (and only they) are submenus.
+      for found in edit.items where found.hasSubmenu { edit.removeItem(found) }
       while let last = edit.items.last, last.isSeparatorItem { edit.removeItem(last) }
       edit.addItem(.separator())
       edit.addItem(
@@ -285,11 +334,17 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Cite Paper…", "citePaper", key: "k", modifiers: shift),
         item("Add Comment…", "addComment", key: "k", modifiers: [.command, .option]),
       ])
-    if let viewIndex = main.items.firstIndex(where: { $0.title == "View" }) {
+    let viewItem = main.items.first {
+      $0.submenu?.items.contains { $0.action == #selector(NSWindow.toggleFullScreen(_:)) }
+        ?? false
+    }
+    if let viewItem = viewItem, let viewIndex = main.items.firstIndex(of: viewItem) {
       main.insertItem(format, at: viewIndex)
     }
 
-    if let view = main.items.first(where: { $0.title == "View" })?.submenu {
+    if let view = viewItem?.submenu {
+      viewItem?.title = menuTitle("View")
+      view.title = menuTitle("View")
       let entries = [
         item("Notes", "showNotes", key: "1"),
         item("Library", "showLibrary", key: "2"),
@@ -297,6 +352,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Search", "search", key: "f", modifiers: shift),
         .separator(),
         item("Toggle Sidebar", "toggleSidebar", key: "s", modifiers: [.command, .control]),
+        .separator(),
+        item("Collapse All Sections", "collapseSections"),
+        item("Expand All Sections", "expandSections"),
         .separator(),
         item("Zoom In", "zoomIn", key: "+"),
         item("Zoom Out", "zoomOut", key: "-"),
@@ -314,14 +372,19 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     }
 
     let go = menu("Go", [item("Back", "back", key: "[")])
-    if let windowIndex = main.items.firstIndex(where: { $0.title == "Window" }) {
+    let windowItem = main.items.first { $0.submenu === NSApp.windowsMenu }
+    if let windowItem = windowItem, let windowIndex = main.items.firstIndex(of: windowItem) {
       main.insertItem(go, at: windowIndex)
+      windowItem.title = menuTitle("Window")
+      windowItem.submenu?.title = menuTitle("Window")
     }
 
-    if let help = main.items.first(where: { $0.title == "Help" }) {
-      let menu = NSMenu(title: "Help")
+    if let help = main.items.first(where: { $0.submenu === NSApp.helpMenu }) {
+      help.title = menuTitle("Help")
+      let menu = NSMenu(title: menuTitle("Help"))
       menu.addItem(item("Keyboard Shortcuts", "keyboardShortcuts", key: "/"))
       help.submenu = menu
+      NSApp.helpMenu = menu
     }
   }
 }

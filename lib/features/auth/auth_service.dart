@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
+
 /// The signed-in user's identity. Only what the app currently needs.
 class AppUser {
   const AppUser({required this.id, required this.email});
@@ -44,15 +46,18 @@ class StubAuthService implements AuthService {
       signIn(email: email, password: password);
 
   @override
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signIn({required String email, required String password}) async {
     if (!email.contains('@')) {
-      throw const AuthException('Enter a valid email address.');
+      throw const AuthException(
+        'Enter a valid email address.',
+        code: AuthErrorCode.invalidEmail,
+      );
     }
     if (password.length < 6) {
-      throw const AuthException('Password must be at least 6 characters.');
+      throw const AuthException(
+        'Password must be at least 6 characters.',
+        code: AuthErrorCode.shortPassword,
+      );
     }
     _currentUser = AppUser(id: email, email: email);
     _controller.add(_currentUser);
@@ -65,13 +70,43 @@ class StubAuthService implements AuthService {
   }
 }
 
-class AuthException implements Exception {
-  const AuthException(this.message);
+/// The failures the app words itself (a server's own message has no code).
+enum AuthErrorCode {
+  invalidEmail,
+  shortPassword,
+  confirmEmail,
+  offline,
+  unknown,
+}
 
+class AuthException implements Exception {
+  const AuthException(this.message, {this.code, this.detail});
+
+  /// English text, for logs and tests; screens show [authErrorText].
   final String message;
+  final AuthErrorCode? code;
+
+  /// What [AuthErrorCode.unknown] names (the exception's type).
+  final String? detail;
 
   @override
   String toString() => message;
+}
+
+/// [error] in the app's language: the app's own failures are translated, a
+/// message that came from the server is shown as it arrived.
+String authErrorText(AppLocalizations l10n, Object error) {
+  if (error is AuthException) {
+    return switch (error.code) {
+      AuthErrorCode.invalidEmail => l10n.authInvalidEmail,
+      AuthErrorCode.shortPassword => l10n.authShortPassword,
+      AuthErrorCode.confirmEmail => l10n.authConfirmEmail,
+      AuthErrorCode.offline => l10n.authOffline,
+      AuthErrorCode.unknown => l10n.authUnknown(error.detail ?? ''),
+      null => error.message,
+    };
+  }
+  return error.toString();
 }
 
 final authServiceProvider = Provider<AuthService>((ref) => StubAuthService());

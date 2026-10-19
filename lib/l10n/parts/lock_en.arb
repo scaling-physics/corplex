@@ -1,0 +1,83 @@
+{
+  "@@locale": "en",
+  "lockLockedNote": "This note is locked",
+  "lockPassword": "Password",
+  "lockUnlock": "Unlock",
+  "lockShowHint": "Show hint",
+  "lockHint": "Hint: {hint}",
+  "@lockHint": {
+    "placeholders": {
+      "hint": {
+        "type": "String"
+      }
+    }
+  },
+  "lockUseBiometric": "Use {name}",
+  "@lockUseBiometric": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockWrongPassword": "Wrong password",
+  "lockEarlierPassword": "This note uses an earlier notes password",
+  "lockBiometricFaceTouch": "Face ID / Touch ID",
+  "lockBiometricTouch": "Touch ID",
+  "lockBiometricFingerprint": "fingerprint",
+  "lockBiometricGeneric": "biometrics",
+  "lockBiometricReason": "Unlock your locked notes",
+  "lockUnlockToContinue": "Unlock your locked notes to continue.",
+  "lockEnterPassword": "Enter your notes password.",
+  "lockEnterToTurnOn": "Enter your notes password to turn this on.",
+  "lockForgottenWarning": "If you forget this password, locked notes can't be recovered — not by you, and not by us.",
+  "lockOfferTitle": "Use {name} to unlock?",
+  "@lockOfferTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockOfferBody": "Open locked notes with {name} instead of typing the password. The password still works.",
+  "@lockOfferBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockNotNow": "Not now",
+  "lockSetTitle": "Set a notes password",
+  "lockResetTitle": "Reset notes password",
+  "lockMinLength": "Use at least {count} characters.",
+  "@lockMinLength": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lockMismatch": "The passwords don't match.",
+  "lockNewMismatch": "The new passwords don't match.",
+  "lockConfirm": "Confirm",
+  "lockHintOptional": "Hint (optional)",
+  "lockHintHelper": "Shown on the lock screen. Not the password!",
+  "lockResetPassword": "Reset password",
+  "lockSetPassword": "Set password",
+  "lockNotesPassword": "Notes password",
+  "lockChangeTitle": "Change notes password",
+  "lockCurrentPassword": "Current password",
+  "lockNewPassword": "New password",
+  "lockCurrentWrong": "The current password is wrong.",
+  "lockChangePassword": "Change password",
+  "lockPasswordChanged": "Notes password changed",
+  "lockBiometricSubtitle": "Open locked notes without typing",
+  "lockNow": "Lock now",
+  "lockNowSubtitle": "Locked notes ask for the password again",
+  "lockResetItem": "Reset password…",
+  "lockResetItemSubtitle": "For a forgotten password",
+  "lockResetDialogTitle": "Reset the notes password?",
+  "lockResetBody": "You'll choose a new password for notes you lock from now on.\n\nNotes already locked stay locked under the old password. Without it they can't be opened — not by you, and not by us. If you remember the old password later, entering it opens them again.",
+  "lockContinue": "Continue"
+}

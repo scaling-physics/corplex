@@ -1,0 +1,13 @@
+{
+  "@@locale": "de",
+  "graphLockedNote": "Gesperrte Notiz",
+  "graphUntitledPaper": "Paper ohne Titel",
+  "graphMap": "Karte",
+  "graphHideUnconnected": "Nicht verbundene Elemente ausblenden",
+  "graphShowUnconnected": "Nicht verbundene Elemente einblenden",
+  "graphCouldntDraw": "Karte konnte nicht gezeichnet werden",
+  "graphTryAgainInAMoment": "Gleich noch einmal versuchen.",
+  "graphNothingToMap": "Noch nichts zum Darstellen",
+  "graphNothingConnected": "Nichts verbunden",
+  "graphEmptyMessage": "Notizen miteinander oder mit Papern verknüpfen oder ein Paper mit [@ zitieren, dann erscheinen die Verbindungen hier."
+}

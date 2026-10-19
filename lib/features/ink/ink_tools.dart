@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import 'ink_model.dart';
 import 'pencil_taps.dart';
@@ -162,21 +163,25 @@ class InkPalette extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    toolButton(InkToolKind.pen, Icons.edit_outlined, 'Pen'),
+                    toolButton(
+                      InkToolKind.pen,
+                      Icons.edit_outlined,
+                      context.l10n.inkPen,
+                    ),
                     toolButton(
                       InkToolKind.highlighter,
                       Icons.border_color_outlined,
-                      'Highlighter',
+                      context.l10n.inkHighlighter,
                     ),
                     toolButton(
                       InkToolKind.eraser,
                       Icons.cleaning_services_outlined,
-                      'Eraser',
+                      context.l10n.inkEraser,
                     ),
                     toolButton(
                       InkToolKind.lasso,
                       Icons.highlight_alt_outlined,
-                      'Select',
+                      context.l10n.inkSelect,
                     ),
                     AnimatedSize(
                       duration: AppMotion.medium,
@@ -237,7 +242,7 @@ class _Swatch extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: 'Ink color',
+      label: context.l10n.inkColor,
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
@@ -276,7 +281,7 @@ class _WidthDot extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: 'Line thickness',
+      label: context.l10n.inkThickness,
       child: GestureDetector(
         onTap: onTap,
         child: Container(

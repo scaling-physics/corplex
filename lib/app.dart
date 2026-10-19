@@ -12,6 +12,7 @@ import 'features/platform/platform_coordinator.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
 import 'features/sync/sync_coordinator.dart';
+import 'l10n/l10n.dart';
 import 'theme/app_theme.dart';
 
 class CorplexApp extends ConsumerStatefulWidget {
@@ -39,11 +40,13 @@ class _CorplexAppState extends ConsumerState<CorplexApp> {
       title: 'Corplex',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(appearanceSettingsProvider).themeMode,

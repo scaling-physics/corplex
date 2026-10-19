@@ -1,0 +1,12 @@
+{
+  "@@locale": "de",
+  "tableAddRowAbove": "Zeile oberhalb einfügen",
+  "tableAddRowBelow": "Zeile unterhalb einfügen",
+  "tableAddColumnLeft": "Spalte links einfügen",
+  "tableAddColumnRight": "Spalte rechts einfügen",
+  "tableDeleteRow": "Zeile löschen",
+  "tableDeleteColumn": "Spalte löschen",
+  "tableHeaderRow": "Kopfzeile",
+  "tableDeleteTable": "Tabelle löschen",
+  "tableTooltip": "Tabelle"
+}

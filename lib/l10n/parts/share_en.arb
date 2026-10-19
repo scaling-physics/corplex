@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "shareAddedToLibrary": "Added “{name}” to your library",
+  "@shareAddedToLibrary": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareSavedLink": "Saved link as a note",
+  "shareSavedAsNote": "Saved as a note",
+  "shareAudioAttached": "Audio attached",
+  "shareAttachTo": "Attach “{name}” to…",
+  "@shareAttachTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareNewNote": "A new note"
+}

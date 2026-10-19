@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Start a note or pick up your reading</string>
+    <string name="widget_continue_reading">Continue reading</string>
+    <string name="widget_new_note">New note</string>
 </resources>

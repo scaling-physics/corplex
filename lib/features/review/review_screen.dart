@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/haptics.dart';
 import '../../theme/motion_widgets.dart';
 import '../home/adaptive.dart' show ReadableColumn;
@@ -79,19 +80,20 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     } else if (_index >= queue.length) {
       body = EmptyState(
         icon: Icons.check_circle_outline,
-        title: queue.isEmpty ? 'Nothing to revisit' : 'All caught up',
+        title: queue.isEmpty
+            ? context.l10n.reviewNothing
+            : context.l10n.reviewCaughtUp,
         message: queue.isEmpty
-            ? 'Highlights come back here a day after you make them, then '
-                  'less and less often.'
+            ? context.l10n.reviewEmptyMessage
             : _kept == 0
-            ? 'They will come back tomorrow.'
-            : 'The ones you kept will return in a while.',
+            ? context.l10n.reviewTomorrow
+            : context.l10n.reviewLater,
       );
     } else {
       body = _Card(
         key: ValueKey(queue[_index].highlight.id),
         entry: queue[_index],
-        position: '${_index + 1} of ${queue.length}',
+        position: context.l10n.reviewPosition(_index + 1, queue.length),
         onOpen: () => _open(queue[_index]),
         onKeep: () => _act(queue[_index], keep: true),
         onSkip: () => _act(queue[_index], keep: false),
@@ -99,7 +101,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Revisit highlights')),
+      appBar: AppBar(title: Text(context.l10n.reviewTitle)),
       body: ReadableColumn(
         child: Column(
           children: [
@@ -107,8 +109,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
               child: StateSwitcher(stateKey: _index, child: body),
             ),
             SwitchListTile(
-              title: const Text('Remind me on the home screen'),
-              subtitle: const Text('A single quiet line when something is due'),
+              title: Text(context.l10n.reviewRemind),
+              subtitle: Text(context.l10n.reviewRemindHint),
               value: settings.remind,
               onChanged: settings.setRemind,
             ),
@@ -152,7 +154,7 @@ class _Card extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          '“${h.quote}”',
+          context.l10n.reviewQuote(h.quote),
           style: theme.textTheme.titleLarge?.copyWith(
             fontStyle: FontStyle.italic,
             height: 1.4,
@@ -164,7 +166,7 @@ class _Card extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         Text(
-          '${entry.paper.title} · p. ${h.pageNumber}',
+          context.l10n.reviewSource(entry.paper.title, h.pageNumber),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -174,12 +176,18 @@ class _Card extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            FilledButton(onPressed: onKeep, child: const Text('Keep')),
-            OutlinedButton(onPressed: onSkip, child: const Text('Skip')),
+            FilledButton(
+              onPressed: onKeep,
+              child: Text(context.l10n.reviewKeep),
+            ),
+            OutlinedButton(
+              onPressed: onSkip,
+              child: Text(context.l10n.reviewSkip),
+            ),
             TextButton.icon(
               onPressed: onOpen,
               icon: const Icon(Icons.open_in_new, size: 18),
-              label: const Text('Open in paper'),
+              label: Text(context.l10n.reviewOpenInPaper),
             ),
           ],
         ),

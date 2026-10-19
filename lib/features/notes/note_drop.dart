@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:quill_native_bridge/quill_native_bridge.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database_provider.dart';
 import '../../data/local_files.dart';
 import '../../data/tables/attachments_table.dart';
@@ -219,7 +220,7 @@ class _NoteDropTargetState extends ConsumerState<NoteDropTarget> {
     } on Object {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Couldn\'t add that file.')),
+          SnackBar(content: Text(context.l10n.notesCouldntAddFile)),
         );
       }
     } finally {
@@ -254,7 +255,7 @@ class _NoteDropTargetState extends ConsumerState<NoteDropTarget> {
                   ),
                   child: Center(
                     child: Text(
-                      'Drop to attach',
+                      context.l10n.notesDropToAttach,
                       style: Theme.of(context).textTheme.titleMedium
                           ?.copyWith(color: c.primary),
                     ),

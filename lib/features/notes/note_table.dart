@@ -15,13 +15,12 @@ class NoteTable {
 
   /// An empty table with [columnCount] columns and [rowCount] rows (the
   /// first a header).
-  factory NoteTable.empty({int rowCount = 3, int columnCount = 3}) =>
-      NoteTable(
-        rows: [
-          for (var r = 0; r < rowCount; r++)
-            [for (var c = 0; c < columnCount; c++) ''],
-        ],
-      );
+  factory NoteTable.empty({int rowCount = 3, int columnCount = 3}) => NoteTable(
+    rows: [
+      for (var r = 0; r < rowCount; r++)
+        [for (var c = 0; c < columnCount; c++) ''],
+    ],
+  );
 
   /// Never throws: damaged data gives a 1×1 empty table rather than
   /// breaking the note.
@@ -33,11 +32,19 @@ class NoteTable {
           [for (final c in (r as List)) c?.toString() ?? ''],
       ];
       return NoteTable(
-        rows: rows.isEmpty ? [['']] : rows,
+        rows: rows.isEmpty
+            ? [
+                [''],
+              ]
+            : rows,
         header: json['h'] != false,
       );
     } catch (_) {
-      return NoteTable(rows: [['']]);
+      return NoteTable(
+        rows: [
+          [''],
+        ],
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../library/citations.dart' show citedKeys;
@@ -12,12 +13,31 @@ import '../notes/note_content.dart' show notePlainTextPreview;
 
 enum GraphNodeKind { note, paper }
 
+/// A node whose [GraphNode.label] is a stand-in the screen words itself.
+enum GraphPlaceholder { lockedNote, untitledNote, untitledPaper }
+
 class GraphNode {
-  const GraphNode({required this.kind, required this.id, required this.label});
+  const GraphNode({
+    required this.kind,
+    required this.id,
+    required this.label,
+    this.placeholder,
+  });
 
   final GraphNodeKind kind;
   final String id;
   final String label;
+
+  /// Set when [label] is only an English stand-in ("Locked note").
+  final GraphPlaceholder? placeholder;
+
+  /// The label in the app's language.
+  String labelIn(AppLocalizations l10n) => switch (placeholder) {
+    GraphPlaceholder.lockedNote => l10n.graphLockedNote,
+    GraphPlaceholder.untitledNote => l10n.commonUntitled,
+    GraphPlaceholder.untitledPaper => l10n.graphUntitledPaper,
+    null => label,
+  };
 }
 
 /// Notes and papers as nodes; an edge for each note-to-note link, each
@@ -91,6 +111,13 @@ Future<GraphData> buildGraph(
                   ? 'Locked note'
                   : _firstWords(notePlainTextPreview(n.content)))
             : n.title.trim(),
+        placeholder: n.title.trim().isNotEmpty
+            ? null
+            : isLockedContent(n.content)
+            ? GraphPlaceholder.lockedNote
+            : notePlainTextPreview(n.content).trim().isEmpty
+            ? GraphPlaceholder.untitledNote
+            : null,
       ),
     );
   }
@@ -105,6 +132,9 @@ Future<GraphData> buildGraph(
         kind: GraphNodeKind.paper,
         id: p.id,
         label: p.title.trim().isEmpty ? 'Untitled paper' : p.title.trim(),
+        placeholder: p.title.trim().isEmpty
+            ? GraphPlaceholder.untitledPaper
+            : null,
       ),
     );
   }

@@ -15,6 +15,7 @@ import '../audio/audio_player_bar.dart';
 import '../capture/quick_capture.dart';
 import '../capture/quick_capture_actions.dart';
 import '../library/library_screen.dart';
+import '../library/papers_providers.dart' show filteredPapersProvider;
 import '../search/pdf_text_index.dart' show pdfIndexStartupProvider;
 import '../ocr/ocr_service.dart';
 import '../settings/appearance_settings.dart';
@@ -28,6 +29,8 @@ import '../sync/sync_ring.dart';
 import '../sync/sync_service.dart';
 import '../sync/transfer_settings.dart';
 import '../attachments/attachments_browser.dart';
+import '../attachments/attachments_providers.dart' show allAttachmentsProvider;
+import 'mac_toolbar.dart';
 import '../notes/note_file_actions.dart';
 import '../notes/notes_screen.dart';
 import '../projects/projects_providers.dart';
@@ -56,6 +59,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
   StreamSubscription<MenuCommand>? _menu;
   StreamSubscription<QuickCapture>? _captures;
+
+  // Mac: the toolbar's search field, whose results fill the list column,
+  // and whether the attachments fill the window in place of list and pane.
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode(debugLabel: 'mac-toolbar-search');
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  bool _attachments = false;
 
   @override
   void initState() {
@@ -90,7 +101,38 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void dispose() {
     _menu?.cancel();
     _captures?.cancel();
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String text) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      setState(() {
+        _searchQuery = text.trim();
+        if (_searchQuery.isNotEmpty) _attachments = false;
+      });
+    });
+  }
+
+  /// Leaves search results and the attachments for the list (choosing a
+  /// sidebar row, as in Notes).
+  void _clearMacModes() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    _searchQuery = '';
+    _attachments = false;
+  }
+
+  void _showMacAttachments() {
+    _home();
+    setState(() {
+      _clearMacModes();
+      _attachments = true;
+    });
   }
 
   /// Back to the home screen, closing anything pushed over it.
@@ -132,8 +174,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.search:
         _openSearch();
       case MenuCommand.showAttachments:
-        _home();
-        showAttachmentsBrowser(context);
+        if (isMac(context)) {
+          _showMacAttachments();
+        } else {
+          _home();
+          showAttachmentsBrowser(context);
+        }
       case MenuCommand.toggleSidebar:
         final visible = ref.read(macSidebarVisibleProvider.notifier);
         visible.state = !visible.state;
@@ -222,9 +268,22 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
   }
 
-  void _openSearch() =>
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+  /// Search: on a Mac the toolbar's field (results in the list column),
+  /// elsewhere the search page.
+  void _openSearch() {
+    if (isMac(context)) {
+      _home();
+      if (_attachments) setState(() => _attachments = false);
+      _searchFocus.requestFocus();
+      _searchController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _searchController.text.length,
+      );
+      return;
+    }
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+  }
 
   void _openTrash() =>
       Navigator.of(context)
@@ -345,36 +404,177 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final c = theme.colorScheme;
     final width = MediaQuery.sizeOf(context).width;
     final sidebarOn = ref.watch(macSidebarVisibleProvider);
-    // Like Notes, the list is titled by the folder, project or tag shown.
-    final title = _index == 0
-        ? notesFilterTitle(
-            ref.watch(notesFilterProvider),
-            folders: ref.watch(foldersListProvider).value ?? const [],
-            projects: ref.watch(projectsListProvider).value ?? const [],
-            tags: ref.watch(tagsListProvider).value ?? const [],
-          )
-        : _titles[_index];
-    final lists = Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 52,
-        titleSpacing: 18,
-        title: Text(
-          title,
-          key: const ValueKey('mac-list-title'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleLarge,
-        ),
-      ),
-      body: _tabs(),
+    final lights = ref.watch(macFullScreenProvider)
+        ? 0.0
+        : macTrafficLightsWidth;
+    final expanded = layout == HomeLayout.expanded;
+    final searching = _searchQuery.isNotEmpty;
+
+    // List and pane widths (expanded layout).
+    final listWidth = ref.watch(macListWidthProvider);
+    final room = width - (sidebarOn ? macSidebarWidth + 1 : 0);
+    // The detail pane always keeps at least 360 points.
+    final maxList = (room - 360 - 7).clamp(macListMinWidth, macListMaxWidth);
+    final w = listWidth.width.clamp(macListMinWidth, maxList);
+    final pane = room - w - 7;
+    // A narrow pane needs its row for the note's formatting buttons: the
+    // search field moves to the list's row then (always, without a pane).
+    final searchInList = !expanded || pane < 820;
+
+    void toggleSidebar() {
+      final visible = ref.read(macSidebarVisibleProvider.notifier);
+      visible.state = !visible.state;
+    }
+
+    final sidebarButton = MacToolbarButton(
+      key: const ValueKey('mac-show-sidebar'),
+      icon: Icons.view_sidebar_outlined,
+      tooltip: 'Show Sidebar (⌃⌘S)',
+      onPressed: toggleSidebar,
     );
+    // The space's main action: New note / Import PDF, first in the pane's
+    // part of the toolbar row (Notes' compose button).
+    final primary = MacToolbarButton(
+      key: const ValueKey('mac-primary-action'),
+      icon: _index == 0 ? Icons.edit_square : Icons.upload_file_outlined,
+      tooltip: _index == 0 ? 'New Note (⌘N)' : 'Import PDF (⌘O)',
+      onPressed: () =>
+          _index == 0 ? createNote(context, ref) : importPaper(context, ref),
+    );
+    Widget search(double width) => MacToolbarSearch(
+      controller: _searchController,
+      focusNode: _searchFocus,
+      onChanged: _onSearchChanged,
+      width: width,
+    );
+
+    // Like Notes, the list is titled by the folder, project or tag shown,
+    // with its count under it.
+    final String title;
+    final String subtitle;
+    if (searching) {
+      title = 'Search';
+      subtitle = 'Notes, papers and highlights';
+    } else if (_index == 0) {
+      title = notesFilterTitle(
+        ref.watch(notesFilterProvider),
+        folders: ref.watch(foldersListProvider).value ?? const [],
+        projects: ref.watch(projectsListProvider).value ?? const [],
+        tags: ref.watch(tagsListProvider).value ?? const [],
+      );
+      subtitle = countLabel(
+        ref.watch(visibleNotesProvider).value?.length ?? 0,
+        'note',
+        'notes',
+      );
+    } else {
+      title = 'Library';
+      subtitle = countLabel(
+        ref.watch(filteredPapersProvider).value?.length ?? 0,
+        'paper',
+        'papers',
+      );
+    }
+    final listMenu = _index == 0
+        ? PopupMenuButton<String>(
+            key: const ValueKey('mac-list-menu'),
+            tooltip: 'More',
+            icon: const Icon(Icons.more_horiz, size: 19),
+            onSelected: (v) {
+              if (v == 'attachments') _showMacAttachments();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'attachments',
+                child: ListTile(
+                  leading: Icon(Icons.attach_file),
+                  title: Text('Show Attachments'),
+                  trailing: Text('⌘3'),
+                ),
+              ),
+            ],
+          )
+        : LibraryMenuButton(
+            key: const ValueKey('mac-list-menu'),
+            onShowAttachments: _showMacAttachments,
+          );
+
+    final lists = Column(
+      children: [
+        MacToolbarRow(
+          leadingInset: sidebarOn ? 0 : lights,
+          leading: [if (!sidebarOn) sidebarButton],
+          title: title,
+          titleKey: const ValueKey('mac-list-title'),
+          subtitle: subtitle,
+          actions: [
+            listMenu,
+            // Without a pane the row's other controls come here.
+            if (!expanded) primary,
+            if (searchInList) search(expanded ? 150 : 200),
+          ],
+        ),
+        Expanded(
+          child: Material(
+            type: MaterialType.transparency,
+            child: IndexedStack(
+              // The list keeps its place while results show over it.
+              index: searching ? 1 : 0,
+              sizing: StackFit.expand,
+              children: [
+                _tabs(),
+                if (searching)
+                  SearchResultsView(
+                    query: _searchQuery,
+                    onOpenNote: (id) {
+                      setState(() => _index = 0);
+                      openNote(context, ref, id);
+                    },
+                    onOpenPaper: (id) {
+                      setState(() => _index = 1);
+                      openPaper(context, ref, id);
+                    },
+                  )
+                else
+                  const SizedBox.shrink(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
     final Widget content;
-    if (layout == HomeLayout.expanded) {
-      final listWidth = ref.watch(macListWidthProvider);
-      final room = width - (sidebarOn ? macSidebarWidth + 1 : 0);
-      // The detail pane always keeps at least 360 points.
-      final maxList = (room - 360 - 7).clamp(macListMinWidth, macListMaxWidth);
-      final w = listWidth.width.clamp(macListMinWidth, maxList);
+    if (_attachments) {
+      content = Column(
+        children: [
+          MacToolbarRow(
+            leadingInset: sidebarOn ? 0 : lights,
+            leading: [if (!sidebarOn) sidebarButton],
+            title: 'Attachments',
+            subtitle: countLabel(
+              ref.watch(allAttachmentsProvider).value?.length ?? 0,
+              'item',
+              'items',
+            ),
+            actions: [
+              TextButton(
+                key: const ValueKey('mac-attachments-done'),
+                onPressed: () => setState(() => _attachments = false),
+                child: const Text('Done'),
+              ),
+              search(200),
+            ],
+          ),
+          Expanded(
+            child: AttachmentsBrowserScreen(
+              embedded: true,
+              onLeave: () => setState(() => _attachments = false),
+            ),
+          ),
+        ],
+      );
+    } else if (expanded) {
       content = Row(
         children: [
           SizedBox(
@@ -387,7 +587,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             onDragEnd: listWidth.save,
           ),
           Expanded(
-            child: FocusTraversalGroup(child: DetailPane(tab: _index)),
+            child: FocusTraversalGroup(
+              child: MacPaneChrome(
+                leading: primary,
+                trailing: searchInList
+                    ? const SizedBox(width: 6)
+                    : search(pane >= 1000 ? 220 : 180),
+                child: DetailPane(tab: _index),
+              ),
+            ),
           ),
         ],
       );
@@ -405,31 +613,38 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       body: Column(
         children: [
           Expanded(
-            child: Row(
-              children: [
-                MacSidebarSlot(
-                  visible: sidebarOn,
-                  child: Row(
-                    children: [
-                      FocusTraversalGroup(
-                        child: MacSidebar(
-                          index: _index,
-                          email: user?.email,
-                          onSelected: (i) => setState(() => _index = i),
-                          onPrimary: () => _index == 0
-                              ? createNote(context, ref)
-                              : importPaper(context, ref),
-                          onSearch: _openSearch,
-                          onTrash: _openTrash,
-                          onSettings: () => _showAccountMenu(context),
+            // Each column draws its part of the toolbar row in the title
+            // bar band, so none of them takes the band as padding.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: Row(
+                children: [
+                  MacSidebarSlot(
+                    visible: sidebarOn,
+                    child: Row(
+                      children: [
+                        FocusTraversalGroup(
+                          child: MacSidebar(
+                            index: _index,
+                            selectionShown: !searching && !_attachments,
+                            email: user?.email,
+                            onSelected: (i) => setState(() {
+                              _clearMacModes();
+                              _index = i;
+                            }),
+                            onToggleSidebar: toggleSidebar,
+                            onTrash: _openTrash,
+                            onSettings: () => _showAccountMenu(context),
+                          ),
                         ),
-                      ),
-                      VerticalDivider(width: 1, color: c.outlineVariant),
-                    ],
+                        VerticalDivider(width: 1, color: c.outlineVariant),
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(child: content),
-              ],
+                  Expanded(child: content),
+                ],
+              ),
             ),
           ),
           const AudioPlayerBar(),

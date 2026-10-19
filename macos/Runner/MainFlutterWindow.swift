@@ -26,6 +26,14 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     titlebarAppearsTransparent = true
     titleVisibility = .hidden
     styleMask.insert(.fullSizeContentView)
+    // An empty unified toolbar makes the title bar the height of Notes'
+    // toolbar row (the traffic lights move down to its middle); Flutter
+    // draws the toolbar's controls in that band and still gets the clicks.
+    // Pages pushed over home hide it (`setToolbar`), back to the slim bar.
+    let toolbar = NSToolbar(identifier: "CorplexToolbar")
+    toolbar.showsBaselineSeparator = false
+    self.toolbar = toolbar
+    toolbarStyle = .unified
     tabbingMode = .disallowed
     minSize = NSSize(width: 720, height: 520)
     // A first launch opens at a comfortable size for reading beside notes,
@@ -56,6 +64,12 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       case "zoom":
         self.performZoom(nil)
         result(nil)
+      case "setToolbar":
+        // Shows or hides the toolbar row; answers the band's new height.
+        self.toolbar?.isVisible = call.arguments as? Bool ?? true
+        result(self.titleBandHeight())
+      case "titleBandHeight":
+        result(self.titleBandHeight())
       case "isFullScreen":
         result(self.styleMask.contains(.fullScreen))
       case "captureReady":
@@ -136,6 +150,16 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   @objc func dockNewNote(_ sender: Any?) { capture("capture", "newNote") }
 
   // MARK: Full screen (the title bar strip collapses there)
+
+  /// The height of the title-bar band Flutter must leave for the traffic
+  /// lights: twice the distance from the top to the buttons' middle, which
+  /// holds for the slim title bar and the toolbar row on every macOS.
+  func titleBandHeight() -> Double {
+    contentView?.superview?.layoutSubtreeIfNeeded()
+    guard let button = standardWindowButton(.closeButton) else { return 28 }
+    let rect = button.convert(button.bounds, to: nil)
+    return Double((frame.height - rect.midY) * 2).rounded()
+  }
 
   func windowWillEnterFullScreen(_ notification: Notification) {
     channel?.invokeMethod("fullScreen", arguments: true)

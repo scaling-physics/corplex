@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../theme/app_theme.dart';
 import '../capture/quick_capture.dart';
@@ -20,14 +21,21 @@ bool isDesktop(BuildContext context) =>
 bool isMac(BuildContext context) =>
     Theme.of(context).platform == TargetPlatform.macOS;
 
-/// Height of the transparent macOS title bar that the window's content runs
-/// under. Every column's top keeps this much free of controls: AppKit takes
-/// the clicks there (window drag, double-click to zoom), and the traffic
-/// lights sit in it at the top left.
+/// Height of the slim transparent macOS title bar that pages pushed over
+/// home run under (the native window reports the real height, see
+/// [MacWindow.titleBand]; 28 pt before macOS 26, 32 pt after).
 const macTitleBarHeight = 28.0;
 
-/// How far the traffic lights reach in from the left edge of the window.
-const macTrafficLightsWidth = 78.0;
+/// Height of the home window's toolbar row, as in Notes: the native window
+/// has an empty unified toolbar there, so the traffic lights sit in its
+/// middle, and Flutter draws the row's controls (search, new note, the
+/// formatting buttons) in that band — clicks there still reach Flutter.
+const macToolbarHeight = 52.0;
+
+/// How far the traffic lights reach in from the left edge of the window
+/// in the toolbar row, plus a little air: a toolbar that starts at the
+/// window's left edge starts its controls after this.
+const macTrafficLightsWidth = 86.0;
 
 /// The widest a Mac pane's text measure gets. Panes fill their width like
 /// Notes with small margins, but on an ultrawide display (a 38" 3840×1600
@@ -151,6 +159,14 @@ abstract class MacWindow {
   /// when it is now registered; false when off or taken by another app.
   Future<bool> setQuickNoteHotKey(bool enabled);
   ValueListenable<bool> get fullScreen;
+
+  /// The title bar band's height outside full screen: [macToolbarHeight]
+  /// while the toolbar row shows, the slim title bar's otherwise.
+  ValueListenable<double> get titleBand;
+
+  /// Shows the toolbar row (home on top) or the slim title bar (a page
+  /// pushed over home, whose own app bar sits under it).
+  Future<void> setToolbar(bool visible);
   Future<void> startDrag();
   Future<void> zoom();
 
@@ -164,9 +180,15 @@ class InertMacWindow implements MacWindow {
   InertMacWindow();
 
   final _fullScreen = ValueNotifier(false);
+  final _titleBand = ValueNotifier(macToolbarHeight);
 
   @override
   Stream<MenuCommand> get menuCommands => const Stream.empty();
+  @override
+  ValueListenable<double> get titleBand => _titleBand;
+  @override
+  Future<void> setToolbar(bool visible) async =>
+      _titleBand.value = visible ? macToolbarHeight : macTitleBarHeight;
   @override
   Stream<QuickCapture> get captures => const Stream.empty();
   @override
@@ -206,11 +228,16 @@ class ChannelMacWindow implements MacWindow {
     });
     // Native holds captures until told Dart is listening.
     _channel.invokeMethod<void>('captureReady').catchError((_) {});
+    _channel
+        .invokeMethod<double>('titleBandHeight')
+        .then((h) => _titleBand.value = h ?? _titleBand.value)
+        .catchError((_) => _titleBand.value);
   }
 
   static const _channel = MethodChannel('corplex/window');
   final _commands = StreamController<MenuCommand>.broadcast();
   final _fullScreen = ValueNotifier(false);
+  final _titleBand = ValueNotifier(macToolbarHeight);
   final _pending = <QuickCapture>[];
   late final StreamController<QuickCapture> _captures =
       StreamController<QuickCapture>.broadcast(
@@ -238,6 +265,16 @@ class ChannelMacWindow implements MacWindow {
 
   @override
   ValueListenable<bool> get fullScreen => _fullScreen;
+  @override
+  ValueListenable<double> get titleBand => _titleBand;
+  @override
+  Future<void> setToolbar(bool visible) async {
+    try {
+      final h = await _channel.invokeMethod<double>('setToolbar', visible);
+      if (h != null) _titleBand.value = h;
+    } catch (_) {}
+  }
+
   @override
   Future<void> startDrag() => _channel.invokeMethod('startDrag');
   @override
@@ -268,11 +305,95 @@ final macFullScreenProvider = Provider<bool>((ref) {
   return fullScreen.value;
 });
 
-/// [macTitleBarHeight] on macOS outside full screen, else 0. Most code
+/// The title bar band's height ([MacWindow.titleBand]).
+final macTitleBandProvider = Provider<double>((ref) {
+  final band = ref.watch(macWindowProvider).titleBand;
+  void changed() => ref.invalidateSelf();
+  band.addListener(changed);
+  ref.onDispose(() => band.removeListener(changed));
+  return band.value;
+});
+
+/// The title bar band on macOS outside full screen, else 0. Most code
 /// never needs this: [MacWindowFrame] already adds it to the top of
 /// `MediaQuery.padding`, so AppBars and SafeAreas leave room by themselves.
+/// The home window removes it and draws its toolbar row in the band.
 double macTitleBarInset(BuildContext context, WidgetRef ref) =>
-    isMac(context) && !ref.watch(macFullScreenProvider) ? macTitleBarHeight : 0;
+    isMac(context) && !ref.watch(macFullScreenProvider)
+    ? ref.watch(macTitleBandProvider)
+    : 0;
+
+/// Whether the toolbar row shows: home is the top page (dialogs, sheets and
+/// menus over it don't count). Kept by [MacToolbarRouteObserver].
+final macHomeOnTopProvider = StateProvider<bool>((ref) => true);
+
+/// Keeps the native toolbar row for the home window only: a page pushed
+/// over home (the PDF viewer, a project) gets the slim title bar and its
+/// own app bar below it, so its back button never sits under the traffic
+/// lights. Popup routes (dialogs, sheets, menus) are ignored.
+class MacToolbarRouteObserver extends NavigatorObserver {
+  MacToolbarRouteObserver(this._onChanged);
+
+  final void Function(bool homeOnTop) _onChanged;
+  final _pages = <Route<dynamic>>[];
+  bool? _last;
+
+  void _update() {
+    final homeOnTop = _pages.length <= 1;
+    if (homeOnTop == _last) return;
+    _last = homeOnTop;
+    _onChanged(homeOnTop);
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (route is PageRoute) _pages.add(route);
+    _update();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _pages.remove(route);
+    _update();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _pages.remove(route);
+    _update();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    final i = oldRoute == null ? -1 : _pages.indexOf(oldRoute);
+    if (i >= 0) _pages.removeAt(i);
+    if (newRoute is PageRoute) {
+      i >= 0 ? _pages.insert(i, newRoute) : _pages.add(newRoute);
+    }
+    _update();
+  }
+}
+
+/// Empty toolbar space on a Mac: drags the window, double-click zooms (the
+/// band's clicks reach Flutter, not AppKit). Put it behind a toolbar row's
+/// controls, e.g. as an AppBar's `flexibleSpace`.
+class MacWindowDragArea extends ConsumerWidget {
+  const MacWindowDragArea({super.key, this.child});
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!isMac(context)) return child ?? const SizedBox.expand();
+    final window = ref.watch(macWindowProvider);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (_) => window.startDrag(),
+      onDoubleTap: window.zoom,
+      child: child ?? const SizedBox.expand(),
+    );
+  }
+}
 
 /// Wraps the whole app (`MaterialApp.builder`). On macOS the window's
 /// content runs under a transparent title bar, so this treats the title
@@ -323,7 +444,8 @@ class MacWindowFrame extends ConsumerWidget {
         child: SizedBox.fromSize(size: size, child: app),
       );
     }
-    if (inset == 0) return app;
+    // On home the toolbar row's own empty space drags the window.
+    if (inset == 0 || ref.watch(macHomeOnTopProvider)) return app;
     final window = ref.watch(macWindowProvider);
     return Stack(
       children: [

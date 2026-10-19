@@ -54,13 +54,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
-  Future<List<SearchHit>> _find(String query) async {
-    final pdf = ref.read(pdfTextIndexProvider);
-    // Papers' text may not be indexed yet (or since a restart): carry on.
-    pdf.kickIfIncomplete();
-    final hits = await ref.read(searchIndexProvider).search(query);
-    return [...hits, ...await pdf.search(query)];
-  }
+  Future<List<SearchHit>> _find(String query) => searchEverything(ref, query);
 
   Future<void> _open(SearchHit hit) async {
     final db = ref.read(databaseProvider);
@@ -72,31 +66,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         builder: (_) => PaperDetailScreen(paperId: hit.id),
       ),
       SearchKind.highlight ||
-      SearchKind.pdfText => await _highlightRoute(db, hit),
+      SearchKind.pdfText => await highlightRoute(db, hit, _query),
     };
     if (route != null && mounted) {
       await Navigator.of(context).push(route);
     }
-  }
-
-  /// A highlight opens its PDF at the right page — or the paper's screen
-  /// when the file hasn't reached this device yet.
-  Future<Route<void>?> _highlightRoute(AppDatabase db, SearchHit hit) async {
-    final paper = await (db.select(
-      db.papers,
-    )..where((p) => p.id.equals(hit.paperId!))).getSingleOrNull();
-    if (paper == null) return null;
-    return MaterialPageRoute<void>(
-      builder: (_) => paper.pdfPath == null
-          ? PaperDetailScreen(paperId: paper.id)
-          : PdfViewerScreen(
-              paperId: paper.id,
-              pdfPath: paper.pdfPath!,
-              initialPage: hit.page,
-              // A match in the paper's text: show it with Find.
-              initialQuery: hit.kind == SearchKind.pdfText ? _query : null,
-            ),
-    );
   }
 
   @override
@@ -164,7 +138,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       message: 'Try fewer or different words.',
                     );
                   }
-                  return _ResultsList(
+                  return SearchResultsList(
                     hits: hits,
                     onTap: _open,
                     indexing: _indexing,
@@ -176,8 +150,132 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _ResultsList extends StatelessWidget {
-  const _ResultsList({required this.hits, required this.onTap, this.indexing});
+/// Notes, papers, highlights and PDF text matching [query], each kind
+/// starting the PDF indexer if papers' text isn't all indexed yet.
+Future<List<SearchHit>> searchEverything(WidgetRef ref, String query) async {
+  final pdf = ref.read(pdfTextIndexProvider);
+  // Papers' text may not be indexed yet (or since a restart): carry on.
+  pdf.kickIfIncomplete();
+  final hits = await ref.read(searchIndexProvider).search(query);
+  return [...hits, ...await pdf.search(query)];
+}
+
+/// A highlight (or a match in a paper's text) opens its PDF at the right
+/// page — or the paper's screen when the file hasn't reached this device.
+Future<Route<void>?> highlightRoute(
+  AppDatabase db,
+  SearchHit hit,
+  String query,
+) async {
+  final paper = await (db.select(
+    db.papers,
+  )..where((p) => p.id.equals(hit.paperId!))).getSingleOrNull();
+  if (paper == null) return null;
+  return MaterialPageRoute<void>(
+    builder: (_) => paper.pdfPath == null
+        ? PaperDetailScreen(paperId: paper.id)
+        : PdfViewerScreen(
+            paperId: paper.id,
+            pdfPath: paper.pdfPath!,
+            initialPage: hit.page,
+            // A match in the paper's text: show it with Find.
+            initialQuery: hit.kind == SearchKind.pdfText ? query : null,
+          ),
+  );
+}
+
+/// Search results for [query] in place, for the Mac window's list column
+/// (the toolbar's search field fills it): a note or paper opens in the
+/// pane beside it ([onOpenNote] / [onOpenPaper]); a highlight or a match in
+/// a paper's text opens the PDF at its page.
+class SearchResultsView extends ConsumerStatefulWidget {
+  const SearchResultsView({
+    super.key,
+    required this.query,
+    required this.onOpenNote,
+    required this.onOpenPaper,
+  });
+
+  final String query;
+  final ValueChanged<String> onOpenNote;
+  final ValueChanged<String> onOpenPaper;
+
+  @override
+  ConsumerState<SearchResultsView> createState() => _SearchResultsViewState();
+}
+
+class _SearchResultsViewState extends ConsumerState<SearchResultsView> {
+  late Future<List<SearchHit>> _results;
+  late Future<bool> _indexing;
+
+  @override
+  void initState() {
+    super.initState();
+    _search();
+  }
+
+  @override
+  void didUpdateWidget(SearchResultsView old) {
+    super.didUpdateWidget(old);
+    if (old.query != widget.query) _search();
+  }
+
+  void _search() {
+    _results = searchEverything(ref, widget.query);
+    _indexing = ref.read(pdfTextIndexProvider).incomplete;
+  }
+
+  Future<void> _open(SearchHit hit) async {
+    switch (hit.kind) {
+      case SearchKind.note:
+        widget.onOpenNote(hit.id);
+      case SearchKind.paper:
+        widget.onOpenPaper(hit.id);
+      case SearchKind.highlight || SearchKind.pdfText:
+        final route = await highlightRoute(
+          ref.read(databaseProvider),
+          hit,
+          widget.query,
+        );
+        if (route != null && mounted) await Navigator.of(context).push(route);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<SearchHit>>(
+    future: _results,
+    builder: (context, snapshot) {
+      final hits = snapshot.data;
+      if (hits == null) return const SizedBox.shrink();
+      if (hits.isEmpty) {
+        return const EmptyState(
+          icon: Icons.search_off,
+          title: 'No matches',
+          message: 'Try fewer or different words.',
+        );
+      }
+      return SearchResultsList(
+        hits: hits,
+        onTap: _open,
+        indexing: _indexing,
+        dense: true,
+      );
+    },
+  );
+}
+
+/// Results grouped by kind (Notes, Papers, Highlights, In papers).
+class SearchResultsList extends StatelessWidget {
+  const SearchResultsList({
+    super.key,
+    required this.hits,
+    required this.onTap,
+    this.indexing,
+    this.dense = false,
+  });
+
+  /// Smaller rows and headings, for a Mac list column.
+  final bool dense;
 
   final List<SearchHit> hits;
   final ValueChanged<SearchHit> onTap;
@@ -200,7 +298,9 @@ class _ResultsList extends StatelessWidget {
       if (ofKind.isEmpty) continue;
       children.add(
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+          padding: dense
+              ? const EdgeInsets.fromLTRB(16, 12, 16, 2)
+              : const EdgeInsets.fromLTRB(20, 16, 20, 4),
           child: Text(
             _labels[kind]!,
             style: Theme.of(context).textTheme.titleSmall,
@@ -212,7 +312,7 @@ class _ResultsList extends StatelessWidget {
           EntranceTransition(
             key: ValueKey('${hit.kind.name}-${hit.id}-${hit.page}'),
             index: i,
-            child: _HitTile(hit: hit, onTap: () => onTap(hit)),
+            child: _HitTile(hit: hit, dense: dense, onTap: () => onTap(hit)),
           ),
         );
       }
@@ -243,10 +343,11 @@ class _ResultsList extends StatelessWidget {
 }
 
 class _HitTile extends StatelessWidget {
-  const _HitTile({required this.hit, required this.onTap});
+  const _HitTile({required this.hit, required this.onTap, this.dense = false});
 
   final SearchHit hit;
   final VoidCallback onTap;
+  final bool dense;
 
   static Widget _marked(BuildContext context, String text, TextStyle? base) {
     final c = Theme.of(context).colorScheme;
@@ -283,11 +384,12 @@ class _HitTile extends StatelessWidget {
     };
     final title = hit.title.replaceAll(RegExp(r'\s+'), ' ').trim();
     return ListTile(
+      dense: dense,
       leading: Icon(icon, color: theme.colorScheme.primary),
       title: _marked(
         context,
         title.isEmpty ? 'Untitled' : title,
-        theme.textTheme.titleMedium,
+        dense ? theme.textTheme.titleSmall : theme.textTheme.titleMedium,
       ),
       subtitle: hit.snippet.isEmpty && hit.page == null
           ? null
@@ -299,9 +401,8 @@ class _HitTile extends StatelessWidget {
                   if (hit.page != null) 'p. ${hit.page}',
                   if (hit.snippet.isNotEmpty) hit.snippet,
                 ].join(' · '),
-                theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                (dense ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
       onTap: onTap,

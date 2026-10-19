@@ -27,7 +27,19 @@ Future<void> showAttachmentsBrowser(BuildContext context) =>
     );
 
 class AttachmentsBrowserScreen extends ConsumerStatefulWidget {
-  const AttachmentsBrowserScreen({super.key});
+  const AttachmentsBrowserScreen({
+    super.key,
+    this.embedded = false,
+    this.onLeave,
+  });
+
+  /// Just the browser, no page around it: the Mac window shows it in place
+  /// of the list and the pane, under its own toolbar row.
+  final bool embedded;
+
+  /// Called before "Show in note/paper" opens the item, so an embedded
+  /// browser can step aside for the pane.
+  final VoidCallback? onLeave;
 
   @override
   ConsumerState<AttachmentsBrowserScreen> createState() =>
@@ -40,6 +52,7 @@ class _AttachmentsBrowserScreenState
   String _query = '';
 
   void _show(AttachmentEntry e) {
+    widget.onLeave?.call();
     if (e.noteId != null) {
       openNoteFromPage(context, ref, e.noteId!);
     } else if (e.paperId != null) {
@@ -253,6 +266,7 @@ class _AttachmentsBrowserScreenState
       },
     );
 
+    if (widget.embedded) return body;
     return Scaffold(
       appBar: AppBar(title: const Text('Attachments')),
       body: mac ? body : ReadableColumn(child: body),

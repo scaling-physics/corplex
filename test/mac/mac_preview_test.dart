@@ -93,7 +93,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The Library with a paper open.
-      await tester.tap(find.text('Library').first);
+      await tester.tap(find.text('All Papers').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Attention Is All You Need').first);
       await tester.pumpAndSettle();

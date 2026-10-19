@@ -119,77 +119,30 @@ class LibraryScreen extends ConsumerWidget {
     return _TrashKey(
       child: Column(
         children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 4, isDesktop(context) ? 8 : 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SearchBar(
-                    hintText: 'Search papers',
-                    leading: const Icon(Icons.search),
-                    onChanged: (value) =>
-                        ref.read(librarySearchProvider.notifier).state = value,
+          // On a Mac the toolbar row has the search field and this menu.
+          if (!isMac(context))
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                4,
+                4,
+                isDesktop(context) ? 8 : 12,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SearchBar(
+                      hintText: 'Search papers',
+                      leading: const Icon(Icons.search),
+                      onChanged: (value) =>
+                          ref.read(librarySearchProvider.notifier).state =
+                              value,
+                    ),
                   ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'More',
-                  onSelected: (v) => switch (v) {
-                    'doi' => addPaperByIdentifier(context, ref),
-                    'import' => importBibtexFile(context, ref),
-                    'export' => exportLibraryBibtex(context, ref),
-                    'zotero' => importFromZotero(context, ref),
-                    'highlights' => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AllHighlightsScreen(),
-                      ),
-                    ),
-                    _ => null,
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'highlights',
-                      child: ListTile(
-                        leading: Icon(Icons.format_quote_outlined),
-                        title: Text('All highlights'),
-                        subtitle: Text('Across every paper'),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'doi',
-                      child: ListTile(
-                        leading: Icon(Icons.travel_explore),
-                        title: Text('Add by DOI or arXiv ID'),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'import',
-                      child: ListTile(
-                        leading: Icon(Icons.file_download_outlined),
-                        title: Text('Import references'),
-                        subtitle: Text(
-                          'BibTeX, RIS or CSL JSON (Zotero, Mendeley)',
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'zotero',
-                      child: ListTile(
-                        leading: Icon(Icons.sync_alt),
-                        title: Text('Import from Zotero…'),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'export',
-                      child: ListTile(
-                        leading: Icon(Icons.ios_share),
-                        title: Text('Export as BibTeX'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  const LibraryMenuButton(),
+                ],
+              ),
             ),
-          ),
           AnimatedSize(
             duration: AppMotion.medium,
             curve: AppMotion.standard,
@@ -699,3 +652,82 @@ void _openPdf(BuildContext context, Paper paper) => Navigator.of(context).push(
     ),
   ),
 );
+
+/// The Library's ⋯ menu: all highlights, add by identifier, import and
+/// export references, Zotero. Beside the search field on phones and
+/// tablets; in the list column's toolbar row on a Mac.
+class LibraryMenuButton extends ConsumerWidget {
+  const LibraryMenuButton({super.key, this.onShowAttachments});
+
+  /// Adds "Show Attachments" first (the Mac list column's ⋯ menu).
+  final VoidCallback? onShowAttachments;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<String>(
+      tooltip: 'More',
+      icon: onShowAttachments == null
+          ? null
+          : const Icon(Icons.more_horiz, size: 19),
+      onSelected: (v) => switch (v) {
+        'attachments' => onShowAttachments?.call(),
+        'doi' => addPaperByIdentifier(context, ref),
+        'import' => importBibtexFile(context, ref),
+        'export' => exportLibraryBibtex(context, ref),
+        'zotero' => importFromZotero(context, ref),
+        'highlights' => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const AllHighlightsScreen())),
+        _ => null,
+      },
+      itemBuilder: (_) => [
+        if (onShowAttachments != null)
+          const PopupMenuItem(
+            value: 'attachments',
+            child: ListTile(
+              leading: Icon(Icons.attach_file),
+              title: Text('Show Attachments'),
+              trailing: Text('\u23183'),
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'highlights',
+          child: ListTile(
+            leading: Icon(Icons.format_quote_outlined),
+            title: Text('All highlights'),
+            subtitle: Text('Across every paper'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'doi',
+          child: ListTile(
+            leading: Icon(Icons.travel_explore),
+            title: Text('Add by DOI or arXiv ID'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'import',
+          child: ListTile(
+            leading: Icon(Icons.file_download_outlined),
+            title: Text('Import references'),
+            subtitle: Text('BibTeX, RIS or CSL JSON (Zotero, Mendeley)'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'zotero',
+          child: ListTile(
+            leading: Icon(Icons.sync_alt),
+            title: Text('Import from Zotero…'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'export',
+          child: ListTile(
+            leading: Icon(Icons.ios_share),
+            title: Text('Export as BibTeX'),
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -17,6 +17,8 @@ import 'package:corplex/features/notes/note_editor_screen.dart';
 import 'package:corplex/features/platform/mac_window.dart';
 import 'package:corplex/features/share/share_import.dart';
 import 'package:corplex/features/trash/trash_screen.dart';
+import 'package:corplex/features/search/search_screen.dart';
+import 'package:corplex/features/attachments/attachments_browser.dart';
 
 import '../../support/fake_audio_engine.dart';
 import '../../support/mac_screenshot.dart';
@@ -40,6 +42,16 @@ class _FakeWindow implements MacWindow {
   Stream<MenuCommand> get menuCommands => commands.stream;
   @override
   ValueListenable<bool> get fullScreen => _full;
+  final _band = ValueNotifier(macToolbarHeight);
+  final toolbarCalls = <bool>[];
+  @override
+  ValueListenable<double> get titleBand => _band;
+  @override
+  Future<void> setToolbar(bool visible) async {
+    toolbarCalls.add(visible);
+    _band.value = visible ? macToolbarHeight : macTitleBarHeight;
+  }
+
   @override
   Future<void> startDrag() async {}
   @override
@@ -111,13 +123,33 @@ void main() {
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.byType(FloatingActionButton), findsNothing);
       expect(tester.takeException(), isNull);
-      // Nothing sits in the title-bar band.
+      // One toolbar row, as in Notes: the controls sit in the title bar
+      // band, level with the traffic lights and clear of them.
       final sidebar = tester.getRect(find.byKey(const ValueKey('mac-sidebar')));
       final primary = tester.getRect(
         find.byKey(const ValueKey('mac-primary-action')),
       );
-      expect(primary.top, greaterThanOrEqualTo(macTitleBarHeight));
+      final newFolder = tester.getRect(
+        find.byKey(const ValueKey('mac-new-folder')),
+      );
+      final search = tester.getRect(
+        find.byKey(const ValueKey('mac-toolbar-search')),
+      );
+      for (final r in [primary, newFolder, search]) {
+        expect(r.center.dy, closeTo(macToolbarHeight / 2, 1));
+      }
+      expect(newFolder.left, greaterThanOrEqualTo(macTrafficLightsWidth));
+      expect(primary.left, greaterThanOrEqualTo(sidebar.right));
       expect(sidebar.width, macSidebarWidth);
+      // Search and Attachments are no longer sidebar rows.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('mac-sidebar')),
+          matching: find.text('Search'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('Attachments'), findsNothing);
       await macScreenshot(tester, 'shell-$name');
       await dispose(tester);
     }, variant: macOnly);
@@ -129,7 +161,7 @@ void main() {
 
     await send(tester, MenuCommand.showLibrary);
     expect(find.text('Your library is empty'), findsOneWidget);
-    expect(find.text('Import PDF'), findsWidgets);
+    expect(find.byTooltip('Import PDF (\u2318O)'), findsOneWidget);
 
     await send(tester, MenuCommand.showNotes);
     expect(find.text('First note'), findsOneWidget);
@@ -145,6 +177,117 @@ void main() {
     await send(tester, MenuCommand.trash);
     expect(find.text('Trash'), findsWidgets);
     await send(tester, MenuCommand.showNotes); // pops back home
+    expect(find.byKey(const ValueKey('mac-sidebar')), findsOneWidget);
+    await dispose(tester);
+  }, variant: macOnly);
+
+  testWidgets('the toolbar search shows results in the list column', (
+    tester,
+  ) async {
+    await show(tester, macWindowSizes['laptop16']!);
+    // View → Search (and ⌘F outside a note) focuses the toolbar field:
+    // no search page.
+    await send(tester, MenuCommand.search);
+    expect(find.byType(SearchScreen), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('mac-toolbar-search')),
+      'second',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    final title = find.byKey(const ValueKey('mac-list-title'));
+    expect(tester.widget<Text>(title).data, 'Search');
+    expect(find.byType(SearchResultsView), findsOneWidget);
+    // A result opens in the pane beside the results, which stay.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SearchResultsView),
+        matching: find.textContaining('Second note', findRichText: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteEditorScreen), findsOneWidget);
+    expect(find.byType(SearchResultsView), findsOneWidget);
+    // Escape clears it and the list comes back.
+    await tester.tap(find.byKey(const ValueKey('mac-toolbar-search')));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchResultsView), findsNothing);
+    expect(tester.widget<Text>(title).data, 'Notes');
+    await dispose(tester);
+  }, variant: macOnly);
+
+  testWidgets('attachments fill the window from the list menu; Done leaves', (
+    tester,
+  ) async {
+    await show(tester, macWindowSizes['laptop16']!);
+    await tester.tap(find.byKey(const ValueKey('mac-list-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show Attachments'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AttachmentsBrowserScreen), findsOneWidget);
+    expect(find.text('Attachments'), findsOneWidget);
+    // In place of list and pane, not a page over them.
+    expect(find.byKey(const ValueKey('mac-list')), findsNothing);
+    expect(find.byKey(const ValueKey('mac-sidebar')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('mac-attachments-done')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AttachmentsBrowserScreen), findsNothing);
+    expect(find.byKey(const ValueKey('mac-list')), findsOneWidget);
+    // View → Attachments too; choosing a sidebar row leaves.
+    await send(tester, MenuCommand.showAttachments);
+    expect(find.byType(AttachmentsBrowserScreen), findsOneWidget);
+    await tester.tap(find.text('All Papers'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AttachmentsBrowserScreen), findsNothing);
+    expect(find.text('Your library is empty'), findsOneWidget);
+    await dispose(tester);
+  }, variant: macOnly);
+
+  testWidgets('a page pushed over home gets the slim title bar', (
+    tester,
+  ) async {
+    await show(tester, macWindowSizes['laptop13']!);
+    window.toolbarCalls.clear();
+    await send(tester, MenuCommand.trash);
+    expect(find.byType(TrashScreen), findsOneWidget);
+    expect(window.toolbarCalls, [false]);
+    // Its app bar sits under the slim title bar, clear of the lights.
+    final bar = tester.getRect(
+      find.descendant(
+        of: find.byType(TrashScreen),
+        matching: find.byType(AppBar),
+      ),
+    );
+    expect(bar.top, 0);
+    expect(
+      tester.getRect(find.byType(BackButton)).top,
+      greaterThanOrEqualTo(macTitleBarHeight),
+    );
+    await send(tester, MenuCommand.back);
+    expect(window.toolbarCalls, [false, true]);
+    // A dialog over home keeps the toolbar row.
+    await send(tester, MenuCommand.keyboardShortcuts);
+    expect(window.toolbarCalls, [false, true]);
+    await dispose(tester);
+  }, variant: macOnly);
+
+  testWidgets('with the sidebar hidden the list row clears the lights', (
+    tester,
+  ) async {
+    await show(tester, macWindowSizes['laptop13']!);
+    await tester.tap(find.byKey(const ValueKey('mac-toggle-sidebar')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mac-sidebar')), findsNothing);
+    final show_ = find.byKey(const ValueKey('mac-show-sidebar'));
+    expect(
+      tester.getRect(show_).left,
+      greaterThanOrEqualTo(macTrafficLightsWidth),
+    );
+    await tester.tap(show_);
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('mac-sidebar')), findsOneWidget);
     await dispose(tester);
   }, variant: macOnly);
@@ -283,7 +426,7 @@ void main() {
     // The editor owns Tab while it has focus (indent), so start from the
     // sidebar's first control and walk forwards.
     FocusManager.instance.primaryFocus?.unfocus();
-    Focus.of(tester.element(find.byKey(const ValueKey('mac-primary-action'))))
+    Focus.of(tester.element(find.byKey(const ValueKey('mac-new-folder'))))
         .requestFocus();
     await tester.pump();
     final seen = <int>[region()];

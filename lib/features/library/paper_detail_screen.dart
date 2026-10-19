@@ -35,6 +35,7 @@ import 'pdf_viewer_screen.dart';
 import 'split_reader.dart';
 import 'study_details_section.dart';
 import '../home/adaptive.dart' show readablePadding;
+import '../home/mac_toolbar.dart' show MacPaneChrome;
 import '../../theme/app_theme.dart';
 import '../../theme/context_menu.dart';
 import '../../theme/haptics.dart';
@@ -714,6 +715,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                 ),
               ),
           ];
+          final chrome = MacPaneChrome.maybeOf(context);
           return CustomScrollView(
             key: _scrollKey,
             controller: _scroll,
@@ -721,6 +723,18 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
               SliverAppBar(
                 pinned: true,
                 automaticallyImplyLeading: !widget.embedded,
+                // In the Mac window's pane: the pane's part of the toolbar
+                // row, Import PDF first and the search field last.
+                toolbarHeight: chrome == null
+                    ? kToolbarHeight
+                    : macToolbarHeight,
+                leading: chrome == null ? null : Center(child: chrome.leading),
+                leadingWidth: chrome == null
+                    ? null
+                    : MacPaneChrome.leadingWidth,
+                flexibleSpace: chrome == null
+                    ? null
+                    : const MacWindowDragArea(),
                 title: _CompactTitle(
                   controller: _titleController,
                   collapse: _collapse,
@@ -752,6 +766,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                       ),
                     ],
                   ),
+                  ?chrome?.trailing,
                 ],
               ),
               if (_loaded)

@@ -829,33 +829,63 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   radius 12, no sheet drag handles, fade page transitions); swipe-to-trash
   is off for a mouse.
 - **Window** (`macos/Runner/MainFlutterWindow.swift`): transparent title bar
-  with full-size content, min 720×520, first size proportional to the
-  screen (~1320×860 on a laptop, ~2100×1180 on a 38" ultrawide), frame
-  remembered. `MacWindowFrame` (`MaterialApp.builder`) treats the title bar
-  like a status bar: its 28 pt join the top of `MediaQuery.padding`, so
-  every AppBar/SafeArea clears the traffic lights; never put controls in
-  that band (it drags the window). Full screen collapses it
-  (`macFullScreenProvider`).
+  with full-size content and an **empty unified `NSToolbar`**, min 720×520,
+  first size proportional to the screen (~1320×860 on a laptop, ~2100×1180
+  on a 38" ultrawide), frame remembered. The toolbar makes the title bar a
+  52 pt band (`macToolbarHeight`) with the traffic lights in its middle,
+  like Notes; **clicks in the band still reach Flutter** (checked natively:
+  `hitTest` there returns the Flutter view, only the lights are AppKit's),
+  so the home window draws its toolbar row there and empty space drags the
+  window through `MacWindowDragArea` (`startDrag`/`zoom` on
+  `corplex/window`). Pages pushed over home (PDF viewer, project, trash…)
+  hide the toolbar for the slim title bar (32 pt on macOS 26+, 28 before):
+  `MacToolbarRouteObserver` (in `app.dart`, page routes only — dialogs,
+  sheets and menus don't count) calls `setToolbar`, which answers the
+  band's real height (`titleBandHeight`: twice the lights' centre);
+  `macHomeOnTopProvider` / `macTitleBandProvider` hold the state.
+  `MacWindowFrame` (`MaterialApp.builder`) adds the band to the top of
+  `MediaQuery.padding`, so a pushed page's AppBar/SafeArea clears the
+  lights and a strip over the band drags the window; home removes that
+  padding (`MediaQuery.removePadding` in `_macScaffold`). Full screen
+  collapses the band (`macFullScreenProvider`).
 - **Interface size** (Settings, View → Interface Size, ⌥⌘+/⌥⌘−/⌥⌘0;
   `AppearanceSettings.interfaceScale`, per device, 90–160%): `MacWindowFrame`
   lays the app out at 1/scale and draws it scaled (a `FittedBox`, so text
   stays sharp and hit testing works), with MediaQuery size and
   devicePixelRatio adjusted. Note text zoom (⌘+/⌘− in a note,
   `noteZoomProvider`) is separate and multiplies with it.
-- **Layout**: `HomeShell._macScaffold` + `home/mac_sidebar.dart` — a source
-  list laid out like Apple Notes (`MacSidebar`: primary action,
-  Library/Search/Attachments, then foldable sections — Notes (All Notes and
-  every folder, with live counts from `folderNoteCountsProvider`), Projects
-  (`projectNoteCountsProvider`) and Tags, each only once one exists — and
-  New Folder, Trash, Settings at the bottom). Choosing a folder, project or
-  tag sets `notesFilterProvider` and the list column's title
-  (`notesFilterTitle`); right-click renames/deletes a folder, opens a
-  project's page or its menu, deletes a tag; dragging a note row
-  (`Draggable<DraggedNote>`) onto a row files it there (All Notes =
-  unfiled). The Notes filter chip row is hidden on desktop while the
-  sidebar shows. Folded sections: `macSidebarCollapsedProvider`, per
-  session. The Notes space has no separate "Notes" row any more: All
-  Notes is it. toggled by ⌃⌘S
+- **Layout**: `HomeShell._macScaffold`, `home/mac_sidebar.dart` and
+  `home/mac_toolbar.dart`, laid out like Apple Notes. **One toolbar row**
+  across the window, each column drawing its part (`MacToolbarRow`,
+  `MacToolbarButton`): the sidebar's (lights, then New Folder and Hide
+  Sidebar), the list's (folder/project/tag title — `notesFilterTitle` — with
+  its count under it, and a ⋯ menu: Show Attachments; in Library the Library
+  menu, `LibraryMenuButton(onShowAttachments:)`), and the pane's (New note /
+  Import PDF first, then the note's formatting and actions, the search field
+  last). The pane's screens take the two ends from `MacPaneChrome`
+  (`NoteEditorScreen`, `PaperDetailScreen`'s SliverAppBar, the empty pane via
+  `macPaneBar`) and size their app bar to the row; elsewhere they keep
+  their usual bar. When the pane is under 820 pt (or there is none) the
+  search field moves to the list's row so a 13" pane keeps all its
+  formatting buttons; with the sidebar hidden the list's row starts after
+  the lights with a Show Sidebar button. **Search** (`MacToolbarSearch`,
+  View → Search, ⌘F outside a note): typing shows `SearchResultsView`
+  (`search_screen.dart`) in the list column over the list (an
+  `IndexedStack`, so the list keeps its place); a note or paper opens in the
+  pane and the results stay; Escape or × clears. **Attachments** (list ⋯ →
+  Show Attachments, View → Attachments ⌘3): the browser
+  (`AttachmentsBrowserScreen(embedded: true)`) replaces list and pane under
+  its own row with Done; choosing a sidebar row or searching leaves it. The
+  sidebar (`MacSidebar`): Notes (All Notes and every folder, live counts from
+  `folderNoteCountsProvider`), Library (All Papers), Projects
+  (`projectNoteCountsProvider`) and Tags, each foldable and the last two only
+  once one exists, then Trash and Settings at the bottom. Choosing a folder,
+  project or tag sets `notesFilterProvider`; right-click renames/deletes a
+  folder, opens a project's page or its menu, deletes a tag; dragging a note
+  row (`Draggable<DraggedNote>`) onto a row files it there (All Notes =
+  unfiled). The Notes filter chip row and Library's own search field are
+  hidden on the Mac. Folded sections: `macSidebarCollapsedProvider`, per
+  session. Sidebar toggled by ⌃⌘S
   (`macSidebarVisibleProvider`, `MacSidebarSlot`; slot = 232 + 1 pt divider,
   change both). ≥ 900 pt: sidebar | list (drag `ColumnDivider`, 280–520,
   `mac.listWidth`; the pane keeps ≥ 360) | pane. Lists are Notes-style

@@ -12,10 +12,12 @@ import '../notes/notes_screen.dart' show confirmDeleteFolder, confirmDeleteTag;
 import '../notes/tags_providers.dart';
 import '../projects/project_menu.dart' show showProjectMenu;
 import '../../theme/app_theme.dart';
-import '../attachments/attachments_browser.dart';
+import '../library/papers_providers.dart';
+import '../platform/mac_window.dart';
 import '../projects/project_page.dart';
 import '../projects/projects_providers.dart';
 import '../sync/sync_ring.dart';
+import 'mac_toolbar.dart';
 
 /// Whether the Mac sidebar is showing (View > Toggle Sidebar). Per session.
 final macSidebarVisibleProvider = StateProvider<bool>((ref) => true);
@@ -196,29 +198,33 @@ String notesFilterTitle(
   },
 };
 
-/// The Mac source list, laid out like Apple Notes: the space's main
-/// action, Library / Search / Attachments, then the Notes section (All
-/// Notes and every folder, with counts), Projects and Tags (each only once
-/// one exists, each foldable), New Folder, Trash and Settings. Choosing a
-/// folder, project or tag shows those notes in the list column; dragging a
-/// note onto one files it there. Its tinted background runs up behind the
-/// traffic lights; the band they sit in stays empty.
+/// The Mac source list, laid out like Apple Notes: its part of the toolbar
+/// row (the traffic lights, then New Folder and the sidebar button), then
+/// the Notes section (All Notes and every folder, with counts), Library
+/// (All Papers), Projects and Tags (each only once one exists, each
+/// foldable), and Trash and Settings at the bottom. Search, New note and
+/// the attachments live in the toolbar row and the list's ⋯ menu, not
+/// here. Choosing a folder, project or tag shows those notes in the list
+/// column; dragging a note onto one files it there.
 class MacSidebar extends ConsumerWidget {
   const MacSidebar({
     super.key,
     required this.index,
+    required this.selectionShown,
     required this.onSelected,
-    required this.onPrimary,
-    required this.onSearch,
+    required this.onToggleSidebar,
     required this.onTrash,
     required this.onSettings,
     required this.email,
   });
 
   final int index;
+
+  /// False while search results or the attachments fill the window: no
+  /// row is the one shown then.
+  final bool selectionShown;
   final ValueChanged<int> onSelected;
-  final VoidCallback onPrimary;
-  final VoidCallback onSearch;
+  final VoidCallback onToggleSidebar;
   final VoidCallback onTrash;
   final VoidCallback onSettings;
   final String? email;
@@ -226,7 +232,6 @@ class MacSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = Theme.of(context).colorScheme;
-    final top = MediaQuery.paddingOf(context).top;
     final db = ref.read(databaseProvider);
     final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
     final folders = ref.watch(foldersListProvider).value ?? const <Folder>[];
@@ -238,13 +243,29 @@ class MacSidebar extends ConsumerWidget {
     final filter = ref.watch(notesFilterProvider);
     final collapsed = ref.watch(macSidebarCollapsedProvider);
     final total = folderCounts.values.fold(0, (a, b) => a + b);
+    final paperCount = ref.watch(papersListProvider).value?.length ?? 0;
+    final lights = ref.watch(macFullScreenProvider)
+        ? 0.0
+        : macTrafficLightsWidth;
 
     void show(NotesFilter f) {
       ref.read(notesFilterProvider.notifier).state = f;
       onSelected(0);
     }
 
-    bool shown(NotesFilter f) => index == 0 && _sameFilter(filter, f);
+    bool shown(NotesFilter f) =>
+        selectionShown && index == 0 && _sameFilter(filter, f);
+
+    Future<void> newFolder() async {
+      final name = await _askName(
+        context,
+        title: 'New folder',
+        action: 'Create',
+      );
+      if (name == null) return;
+      final id = await createFolder(db, name);
+      show(FolderFilter(id));
+    }
 
     Widget section(String title) {
       final folded = collapsed.contains(title);
@@ -256,54 +277,34 @@ class MacSidebar extends ConsumerWidget {
       );
     }
 
-    final (primaryIcon, primaryLabel) = index == 0
-        ? (Icons.add, 'New note')
-        : (Icons.upload_file_outlined, 'Import PDF');
     return Container(
       key: const ValueKey('mac-sidebar'),
       width: macSidebarWidth,
       color: c.surfaceContainerLow,
-      padding: EdgeInsets.fromLTRB(10, top + 10, 10, 10),
+      // The sidebar's part of the toolbar row is drawn here, level with the
+      // traffic lights, so this column ignores the title bar padding.
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FilledButton.tonalIcon(
-            key: const ValueKey('mac-primary-action'),
-            onPressed: onPrimary,
-            icon: AnimatedSwitcher(
-              duration: AppMotion.of(context, AppMotion.short),
-              child: Icon(primaryIcon, key: ValueKey(primaryIcon), size: 18),
-            ),
-            label: AnimatedSwitcher(
-              duration: AppMotion.of(context, AppMotion.short),
-              child: Text(primaryLabel, key: ValueKey(primaryLabel)),
-            ),
-            style: FilledButton.styleFrom(
-              alignment: Alignment.centerLeft,
-              minimumSize: const Size.fromHeight(34),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-            ),
+          MacToolbarRow(
+            leadingInset: lights - 10,
+            actions: [
+              MacToolbarButton(
+                key: const ValueKey('mac-new-folder'),
+                icon: Icons.create_new_folder_outlined,
+                tooltip: 'New Folder',
+                onPressed: newFolder,
+              ),
+              MacToolbarButton(
+                key: const ValueKey('mac-toggle-sidebar'),
+                icon: Icons.view_sidebar_outlined,
+                tooltip: 'Hide Sidebar (\u2303\u2318S)',
+                onPressed: onToggleSidebar,
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          _SidebarRow(
-            icon: Icons.library_books_outlined,
-            selectedIcon: Icons.library_books,
-            label: 'Library',
-            selected: index == 1,
-            onTap: () => onSelected(1),
-          ),
-          _SidebarRow(
-            icon: Icons.search,
-            label: 'Search',
-            selected: false,
-            onTap: onSearch,
-          ),
-          _SidebarRow(
-            icon: Icons.attach_file,
-            label: 'Attachments',
-            selected: false,
-            onTap: () => showAttachmentsBrowser(context),
-          ),
+          const SizedBox(height: 4),
           Expanded(
             child: ListView(
               key: const ValueKey('mac-source-list'),
@@ -359,6 +360,17 @@ class MacSidebar extends ConsumerWidget {
                       ],
                     ),
                 ],
+                section('Library'),
+                if (!collapsed.contains('Library'))
+                  _SidebarRow(
+                    key: const ValueKey('mac-library'),
+                    icon: Icons.library_books_outlined,
+                    selectedIcon: Icons.library_books,
+                    label: 'All Papers',
+                    count: paperCount,
+                    selected: selectionShown && index == 1,
+                    onTap: () => onSelected(1),
+                  ),
                 if (projects.isNotEmpty) ...[
                   section('Projects'),
                   if (!collapsed.contains('Projects'))
@@ -418,22 +430,6 @@ class MacSidebar extends ConsumerWidget {
                 ],
               ],
             ),
-          ),
-          _SidebarRow(
-            key: const ValueKey('mac-new-folder'),
-            icon: Icons.create_new_folder_outlined,
-            label: 'New Folder',
-            selected: false,
-            onTap: () async {
-              final name = await _askName(
-                context,
-                title: 'New folder',
-                action: 'Create',
-              );
-              if (name == null) return;
-              final id = await createFolder(db, name);
-              show(FolderFilter(id));
-            },
           ),
           _SidebarRow(
             icon: Icons.delete_outline,

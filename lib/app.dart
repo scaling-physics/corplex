@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,12 +14,28 @@ import 'features/share/share_import.dart';
 import 'features/sync/sync_coordinator.dart';
 import 'theme/app_theme.dart';
 
-class CorplexApp extends ConsumerWidget {
+class CorplexApp extends ConsumerStatefulWidget {
   const CorplexApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CorplexApp> createState() => _CorplexAppState();
+}
+
+class _CorplexAppState extends ConsumerState<CorplexApp> {
+  // macOS: the toolbar row only while home is the top page. Told after the
+  // navigator's update (providers can't change mid-build).
+  late final _toolbarObserver = MacToolbarRouteObserver(
+    (homeOnTop) => scheduleMicrotask(() {
+      if (!mounted) return;
+      ref.read(macHomeOnTopProvider.notifier).state = homeOnTop;
+      ref.read(macWindowProvider).setToolbar(homeOnTop);
+    }),
+  );
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorObservers: [_toolbarObserver],
       title: 'Corplex',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [

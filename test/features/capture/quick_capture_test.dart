@@ -39,6 +39,16 @@ class _Window implements MacWindow {
 
   @override
   ValueListenable<bool> get fullScreen => _full;
+  final _band = ValueNotifier(macToolbarHeight);
+  final toolbarCalls = <bool>[];
+  @override
+  ValueListenable<double> get titleBand => _band;
+  @override
+  Future<void> setToolbar(bool visible) async {
+    toolbarCalls.add(visible);
+    _band.value = visible ? macToolbarHeight : macTitleBarHeight;
+  }
+
   @override
   Future<void> startDrag() async {}
   @override

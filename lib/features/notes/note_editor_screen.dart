@@ -63,8 +63,16 @@ import '../projects/projects_providers.dart';
 import '../projects/todos_request.dart';
 import '../sync/merge.dart';
 import '../home/adaptive.dart' show readablePadding, readableWidth;
+import '../home/mac_toolbar.dart' show MacPaneChrome, macPaneBar;
 import '../platform/mac_window.dart'
-    show MenuCommand, MenuCommandHandler, isDesktop, isMac, macPanePadding;
+    show
+        MacWindowDragArea,
+        MenuCommand,
+        MenuCommandHandler,
+        isDesktop,
+        isMac,
+        macPanePadding,
+        macToolbarHeight;
 import 'note_find.dart';
 import 'note_highlight.dart';
 import 'note_zoom.dart';
@@ -140,7 +148,12 @@ class NoteEditorScreen extends ConsumerWidget {
     final note = ref.watch(noteByIdProvider(noteId));
     final loaded = note.hasValue;
     if (!loaded) {
-      return Scaffold(appBar: AppBar(automaticallyImplyLeading: !embedded));
+      final chrome = MacPaneChrome.maybeOf(context);
+      return Scaffold(
+        appBar: chrome != null
+            ? macPaneBar(chrome)
+            : AppBar(automaticallyImplyLeading: !embedded),
+      );
     }
     final value = note.value;
     if (value != null &&
@@ -1460,12 +1473,19 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (_loaded) {
       _comments.sync(ref.watch(commentViewsProvider(widget.noteId)));
     }
+    // In the Mac window's pane this app bar is the pane's part of the
+    // toolbar row: New note first, the search field last.
+    final chrome = MacPaneChrome.maybeOf(context);
     final scaffold = Scaffold(
       // The toolbar rides on top of the keyboard (see bottomNavigationBar),
       // so the body must not also shrink for it.
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         automaticallyImplyLeading: !widget.embedded,
+        toolbarHeight: chrome == null ? null : macToolbarHeight,
+        leading: chrome == null ? null : Center(child: chrome.leading),
+        leadingWidth: chrome == null ? null : MacPaneChrome.leadingWidth,
+        flexibleSpace: chrome == null ? null : const MacWindowDragArea(),
         // One toolbar row, as in Apple Notes: the formatting controls on
         // the left of the header, the note's actions on the right. The
         // header never holds the note's title.
@@ -1691,6 +1711,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               ),
             ],
           ),
+          ?chrome?.trailing,
         ],
       ),
       body: Stack(

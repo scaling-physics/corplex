@@ -6,6 +6,7 @@ import '../../data/database_provider.dart';
 import '../../theme/app_theme.dart';
 import '../library/paper_detail_screen.dart';
 import '../notes/note_editor_screen.dart';
+import 'mac_toolbar.dart';
 
 /// How the home screen arranges itself for the window it has, so an iPad
 /// (or a tablet, or a wide split-screen window) gets a tablet layout rather
@@ -154,7 +155,8 @@ class _Placeholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
-    return ColoredBox(
+    final chrome = MacPaneChrome.maybeOf(context);
+    final placeholder = ColoredBox(
       color: c.surface,
       child: Center(
         child: Column(
@@ -171,6 +173,9 @@ class _Placeholder extends StatelessWidget {
         ),
       ),
     );
+    // The Mac pane keeps its part of the toolbar row with nothing open.
+    if (chrome == null) return placeholder;
+    return Scaffold(appBar: macPaneBar(chrome), body: placeholder);
   }
 }
 

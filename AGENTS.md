@@ -939,7 +939,7 @@ and **titles stay plain** (list shows the title, a lock and "Locked").
   `USE_BIOMETRIC`; iOS: `NSFaceIDUsageDescription`.
 
 ### macOS app (built; checked in widget tests and a release launch, not by hand on a Mac)
-- **Build**: `tool/macos/make_dmg.sh` → `build/dmg/Corplex-<version>.dmg`
+- **Build**: `tool/macos/make_dmg.sh` (needs `tool/supabase.env`, copied from `tool/supabase.env.example`: a build without Supabase credentials has no sync and a greyed "Sync now") → `build/dmg/Corplex-<version>.dmg`
   (drag-to-Applications; `--no-build` packages the existing build). Without
   a Developer ID it is ad-hoc signed: fine on the Mac that built it, blocked
   by Gatekeeper elsewhere until right-click → Open; set

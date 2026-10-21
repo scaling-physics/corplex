@@ -1,0 +1,22 @@
+name: Windows build
+
+# Manual: Corplex has no Windows machine to build on, so this is how the
+# Windows runner gets compiled. Download the "corplex-windows" artifact.
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corplex-windows
+          path: build/windows/x64/runner/Release/

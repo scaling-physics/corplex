@@ -48,7 +48,8 @@ final folderNoteCountsProvider = StreamProvider.autoDispose<Map<String?, int>>((
   final db = ref.watch(databaseProvider);
   return db
       .customSelect(
-        'SELECT folder_id AS id, COUNT(*) AS n FROM notes GROUP BY folder_id',
+        'SELECT folder_id AS id, COUNT(*) AS n FROM notes '
+        'WHERE is_template = 0 GROUP BY folder_id',
         readsFrom: {db.notes},
       )
       .watch()

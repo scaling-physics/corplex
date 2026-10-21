@@ -53,7 +53,9 @@ import '../../l10n/l10n.dart';
 import 'editor_document.dart';
 import 'heading_fold_controller.dart';
 import 'heading_fold_ui.dart';
+import 'callout_embed.dart';
 import 'figure_embed.dart';
+import 'footnote_embed.dart';
 import 'figure_markers.dart';
 import '../projects/figures.dart';
 import '../projects/todos.dart' show openNoteAtSelection;
@@ -84,9 +86,18 @@ import 'citation_embed.dart';
 import '../csl/style_picker.dart';
 import 'math_embed.dart';
 import 'note_bibliography.dart';
+import 'block_ids.dart';
+import 'note_aliases.dart';
+import 'note_embed.dart';
+import 'note_link_open.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
+import 'note_sections.dart';
+import 'unlinked_mentions.dart';
 import 'note_templates.dart';
+import 'daily_notes.dart' show openNeighbouringDailyNote;
+import 'templates.dart'
+    show pickAndInsertTemplate, setNoteTemplate, templateNotesProvider;
 import '../library/add_attachment_sheet.dart';
 import '../library/citations.dart';
 import '../library/highlights.dart';
@@ -987,12 +998,14 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     final typed = text.substring(end - 2, end);
     if (typed != '[[' && typed != '[@') return;
     final cite = typed == '[@';
-    final start = end - 2;
+    // "![[" embeds a note instead of linking it.
+    final embed = !cite && end >= 3 && text[end - 3] == '!';
+    final start = embed ? end - 3 : end - 2;
     // After this change has finished applying.
     Future.microtask(() async {
       _quillController.replaceText(
         start,
-        2,
+        embed ? 3 : 2,
         '',
         TextSelection.collapsed(offset: start),
       );
@@ -1000,7 +1013,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       if (cite) {
         await _citePaper(context);
       } else {
-        await _linkNote(context);
+        await _linkNote(context, embed: embed);
       }
     });
   }
@@ -1091,6 +1104,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           children: [
             for (final c in _Command.values)
               if (c != _Command.dictate || ref.read(dictationOfferedProvider))
+                if (c != _Command.insertTemplate ||
+                    (ref.read(templateNotesProvider).value?.isNotEmpty ??
+                        false))
                 ListTile(
                   leading: Icon(c.icon),
                   title: Text(c.label(context.l10n)),
@@ -1142,12 +1158,18 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           await _citePaper(context);
         case _Command.equation:
           await insertDisplayMath(context, _quillController);
+        case _Command.footnote:
+          await insertFootnote(context, _quillController);
+        case _Command.callout:
+          await insertCallout(context, _quillController);
         case _Command.figure:
           _insertCaption(FigureKind.figure);
         case _Command.table:
           _insertCaption(FigureKind.table);
         case _Command.refer:
           await _referToFigure(context);
+        case _Command.embed:
+          await _linkNote(context, embed: true);
         case _Command.link:
           await _linkNote(context);
         case _Command.draw:
@@ -1160,6 +1182,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           _quillController.formatSelection(Attribute.unchecked);
         case _Command.template:
           _insertTemplate();
+        case _Command.insertTemplate:
+          await _insertTemplateNote();
         case _Command.bibliography:
           await _addBibliography(context);
         case _Command.attach:
@@ -1283,6 +1307,37 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     );
   }
 
+  /// `/` → Insert template: one of the reader's templates (or the
+  /// literature skeleton) at the caret.
+  Future<void> _insertTemplateNote() => pickAndInsertTemplate(
+    context,
+    ref,
+    _quillController,
+    noteTitle: _titleController.text,
+    insertLiterature: _insertTemplate,
+  );
+
+  /// ⋮ → Previous / Next day's note on a daily note.
+  Future<void> _openDay({required bool previous}) async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await openNeighbouringDailyNote(
+      context,
+      ref,
+      widget.noteId,
+      previous: previous,
+    );
+    if (!opened) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(previous ? l10n.dailyNoEarlier : l10n.dailyNoLater),
+          ),
+        );
+    }
+  }
+
   Future<void> _addBibliography(BuildContext context) async {
     final style = await pickCitationStyle(context);
     if (style == null || !context.mounted) return;
@@ -1305,14 +1360,53 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     );
   }
 
-  Future<void> _linkNote(BuildContext context) async {
+  /// The note being edited, for `[[#Heading]]` and `[[#^` in the picker.
+  LiveNote get _liveNote => LiveNote(
+    noteId: widget.noteId,
+    title: _titleController.text,
+    document: _folds.unfoldedDocument,
+    assignBlockId: _assignBlockIdHere,
+  );
+
+  /// Marks the paragraph starting at [lineStart] (an offset in the unfolded
+  /// note) with a block id, in the open editor — never through the
+  /// database, whose autosave would overwrite it.
+  String _assignBlockIdHere(int lineStart) {
+    final live = _folds.reveal(lineStart);
+    final lines = docLines(_quillController.document.toDelta());
+    final line = lines.firstWhere(
+      (l) => l.start == live,
+      orElse: () => lines.last,
+    );
+    if (line.blockId != null) return line.blockId!;
+    final id = blockIdFor(null, {
+      for (final l in lines)
+        if (l.blockId != null) l.blockId!,
+    });
+    _quillController.replaceText(
+      line.end,
+      0,
+      Embeddable(blockIdEmbedType, id),
+      null,
+    );
+    return id;
+  }
+
+  Future<void> _linkNote(BuildContext context, {bool embed = false}) async {
     final picked = await showNoteLinkSheet(
       context,
       ref,
       excludeNoteId: widget.noteId,
+      live: _liveNote,
+      embed: embed,
     );
     if (picked == null || !mounted) return;
     final controller = _quillController;
+    if (embed) {
+      insertNoteEmbed(controller, picked.link);
+      _bodyFocus.requestFocus();
+      return;
+    }
     final docEnd = controller.document.length - 1;
     final cursor = controller.selection.baseOffset;
     final index = cursor < 0 || cursor > docEnd ? docEnd : cursor;
@@ -1325,12 +1419,38 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     controller.formatText(
       index,
       picked.title.length,
-      LinkAttribute(noteLink(picked.id)),
+      LinkAttribute(picked.link),
     );
     controller.updateSelection(
       TextSelection.collapsed(offset: index + picked.title.length + 1),
       ChangeSource.local,
     );
+  }
+
+  /// A tap on a note link: the note, or one heading or paragraph of it
+  /// (selected, with folds opened). Links into this very note just move
+  /// the selection.
+  void _openLinkTarget(NoteLinkTarget target) {
+    if (target.heading == null && target.block == null) {
+      _openNote(target.noteId);
+      return;
+    }
+    if (target.noteId == widget.noteId) {
+      final selection = selectionForTarget(
+        docLines(_folds.unfoldedDocument().toDelta()),
+        target,
+      );
+      if (selection != null) {
+        // After the tap itself, which also places the caret.
+        Future.delayed(Duration.zero, () {
+          if (!mounted) return;
+          _selectUnfolded(selection);
+          _revealInitialSelection();
+        });
+      }
+      return;
+    }
+    unawaited(openNoteLink(context, ref, target));
   }
 
   void _openNote(String id) => Navigator.of(context)
@@ -1489,7 +1609,14 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     await exportNotes(
       context,
       _db,
-      [ExportNote(_titleController.text, content, images: images)],
+      [
+        ExportNote(
+          _titleController.text,
+          content,
+          images: images,
+          id: widget.noteId,
+        ),
+      ],
       title: _titleController.text,
       figures: figures,
     );
@@ -1618,8 +1745,17 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                 noteId: widget.noteId,
               ),
               'link' => _linkNote(context),
+              'aliases' => showAliasesDialog(context, ref, widget.noteId),
               'cite' => _citePaper(context),
               'template' => _insertTemplate(),
+              'astemplate' => setNoteTemplate(
+                ref.read(databaseProvider),
+                widget.noteId,
+                !(ref.read(noteByIdProvider(widget.noteId)).value?.isTemplate ??
+                    false),
+              ),
+              'prevday' => _openDay(previous: true),
+              'nextday' => _openDay(previous: false),
               'bibliography' => _addBibliography(context),
               'export' => _export(context),
               'words' => _showWordCount(context),
@@ -1665,6 +1801,14 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                   leading: Icon(Icons.add_link),
                   title: Text(context.l10n.editorLinkToNote),
                   subtitle: Text(context.l10n.editorLinkToNoteHint),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'aliases',
+                child: ListTile(
+                  leading: Icon(Icons.label_outline),
+                  title: Text(context.l10n.aliasesMenu),
+                  subtitle: Text(context.l10n.aliasesMenuHint),
                 ),
               ),
               PopupMenuItem(
@@ -1789,6 +1933,36 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                   ),
                 ),
               PopupMenuItem(
+                value: 'astemplate',
+                child: ListTile(
+                  leading: const Icon(Icons.dashboard_customize_outlined),
+                  title: Text(
+                    ref.read(noteByIdProvider(widget.noteId)).value
+                                ?.isTemplate ??
+                            false
+                        ? context.l10n.templatesStopUsing
+                        : context.l10n.templatesUse,
+                  ),
+                ),
+              ),
+              if (ref.read(noteByIdProvider(widget.noteId)).value?.dailyDate !=
+                  null) ...[
+                PopupMenuItem(
+                  value: 'prevday',
+                  child: ListTile(
+                    leading: const Icon(Icons.chevron_left),
+                    title: Text(context.l10n.dailyPrevious),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'nextday',
+                  child: ListTile(
+                    leading: const Icon(Icons.chevron_right),
+                    title: Text(context.l10n.dailyNext),
+                  ),
+                ),
+              ],
+              PopupMenuItem(
                 value: 'duplicate',
                 child: ListTile(
                   leading: Icon(Icons.copy_outlined),
@@ -1909,6 +2083,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                               ),
                             ),
                           ),
+                          // "Also: …", only when the note has aliases.
+                          NoteAliasLine(noteId: widget.noteId),
                           if (folderName != null)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
@@ -2133,6 +2309,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                         CitationEmbedBuilder(),
                                         MathInlineEmbedBuilder(),
                                         MathBlockEmbedBuilder(),
+                                        FootnoteEmbedBuilder(),
+                                        CalloutEmbedBuilder(),
+                                        BlockIdEmbedBuilder(),
+                                        NoteEmbedBuilder(),
                                       ],
                                       // Audio timestamps play on a plain tap; other links
                                       // keep Quill's default long-press menu.
@@ -2161,10 +2341,11 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                                   p.page,
                                                 );
                                             }
-                                            if (parseNoteLink(link)
-                                                case final id?) {
+                                            if (parseNoteLinkTarget(link)
+                                                case final target?) {
                                               return TapGestureRecognizer()
-                                                ..onTap = () => _openNote(id);
+                                                ..onTap = () =>
+                                                    _openLinkTarget(target);
                                             }
                                             return null;
                                           },
@@ -2175,6 +2356,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                             ),
                           ),
                           _Backlinks(noteId: widget.noteId),
+                          UnlinkedMentionsSection(noteId: widget.noteId),
                         ],
                       ),
               ),
@@ -2346,6 +2528,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.expandSections: () => _folds.expandAll(),
     MenuCommand.linkNote: () => _linkNote(context),
     MenuCommand.citePaper: () => _citePaper(context),
+    MenuCommand.footnote: () => insertFootnote(context, _quillController),
     MenuCommand.find: _openFind,
     MenuCommand.addComment: _commentOnSelection,
     MenuCommand.findNext: () =>
@@ -2979,6 +3162,7 @@ enum _Command {
   table(Icons.table_chart_outlined),
   refer(Icons.tag),
   link(Icons.link),
+  embed(Icons.input),
   draw(Icons.draw_outlined),
   insertTable(Icons.grid_on),
   heading(Icons.title),
@@ -2987,7 +3171,10 @@ enum _Command {
   voice(Icons.mic_none),
   dictate(Icons.keyboard_voice_outlined),
   template(Icons.article_outlined),
-  bibliography(Icons.list_alt);
+  insertTemplate(Icons.dashboard_customize_outlined),
+  bibliography(Icons.list_alt),
+  footnote(Icons.notes),
+  callout(Icons.campaign_outlined);
 
   const _Command(this.icon);
 
@@ -2996,10 +3183,13 @@ enum _Command {
   String label(AppLocalizations l) => switch (this) {
     cite => l.notesCiteAPaper,
     equation => l.editorCmdEquation,
+    footnote => l.footnotesCommand,
+    callout => l.calloutsCommand,
     figure => l.editorCmdFigure,
     table => l.editorCmdTable,
     refer => l.editorCmdRefer,
     link => l.editorCmdLink,
+    embed => l.linksCmdEmbed,
     draw => l.editorCmdDraw,
     insertTable => l.editorCmdInsertTable,
     heading => l.editorCmdHeading,
@@ -3008,16 +3198,20 @@ enum _Command {
     voice => l.voiceNote,
     dictate => l.voiceDictate,
     template => l.editorCmdTemplate,
+    insertTemplate => l.templatesInsert,
     bibliography => l.editorCmdBibliography,
   };
 
   String hint(AppLocalizations l) => switch (this) {
     cite => l.editorCmdCiteHint,
     equation => l.editorCmdEquationHint,
+    footnote => l.footnotesCommandHint,
+    callout => l.calloutsCommandHint,
     figure => l.editorCmdFigureHint,
     table => l.editorCmdTableHint,
     refer => l.editorCmdReferHint,
     link => l.editorCmdLinkHint,
+    embed => l.linksCmdEmbedHint,
     draw => l.editorCmdDrawHint,
     insertTable => l.editorCmdInsertTableHint,
     heading => l.editorCmdHeadingHint,
@@ -3026,6 +3220,7 @@ enum _Command {
     voice => l.editorCmdVoiceHint,
     dictate => l.editorCmdDictateHint,
     template => l.editorCmdTemplateHint,
+    insertTemplate => l.templatesInsertHint,
     bibliography => l.editorCmdBibliographyHint,
   };
 }

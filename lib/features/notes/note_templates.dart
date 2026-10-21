@@ -2,6 +2,7 @@ import 'package:flutter/painting.dart' show TextSelection;
 import 'package:flutter_quill/flutter_quill.dart';
 
 import '../../l10n/l10n.dart';
+import 'note_content.dart';
 
 /// Headings of the literature-note template, in order (English; the
 /// inserted headings follow the app language, see [insertLiteratureTemplate]).
@@ -44,4 +45,16 @@ int insertLiteratureTemplate(
     ChangeSource.local,
   );
   return cursor;
+}
+
+/// A new note's stored body holding the literature skeleton, in [l10n]'s
+/// language.
+String literatureNoteContent(AppLocalizations l10n) {
+  final controller = QuillController.basic();
+  try {
+    insertLiteratureTemplate(controller, 0, l10n: l10n);
+    return encodeNoteContent(controller.document);
+  } finally {
+    controller.dispose();
+  }
 }

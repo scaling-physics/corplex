@@ -11,11 +11,14 @@ import '../notes/folders_providers.dart';
 import '../notes/notes_providers.dart';
 import '../notes/notes_screen.dart' show confirmDeleteFolder, confirmDeleteTag;
 import '../notes/tags_providers.dart';
+import '../notes/templates.dart' show templateNotesProvider;
 import '../projects/project_menu.dart' show showProjectMenu;
 import '../../theme/app_theme.dart';
 import '../library/papers_providers.dart';
 import '../platform/mac_window.dart';
 import '../projects/project_page.dart';
+import '../search/saved_searches.dart';
+import '../search/saved_searches_ui.dart';
 import '../projects/projects_providers.dart';
 import '../sync/sync_ring.dart';
 import 'mac_toolbar.dart';
@@ -172,6 +175,7 @@ final macSidebarCollapsedProvider = StateProvider<Set<String>>((ref) => {});
 
 bool _sameFilter(NotesFilter a, NotesFilter b) => switch ((a, b)) {
   (AllNotes(), AllNotes()) => true,
+  (TemplatesFilter(), TemplatesFilter()) => true,
   (FolderFilter(:final folderId), FolderFilter(folderId: final other)) =>
     folderId == other,
   (TagFilter(:final tagId), TagFilter(tagId: final other)) => tagId == other,
@@ -190,6 +194,7 @@ String notesFilterTitle(
   required AppLocalizations l10n,
 }) => switch (filter) {
   AllNotes() => l10n.commonNotes,
+  TemplatesFilter() => l10n.templatesTitle,
   FolderFilter(:final folderId) =>
     folders.where((f) => f.id == folderId).firstOrNull?.name ??
         l10n.commonNotes,
@@ -241,10 +246,13 @@ class MacSidebar extends ConsumerWidget {
     final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
     final folders = ref.watch(foldersListProvider).value ?? const <Folder>[];
     final tags = ref.watch(tagsListProvider).value ?? const <Tag>[];
+    final savedSearches =
+        ref.watch(savedSearchesProvider).value ?? const <SavedSearchEntry>[];
     final folderCounts =
         ref.watch(folderNoteCountsProvider).value ?? const <String?, int>{};
     final projectCounts =
         ref.watch(projectNoteCountsProvider).value ?? const <String, int>{};
+    final templates = ref.watch(templateNotesProvider).value ?? const <Note>[];
     final filter = ref.watch(notesFilterProvider);
     final collapsed = ref.watch(macSidebarCollapsedProvider);
     final total = folderCounts.values.fold(0, (a, b) => a + b);
@@ -366,6 +374,17 @@ class MacSidebar extends ConsumerWidget {
                         ),
                       ],
                     ),
+                  // Only once a note has been made a template.
+                  if (templates.isNotEmpty)
+                    _SidebarRow(
+                      key: const ValueKey('mac-templates'),
+                      icon: Icons.description_outlined,
+                      selectedIcon: Icons.description,
+                      label: l10n.templatesTitle,
+                      count: templates.length,
+                      selected: shown(const TemplatesFilter()),
+                      onTap: () => show(const TemplatesFilter()),
+                    ),
                 ],
                 section('Library', l10n.commonLibrary),
                 if (!collapsed.contains('Library'))
@@ -411,6 +430,23 @@ class MacSidebar extends ConsumerWidget {
                             onSelected: () => showProjectMenu(context, ref, p),
                           ),
                         ],
+                      ),
+                ],
+                if (savedSearches.isNotEmpty) ...[
+                  section('SavedSearches', l10n.savedSearchSection),
+                  if (!collapsed.contains('SavedSearches'))
+                    for (final saved in savedSearches)
+                      _SidebarRow(
+                        key: ValueKey('mac-saved-search-${saved.id}'),
+                        icon: Icons.bookmark_outline,
+                        label: saved.name,
+                        selected: false,
+                        onTap: () =>
+                            ref
+                                    .read(savedSearchRunRequestProvider.notifier)
+                                    .state =
+                                saved.query,
+                        contextActions: savedSearchActions(context, ref, saved),
                       ),
                 ],
                 if (tags.isNotEmpty) ...[

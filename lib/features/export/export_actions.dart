@@ -245,6 +245,7 @@ Future<ExportDoc> buildStyledExportDoc(
         notes[i].title,
         jsonEncode(deltas[i]),
         images: notes[i].images,
+        id: notes[i].id,
       ),
     );
   }

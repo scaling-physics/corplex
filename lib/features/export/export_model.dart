@@ -6,9 +6,13 @@ import '../lock/note_crypto.dart' show isLockedContent;
 import '../library/citations.dart';
 import '../library/highlights.dart';
 import '../audio/audio_link.dart';
+import '../notes/block_ids.dart' show withoutBlockIds;
 import '../notes/note_content.dart';
+import '../notes/note_sections.dart' show inlineNoteEmbeds;
 import '../notes/note_highlight.dart' show highlightHex;
+import '../notes/callout_markers.dart';
 import '../notes/figure_markers.dart';
+import '../notes/footnote_markers.dart';
 import '../notes/math_markers.dart';
 import '../projects/figures.dart';
 import '../notes/note_links.dart';
@@ -58,7 +62,14 @@ class Run {
     this.math = false,
     this.highlight,
     this.source,
+    this.footnote,
   });
+
+  /// For a footnote reference: the footnote's own text (citations resolved,
+  /// maths split out), which each renderer places as it likes — a real
+  /// footnote in Word and LaTeX, a superscript number and an end-of-chapter
+  /// note in PDF, `^[…]` in Markdown. [text] is empty.
+  final List<Run>? footnote;
 
   /// The text as stored, before citations and figure references were
   /// replaced by their printed form (`[@key, p. 4]`, `{@fig:x}`). The LaTeX
@@ -91,6 +102,7 @@ class ExportBlock {
     this.table,
     this.figure,
     this.photo,
+    this.callout,
     this.chapterTitle = false,
   });
 
@@ -102,6 +114,7 @@ class ExportBlock {
       table = null,
       figure = null,
       photo = null,
+      callout = null,
       chapterTitle = false;
 
   /// A table block.
@@ -112,6 +125,7 @@ class ExportBlock {
       sketch = null,
       figure = null,
       photo = null,
+      callout = null,
       chapterTitle = false;
 
   /// A block for an image attached to a note.
@@ -122,6 +136,7 @@ class ExportBlock {
       sketch = null,
       table = null,
       figure = null,
+      callout = null,
       chapterTitle = false;
 
   final BlockKind kind;
@@ -139,6 +154,11 @@ class ExportBlock {
   /// For a [BlockKind.caption]: the figure or table it defines.
   final FigureMarker? figure;
 
+  /// For a [BlockKind.quote] that belongs to a callout: its type, and
+  /// whether this is the line that opens it (its runs are then the bold
+  /// label). Null for an ordinary quote.
+  final CalloutInfo? callout;
+
   /// A heading that opens one note of a multi-note (project) export.
   final bool chapterTitle;
 
@@ -146,6 +166,20 @@ class ExportBlock {
   final int ordinal;
 
   String get text => runs.map((r) => r.text).join();
+}
+
+/// The callout a quote block belongs to.
+class CalloutInfo {
+  const CalloutInfo(this.type, {this.head = false});
+
+  /// Lower-case type word (`warning`, or any word of the reader's own).
+  final String type;
+
+  /// The opening line: its runs are the bold label (the title, or the type
+  /// name when it has none).
+  final bool head;
+
+  CalloutTone get tone => calloutToneOf(type);
 }
 
 class ExportDoc {
@@ -170,7 +204,16 @@ class ExportDoc {
 
 /// One note to export: its title and Quill content.
 class ExportNote {
-  const ExportNote(this.title, this.content, {this.images = const []});
+  const ExportNote(
+    this.title,
+    this.content, {
+    this.images = const [],
+    this.id,
+  });
+
+  /// The note's id, when known: an embed of the note in itself isn't
+  /// expanded again.
+  final String? id;
 
   final String title;
   final String content;
@@ -236,6 +279,16 @@ Future<ExportDoc> buildExportDoc(
   List<ExportBlock> extraFrontMatter = const [],
 }) async {
   notes = withoutLockedBodies(notes);
+  // Embedded notes (`![[…]]`) become their text, in place.
+  notes = [
+    for (final n in notes)
+      ExportNote(
+        n.title,
+        await inlineNoteEmbeds(db, n.content, expanding: {?n.id}),
+        images: n.images,
+        id: n.id,
+      ),
+  ];
   final index =
       figures ??
       buildFigureIndex([
@@ -248,7 +301,11 @@ Future<ExportDoc> buildExportDoc(
           ),
       ]);
   final deltas = [
-    for (final n in notes) decodeNoteContent(n.content).toDelta(),
+    for (final n in notes)
+      // Block ids (` ^abc123`) are bookkeeping, not text.
+      withoutBlockIds(
+        decodeNoteContent(footnotesToEmbeds(n.content)).toDelta(),
+      ),
   ];
   final keys = <String>[];
   for (final d in deltas) {
@@ -306,7 +363,12 @@ Future<ExportDoc> buildExportDoc(
 
 String _plain(Delta d) => [
   for (final op in d.toList())
-    if (op.isInsert && op.data is String) op.data as String,
+    if (op.isInsert)
+      if (op.data is String)
+        op.data as String
+      else if (op.data case {footnoteEmbedType: final String text})
+        // Citations inside footnotes count as cited.
+        ' $text ',
 ].join();
 
 /// Drops a "References" section the reader generated in the note itself
@@ -334,6 +396,18 @@ List<ExportBlock> _blocks(
     if (data is Map) {
       if (data[mathInlineType] case final String tex) {
         runs.add(Run(tex, math: true));
+      } else if (data[footnoteEmbedType] case final String text) {
+        runs.add(
+          Run(
+            '',
+            footnote: _runs(
+              footnoteDisplayText(text),
+              const {},
+              resolver,
+              figures,
+            ),
+          ),
+        );
       } else if (data[mathBlockType] case final String tex) {
         if (runs.isNotEmpty) {
           blocks.add(ExportBlock(BlockKind.paragraph, runs));
@@ -386,8 +460,73 @@ List<ExportBlock> _blocks(
   if (runs.isNotEmpty) {
     blocks.add(_line(BlockKind.paragraph, runs, 0, figures));
   }
-  return blocks;
+  return _callouts(blocks);
 }
+
+/// Marks the quote blocks that make up callouts: the line that starts with
+/// `[!type]` (its runs become the bold label) and the quote lines after it.
+List<ExportBlock> _callouts(List<ExportBlock> blocks) {
+  final out = <ExportBlock>[];
+  CalloutInfo? open;
+  for (final b in blocks) {
+    if (b.kind != BlockKind.quote) {
+      open = null;
+      out.add(b);
+      continue;
+    }
+    final first = b.runs.isEmpty ? null : b.runs.first;
+    final head = first == null || first.math
+        ? null
+        : parseCalloutLine(first.text);
+    if (head == null) {
+      out.add(
+        open == null
+            ? b
+            : ExportBlock(
+                BlockKind.quote,
+                b.runs,
+                callout: CalloutInfo(open.type),
+              ),
+      );
+      continue;
+    }
+    open = CalloutInfo(head.type, head: true);
+    final strip = RegExp(r'^\[![A-Za-z][A-Za-z0-9_-]*\][+-]?\s*');
+    final rest = [
+      Run(
+        first!.text.replaceFirst(strip, ''),
+        source: first.source?.replaceFirst(strip, ''),
+        bold: true,
+        italic: first.italic,
+        strike: first.strike,
+        highlight: first.highlight,
+        link: first.link,
+      ),
+      for (final r in b.runs.skip(1)) _bold(r),
+    ];
+    final empty = rest.every((r) => r.footnote == null && r.text.isEmpty);
+    out.add(
+      ExportBlock(
+        BlockKind.quote,
+        empty ? [Run(calloutLabel(head.type), bold: true)] : rest,
+        callout: open,
+      ),
+    );
+  }
+  return out;
+}
+
+Run _bold(Run r) => Run(
+  r.text,
+  bold: true,
+  italic: r.italic,
+  strike: r.strike,
+  link: r.link,
+  math: r.math,
+  highlight: r.highlight,
+  source: r.source,
+  footnote: r.footnote,
+);
 
 /// The runs of one line's worth of text: prose with inline `$…$` maths
 /// pulled out (code spans keep their dollars).

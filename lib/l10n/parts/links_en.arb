@@ -1,0 +1,44 @@
+{
+  "@@locale": "en",
+  "linksEmbedANote": "Embed a note…",
+  "linksCmdEmbed": "Embed a note",
+  "linksCmdEmbedHint": "Show another note here, live. Or type ![[",
+  "linksPartsLocked": "A locked note can only be linked as a whole.",
+  "linksNoHeadings": "No headings in this note",
+  "linksNoParagraphs": "No paragraphs in this note",
+  "linksToParagraph": "Link to a paragraph",
+  "linksToParagraphHint": "Or type Title#^",
+  "linksHeadingsOf": "Headings",
+  "linksParagraphUnavailable": "Couldn't mark that paragraph",
+  "linksEmbedLocked": "Locked",
+  "linksEmbedMissing": "Note not found",
+  "linksEmbedSectionMissing": "Section not found",
+  "linksEmbedShowAll": "Show all",
+  "linksEmbedShowLess": "Show less",
+  "linksEmbedOpen": "Open {title}",
+  "@linksEmbedOpen": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "linksEmbedEmpty": "Empty note",
+  "linksUnlinkedMentions": "Unlinked mentions ({count})",
+  "@linksUnlinkedMentions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linksLinkMention": "Link",
+  "linksMentionLinked": "Linked in “{title}”",
+  "@linksMentionLinked": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
+}

@@ -8,11 +8,18 @@ import '../../l10n/l10n.dart';
 
 import 'spell_checker.dart';
 
-/// Whether a misspelling the platform reported is worth showing. Skips
-/// words with digits, ALL-CAPS abbreviations, identifiers (`snake_case`,
+/// Whether a misspelling the platform reported is worth showing. Grammar
+/// issues are kept unless they touch a URL. Misspellings skip words with
+/// digits, ALL-CAPS abbreviations, identifiers (`snake_case`,
 /// `@mentions`, `#tags`) and anything inside a URL.
 bool keepMisspelling(String text, TextRange r) {
   if (r.start < 0 || r.end > text.length || r.isCollapsed) return false;
+  if (r is SpellIssue && r.grammar) {
+    // Grammar spans words; only a URL inside it disqualifies it.
+    return !_url
+        .allMatches(text)
+        .any((m) => r.start < m.end && r.end > m.start);
+  }
   final word = text.substring(r.start, r.end);
   if (word.contains(RegExp(r'[0-9_]'))) return false;
   if (word.length > 1 &&
@@ -26,6 +33,17 @@ bool keepMisspelling(String text, TextRange r) {
   }
   return true;
 }
+
+/// A flagged range under the selection: its text, where it is in the
+/// document and in its paragraph, and the checker's detail if any.
+typedef Misspelling = ({
+  String word,
+  int docStart,
+  int length,
+  String lineText,
+  int lineStart,
+  SpellIssue? issue,
+});
 
 final _url = RegExp(
   r'(?:[a-z][a-z0-9+.-]*://|www\.)\S+|\b[\w.-]+\.(?:com|org|net|edu|io|gov|ac\.uk)\b\S*',
@@ -169,29 +187,44 @@ class NoteSpell extends ChangeNotifier {
     final caret = sel.isValid && sel.isCollapsed
         ? sel.baseOffset - line.documentOffset
         : -1;
-    final marks = <TextRange>[
+    final marks = <(TextRange, bool)>[
       for (final r in ranges)
         // The word being typed is left alone, as macOS does.
         if (r.end > start &&
             r.start < end &&
             !(caret >= r.start && caret <= r.end))
-          TextRange(
-            start: (r.start - start).clamp(0, text.length),
-            end: (r.end - start).clamp(0, text.length),
+          (
+            TextRange(
+              start: (r.start - start).clamp(0, text.length),
+              end: (r.end - start).clamp(0, text.length),
+            ),
+            r is SpellIssue && r.grammar,
           ),
     ];
+    // Overlaps (a misspelling inside a grammar issue) keep the first.
+    marks.sort((a, b) => a.$1.start.compareTo(b.$1.start));
+    for (var i = 1; i < marks.length; i++) {
+      if (marks[i].$1.start < marks[i - 1].$1.end) marks.removeAt(i--);
+    }
     if (marks.isEmpty) return plain();
 
     final base = style ?? const TextStyle();
-    final mark = base.copyWith(
+    final scheme = Theme.of(context).colorScheme;
+    TextStyle underline(bool grammar) => base.copyWith(
       decoration: TextDecoration.combine([
         if (base.decoration != null && base.decoration != TextDecoration.none)
           base.decoration!,
         TextDecoration.underline,
       ]),
-      decorationStyle: TextDecorationStyle.wavy,
-      decorationColor: Theme.of(context).colorScheme.error,
+      // Misspellings wavy red, grammar dotted in the accent, like macOS's
+      // two kinds of marks.
+      decorationStyle: grammar
+          ? TextDecorationStyle.dotted
+          : TextDecorationStyle.wavy,
+      decorationColor: grammar ? scheme.primary : scheme.error,
     );
+    final spellingMark = underline(false);
+    final grammarMark = underline(true);
     MouseCursor? cursor = recognizer != null ? SystemMouseCursors.click : null;
     TextSpan piece(int a, int b, TextStyle? s) => TextSpan(
       text: text.substring(a, b),
@@ -201,9 +234,9 @@ class NoteSpell extends ChangeNotifier {
     );
     final children = <InlineSpan>[];
     var at = 0;
-    for (final m in marks) {
+    for (final (m, grammar) in marks) {
       if (m.start > at) children.add(piece(at, m.start, null));
-      children.add(piece(m.start, m.end, mark));
+      children.add(piece(m.start, m.end, grammar ? grammarMark : spellingMark));
       at = m.end;
     }
     if (at < text.length) children.add(piece(at, text.length, null));
@@ -212,7 +245,7 @@ class NoteSpell extends ChangeNotifier {
 
   /// The misspelling under the selection, if any: its text and document
   /// range.
-  ({String word, int docStart, int length})? misspellingAtSelection() {
+  Misspelling? misspellingAtSelection() {
     final sel = controller.selection;
     if (!_enabled || !sel.isValid) return null;
     final line = _lineAt(sel.start);
@@ -228,6 +261,9 @@ class NoteSpell extends ChangeNotifier {
           word: text.substring(r.start, r.end),
           docStart: line.documentOffset + r.start,
           length: r.end - r.start,
+          lineText: text,
+          lineStart: r.start,
+          issue: r is SpellIssue ? r : null,
         );
       }
     }
@@ -241,15 +277,28 @@ class NoteSpell extends ChangeNotifier {
     return n is Line ? n : null;
   }
 
-  Future<List<String>> guessesFor(String word) async {
-    final hit = _guessCache[word];
+  /// Suggestions for [m], best first: a grammar issue's own corrections,
+  /// else the checker's guesses for the word in its paragraph (context
+  /// ranks them and picks the paragraph's language).
+  Future<List<String>> guessesFor(Misspelling m) async {
+    final grammar = m.issue?.grammar ?? false;
+    if (grammar) return m.issue!.corrections.take(5).toList();
+    final key = '${m.word}\u0000${m.lineText}';
+    final hit = _guessCache[key];
     if (hit != null) return hit;
-    final g = await checker().guesses(word);
-    return _guessCache[word] = g.take(5).toList();
+    final g = await checker().guesses(
+      m.word,
+      text: m.lineText,
+      start: m.lineStart,
+    );
+    while (_guessCache.length > 100) {
+      _guessCache.remove(_guessCache.keys.first);
+    }
+    return _guessCache[key] = g.take(5).toList();
   }
 
   /// One undoable edit.
-  void replaceWord(({String word, int docStart, int length}) m, String with_) {
+  void replaceWord(Misspelling m, String with_) {
     controller.replaceText(
       m.docStart,
       m.length,
@@ -265,8 +314,11 @@ class NoteSpell extends ChangeNotifier {
     notifyListeners();
   }
 
-  void ignore(String word) {
-    _ignored.add(word.toLowerCase());
+  /// Ignores [m] in every note until the app quits. Misspellings also go to
+  /// the platform's ignore list, so its later checks skip them too.
+  void ignore(Misspelling m) {
+    _ignored.add(m.word.toLowerCase());
+    if (!(m.issue?.grammar ?? false)) unawaited(checker().ignore(m.word));
     notifyListeners();
   }
 
@@ -297,7 +349,7 @@ class _SpellMenu extends StatefulWidget {
 
   final NoteSpell spell;
   final QuillRawEditorState state;
-  final ({String word, int docStart, int length}) miss;
+  final Misspelling miss;
 
   @override
   State<_SpellMenu> createState() => _SpellMenuState();
@@ -309,7 +361,7 @@ class _SpellMenuState extends State<_SpellMenu> {
   @override
   void initState() {
     super.initState();
-    widget.spell.guessesFor(widget.miss.word).then((g) {
+    widget.spell.guessesFor(widget.miss).then((g) {
       if (mounted) setState(() => _guesses = g);
     });
   }
@@ -319,7 +371,12 @@ class _SpellMenuState extends State<_SpellMenu> {
     final spell = widget.spell;
     final miss = widget.miss;
     void done() => widget.state.hideToolbar();
+    final grammar = miss.issue?.grammar ?? false;
+    final message = miss.issue?.message;
     final items = <ContextMenuButtonItem>[
+      // The checker's explanation, as macOS shows it; not a button.
+      if (grammar && message != null && message.isNotEmpty)
+        ContextMenuButtonItem(label: message, onPressed: null),
       for (final g in _guesses)
         ContextMenuButtonItem(
           label: g,
@@ -328,17 +385,20 @@ class _SpellMenuState extends State<_SpellMenu> {
             done();
           },
         ),
+      if (!grammar)
+        ContextMenuButtonItem(
+          label: context.l10n.spellLearn,
+          onPressed: () {
+            spell.learn(miss.word);
+            done();
+          },
+        ),
       ContextMenuButtonItem(
-        label: context.l10n.spellLearn,
+        label: grammar
+            ? context.l10n.spellIgnoreGrammar
+            : context.l10n.spellIgnore,
         onPressed: () {
-          spell.learn(miss.word);
-          done();
-        },
-      ),
-      ContextMenuButtonItem(
-        label: context.l10n.spellIgnore,
-        onPressed: () {
-          spell.ignore(miss.word);
+          spell.ignore(miss);
           done();
         },
       ),

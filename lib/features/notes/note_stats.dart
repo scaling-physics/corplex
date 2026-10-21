@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../l10n/l10n.dart';
 import '../library/citations.dart';
 import 'citation_embed.dart';
+import 'footnote_markers.dart';
 import 'note_table.dart';
 
 /// Reading speed for the estimate, in words per minute.
@@ -16,6 +17,7 @@ class NoteStats {
     required this.characters,
     required this.paragraphs,
     required this.citations,
+    this.footnoteWords = 0,
   });
 
   final int words;
@@ -24,6 +26,9 @@ class NoteStats {
 
   /// Citations in the text (a chip citing two papers counts twice).
   final int citations;
+
+  /// Words inside footnotes, which [words] leaves out.
+  final int footnoteWords;
 
   /// Whole minutes, rounded up; 0 for an empty note.
   int get readingMinutes => (words / wordsPerMinute).ceil();
@@ -47,8 +52,18 @@ NoteStats noteStats(Document document) {
   final wordPattern = RegExp(r'\S*[\p{L}\p{N}]\S*', unicode: true);
   // Words in table cells count too.
   var tableWords = 0;
+  var footnoteWords = 0;
   for (final op in document.toDelta().toList()) {
     final data = op.data;
+    if (data is Map && data[footnoteEmbedType] is String) {
+      // A footnote's citations are not words, as in the body.
+      footnoteWords += wordPattern
+          .allMatches(
+            footnoteDisplayText(data[footnoteEmbedType] as String)
+                .replaceAll(_markerPattern, ' '),
+          )
+          .length;
+    }
     if (data is Map && data[tableEmbedType] is String) {
       tableWords += wordPattern
           .allMatches(
@@ -62,6 +77,7 @@ NoteStats noteStats(Document document) {
     characters: lines.fold(0, (sum, l) => sum + l.runes.length),
     paragraphs: lines.where((l) => l.trim().isNotEmpty).length,
     citations: citations,
+    footnoteWords: footnoteWords,
   );
 }
 
@@ -88,22 +104,30 @@ Future<void> showNoteStatsSheet(
   final fmt = NumberFormat.decimalPattern(
     Localizations.localeOf(context).toString(),
   );
-  Widget tile(String key, String label, String value) => SizedBox(
-    key: ValueKey(key),
-    width: 104,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(value, style: text.titleLarge),
-        Text(
-          label,
-          style: text.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.secondary,
-          ),
+  Widget tile(String key, String label, String value, {String? note}) =>
+      SizedBox(
+        key: ValueKey(key),
+        width: 104,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: text.titleLarge),
+            Text(
+              label,
+              style: text.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+            ),
+            if (note != null)
+              Text(
+                note,
+                style: text.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -114,7 +138,16 @@ Future<void> showNoteStatsSheet(
           spacing: 16,
           runSpacing: 20,
           children: [
-            tile('Words', l10n.notesStatsWords, fmt.format(stats.words)),
+            tile(
+              'Words',
+              l10n.notesStatsWords,
+              fmt.format(stats.words),
+              note: stats.footnoteWords > 0
+                  ? l10n.footnotesStatsInFootnotes(
+                      fmt.format(stats.footnoteWords),
+                    )
+                  : null,
+            ),
             tile(
               'Characters',
               l10n.notesStatsCharacters,

@@ -1,3 +1,5 @@
+import '../notes/callout_markers.dart' show calloutLabel;
+import '../notes/footnote_markers.dart' show balanceFootnoteText;
 import '../notes/note_markdown.dart' show sketchMarkdown, tableMarkdown;
 import 'export_model.dart';
 
@@ -28,6 +30,7 @@ String exportToMarkdown(ExportDoc doc) {
       BlockKind.heading3 => '#### $text',
       BlockKind.bullet => '- $text',
       BlockKind.ordered => '${b.ordinal}. $text',
+      BlockKind.quote when b.callout?.head ?? false => _calloutHead(b),
       BlockKind.quote => '> $text',
       BlockKind.paragraph || BlockKind.caption => text,
       BlockKind.displayMath => '\$\$\n${b.text}\n\$\$',
@@ -43,9 +46,14 @@ String exportToMarkdown(ExportDoc doc) {
       previous = null;
       continue;
     }
+    // A callout's lines stay in one block quote.
     final sameList =
-        previous == b.kind &&
-        (b.kind == BlockKind.bullet || b.kind == BlockKind.ordered);
+        (previous == b.kind &&
+            (b.kind == BlockKind.bullet || b.kind == BlockKind.ordered)) ||
+        (previous == BlockKind.quote &&
+            b.kind == BlockKind.quote &&
+            b.callout != null &&
+            !b.callout!.head);
     if (out.isNotEmpty) out.write(sameList ? '\n' : '\n\n');
     out.write(line);
     previous = b.kind;
@@ -56,7 +64,34 @@ String exportToMarkdown(ExportDoc doc) {
   return '$heading$body\n';
 }
 
+/// `> [!warning] Title` — the type word, then the title unless it is just
+/// the type's own name (a callout without a title).
+String _calloutHead(ExportBlock b) {
+  final title = b.runs
+      .map(
+        (r) => _inline(
+          Run(
+            r.text,
+            math: r.math,
+            italic: r.italic,
+            strike: r.strike,
+            link: r.link,
+            highlight: r.highlight,
+            footnote: r.footnote,
+          ),
+        ),
+      )
+      .join()
+      .trim();
+  final type = b.callout!.type;
+  final shown = title == calloutLabel(type) ? '' : title;
+  return '> [!$type]${shown.isEmpty ? '' : ' $shown'}';
+}
+
 String _inline(Run r) {
+  if (r.footnote != null) {
+    return '^[${balanceFootnoteText(r.footnote!.map(_inline).join())}]';
+  }
   var out = r.text;
   if (out.isEmpty) return out;
   if (r.math) return '\$$out\$';

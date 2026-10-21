@@ -34,14 +34,20 @@ import '../attachments/attachments_browser.dart';
 import '../attachments/attachments_providers.dart' show allAttachmentsProvider;
 import 'mac_toolbar.dart';
 import '../notes/note_file_actions.dart';
+import '../notes/daily_notes.dart' show openTodaysNote;
+import '../notes/daily_settings_tile.dart';
 import '../notes/notes_screen.dart';
+import '../notes/templates.dart'
+    show NewNoteMenuRegion, newNoteFromTemplate;
 import '../projects/projects_providers.dart';
 import '../notes/tags_providers.dart';
 import '../notes/folders_providers.dart';
 import '../notes/notes_providers.dart';
 import '../review/review_prompt.dart';
+import '../search/saved_searches.dart' show savedSearchRunRequestProvider;
 import '../search/search_screen.dart';
 import '../trash/trash_screen.dart';
+import '../markdown_import/markdown_import_ui.dart';
 import 'data_actions.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
@@ -97,6 +103,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ref.read(ocrStartupProvider);
     // Papers' full text for search is indexed quietly in the background.
     ref.read(pdfIndexStartupProvider);
+    // A saved search chosen in the Mac sidebar runs in the toolbar field.
+    ref.listenManual(savedSearchRunRequestProvider, (_, query) {
+      if (query == null) return;
+      ref.read(savedSearchRunRequestProvider.notifier).state = null;
+      _runSavedSearch(query);
+    });
   }
 
   @override
@@ -117,6 +129,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         _searchQuery = text.trim();
         if (_searchQuery.isNotEmpty) _attachments = false;
       });
+    });
+  }
+
+  void _runSavedSearch(String query) {
+    if (!mounted) return;
+    _searchDebounce?.cancel();
+    _home();
+    setState(() {
+      _searchController.text = query;
+      _searchQuery = query.trim();
+      _attachments = false;
     });
   }
 
@@ -156,6 +179,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.newNote:
         _home();
         createNote(context, ref);
+      case MenuCommand.todaysNote:
+        _home();
+        setState(() => _index = 0);
+        openTodaysNote(context, ref);
+      case MenuCommand.newNoteFromTemplate:
+        _home();
+        setState(() => _index = 0);
+        newNoteFromTemplate(context, ref);
       case MenuCommand.importPdf:
         _home();
         importPaper(context, ref);
@@ -165,6 +196,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         backUpToFile(context, ref);
       case MenuCommand.exportMarkdown:
         exportAsMarkdown(context, ref);
+      case MenuCommand.importMarkdown:
+        importMarkdownVault(context, ref);
       case MenuCommand.trash:
         _openTrash();
       case MenuCommand.showNotes:
@@ -215,6 +248,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.addComment:
       case MenuCommand.linkNote:
       case MenuCommand.citePaper:
+      case MenuCommand.footnote:
       case MenuCommand.collapseSections:
       case MenuCommand.expandSections:
         // Editor commands; no note editor has focus, so nothing to format.
@@ -340,6 +374,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final actions = <LogicalKeyboardKey, VoidCallback>{
       if (!mac) LogicalKeyboardKey.keyN: () => createNote(context, ref),
       if (!mac) LogicalKeyboardKey.keyO: () => importPaper(context, ref),
+      if (!mac) LogicalKeyboardKey.keyT: () => openTodaysNote(context, ref),
       LogicalKeyboardKey.keyF: search,
       if (!mac) LogicalKeyboardKey.digit1: () => setState(() => _index = 0),
       if (!mac) LogicalKeyboardKey.digit2: () => setState(() => _index = 1),
@@ -463,6 +498,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       onPressed: () =>
           _index == 0 ? createNote(context, ref) : importPaper(context, ref),
     );
+    // Right-click (or long-press) New note for Today's note and templates.
+    final primaryWithMenu = NewNoteMenuRegion(
+      enabled: _index == 0,
+      child: primary,
+    );
     Widget search(double width) => MacToolbarSearch(
       controller: _searchController,
       focusNode: _searchFocus,
@@ -529,7 +569,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           actions: [
             listMenu,
             // Without a pane the row's other controls come here.
-            if (!expanded) primary,
+            if (!expanded) primaryWithMenu,
             if (searchInList) search(expanded ? 150 : 200),
           ],
         ),
@@ -606,7 +646,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           Expanded(
             child: FocusTraversalGroup(
               child: MacPaneChrome(
-                leading: primary,
+                leading: primaryWithMenu,
                 trailing: searchInList
                     ? const SizedBox(width: 6)
                     : search(pane >= 1000 ? 220 : 180),
@@ -920,6 +960,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 );
               },
             ),
+            const DailyNotesSettingsTile(),
             const NotesPasswordSettings(),
             Consumer(
               builder: (context, ref, _) {
@@ -945,6 +986,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               title: Text(l10n.settingsExportMarkdown),
               subtitle: Text(l10n.settingsExportMarkdownSubtitle),
               onTap: () => Navigator.pop(context, 'markdown'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.drive_folder_upload_outlined),
+              title: Text(l10n.mdImportAction),
+              subtitle: Text(l10n.mdImportActionSubtitle),
+              onTap: () => Navigator.pop(context, 'markdown-import'),
             ),
             ListTile(
               leading: const Icon(Icons.settings_backup_restore),
@@ -1018,6 +1065,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         await backUpToFile(context, ref);
       case 'markdown':
         await exportAsMarkdown(context, ref);
+      case 'markdown-import':
+        await importMarkdownVault(context, ref);
       case 'restore':
         await restoreFromBackupFile(context, ref);
       case 'signout':
@@ -1108,19 +1157,22 @@ class _PrimaryAction extends ConsumerWidget {
         importPaper,
       ),
     };
-    return FloatingActionButton.extended(
-      heroTag: null,
-      onPressed: () => action(context, ref),
-      icon: AnimatedSwitcher(
-        duration: AppMotion.short,
-        child: Icon(icon, key: ValueKey(icon)),
-      ),
-      label: AnimatedSize(
-        duration: AppMotion.medium,
-        curve: AppMotion.standard,
-        child: AnimatedSwitcher(
+    return NewNoteMenuRegion(
+      enabled: index == 0,
+      child: FloatingActionButton.extended(
+        heroTag: null,
+        onPressed: () => action(context, ref),
+        icon: AnimatedSwitcher(
           duration: AppMotion.short,
-          child: Text(label, key: ValueKey(label)),
+          child: Icon(icon, key: ValueKey(icon)),
+        ),
+        label: AnimatedSize(
+          duration: AppMotion.medium,
+          curve: AppMotion.standard,
+          child: AnimatedSwitcher(
+            duration: AppMotion.short,
+            child: Text(label, key: ValueKey(label)),
+          ),
         ),
       ),
     );
@@ -1198,7 +1250,9 @@ class _Rail extends ConsumerWidget {
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       leading: Padding(
         padding: const EdgeInsets.only(top: 12, bottom: 20),
-        child: extended
+        child: NewNoteMenuRegion(
+          enabled: index == 0,
+          child: extended
             ? FloatingActionButton.extended(
                 heroTag: null,
                 elevation: 0,
@@ -1216,6 +1270,7 @@ class _Rail extends ConsumerWidget {
                   child: Icon(icon, key: ValueKey(icon)),
                 ),
               ),
+        ),
       ),
       destinations: [
         NavigationRailDestination(

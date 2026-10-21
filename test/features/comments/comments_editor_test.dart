@@ -41,9 +41,12 @@ class _FakeSpell implements SpellChecker {
       ],
   ];
   @override
-  Future<List<String>> guesses(String word) async => const [];
+  Future<List<String>> guesses(String word, {String? text, int? start}) async =>
+      const [];
   @override
   Future<void> learn(String word) async {}
+  @override
+  Future<void> ignore(String word) async {}
 }
 
 void main() {

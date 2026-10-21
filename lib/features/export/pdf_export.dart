@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../ink/ink_model.dart';
 import '../ink/ink_tools.dart' show sketchPaperColor;
+import '../notes/callout_markers.dart';
 import '../notes/math_render.dart';
 import '../notes/note_table.dart';
 import 'export_images.dart' show ExportPhoto;
@@ -43,10 +44,15 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     lineSpacing: 3,
   );
 
+  // Footnotes print as superscript numbers with a "Notes" list at the end of
+  // each note (chapter), before the references.
+  final numbers = Map<Run, int>.identity();
+  final blocks = _withEndnotes(doc, numbers);
+
   // Equations are drawn up front (async); one that won't render falls back
   // to its LaTeX source as text.
   final maths = <String, MathImage?>{};
-  for (final b in doc.blocks) {
+  for (final b in blocks) {
     for (final r in b.runs) {
       if (!r.math) continue;
       final display = b.kind == BlockKind.displayMath;
@@ -59,6 +65,13 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
   }
 
   pw.InlineSpan span(Run r, double size, {bool forceBold = false}) {
+    if (r.footnote != null) {
+      return pw.TextSpan(
+        text: '${numbers[r] ?? '?'}',
+        style: style(size * 0.7, isBold: true),
+        baseline: size * 0.4,
+      );
+    }
     if (r.math) {
       final img = maths['I${r.text}'];
       if (img == null) {
@@ -108,7 +121,7 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
     );
   }
 
-  pw.Widget block(ExportBlock b) {
+  pw.Widget block(ExportBlock b, {bool endOfCallout = true}) {
     pw.Widget rich(
       double size, {
       bool isBold = false,
@@ -174,6 +187,29 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
         marker: '${b.ordinal}.  ',
         after: 3,
       ),
+      BlockKind.quote when b.callout != null => () {
+        final colors = calloutExportColors(b.callout!.tone);
+        return pw.Container(
+          width: double.infinity,
+          margin: pw.EdgeInsets.only(bottom: endOfCallout ? 8 : 0),
+          padding: pw.EdgeInsets.only(
+            left: 10,
+            right: 8,
+            top: b.callout!.head ? 6 : 2,
+            bottom: endOfCallout ? 6 : 2,
+          ),
+          decoration: pw.BoxDecoration(
+            color: PdfColor.fromHex(colors.fill),
+            border: pw.Border(
+              left: pw.BorderSide(
+                color: PdfColor.fromHex(colors.bar),
+                width: 3,
+              ),
+            ),
+          ),
+          child: rich(11, after: 0),
+        );
+      }(),
       BlockKind.quote => pw.Container(
         margin: const pw.EdgeInsets.only(left: 12, bottom: 6),
         padding: const pw.EdgeInsets.only(left: 10),
@@ -206,11 +242,58 @@ Future<Uint8List> exportToPdf(ExportDoc doc, {FontLoader? loadFont}) async {
             padding: const pw.EdgeInsets.only(bottom: 14),
             child: pw.Text(doc.title.trim(), style: style(26, isBold: true)),
           ),
-        for (final b in doc.blocks) block(b),
+        for (final (i, b) in blocks.indexed)
+          block(
+            b,
+            endOfCallout:
+                i + 1 >= blocks.length ||
+                blocks[i + 1].kind != BlockKind.quote ||
+                blocks[i + 1].callout == null ||
+                blocks[i + 1].callout!.head,
+          ),
       ],
     ),
   );
   return pdf.save();
+}
+
+/// [doc]'s blocks with a "Notes" section (numbered footnote texts) added at
+/// the end of every note: before the next chapter, or before the generated
+/// "References". Numbering restarts in each note; [numbers] receives the
+/// number of every footnote run.
+List<ExportBlock> _withEndnotes(ExportDoc doc, Map<Run, int> numbers) {
+  if (!doc.blocks.any((b) => b.runs.any((r) => r.footnote != null))) {
+    return doc.blocks;
+  }
+  final refsAt = doc.papers.isEmpty
+      ? -1
+      : doc.blocks.lastIndexWhere(
+          (b) => b.kind == BlockKind.heading2 && b.text.trim() == 'References',
+        );
+  final out = <ExportBlock>[];
+  var notes = <Run>[];
+  void flush() {
+    if (notes.isEmpty) return;
+    out.add(const ExportBlock(BlockKind.heading3, [Run('Notes')]));
+    for (final (i, n) in notes.indexed) {
+      out.add(
+        ExportBlock(BlockKind.caption, [Run('${i + 1}.  '), ...n.footnote!]),
+      );
+    }
+    notes = [];
+  }
+
+  for (final (i, b) in doc.blocks.indexed) {
+    if ((b.chapterTitle && i > 0) || i == refsAt) flush();
+    for (final r in b.runs) {
+      if (r.footnote == null) continue;
+      notes.add(r);
+      numbers[r] = notes.length;
+    }
+    out.add(b);
+  }
+  flush();
+  return out;
 }
 
 // A4 text width with the 56 pt margins used above.

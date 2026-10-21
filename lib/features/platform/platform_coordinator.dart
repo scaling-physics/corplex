@@ -10,6 +10,7 @@ import '../library/library_screen.dart';
 import '../../data/database_provider.dart';
 import '../library/papers_providers.dart';
 import '../library/pdf_viewer_screen.dart';
+import '../notes/daily_notes.dart' show openTodaysNote;
 import '../notes/notes_screen.dart';
 import 'quick_action_source.dart';
 import 'widget_data.dart';
@@ -55,6 +56,8 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
     switch (type) {
       case quickNewNote:
         createNote(context, ref);
+      case quickTodaysNote:
+        openTodaysNote(context, ref);
       case quickImportPdf:
         importPaper(context, ref);
     }
@@ -92,7 +95,8 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
   }
 }
 
-/// Opens what a widget link points at: `corplex://new-note` or
+/// Opens what a widget link points at: `corplex://new-note`,
+/// `corplex://today` (today's note) or
 /// `corplex://paper/<id>?page=N` (the PDF at that page, or the paper's
 /// screen when the file isn't on this device).
 Future<void> openWidgetLink(
@@ -103,6 +107,10 @@ Future<void> openWidgetLink(
   if (uri.scheme != 'corplex') return;
   if (uri.host == 'new-note') {
     await createNote(context, ref);
+    return;
+  }
+  if (uri.host == 'today') {
+    await openTodaysNote(context, ref);
     return;
   }
   final link = parsePaperPageLink(uri.toString());

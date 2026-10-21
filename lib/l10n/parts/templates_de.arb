@@ -1,0 +1,11 @@
+{
+  "@@locale": "de",
+  "templatesTitle": "Vorlagen",
+  "templatesUntitled": "Vorlage ohne Titel",
+  "templatesUse": "Als Vorlage verwenden",
+  "templatesStopUsing": "Nicht mehr als Vorlage verwenden",
+  "templatesInsert": "Vorlage einfügen",
+  "templatesInsertHint": "Eine deiner Vorlagen hier einfügen",
+  "templatesLiterature": "Literaturnotiz",
+  "templatesUnlockReason": "Zum Verwenden dieser Vorlage entsperren"
+}

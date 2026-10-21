@@ -7,6 +7,7 @@ import '../library/highlights.dart';
 import '../projects/figures.dart';
 import 'figure_markers.dart';
 import 'math_markers.dart';
+import 'block_ids.dart';
 import 'note_content.dart';
 import 'note_highlight.dart' show highlightHex;
 import 'note_links.dart';
@@ -24,13 +25,17 @@ String noteToMarkdown({
   required String content,
   FigureIndex? figures,
   String Function(Sketch sketch)? sketchLink,
+  bool keepBlockIds = true,
+  String? Function(String link)? embedLine,
 }) {
   // The editor's form (figure chips) is turned back to markers first.
   final stored = figureEmbedsToText(content);
   final index =
       figures ??
       buildFigureIndex([FigureNote(noteId: '', title: title, content: stored)]);
-  final delta = decodeNoteContent(stored).toDelta();
+  var delta = decodeNoteContent(stored).toDelta();
+  // `^id` block ids stay (Obsidian reads them) unless asked to go.
+  if (!keepBlockIds) delta = withoutBlockIds(delta);
   final lines = <String>[];
   // Raw (unformatted) text of each line that is a code-block line, else null.
   final codeOf = <String?>[];
@@ -54,6 +59,13 @@ String noteToMarkdown({
         line.write('\n${(sketchLink ?? sketchMarkdown)(sketch)}\n');
       } else if (data[tableEmbedType] case final String json) {
         line.write('\n${tableMarkdown(NoteTable.decode(json))}\n');
+      } else if (data[blockIdEmbedType] case final String id) {
+        if (keepBlockIds) line.write(' ^$id');
+      } else if (data[noteEmbedType] case final String json) {
+        // On a line of its own: `![[Note#Heading]]`.
+        final link = noteEmbedLink(json);
+        final text = link == null ? null : embedLine?.call(link);
+        if (text != null) line.write('\n$text\n');
       }
       continue;
     }
@@ -126,8 +138,17 @@ String _inline(String text, Map<String, dynamic> attrs) {
 
 String _block(String text, Map<String, dynamic> attrs, int ordinal) {
   if (attrs['header'] case final int level) return '${'#' * (level + 1)} $text';
-  if (attrs['list'] == 'bullet') return '- $text';
-  if (attrs['list'] == 'ordered') return '$ordinal. $text';
+  // Nested items indent four spaces a level, enough under "1. " too.
+  final nest =
+      '    ' *
+      switch (attrs['indent']) {
+        final int n when n > 0 => n,
+        _ => 0,
+      };
+  if (attrs['list'] == 'bullet') return '$nest- $text';
+  if (attrs['list'] == 'ordered') return '$nest$ordinal. $text';
+  if (attrs['list'] == 'unchecked') return '$nest- [ ] $text';
+  if (attrs['list'] == 'checked') return '$nest- [x] $text';
   if (attrs['blockquote'] == true) return '> $text';
   return text;
 }

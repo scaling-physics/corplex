@@ -1,0 +1,27 @@
+{
+  "@@locale": "en",
+  "calloutsCommand": "Callout",
+  "calloutsCommandHint": "Set a passage apart as a note, tip or warning",
+  "calloutsPickTitle": "Callout type",
+  "calloutsRemove": "Remove callout",
+  "calloutsLabel": "Callout: {type}",
+  "@calloutsLabel": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "calloutsTypeNote": "Note",
+  "calloutsTypeInfo": "Info",
+  "calloutsTypeTip": "Tip",
+  "calloutsTypeSuccess": "Success",
+  "calloutsTypeExample": "Example",
+  "calloutsTypeImportant": "Important",
+  "calloutsTypeQuestion": "Question",
+  "calloutsTypeTodo": "To do",
+  "calloutsTypeWarning": "Warning",
+  "calloutsTypeCaution": "Caution",
+  "calloutsTypeDanger": "Danger",
+  "calloutsTypeBug": "Bug"
+}

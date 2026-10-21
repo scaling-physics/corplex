@@ -1,0 +1,15 @@
+{
+  "@@locale": "en",
+  "dailyTodaysNote": "Today's note",
+  "dailyPrevious": "Previous day's note",
+  "dailyNext": "Next day's note",
+  "dailyNoEarlier": "No earlier daily note",
+  "dailyNoLater": "No later daily note",
+  "dailySettingsTitle": "Daily notes",
+  "dailySettingsSubtitle": "Template and folder for today's note",
+  "dailyTemplate": "Template",
+  "dailyTemplateHint": "Use a note as a template (note menu) to choose one here.",
+  "dailyFolder": "Folder",
+  "dailyNone": "None",
+  "dailyKeyTodaysNote": "Today's note"
+}

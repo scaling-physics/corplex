@@ -1,7 +1,10 @@
 import 'package:flutter_quill/flutter_quill.dart';
 
+import 'block_ids.dart';
+import 'callout_markers.dart';
 import 'citation_embed.dart';
 import 'figure_markers.dart';
+import 'footnote_markers.dart';
 import 'heading_fold.dart';
 import 'math_markers.dart';
 import 'note_content.dart';
@@ -14,8 +17,15 @@ import 'note_content.dart';
 /// Anything that measures offsets for the editor (to-dos, selections to
 /// open a note at) must build the document with [editorDocument], so a
 /// marker added here later is counted the same way everywhere.
-Document editorDocument(String stored) =>
-    decodeNoteContent(figuresToEmbeds(citationsToEmbeds(mathToEmbeds(stored))));
+Document editorDocument(String stored) => decodeNoteContent(
+  blockIdsToEmbeds(
+    calloutsToEmbeds(
+      figuresToEmbeds(
+        citationsToEmbeds(mathToEmbeds(footnotesToEmbeds(stored))),
+      ),
+    ),
+  ),
+);
 
 /// The editor's document back to stored content (the inverse of
 /// [editorDocument]), normalised the way the editor saves notes.
@@ -27,7 +37,15 @@ String storedFromEditor(Document document) {
   final whole = deltaHasFolds(delta)
       ? Document.fromDelta(unfoldDelta(delta))
       : document;
+  // Footnote and callout embeds hold their text raw, so turning them back
+  // first is the same as turning them back last (the design's order).
   return citationEmbedsToText(
-    figureEmbedsToText(mathEmbedsToText(encodeNoteContent(whole))),
+    figureEmbedsToText(
+      mathEmbedsToText(
+        footnoteEmbedsToText(
+          calloutEmbedsToText(blockIdEmbedsToText(encodeNoteContent(whole))),
+        ),
+      ),
+    ),
   );
 }

@@ -1,0 +1,15 @@
+{
+  "@@locale": "de",
+  "dailyTodaysNote": "Heutige Notiz",
+  "dailyPrevious": "Notiz vom Vortag",
+  "dailyNext": "Notiz vom Folgetag",
+  "dailyNoEarlier": "Keine frühere Tagesnotiz",
+  "dailyNoLater": "Keine spätere Tagesnotiz",
+  "dailySettingsTitle": "Tagesnotizen",
+  "dailySettingsSubtitle": "Vorlage und Ordner für die heutige Notiz",
+  "dailyTemplate": "Vorlage",
+  "dailyTemplateHint": "Markiere eine Notiz als Vorlage (Notizmenü), um hier eine auszuwählen.",
+  "dailyFolder": "Ordner",
+  "dailyNone": "Keine",
+  "dailyKeyTodaysNote": "Heutige Notiz"
+}

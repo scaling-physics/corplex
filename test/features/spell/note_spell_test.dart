@@ -13,8 +13,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Flags any word in [bad] (case-insensitive).
 class FakeSpell implements SpellChecker {
-  FakeSpell(this.bad);
+  FakeSpell(this.bad, {this.grammar = const {}});
   final Set<String> bad;
+
+  /// Phrases reported as grammar issues, with "fixed" as the correction.
+  final Set<String> grammar;
   int checks = 0;
   int guessCalls = 0;
   final learned = <String>[];
@@ -31,18 +34,34 @@ class FakeSpell implements SpellChecker {
           for (final m in RegExp(r"[A-Za-z0-9_]+").allMatches(t))
             if (bad.contains(m.group(0)!.toLowerCase()))
               TextRange(start: m.start, end: m.end),
+          for (final g in grammar)
+            if (t.contains(g))
+              SpellIssue(
+                start: t.indexOf(g),
+                end: t.indexOf(g) + g.length,
+                grammar: true,
+                message: 'Agreement',
+                corrections: const ['fixed'],
+              ),
         ],
     ];
   }
 
+  final guessContexts = <(String?, int?)>[];
+  final ignored = <String>[];
+
   @override
-  Future<List<String>> guesses(String word) async {
+  Future<List<String>> guesses(String word, {String? text, int? start}) async {
     guessCalls++;
+    guessContexts.add((text, start));
     return ['one', 'two', 'three', 'four', 'five', 'six'];
   }
 
   @override
   Future<void> learn(String word) async => learned.add(word);
+
+  @override
+  Future<void> ignore(String word) async => ignored.add(word);
 }
 
 QuillController controllerWith(String text) => QuillController(
@@ -253,6 +272,8 @@ void main() {
       expect(find.text('six'), findsNothing);
       expect(find.text('Learn Spelling'), findsOneWidget);
       expect(find.text('Ignore Spelling'), findsOneWidget);
+      // The checker saw the word in its paragraph, for context and language.
+      expect(fake.guessContexts.last, ('hello teh world', 6));
 
       c.document.history.clear();
       await tester.tap(find.text('two'));
@@ -275,15 +296,85 @@ void main() {
       await tester.pumpWidget(editor(c, spell));
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump();
-      spell.ignore('teh');
       c.updateSelection(
         const TextSelection.collapsed(offset: 8),
         ChangeSource.local,
       );
+      spell.ignore(spell.misspellingAtSelection()!);
       expect(spell.misspellingAtSelection(), isNull);
+      // The platform's ignore list hears about it too.
+      expect(fake.ignored, ['teh']);
       await spell.learn('teh');
       expect(fake.learned, ['teh']);
       c.dispose();
+    });
+  });
+
+  group('grammar', () {
+    testWidgets('a grammar issue is dotted, offers its corrections and no '
+        'Learn', (tester) async {
+      final c = controllerWith('today they was here\n');
+      final fake = FakeSpell({}, grammar: {'they was'});
+      final spell = NoteSpell(controller: c, checker: () => fake)
+        ..enabled = true
+        ..addListener(() {});
+      addTearDown(spell.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates:
+              FlutterQuillLocalizations.localizationsDelegates,
+          home: Scaffold(
+            body: QuillEditor.basic(
+              controller: c,
+              focusNode: FocusNode(),
+              config: QuillEditorConfig(
+                textSpanBuilder: spell.spanBuilder,
+                contextMenuBuilder: spell.contextMenu,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+      final dotted = <String>[];
+      for (final rt in tester.widgetList<RichText>(find.byType(RichText))) {
+        rt.text.visitChildren((sp) {
+          if (sp is TextSpan &&
+              sp.text != null &&
+              sp.style?.decorationStyle == TextDecorationStyle.dotted) {
+            dotted.add(sp.text!);
+          }
+          return true;
+        });
+      }
+      expect(dotted, ['they was']);
+
+      c.updateSelection(
+        const TextSelection(baseOffset: 6, extentOffset: 14),
+        ChangeSource.local,
+      );
+      final m = spell.misspellingAtSelection()!;
+      expect(m.issue!.grammar, isTrue);
+      expect(await spell.guessesFor(m), ['fixed']);
+      // Grammar corrections come from the check; no guesses call.
+      expect(fake.guessCalls, 0);
+      spell.ignore(m);
+      expect(fake.ignored, isEmpty);
+      expect(spell.misspellingAtSelection(), isNull);
+      c.dispose();
+    });
+
+    test('keepMisspelling keeps grammar that the word rules would drop', () {
+      const text = 'the NMDAR are open';
+      expect(
+        keepMisspelling(
+          text,
+          const SpellIssue(start: 4, end: 13, grammar: true),
+        ),
+        isTrue,
+      );
+      expect(keepMisspelling(text, const TextRange(start: 4, end: 9)), isFalse);
     });
   });
 
@@ -306,9 +397,24 @@ void main() {
           return [
             [
               [6, 3],
+              [
+                0,
+                8,
+                1,
+                'Use "were"',
+                ['hello were'],
+              ],
             ],
             <Object>[],
           ];
+        }
+        if (call.method == 'guesses') {
+          expect(call.arguments, {
+            'word': 'teh',
+            'text': 'hello teh',
+            'start': 6,
+          });
+          return ['the'];
         }
         return null;
       });
@@ -318,9 +424,20 @@ void main() {
           null,
         ),
       );
-      final r = await ChannelSpellChecker().check(['hello teh', 'ok']);
-      expect(r[0].single, const TextRange(start: 6, end: 9));
+      final checker = ChannelSpellChecker();
+      final r = await checker.check(['hello teh', 'ok']);
+      expect(r[0].first, const TextRange(start: 6, end: 9));
+      expect((r[0].first as SpellIssue).grammar, isFalse);
+      final g = r[0][1] as SpellIssue;
+      expect(
+        (g.start, g.end, g.grammar, g.message),
+        (0, 8, true, 'Use "were"'),
+      );
+      expect(g.corrections, ['hello were']);
       expect(r[1], isEmpty);
+      expect(await checker.guesses('teh', text: 'hello teh', start: 6), [
+        'the',
+      ]);
     });
   });
 

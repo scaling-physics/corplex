@@ -16,6 +16,7 @@ List<(String, List<ShortcutEntry>)> shortcutSections(AppLocalizations l) => [
     l.macShortcutsGeneral,
     [
       ShortcutEntry(l.macKeyNewNote, ['⌘', 'N']),
+      ShortcutEntry(l.dailyKeyTodaysNote, ['⌘', 'T']),
       ShortcutEntry(l.macKeyImportPdf, ['⌘', 'O']),
       ShortcutEntry(l.macKeyQuickNote, ['⌃', '⌥', 'N']),
       ShortcutEntry(l.macKeyDuplicateNote, ['⌘', 'D']),
@@ -50,6 +51,7 @@ List<(String, List<ShortcutEntry>)> shortcutSections(AppLocalizations l) => [
       ShortcutEntry(l.macKeyAddComment, ['⌥', '⌘', 'K']),
       ShortcutEntry(l.macKeyLinkNote, ['⌘', 'K']),
       ShortcutEntry(l.macKeyCitePaper, ['⇧', '⌘', 'K']),
+      ShortcutEntry(l.footnotesCommand, ['⌥', '⌘', 'F']),
     ],
   ),
   (

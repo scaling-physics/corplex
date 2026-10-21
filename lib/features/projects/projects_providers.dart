@@ -142,9 +142,10 @@ final projectNoteCountsProvider = StreamProvider.autoDispose<Map<String, int>>((
   final db = ref.watch(databaseProvider);
   return db
       .customSelect(
-        'SELECT project_id AS id, COUNT(*) AS n FROM project_notes '
-        'GROUP BY project_id',
-        readsFrom: {db.projectNotes},
+        'SELECT p.project_id AS id, COUNT(*) AS n FROM project_notes p '
+        'JOIN notes n ON n.id = p.note_id WHERE n.is_template = 0 '
+        'GROUP BY p.project_id',
+        readsFrom: {db.projectNotes, db.notes},
       )
       .watch()
       .map(

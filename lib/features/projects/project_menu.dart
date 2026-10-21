@@ -201,7 +201,7 @@ Future<void> exportProject(
     db,
     [
       for (final (i, n) in notes.indexed)
-        ExportNote(n.title, contents[i], images: images[i]),
+        ExportNote(n.title, contents[i], images: images[i], id: n.id),
     ],
     title: project.name,
     extraFrontMatter: abbreviationBlocks(contents),

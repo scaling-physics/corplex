@@ -13,6 +13,7 @@ import '../library/citations.dart' show parseCitationGroup;
 import '../library/highlights.dart';
 import '../library/study_details.dart';
 import '../lock/note_crypto.dart' show isLockedContent;
+import '../notes/note_aliases.dart' show parseAliases;
 import '../notes/note_content.dart';
 import '../notes/note_links.dart';
 import '../ink/ink_model.dart';
@@ -255,6 +256,8 @@ Future<VaultExportResult> buildVaultArchive(
       'created': n.createdAt.toUtc().toIso8601String(),
       'updated': n.updatedAt.toUtc().toIso8601String(),
       if (locked) 'locked': true,
+      if (parseAliases(n.aliases).isNotEmpty)
+        'aliases': parseAliases(n.aliases),
       'tags': myTags,
       'projects': myProjects,
       'papers': [for (final id in myPapers) paperLink(id)],
@@ -552,6 +555,14 @@ String _frontmatter(Map<String, Object?> fields) {
 
 final _citation = RegExp(r'\[(@[^\]\[]+)\]');
 
+/// `Note`, `Note#Heading` or `Note#^id`: what goes inside `[[…]]`.
+String _wikiTarget(String base, NoteLinkTarget target) {
+  final heading = target.heading?.replaceAll(RegExp(r'[\[\]|#^]'), ' ').trim();
+  if (heading != null && heading.isNotEmpty) return '$base#$heading';
+  if (target.block != null) return '$base#^${target.block}';
+  return base;
+}
+
 /// Rewrites a note's Delta so [noteToMarkdown] (which flattens Corplex's own
 /// links to plain text) emits wiki-links instead.
 String _rewriteLinks(
@@ -565,6 +576,16 @@ String _rewriteLinks(
   for (final raw in ops) {
     final op = Map<String, dynamic>.from(raw as Map);
     final data = op['insert'];
+    if (data is Map && data[noteEmbedType] is String) {
+      // `![[Note#Heading]]` on its own line (the line's newline follows).
+      final link = noteEmbedLink(data[noteEmbedType] as String);
+      final target = link == null ? null : parseNoteLinkTarget(link);
+      final base = target == null ? null : noteTitleOf(target.noteId);
+      if (target != null && base != null) {
+        out.add({'insert': '![[${_wikiTarget(base, target)}]]'});
+      }
+      continue;
+    }
     if (data is! String) {
       out.add(op);
       continue;
@@ -580,9 +601,15 @@ String _rewriteLinks(
       if (noteId != null) {
         final base = noteTitleOf(noteId);
         if (base != null) {
-          replacement = data.trim() == base || data.trim().isEmpty
-              ? '[[$base]]'
-              : '[[$base|${data.replaceAll('|', ' ')}]]';
+          // A link to a heading or paragraph: `[[Note#Heading]]`,
+          // `[[Note#^id]]`. The generated text "Note › part" is Obsidian's
+          // own display, so it needs no alias.
+          final inner = _wikiTarget(base, parseNoteLinkTarget(link)!);
+          final shown = data.trim();
+          replacement =
+              shown == base || shown.isEmpty || shown.startsWith('$base › ')
+              ? '[[$inner]]'
+              : '[[$inner|${data.replaceAll('|', ' ')}]]';
         }
       } else if (page != null) {
         replacement = paperPage(page.paperId, data.replaceAll('|', ' '));

@@ -92,23 +92,26 @@ String storedPreviewOf(String content) {
 /// no note bodies except those whose preview is missing (new, edited, or
 /// never shown); those are computed, stored and emitted in the same pass.
 Stream<List<NoteListItem>> watchNoteList(AppDatabase db, NotesFilter filter) {
+  // Templates are out of every ordinary list; only their own filter shows
+  // them.
   final (join, where, variables) = switch (filter) {
-    AllNotes() => ('', '', <Variable>[]),
+    AllNotes() => ('', 'WHERE n.is_template = 0', <Variable>[]),
     FolderFilter(:final folderId) => (
       '',
-      'WHERE n.folder_id = ?',
+      'WHERE n.is_template = 0 AND n.folder_id = ?',
       [Variable.withString(folderId)],
     ),
     ProjectFilter(:final projectId) => (
       'JOIN project_notes f ON f.note_id = n.id',
-      'WHERE f.project_id = ?',
+      'WHERE n.is_template = 0 AND f.project_id = ?',
       [Variable.withString(projectId)],
     ),
     TagFilter(:final tagId) => (
       'JOIN note_tags f ON f.note_id = n.id',
-      'WHERE f.tag_id = ?',
+      'WHERE n.is_template = 0 AND f.tag_id = ?',
       [Variable.withString(tagId)],
     ),
+    TemplatesFilter() => ('', 'WHERE n.is_template = 1', <Variable>[]),
   };
   final query = db.customSelect(
     'SELECT n.id, n.title, n.folder_id, n.pinned, n.created_at, n.updated_at, '
@@ -250,6 +253,12 @@ class FolderFilter extends NotesFilter {
 class TagFilter extends NotesFilter {
   const TagFilter(this.tagId);
   final String tagId;
+}
+
+/// The notes marked as templates (see `templates.dart`). Offered only once
+/// one exists.
+class TemplatesFilter extends NotesFilter {
+  const TemplatesFilter();
 }
 
 class ProjectFilter extends NotesFilter {

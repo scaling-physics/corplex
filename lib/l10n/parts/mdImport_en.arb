@@ -1,0 +1,64 @@
+{
+  "@@locale": "en",
+  "mdImportAction": "Import Markdown or Obsidian vault",
+  "mdImportActionSubtitle": "A folder, .md files or a zip",
+  "mdImportChooseTitle": "Import Markdown",
+  "mdImportFolder": "A folder (an Obsidian vault)",
+  "mdImportFiles": "Markdown files",
+  "mdImportZip": "A zip of Markdown files",
+  "mdImportReading": "Reading files…",
+  "mdImportProgress": "Importing {done} of {total}…",
+  "@mdImportProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportDoneTitle": "Import finished",
+  "mdImportNothing": "No Markdown notes were found there.",
+  "mdImportReadFailed": "That couldn't be read.",
+  "mdImportSummaryNotes": "{notes, plural, =0{No notes imported} =1{1 note imported} other{{notes} notes imported}}",
+  "@mdImportSummaryNotes": {
+    "placeholders": {
+      "notes": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummaryAttachments": "{count, plural, =1{1 attachment copied} other{{count} attachments copied}}",
+  "@mdImportSummaryAttachments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummaryUnresolved": "{count, plural, =1{1 link matched nothing and was left as text} other{{count} links matched nothing and were left as text}}",
+  "@mdImportSummaryUnresolved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummarySkipped": "{count, plural, =1{1 skipped (already here, locked, or a paper page)} other{{count} skipped (already here, locked, or paper pages)}}",
+  "@mdImportSummarySkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummaryFailed": "{count, plural, =1{1 note couldn't be saved} other{{count} notes couldn't be saved}}",
+  "@mdImportSummaryFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

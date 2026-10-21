@@ -61,6 +61,11 @@ const syncTables = [
     columns: ['name', 'created_at', 'updated_at'],
   ),
   SyncTableSpec(
+    'saved_searches',
+    keys: ['id'],
+    columns: ['name', 'query', 'position', 'created_at', 'updated_at'],
+  ),
+  SyncTableSpec(
     'papers',
     keys: ['id'],
     columns: [
@@ -100,6 +105,9 @@ const syncTables = [
       'content',
       'folder_id',
       'pinned',
+      'daily_date',
+      'aliases',
+      'is_template',
       'created_at',
       'updated_at',
     ],

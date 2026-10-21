@@ -184,6 +184,7 @@ Future<void> printNote(
           note.title,
           content,
           images: await noteExportImages(db, noteId),
+          id: noteId,
         ),
       ],
       title: note.title,

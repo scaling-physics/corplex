@@ -1,0 +1,21 @@
+{
+  "@@locale": "en",
+  "savedSearchSave": "Save this search",
+  "savedSearchDialogTitle": "Save search",
+  "savedSearchNameLabel": "Name",
+  "savedSearchHeading": "Saved searches",
+  "savedSearchSection": "Saved Searches",
+  "savedSearchRename": "Rename",
+  "savedSearchRenameTitle": "Rename search",
+  "savedSearchDelete": "Delete",
+  "savedSearchDeleted": "Deleted “{name}”",
+  "@savedSearchDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "savedSearchTipsLink": "Search tips",
+  "savedSearchTipsBody": "\"exact phrase\" and -word to leave a word out\ntag:name, folder:name, project:name\nin:notes, in:papers, in:highlights, in:pdfs\nis:pinned, is:template, is:daily\nPut - in front of any of these to exclude it. Use quotes for names with spaces: tag:\"deep learning\""
+}

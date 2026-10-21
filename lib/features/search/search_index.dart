@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../lock/note_crypto.dart';
 import 'note_search_text.dart';
+import 'search_filters.dart';
+import 'search_query.dart';
 
 enum SearchKind { note, paper, highlight, pdfText }
 
@@ -50,7 +53,9 @@ const _close = '⟧';
 /// changed rows are re-read (note content is Quill JSON and must be turned
 /// into text in Dart, which is why triggers can't do this).
 class SearchIndex {
-  SearchIndex(this._db);
+  /// [useFts] false behaves as a SQLite without FTS5 (for tests).
+  SearchIndex(this._db, {@visibleForTesting bool useFts = true})
+    : _available = useFts ? null : false;
 
   final AppDatabase _db;
   bool? _available;
@@ -181,11 +186,14 @@ class SearchIndex {
       'notes',
       "updated_at * 2 + (content LIKE '$lockedPrefix%')",
       "SELECT id, updated_at * 2 + (content LIKE '$lockedPrefix%') "
-          'AS updated_at, title, content AS body, '
+          'AS updated_at, title, aliases, content AS body, '
           "CASE WHEN content LIKE '$lockedPrefix%' THEN 'locked' END AS aux "
           'FROM notes',
       (row) => (
-        title: row.read<String>('title'),
+        title: indexedNoteTitle(
+          row.read<String>('title'),
+          row.read<String?>('aliases'),
+        ),
         body: row.read<String?>('aux') == 'locked'
             ? ''
             : noteSearchText(row.read<String>('body')),
@@ -337,20 +345,35 @@ class SearchIndex {
     }
   }
 
-  /// Results for [query], best matches first, at most [limit] per kind.
-  /// Words match as prefixes ("trans" finds "transformer"); several words
-  /// must all appear.
-  Future<List<SearchHit>> search(String query, {int limit = 20}) async {
-    final terms = _terms(query);
-    if (terms.isEmpty) return const [];
-    if (!await available) return _scan(terms, limit);
+  /// Results for [query] (see [parseSearchQuery] for the operators), best
+  /// matches first, at most [limit] per kind. Words match as prefixes
+  /// ("trans" finds "transformer"); several words must all appear.
+  Future<List<SearchHit>> search(String query, {int limit = 20}) =>
+      searchParsed(parseSearchQuery(query), limit: limit);
+
+  /// [search] for an already parsed query. Papers' own text (`pdfs`) lives
+  /// in another index and isn't searched here.
+  Future<List<SearchHit>> searchParsed(
+    SearchQuery query, {
+    int limit = 20,
+  }) async {
+    if (query.isEmpty) return const [];
+    if (!await available) return _scan(query, limit);
 
     await refresh();
-    final match = terms.map((t) => '"$t"*').join(' ');
+    final match = query.ftsMatch;
     final hits = <SearchHit>[];
     for (final kind in SearchKind.values) {
       // Paper text lives in its own index (PdfTextIndex).
       if (kind == SearchKind.pdfText) continue;
+      final filter = searchFilterSql(query, kind, 'ref');
+      if (filter == null) continue;
+      if (match == null) {
+        // Nothing to look up (only exclusions and filters): read the
+        // candidates and test them here.
+        hits.addAll(await _scanIndexed(query, kind, filter, limit));
+        continue;
+      }
       final rows = await _db
           .customSelect(
             'SELECT ref, aux, title, '
@@ -358,11 +381,13 @@ class SearchIndex {
             "highlight(search_index, 4, '$_open', '$_close') AS marked_title, "
             "(body = '') AS body_empty FROM search_index "
             'WHERE search_index MATCH ? AND kind = ? '
+            '${filter.isEmpty ? '' : 'AND ${filter.where} '}'
             // Title matches count double.
             'ORDER BY bm25(search_index, 0, 0, 0, 0, 2.0, 1.0) LIMIT ?',
             variables: [
               Variable.withString(match),
               Variable.withString(kind.name),
+              ...filter.variables,
               Variable.withInt(limit),
             ],
           )
@@ -376,7 +401,7 @@ class SearchIndex {
           SearchHit(
             kind: kind,
             id: row.read<String>('ref'),
-            title: row.read<String>('marked_title'),
+            title: displayIndexedTitle(row.read<String>('marked_title')),
             // A match in the title alone leaves the body snippet unmarked;
             // that's fine — it still shows the start of the text.
             snippet: locked
@@ -394,67 +419,164 @@ class SearchIndex {
     return hits;
   }
 
-  /// FTS5 syntax characters would be misread; keep words and digits only.
-  static List<String> _terms(String query) => RegExp(
-    r'[\p{L}\p{N}]+',
-    unicode: true,
-  ).allMatches(query.toLowerCase()).map((m) => m.group(0)!).toList();
-
-  /// Fallback when FTS5 isn't compiled in: substring match over everything.
-  Future<List<SearchHit>> _scan(List<String> terms, int limit) async {
-    bool matches(String text) {
-      final lower = text.toLowerCase();
-      return terms.every(lower.contains);
-    }
-
+  /// Candidates of [kind] read from the index table itself, kept when
+  /// [query] matches their text: for queries FTS can't express alone.
+  Future<List<SearchHit>> _scanIndexed(
+    SearchQuery query,
+    SearchKind kind,
+    SearchFilterSql filter,
+    int limit,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT ref, aux, title, body FROM search_index WHERE kind = ? '
+          '${filter.isEmpty ? '' : 'AND ${filter.where}'}',
+          variables: [Variable.withString(kind.name), ...filter.variables],
+        )
+        .get();
     final hits = <SearchHit>[];
-    for (final n in await _db.select(_db.notes).get()) {
-      final locked = isLockedContent(n.content);
-      final body = locked ? '' : noteSearchText(n.content);
-      if (matches('${n.title} $body')) {
-        hits.add(
-          SearchHit(
-            kind: SearchKind.note,
-            id: n.id,
-            title: n.title,
-            snippet: locked ? 'Locked' : body,
-            locked: locked,
-          ),
-        );
+    for (final row in rows) {
+      final title = displayIndexedTitle(row.read<String>('title'));
+      final body = row.read<String>('body');
+      if (!query.matchesText(
+        row.read<String>('title').replaceAll(_aliasSeparator, ' '),
+        body,
+      )) {
+        continue;
+      }
+      final aux = row.read<String?>('aux');
+      final locked = kind == SearchKind.note && aux == 'locked';
+      final split = locked ? null : aux?.split('|');
+      hits.add(
+        SearchHit(
+          kind: kind,
+          id: row.read<String>('ref'),
+          title: title,
+          snippet: locked ? 'Locked' : _excerpt(body),
+          locked: locked,
+          paperId: split?.first,
+          page: split == null ? null : int.tryParse(split.last),
+        ),
+      );
+      if (hits.length >= limit) break;
+    }
+    return hits;
+  }
+
+  static String _excerpt(String body) {
+    final text = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return text.length <= 140 ? text : '${text.substring(0, 140)}…';
+  }
+
+  /// Ids of [kind] rows satisfying [query]'s filters (null = none can).
+  Future<Set<String>?> _allowedIds(
+    SearchQuery query,
+    SearchKind kind,
+    String table,
+  ) async {
+    final filter = searchFilterSql(query, kind, 'id');
+    if (filter == null) return null;
+    final rows = await _db
+        .customSelect(
+          'SELECT id FROM $table '
+          '${filter.isEmpty ? '' : 'WHERE ${filter.where}'}',
+          variables: filter.variables,
+        )
+        .get();
+    return {for (final r in rows) r.read<String>('id')};
+  }
+
+  /// Fallback when FTS5 isn't compiled in: substring match over everything,
+  /// with the same operators.
+  Future<List<SearchHit>> _scan(SearchQuery query, int limit) async {
+    final hits = <SearchHit>[];
+    final noteIds = await _allowedIds(query, SearchKind.note, 'notes');
+    if (noteIds != null) {
+      for (final n in await _db.select(_db.notes).get()) {
+        if (!noteIds.contains(n.id)) continue;
+        final locked = isLockedContent(n.content);
+        final body = locked ? '' : noteSearchText(n.content);
+        final aliases = n.aliases ?? '';
+        if (query.matchesText('${n.title} $aliases', body)) {
+          hits.add(
+            SearchHit(
+              kind: SearchKind.note,
+              id: n.id,
+              title: n.title,
+              snippet: locked ? 'Locked' : body,
+              locked: locked,
+            ),
+          );
+        }
       }
     }
-    for (final p in await _db.select(_db.papers).get()) {
-      final body =
-          '${p.authors} ${p.venue ?? ''} ${p.doi ?? ''} '
-          '${p.species ?? ''} ${p.brainRegions ?? ''} ${p.techniques ?? ''} '
-          '${p.paradigm ?? ''} ${p.abstract ?? ''}';
-      if (matches('${p.title} $body')) {
-        hits.add(
-          SearchHit(
-            kind: SearchKind.paper,
-            id: p.id,
-            title: p.title,
-            snippet: body,
-          ),
-        );
+    final paperIds = await _allowedIds(query, SearchKind.paper, 'papers');
+    if (paperIds != null) {
+      for (final p in await _db.select(_db.papers).get()) {
+        if (!paperIds.contains(p.id)) continue;
+        final body =
+            '${p.authors} ${p.venue ?? ''} ${p.doi ?? ''} '
+            '${p.species ?? ''} ${p.brainRegions ?? ''} ${p.techniques ?? ''} '
+            '${p.paradigm ?? ''} ${p.abstract ?? ''}';
+        if (query.matchesText(p.title, body)) {
+          hits.add(
+            SearchHit(
+              kind: SearchKind.paper,
+              id: p.id,
+              title: p.title,
+              snippet: body,
+            ),
+          );
+        }
       }
     }
-    for (final h in await _db.select(_db.highlights).get()) {
-      if (matches('${h.quote} ${h.comment ?? ''}')) {
-        hits.add(
-          SearchHit(
-            kind: SearchKind.highlight,
-            id: h.id,
-            title: h.quote,
-            snippet: h.comment ?? '',
-            paperId: h.paperId,
-            page: h.pageNumber,
-          ),
-        );
+    final highlightIds = await _allowedIds(
+      query,
+      SearchKind.highlight,
+      'highlights',
+    );
+    if (highlightIds != null) {
+      for (final h in await _db.select(_db.highlights).get()) {
+        if (!highlightIds.contains(h.id)) continue;
+        if (query.matchesText(h.quote, h.comment ?? '')) {
+          hits.add(
+            SearchHit(
+              kind: SearchKind.highlight,
+              id: h.id,
+              title: h.quote,
+              snippet: h.comment ?? '',
+              paperId: h.paperId,
+              page: h.pageNumber,
+            ),
+          );
+        }
       }
     }
     return hits;
   }
+}
+
+/// Separates a note's title from its aliases in the index's title column
+/// (a control character: the tokenizer treats it as a word break, and it
+/// can't be typed into a title).
+const _aliasSeparator = '\u001F';
+
+/// The index's title text for a note: the title, then its aliases, so a
+/// note is found by either.
+String indexedNoteTitle(String title, String? aliases) {
+  final a = aliases?.trim() ?? '';
+  return a.isEmpty ? title : '$title$_aliasSeparator$a';
+}
+
+/// What a result row shows for an indexed title (`⟦…⟧` marks kept): the
+/// title alone, unless the match is in the aliases, which are then shown
+/// after it.
+String displayIndexedTitle(String marked) {
+  final at = marked.indexOf(_aliasSeparator);
+  if (at < 0) return marked;
+  final aliases = marked.substring(at + 1);
+  if (!aliases.contains(_open)) return marked.substring(0, at);
+  return '${marked.substring(0, at)} · $aliases';
 }
 
 final searchIndexProvider = Provider<SearchIndex>((ref) {

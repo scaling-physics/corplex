@@ -1,0 +1,15 @@
+{
+  "@@locale": "en",
+  "aliasesMenu": "Aliases…",
+  "aliasesMenuHint": "Other names, found by [[ and in mentions",
+  "aliasesTitle": "Aliases",
+  "aliasesAdd": "Add an alias",
+  "aliasesAlso": "Also: {names}",
+  "@aliasesAlso": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  }
+}

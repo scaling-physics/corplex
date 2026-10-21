@@ -1,0 +1,8 @@
+{
+  "@@locale": "de",
+  "aliasesMenu": "Aliase …",
+  "aliasesMenuHint": "Andere Namen, gefunden über [[ und in Erwähnungen",
+  "aliasesTitle": "Aliase",
+  "aliasesAdd": "Alias hinzufügen",
+  "aliasesAlso": "Auch: {names}"
+}

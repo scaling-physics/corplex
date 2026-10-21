@@ -186,6 +186,9 @@ void main() {
     type('Method ');
     type('/');
     await tester.pumpAndSettle();
+    // The list scrolls on a short screen.
+    await tester.ensureVisible(find.text('Heading'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Heading'));
     await tester.pumpAndSettle();
     expect(controller.document.toPlainText(), 'and/or /Method \n');

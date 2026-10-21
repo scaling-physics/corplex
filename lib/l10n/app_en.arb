@@ -1,5 +1,17 @@
 {
   "@@locale": "en",
+  "aliasesAdd": "Add an alias",
+  "aliasesAlso": "Also: {names}",
+  "@aliasesAlso": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "aliasesMenu": "Aliases…",
+  "aliasesMenuHint": "Other names, found by [[ and in mentions",
+  "aliasesTitle": "Aliases",
   "attachmentsAddPodcastLink": "Add podcast link",
   "attachmentsAll": "All",
   "attachmentsAudio": "Audio",
@@ -69,6 +81,30 @@
     }
   },
   "authWelcomeBack": "Welcome back",
+  "calloutsCommand": "Callout",
+  "calloutsCommandHint": "Set a passage apart as a note, tip or warning",
+  "calloutsLabel": "Callout: {type}",
+  "@calloutsLabel": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "calloutsPickTitle": "Callout type",
+  "calloutsRemove": "Remove callout",
+  "calloutsTypeBug": "Bug",
+  "calloutsTypeCaution": "Caution",
+  "calloutsTypeDanger": "Danger",
+  "calloutsTypeExample": "Example",
+  "calloutsTypeImportant": "Important",
+  "calloutsTypeInfo": "Info",
+  "calloutsTypeNote": "Note",
+  "calloutsTypeQuestion": "Question",
+  "calloutsTypeSuccess": "Success",
+  "calloutsTypeTip": "Tip",
+  "calloutsTypeTodo": "To do",
+  "calloutsTypeWarning": "Warning",
   "commentsAddComment": "Add comment",
   "commentsComment": "Comment",
   "commentsDeleted": "Comment deleted",
@@ -174,6 +210,18 @@
   "cslProblemWrongVersion": "Only CSL 1.0 styles are supported.",
   "cslReferenceStyle": "Reference style",
   "cslStyleCantBeUsed": "That style can't be used",
+  "dailyFolder": "Folder",
+  "dailyKeyTodaysNote": "Today's note",
+  "dailyNext": "Next day's note",
+  "dailyNoEarlier": "No earlier daily note",
+  "dailyNoLater": "No later daily note",
+  "dailyNone": "None",
+  "dailyPrevious": "Previous day's note",
+  "dailySettingsSubtitle": "Template and folder for today's note",
+  "dailySettingsTitle": "Daily notes",
+  "dailyTemplate": "Template",
+  "dailyTemplateHint": "Use a note as a template (note menu) to choose one here.",
+  "dailyTodaysNote": "Today's note",
   "dataNewerVersion": "This backup was made by a newer version of Corplex. Update the app first.",
   "dataNotABackup": "That file isn’t a Corplex backup.",
   "dataUnsupportedVersion": "This backup is from an unsupported version.",
@@ -368,6 +416,26 @@
   "foldExpandAll": "Expand all sections",
   "foldExpandSection": "Expand section",
   "foldShowSection": "Show section",
+  "footnotesCommand": "Footnote",
+  "footnotesCommandHint": "A note at the foot of the page",
+  "footnotesEditTitle": "Footnote",
+  "footnotesHint": "Write the footnote",
+  "footnotesLabel": "Footnote {number}",
+  "@footnotesLabel": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "footnotesStatsInFootnotes": "+{count} in footnotes",
+  "@footnotesStatsInFootnotes": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "graphCouldntDraw": "Couldn’t draw the map",
   "graphEmptyMessage": "Link notes to each other or to papers, or cite a paper with [@, and the connections appear here.",
   "graphHideUnconnected": "Hide unconnected items",
@@ -593,6 +661,47 @@
   "libraryStatusDone": "Done",
   "libraryStatusReading": "Reading",
   "libraryStatusToRead": "To read",
+  "linksCmdEmbed": "Embed a note",
+  "linksCmdEmbedHint": "Show another note here, live. Or type ![[",
+  "linksEmbedANote": "Embed a note…",
+  "linksEmbedEmpty": "Empty note",
+  "linksEmbedLocked": "Locked",
+  "linksEmbedMissing": "Note not found",
+  "linksEmbedOpen": "Open {title}",
+  "@linksEmbedOpen": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "linksEmbedSectionMissing": "Section not found",
+  "linksEmbedShowAll": "Show all",
+  "linksEmbedShowLess": "Show less",
+  "linksHeadingsOf": "Headings",
+  "linksLinkMention": "Link",
+  "linksMentionLinked": "Linked in “{title}”",
+  "@linksMentionLinked": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "linksNoHeadings": "No headings in this note",
+  "linksNoParagraphs": "No paragraphs in this note",
+  "linksParagraphUnavailable": "Couldn't mark that paragraph",
+  "linksPartsLocked": "A locked note can only be linked as a whole.",
+  "linksToParagraph": "Link to a paragraph",
+  "linksToParagraphHint": "Or type Title#^",
+  "linksUnlinkedMentions": "Unlinked mentions ({count})",
+  "@linksUnlinkedMentions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "listAddToProject": "Add to project…",
   "listAll": "All",
   "listCreate": "Create",
@@ -840,6 +949,67 @@
       }
     }
   },
+  "mdImportAction": "Import Markdown or Obsidian vault",
+  "mdImportActionSubtitle": "A folder, .md files or a zip",
+  "mdImportChooseTitle": "Import Markdown",
+  "mdImportDoneTitle": "Import finished",
+  "mdImportFiles": "Markdown files",
+  "mdImportFolder": "A folder (an Obsidian vault)",
+  "mdImportNothing": "No Markdown notes were found there.",
+  "mdImportProgress": "Importing {done} of {total}…",
+  "@mdImportProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportReadFailed": "That couldn't be read.",
+  "mdImportReading": "Reading files…",
+  "mdImportSummaryAttachments": "{count, plural, =1{1 attachment copied} other{{count} attachments copied}}",
+  "@mdImportSummaryAttachments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummaryFailed": "{count, plural, =1{1 note couldn't be saved} other{{count} notes couldn't be saved}}",
+  "@mdImportSummaryFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummaryNotes": "{notes, plural, =0{No notes imported} =1{1 note imported} other{{notes} notes imported}}",
+  "@mdImportSummaryNotes": {
+    "placeholders": {
+      "notes": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummarySkipped": "{count, plural, =1{1 skipped (already here, locked, or a paper page)} other{{count} skipped (already here, locked, or paper pages)}}",
+  "@mdImportSummarySkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportSummaryUnresolved": "{count, plural, =1{1 link matched nothing and was left as text} other{{count} links matched nothing and were left as text}}",
+  "@mdImportSummaryUnresolved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mdImportZip": "A zip of Markdown files",
   "notesAddTag": "Add tag",
   "notesBeforeRestoring": "Before restoring",
   "notesChangePage": "Change page",
@@ -1450,6 +1620,24 @@
   },
   "reviewTitle": "Revisit highlights",
   "reviewTomorrow": "They will come back tomorrow.",
+  "savedSearchDelete": "Delete",
+  "savedSearchDeleted": "Deleted “{name}”",
+  "@savedSearchDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "savedSearchDialogTitle": "Save search",
+  "savedSearchHeading": "Saved searches",
+  "savedSearchNameLabel": "Name",
+  "savedSearchRename": "Rename",
+  "savedSearchRenameTitle": "Rename search",
+  "savedSearchSave": "Save this search",
+  "savedSearchSection": "Saved Searches",
+  "savedSearchTipsBody": "\"exact phrase\" and -word to leave a word out\ntag:name, folder:name, project:name\nin:notes, in:papers, in:highlights, in:pdfs\nis:pinned, is:template, is:daily\nPut - in front of any of these to exclude it. Use quotes for names with spaces: tag:\"deep learning\"",
+  "savedSearchTipsLink": "Search tips",
   "searchAttachments": "Attachments",
   "searchClear": "Clear",
   "searchEmptyMessage": "Find a note, a paper, or a passage you highlighted.",
@@ -1573,6 +1761,7 @@
   "shareSavedAsNote": "Saved as a note",
   "shareSavedLink": "Saved link as a note",
   "spellIgnore": "Ignore Spelling",
+  "spellIgnoreGrammar": "Ignore Grammar",
   "spellLearn": "Learn Spelling",
   "studyAdd": "Add study details",
   "studyChip": "Study",
@@ -1607,6 +1796,14 @@
   "tableDeleteTable": "Delete table",
   "tableHeaderRow": "Header row",
   "tableTooltip": "Table",
+  "templatesInsert": "Insert template",
+  "templatesInsertHint": "Fill one of your templates in here",
+  "templatesLiterature": "Literature note",
+  "templatesStopUsing": "Stop using as template",
+  "templatesTitle": "Templates",
+  "templatesUnlockReason": "Unlock to use this template",
+  "templatesUntitled": "Untitled template",
+  "templatesUse": "Use as template",
   "trashDaysLeft": "{days, plural, =1{1 day left} other{{days} days left}}",
   "@trashDaysLeft": {
     "placeholders": {

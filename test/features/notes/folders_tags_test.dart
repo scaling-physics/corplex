@@ -13,8 +13,13 @@ void main() {
   setUp(() async {
     db = AppDatabase.inMemoryForTesting();
     noteId = const Uuid().v4();
-    await db.into(db.notes).insert(
-          NotesCompanion.insert(id: Value(noteId), title: const Value('My note')),
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: Value(noteId),
+            title: const Value('My note'),
+          ),
         );
   });
 
@@ -29,15 +34,18 @@ void main() {
       expect(note.folderId, folderId);
     });
 
-    test('deleting a folder unfiles its notes rather than deleting them', () async {
-      final folderId = await createFolder(db, 'Research');
-      await setNoteFolder(db, noteId: noteId, folderId: folderId);
+    test(
+      'deleting a folder unfiles its notes rather than deleting them',
+      () async {
+        final folderId = await createFolder(db, 'Research');
+        await setNoteFolder(db, noteId: noteId, folderId: folderId);
 
-      await deleteFolder(db, folderId);
+        await deleteFolder(db, folderId);
 
-      final note = await db.select(db.notes).getSingle();
-      expect(note.folderId, isNull);
-    });
+        final note = await db.select(db.notes).getSingle();
+        expect(note.folderId, isNull);
+      },
+    );
   });
 
   group('tags', () {
@@ -50,14 +58,17 @@ void main() {
       expect(allTags, hasLength(1));
     });
 
-    test('adding a tag twice does not duplicate the link (insertOrIgnore)', () async {
-      final tagId = await findOrCreateTag(db, 'idea');
-      await addTagToNote(db, noteId: noteId, tagId: tagId);
-      await addTagToNote(db, noteId: noteId, tagId: tagId);
+    test(
+      'adding a tag twice does not duplicate the link (insertOrIgnore)',
+      () async {
+        final tagId = await findOrCreateTag(db, 'idea');
+        await addTagToNote(db, noteId: noteId, tagId: tagId);
+        await addTagToNote(db, noteId: noteId, tagId: tagId);
 
-      final links = await db.select(db.noteTags).get();
-      expect(links, hasLength(1));
-    });
+        final links = await db.select(db.noteTags).get();
+        expect(links, hasLength(1));
+      },
+    );
 
     test('removing a tag from a note leaves the tag itself intact', () async {
       final tagId = await findOrCreateTag(db, 'idea');

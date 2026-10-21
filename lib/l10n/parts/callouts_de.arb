@@ -1,0 +1,20 @@
+{
+  "@@locale": "de",
+  "calloutsCommand": "Hinweisbox",
+  "calloutsCommandHint": "Eine Passage als Notiz, Tipp oder Warnung hervorheben",
+  "calloutsPickTitle": "Art der Hinweisbox",
+  "calloutsRemove": "Hinweisbox entfernen",
+  "calloutsLabel": "Hinweisbox: {type}",
+  "calloutsTypeNote": "Notiz",
+  "calloutsTypeInfo": "Info",
+  "calloutsTypeTip": "Tipp",
+  "calloutsTypeSuccess": "Erfolg",
+  "calloutsTypeExample": "Beispiel",
+  "calloutsTypeImportant": "Wichtig",
+  "calloutsTypeQuestion": "Frage",
+  "calloutsTypeTodo": "Zu erledigen",
+  "calloutsTypeWarning": "Warnung",
+  "calloutsTypeCaution": "Vorsicht",
+  "calloutsTypeDanger": "Gefahr",
+  "calloutsTypeBug": "Fehler"
+}

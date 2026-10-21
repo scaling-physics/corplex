@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "footnotesCommand": "Footnote",
+  "footnotesCommandHint": "A note at the foot of the page",
+  "footnotesLabel": "Footnote {number}",
+  "@footnotesLabel": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "footnotesEditTitle": "Footnote",
+  "footnotesHint": "Write the footnote",
+  "footnotesStatsInFootnotes": "+{count} in footnotes",
+  "@footnotesStatsInFootnotes": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  }
+}

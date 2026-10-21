@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:corplex/features/markdown_import/markdown_to_delta.dart';
 import 'package:corplex/features/notes/note_links.dart';
 import 'package:corplex/features/notes/note_markdown.dart';
 
@@ -105,5 +106,51 @@ void main() {
   test('note links round-trip', () {
     expect(parseNoteLink(noteLink('abc')), 'abc');
     expect(parseNoteLink('corplex://paper/abc?page=1'), isNull);
+  });
+
+  test('checklists and nested lists survive export and import', () {
+    final ops = [
+      {'insert': 'Read the paper'},
+      {
+        'insert': '\n',
+        'attributes': {'list': 'checked'},
+      },
+      {'insert': 'Write the summary'},
+      {
+        'insert': '\n',
+        'attributes': {'list': 'unchecked'},
+      },
+      {'insert': 'Methods'},
+      {
+        'insert': '\n',
+        'attributes': {'list': 'bullet'},
+      },
+      {'insert': 'Sample size'},
+      {
+        'insert': '\n',
+        'attributes': {'list': 'bullet', 'indent': 1},
+      },
+    ];
+    final md = noteToMarkdown(title: 'Plan', content: _content(ops));
+    expect(
+      md,
+      contains(
+        '- [x] Read the paper\n- [ ] Write the summary\n- Methods\n'
+        '    - Sample size',
+      ),
+    );
+
+    final back = markdownToDelta(md, fileTitle: 'Plan').ops;
+    final lines = [
+      for (final op in back)
+        if (op['insert'] == '\n' && op['attributes'] is Map)
+          Map<String, Object?>.from(op['attributes'] as Map),
+    ];
+    expect(lines, [
+      {'list': 'checked'},
+      {'list': 'unchecked'},
+      {'list': 'bullet'},
+      {'list': 'bullet', 'indent': 1},
+    ]);
   });
 }

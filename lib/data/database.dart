@@ -23,6 +23,7 @@ import 'tables/ocr_table.dart';
 import 'tables/notes_table.dart';
 import 'tables/papers_table.dart';
 import 'tables/projects_table.dart';
+import 'tables/saved_searches_table.dart';
 import 'tables/tags_table.dart';
 import 'tables/trash_table.dart';
 
@@ -51,6 +52,7 @@ part 'database.g.dart';
     OcrPages,
     OcrPapers,
     NotePreviews,
+    SavedSearches,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -74,7 +76,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -310,6 +312,24 @@ class AppDatabase extends _$AppDatabase {
           await m.createTable(notePreviews);
         }
         await _createNotePreviewTriggers();
+      }
+      if (from < 22) {
+        // v22: daily notes, aliases and templates on notes, and saved
+        // searches. Synced columns and a synced table, so the sync triggers
+        // are rebuilt to watch them.
+        for (final (name, column) in [
+          ('daily_date', notes.dailyDate),
+          ('aliases', notes.aliases),
+          ('is_template', notes.isTemplate),
+        ]) {
+          if (!await _hasColumn('notes', name)) {
+            await m.addColumn(notes, column);
+          }
+        }
+        if (!await _hasTable('saved_searches')) {
+          await m.createTable(savedSearches);
+        }
+        await _createSyncSchema(markExisting: false);
       }
     },
   );

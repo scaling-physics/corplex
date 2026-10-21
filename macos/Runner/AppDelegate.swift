@@ -1,6 +1,7 @@
 import AVFoundation
 import Cocoa
 import FlutterMacOS
+import NaturalLanguage
 import Speech
 import Vision
 
@@ -172,48 +173,134 @@ private func runRecognition(path: String, result: @escaping FlutterResult) {
   }
 }
 
-/// Spell check for the note editor (`corplex/spell`): `NSSpellChecker`,
-/// which uses the system language settings and the user's learned words.
-/// Offsets are UTF-16, like Dart strings. The checker is touched only on a
-/// call, never at registration.
+/// Spell and grammar check for the note editor (`corplex/spell`):
+/// `NSSpellChecker`. Each paragraph is checked in its own language (see
+/// [spellLanguage]) rather than the Spelling panel's, which on a bilingual
+/// Mac is often the other language. Offsets are UTF-16, like Dart strings.
+/// The checker is touched only on a call, never at registration.
+///
+/// `check` answers, per text, `[start, length]` for a misspelling and
+/// `[start, length, 1, message, [corrections]]` for a grammar issue.
+/// `guesses` takes the word's paragraph and offset (`text`, `start`) so the
+/// checker ranks by context; its autocorrection comes first.
 private func registerSpellChannel(_ messenger: FlutterBinaryMessenger) {
   let channel = FlutterMethodChannel(name: "corplex/spell", binaryMessenger: messenger)
   spellChannel = channel
   channel.setMethodCallHandler { call, result in
     let args = call.arguments as? [String: Any] ?? [:]
     let checker = NSSpellChecker.shared
+    let tag = spellDocumentTag()
     switch call.method {
     case "check":
       let texts = args["texts"] as? [String] ?? []
+      let types =
+        NSTextCheckingResult.CheckingType.spelling.rawValue
+        | NSTextCheckingResult.CheckingType.grammar.rawValue
       result(
-        texts.map { text -> [[Int]] in
+        texts.map { text -> [[Any]] in
           let ns = text as NSString
-          var found: [[Int]] = []
-          var at = 0
-          while at < ns.length {
-            let r = checker.checkSpelling(
-              of: text, startingAt: at, language: nil, wrap: false,
-              inSpellDocumentWithTag: 0, wordCount: nil)
-            if r.location == NSNotFound || r.length == 0 { break }
-            found.append([r.location, r.length])
-            at = r.location + r.length
+          var options: [NSSpellChecker.OptionKey: Any] = [:]
+          if let language = spellLanguage(for: text, available: checker.availableLanguages) {
+            options[.orthography] = NSOrthography.defaultOrthography(forLanguage: language)
+          }
+          var found: [[Any]] = []
+          for r in checker.check(
+            text, range: NSRange(location: 0, length: ns.length), types: types,
+            options: options, inSpellDocumentWithTag: tag, orthography: nil, wordCount: nil)
+          {
+            switch r.resultType {
+            case .spelling:
+              found.append([r.range.location, r.range.length])
+            case .grammar:
+              for detail in r.grammarDetails ?? [] {
+                guard let sub = (detail[NSGrammarRange] as? NSValue)?.rangeValue,
+                  sub.length > 0
+                else { continue }
+                found.append([
+                  r.range.location + sub.location, sub.length, 1,
+                  detail[NSGrammarUserDescription] as? String ?? "",
+                  detail[NSGrammarCorrections] as? [String] ?? [],
+                ])
+              }
+            default:
+              break
+            }
           }
           return found
         })
     case "guesses":
       let word = args["word"] as? String ?? ""
-      let ns = word as NSString
-      result(
-        checker.guesses(
-          forWordRange: NSRange(location: 0, length: ns.length), in: word, language: nil,
-          inSpellDocumentWithTag: 0) ?? [])
+      var text = args["text"] as? String ?? word
+      var range = NSRange(location: args["start"] as? Int ?? 0, length: (word as NSString).length)
+      let ns = text as NSString
+      if NSMaxRange(range) > ns.length || ns.substring(with: range) != word {
+        text = word
+        range = NSRange(location: 0, length: (word as NSString).length)
+      }
+      let language =
+        spellLanguage(for: text, available: checker.availableLanguages) ?? checker.language()
+      var out: [String] = []
+      if let best = checker.correction(
+        forWordRange: range, in: text, language: language, inSpellDocumentWithTag: tag)
+      {
+        out.append(best)
+      }
+      for guess in checker.guesses(
+        forWordRange: range, in: text, language: language, inSpellDocumentWithTag: tag) ?? []
+      where !out.contains(guess) {
+        out.append(guess)
+      }
+      result(out)
     case "learn":
       if let word = args["word"] as? String { checker.learnWord(word) }
+      result(nil)
+    case "ignore":
+      if let word = args["word"] as? String {
+        checker.ignoreWord(word, inSpellDocumentWithTag: tag)
+      }
       result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }
   }
+}
+
+/// One spell document for the whole app, so Ignore Spelling holds in every
+/// note until the app quits (as in other Mac apps).
+private var spellTag: Int?
+private func spellDocumentTag() -> Int {
+  if let tag = spellTag { return tag }
+  let tag = NSSpellChecker.uniqueSpellDocumentTag()
+  spellTag = tag
+  return tag
+}
+
+/// The checker language for [text]: NaturalLanguage's guess among the
+/// user's languages, as the checker names it, preferring the user's region
+/// ("en_IN" on a Mac set to English (India)). nil when the paragraph is too
+/// short to tell, and the checker then identifies the language itself.
+private func spellLanguage(for text: String, available: [String]) -> String? {
+  let recognizer = NLLanguageRecognizer()
+  let preferred = Locale.preferredLanguages.map {
+    $0.replacingOccurrences(of: "-", with: "_")
+  }
+  var hints: [NLLanguage: Double] = [:]
+  for code in preferred {
+    hints[NLLanguage(rawValue: String(code.prefix { $0 != "_" }))] = 0.6
+  }
+  recognizer.languageHints = hints
+  recognizer.processString(text)
+  guard let (language, confidence) = recognizer.languageHypotheses(withMaximum: 1).first,
+    confidence >= 0.6
+  else { return nil }
+  let code = language.rawValue
+  if let regional = preferred.first(where: {
+    ($0 == code || $0.hasPrefix(code + "_")) && available.contains($0)
+  }) {
+    return regional
+  }
+  if available.contains(code) { return code }
+  return available.first { $0.hasPrefix(code + "_") }
 }
 
 /// Read aloud (`corplex/speak`): `AVSpeechSynthesizer`. Utterances queue

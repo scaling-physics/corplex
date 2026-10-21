@@ -170,6 +170,9 @@ Future<void> restoreFromTrash(
     final json = (payload['note'] as Map).cast<String, dynamic>();
     final folderId = json['folderId'] as String?;
     final note = Note.fromJson({
+      // Snapshots taken before a non-null column existed lack it.
+      'pinned': false,
+      'isTemplate': false,
       ...json,
       'folderId': folderId != null && await exists('folders', 'id', folderId)
           ? folderId

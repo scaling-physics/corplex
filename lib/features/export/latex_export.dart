@@ -184,7 +184,13 @@ LatexProject buildLatexProject(
           BlockKind.heading2 => 'subsection',
           _ => 'subsubsection',
         };
-        body.writeln('\n\\$level{${b.runs.map(_run).join().trim()}}\n');
+        // A footnote in a heading would be copied into the contents list.
+        final title = b.runs
+            .map(_run)
+            .join()
+            .trim()
+            .replaceAll(r'\footnote{', r'\protect\footnote{');
+        body.writeln('\n\\$level{$title}\n');
       case BlockKind.bullet:
         open('itemize');
         body.writeln('\\item ${b.runs.map(_run).join().trim()}');
@@ -193,6 +199,8 @@ LatexProject buildLatexProject(
         open('enumerate');
         body.writeln('\\item ${b.runs.map(_run).join().trim()}');
       case BlockKind.quote:
+        // Each callout is a quote of its own.
+        if (env == 'quote' && (b.callout?.head ?? false)) close();
         if (env == 'quote') body.writeln();
         open('quote');
         body.writeln(b.runs.map(_run).join().trim());
@@ -331,6 +339,9 @@ final _markers = RegExp(r'\[@[^\]\[]+\]|\{[@#](?:fig|tbl):[A-Za-z0-9_-]+\}');
 /// the rest is escaped, then bold, italic, strike, highlight and link wrap
 /// it. Maths is passed through untouched.
 String _run(Run r) {
+  if (r.footnote != null) {
+    return '\\footnote{${r.footnote!.map(_run).join().trim()}}';
+  }
   if (r.math) return '\$${r.text}\$';
   final source = r.source ?? r.text;
   if (source.isEmpty) return '';

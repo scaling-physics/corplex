@@ -1,0 +1,14 @@
+{
+  "@@locale": "de",
+  "savedSearchSave": "Suche speichern",
+  "savedSearchDialogTitle": "Suche speichern",
+  "savedSearchNameLabel": "Name",
+  "savedSearchHeading": "Gespeicherte Suchen",
+  "savedSearchSection": "Gespeicherte Suchen",
+  "savedSearchRename": "Umbenennen",
+  "savedSearchRenameTitle": "Suche umbenennen",
+  "savedSearchDelete": "Löschen",
+  "savedSearchDeleted": "„{name}“ gelöscht",
+  "savedSearchTipsLink": "Suchtipps",
+  "savedSearchTipsBody": "„genaue Wendung“ und -Wort, um ein Wort auszuschließen\ntag:name, folder:name, project:name\nin:notes, in:papers, in:highlights, in:pdfs\nis:pinned, is:template, is:daily\nMit - davor schließt du den Filter aus. Namen mit Leerzeichen in Anführungszeichen: tag:\"deep learning\""
+}

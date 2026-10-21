@@ -1,0 +1,9 @@
+{
+  "@@locale": "de",
+  "footnotesCommand": "Fußnote",
+  "footnotesCommandHint": "Eine Anmerkung am Seitenende",
+  "footnotesLabel": "Fußnote {number}",
+  "footnotesEditTitle": "Fußnote",
+  "footnotesHint": "Fußnote schreiben",
+  "footnotesStatsInFootnotes": "+{count} in Fußnoten"
+}

@@ -23,6 +23,19 @@ class Notes extends Table {
   /// Pinned notes sit at the top of the Notes list (schema v18, synced).
   BoolColumn get pinned => boolean().withDefault(const Constant(false))();
 
+  /// The day this note is the daily note of, as `YYYY-MM-DD` in local time
+  /// (schema v22, synced); null for every other note. Two devices offline
+  /// on the same day can each make one, so lookups take the oldest.
+  TextColumn get dailyDate => text().nullable()();
+
+  /// Other names the note can be linked and found by, stored `a; b` like
+  /// the study-detail lists (schema v22, synced).
+  TextColumn get aliases => text().nullable()();
+
+  /// A template: kept out of the ordinary notes lists and offered when
+  /// making a note or inserting one (schema v22, synced).
+  BoolColumn get isTemplate => boolean().withDefault(const Constant(false))();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 

@@ -98,6 +98,36 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// No description provided for @aliasesAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an alias'**
+  String get aliasesAdd;
+
+  /// No description provided for @aliasesAlso.
+  ///
+  /// In en, this message translates to:
+  /// **'Also: {names}'**
+  String aliasesAlso(String names);
+
+  /// No description provided for @aliasesMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Aliases…'**
+  String get aliasesMenu;
+
+  /// No description provided for @aliasesMenuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Other names, found by [[ and in mentions'**
+  String get aliasesMenuHint;
+
+  /// No description provided for @aliasesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Aliases'**
+  String get aliasesTitle;
+
   /// No description provided for @attachmentsAddPodcastLink.
   ///
   /// In en, this message translates to:
@@ -409,6 +439,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Welcome back'**
   String get authWelcomeBack;
+
+  /// No description provided for @calloutsCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Callout'**
+  String get calloutsCommand;
+
+  /// No description provided for @calloutsCommandHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a passage apart as a note, tip or warning'**
+  String get calloutsCommandHint;
+
+  /// No description provided for @calloutsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Callout: {type}'**
+  String calloutsLabel(String type);
+
+  /// No description provided for @calloutsPickTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Callout type'**
+  String get calloutsPickTitle;
+
+  /// No description provided for @calloutsRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove callout'**
+  String get calloutsRemove;
+
+  /// No description provided for @calloutsTypeBug.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug'**
+  String get calloutsTypeBug;
+
+  /// No description provided for @calloutsTypeCaution.
+  ///
+  /// In en, this message translates to:
+  /// **'Caution'**
+  String get calloutsTypeCaution;
+
+  /// No description provided for @calloutsTypeDanger.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger'**
+  String get calloutsTypeDanger;
+
+  /// No description provided for @calloutsTypeExample.
+  ///
+  /// In en, this message translates to:
+  /// **'Example'**
+  String get calloutsTypeExample;
+
+  /// No description provided for @calloutsTypeImportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get calloutsTypeImportant;
+
+  /// No description provided for @calloutsTypeInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get calloutsTypeInfo;
+
+  /// No description provided for @calloutsTypeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get calloutsTypeNote;
+
+  /// No description provided for @calloutsTypeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Question'**
+  String get calloutsTypeQuestion;
+
+  /// No description provided for @calloutsTypeSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Success'**
+  String get calloutsTypeSuccess;
+
+  /// No description provided for @calloutsTypeTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip'**
+  String get calloutsTypeTip;
+
+  /// No description provided for @calloutsTypeTodo.
+  ///
+  /// In en, this message translates to:
+  /// **'To do'**
+  String get calloutsTypeTodo;
+
+  /// No description provided for @calloutsTypeWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get calloutsTypeWarning;
 
   /// No description provided for @commentsAddComment.
   ///
@@ -799,6 +931,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That style can\'t be used'**
   String get cslStyleCantBeUsed;
+
+  /// No description provided for @dailyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get dailyFolder;
+
+  /// No description provided for @dailyKeyTodaysNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s note'**
+  String get dailyKeyTodaysNote;
+
+  /// No description provided for @dailyNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day\'s note'**
+  String get dailyNext;
+
+  /// No description provided for @dailyNoEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'No earlier daily note'**
+  String get dailyNoEarlier;
+
+  /// No description provided for @dailyNoLater.
+  ///
+  /// In en, this message translates to:
+  /// **'No later daily note'**
+  String get dailyNoLater;
+
+  /// No description provided for @dailyNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get dailyNone;
+
+  /// No description provided for @dailyPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day\'s note'**
+  String get dailyPrevious;
+
+  /// No description provided for @dailySettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Template and folder for today\'s note'**
+  String get dailySettingsSubtitle;
+
+  /// No description provided for @dailySettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily notes'**
+  String get dailySettingsTitle;
+
+  /// No description provided for @dailyTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Template'**
+  String get dailyTemplate;
+
+  /// No description provided for @dailyTemplateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a note as a template (note menu) to choose one here.'**
+  String get dailyTemplateHint;
+
+  /// No description provided for @dailyTodaysNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s note'**
+  String get dailyTodaysNote;
 
   /// No description provided for @dataNewerVersion.
   ///
@@ -1447,6 +1651,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show section'**
   String get foldShowSection;
+
+  /// No description provided for @footnotesCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Footnote'**
+  String get footnotesCommand;
+
+  /// No description provided for @footnotesCommandHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A note at the foot of the page'**
+  String get footnotesCommandHint;
+
+  /// No description provided for @footnotesEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Footnote'**
+  String get footnotesEditTitle;
+
+  /// No description provided for @footnotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write the footnote'**
+  String get footnotesHint;
+
+  /// No description provided for @footnotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Footnote {number}'**
+  String footnotesLabel(String number);
+
+  /// No description provided for @footnotesStatsInFootnotes.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} in footnotes'**
+  String footnotesStatsInFootnotes(String count);
 
   /// No description provided for @graphCouldntDraw.
   ///
@@ -2275,6 +2515,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'To read'**
   String get libraryStatusToRead;
+
+  /// No description provided for @linksCmdEmbed.
+  ///
+  /// In en, this message translates to:
+  /// **'Embed a note'**
+  String get linksCmdEmbed;
+
+  /// No description provided for @linksCmdEmbedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show another note here, live. Or type ![['**
+  String get linksCmdEmbedHint;
+
+  /// No description provided for @linksEmbedANote.
+  ///
+  /// In en, this message translates to:
+  /// **'Embed a note…'**
+  String get linksEmbedANote;
+
+  /// No description provided for @linksEmbedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty note'**
+  String get linksEmbedEmpty;
+
+  /// No description provided for @linksEmbedLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get linksEmbedLocked;
+
+  /// No description provided for @linksEmbedMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Note not found'**
+  String get linksEmbedMissing;
+
+  /// No description provided for @linksEmbedOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open {title}'**
+  String linksEmbedOpen(String title);
+
+  /// No description provided for @linksEmbedSectionMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Section not found'**
+  String get linksEmbedSectionMissing;
+
+  /// No description provided for @linksEmbedShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all'**
+  String get linksEmbedShowAll;
+
+  /// No description provided for @linksEmbedShowLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get linksEmbedShowLess;
+
+  /// No description provided for @linksHeadingsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Headings'**
+  String get linksHeadingsOf;
+
+  /// No description provided for @linksLinkMention.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get linksLinkMention;
+
+  /// No description provided for @linksMentionLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked in “{title}”'**
+  String linksMentionLinked(String title);
+
+  /// No description provided for @linksNoHeadings.
+  ///
+  /// In en, this message translates to:
+  /// **'No headings in this note'**
+  String get linksNoHeadings;
+
+  /// No description provided for @linksNoParagraphs.
+  ///
+  /// In en, this message translates to:
+  /// **'No paragraphs in this note'**
+  String get linksNoParagraphs;
+
+  /// No description provided for @linksParagraphUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t mark that paragraph'**
+  String get linksParagraphUnavailable;
+
+  /// No description provided for @linksPartsLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'A locked note can only be linked as a whole.'**
+  String get linksPartsLocked;
+
+  /// No description provided for @linksToParagraph.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to a paragraph'**
+  String get linksToParagraph;
+
+  /// No description provided for @linksToParagraphHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Or type Title#^'**
+  String get linksToParagraphHint;
+
+  /// No description provided for @linksUnlinkedMentions.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlinked mentions ({count})'**
+  String linksUnlinkedMentions(int count);
 
   /// No description provided for @listAddToProject.
   ///
@@ -3295,6 +3655,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{project} matrix'**
   String matrixShareSubject(String project);
+
+  /// No description provided for @mdImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Markdown or Obsidian vault'**
+  String get mdImportAction;
+
+  /// No description provided for @mdImportActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder, .md files or a zip'**
+  String get mdImportActionSubtitle;
+
+  /// No description provided for @mdImportChooseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Markdown'**
+  String get mdImportChooseTitle;
+
+  /// No description provided for @mdImportDoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import finished'**
+  String get mdImportDoneTitle;
+
+  /// No description provided for @mdImportFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown files'**
+  String get mdImportFiles;
+
+  /// No description provided for @mdImportFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder (an Obsidian vault)'**
+  String get mdImportFolder;
+
+  /// No description provided for @mdImportNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No Markdown notes were found there.'**
+  String get mdImportNothing;
+
+  /// No description provided for @mdImportProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing {done} of {total}…'**
+  String mdImportProgress(int done, int total);
+
+  /// No description provided for @mdImportReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That couldn\'t be read.'**
+  String get mdImportReadFailed;
+
+  /// No description provided for @mdImportReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading files…'**
+  String get mdImportReading;
+
+  /// No description provided for @mdImportSummaryAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attachment copied} other{{count} attachments copied}}'**
+  String mdImportSummaryAttachments(int count);
+
+  /// No description provided for @mdImportSummaryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 note couldn\'t be saved} other{{count} notes couldn\'t be saved}}'**
+  String mdImportSummaryFailed(int count);
+
+  /// No description provided for @mdImportSummaryNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'{notes, plural, =0{No notes imported} =1{1 note imported} other{{notes} notes imported}}'**
+  String mdImportSummaryNotes(int notes);
+
+  /// No description provided for @mdImportSummarySkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 skipped (already here, locked, or a paper page)} other{{count} skipped (already here, locked, or paper pages)}}'**
+  String mdImportSummarySkipped(int count);
+
+  /// No description provided for @mdImportSummaryUnresolved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 link matched nothing and was left as text} other{{count} links matched nothing and were left as text}}'**
+  String mdImportSummaryUnresolved(int count);
+
+  /// No description provided for @mdImportZip.
+  ///
+  /// In en, this message translates to:
+  /// **'A zip of Markdown files'**
+  String get mdImportZip;
 
   /// No description provided for @notesAddTag.
   ///
@@ -4742,6 +5198,72 @@ abstract class AppLocalizations {
   /// **'They will come back tomorrow.'**
   String get reviewTomorrow;
 
+  /// No description provided for @savedSearchDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get savedSearchDelete;
+
+  /// No description provided for @savedSearchDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted “{name}”'**
+  String savedSearchDeleted(String name);
+
+  /// No description provided for @savedSearchDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save search'**
+  String get savedSearchDialogTitle;
+
+  /// No description provided for @savedSearchHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved searches'**
+  String get savedSearchHeading;
+
+  /// No description provided for @savedSearchNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get savedSearchNameLabel;
+
+  /// No description provided for @savedSearchRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get savedSearchRename;
+
+  /// No description provided for @savedSearchRenameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename search'**
+  String get savedSearchRenameTitle;
+
+  /// No description provided for @savedSearchSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this search'**
+  String get savedSearchSave;
+
+  /// No description provided for @savedSearchSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Searches'**
+  String get savedSearchSection;
+
+  /// No description provided for @savedSearchTipsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'\"exact phrase\" and -word to leave a word out\ntag:name, folder:name, project:name\nin:notes, in:papers, in:highlights, in:pdfs\nis:pinned, is:template, is:daily\nPut - in front of any of these to exclude it. Use quotes for names with spaces: tag:\"deep learning\"'**
+  String get savedSearchTipsBody;
+
+  /// No description provided for @savedSearchTipsLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Search tips'**
+  String get savedSearchTipsLink;
+
   /// No description provided for @searchAttachments.
   ///
   /// In en, this message translates to:
@@ -5192,6 +5714,12 @@ abstract class AppLocalizations {
   /// **'Ignore Spelling'**
   String get spellIgnore;
 
+  /// No description provided for @spellIgnoreGrammar.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore Grammar'**
+  String get spellIgnoreGrammar;
+
   /// No description provided for @spellLearn.
   ///
   /// In en, this message translates to:
@@ -5353,6 +5881,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Table'**
   String get tableTooltip;
+
+  /// No description provided for @templatesInsert.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert template'**
+  String get templatesInsert;
+
+  /// No description provided for @templatesInsertHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill one of your templates in here'**
+  String get templatesInsertHint;
+
+  /// No description provided for @templatesLiterature.
+  ///
+  /// In en, this message translates to:
+  /// **'Literature note'**
+  String get templatesLiterature;
+
+  /// No description provided for @templatesStopUsing.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop using as template'**
+  String get templatesStopUsing;
+
+  /// No description provided for @templatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get templatesTitle;
+
+  /// No description provided for @templatesUnlockReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock to use this template'**
+  String get templatesUnlockReason;
+
+  /// No description provided for @templatesUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled template'**
+  String get templatesUntitled;
+
+  /// No description provided for @templatesUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as template'**
+  String get templatesUse;
 
   /// No description provided for @trashDaysLeft.
   ///

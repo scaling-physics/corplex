@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_quill/flutter_quill.dart';
 
 import '../lock/note_crypto.dart' show isLockedContent;
+import 'callout_markers.dart' show calloutLineMarker;
+import 'footnote_markers.dart' show replaceFootnotes;
 
 /// Note content is stored as Quill Delta JSON. This decodes it back into a
 /// [Document], falling back to treating the stored string as plain text for
@@ -42,9 +44,13 @@ String notePlainTextPreview(String content) {
 }
 
 /// [notePlainTextPreview] for a document already decoded.
-String previewOfDocument(Document document) => document
-    .toPlainText()
+String previewOfDocument(Document document) => replaceFootnotes(
+      document.toPlainText(),
+      (text) => ' $text ',
+    )
     .replaceAll('\uFFFC', '')
+    .replaceAll(calloutLineMarker, '')
+    .replaceAll(_blockMarker, '')
     .replaceAll(_captionMarker, '')
     .replaceAllMapped(
       _referenceMarker,
@@ -53,6 +59,8 @@ String previewOfDocument(Document document) => document
     .replaceAll(_whitespace, ' ')
     .trim();
 
+/// A paragraph's block id (` ^abc123`, see `block_ids.dart`) is bookkeeping.
+final _blockMarker = RegExp(r' \^[A-Za-z0-9-]+$', multiLine: true);
 final _captionMarker = RegExp(r'\{#(?:fig|tbl):[A-Za-z0-9_-]+\}');
 final _referenceMarker = RegExp(r'\{@(fig|tbl):[A-Za-z0-9_-]+\}');
 final _whitespace = RegExp(r'\s+');

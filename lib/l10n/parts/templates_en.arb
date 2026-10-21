@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "templatesTitle": "Templates",
+  "templatesUntitled": "Untitled template",
+  "templatesUse": "Use as template",
+  "templatesStopUsing": "Stop using as template",
+  "templatesInsert": "Insert template",
+  "templatesInsertHint": "Fill one of your templates in here",
+  "templatesLiterature": "Literature note",
+  "templatesUnlockReason": "Unlock to use this template"
+}

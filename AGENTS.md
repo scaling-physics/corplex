@@ -523,7 +523,15 @@ the default screens until the user opts in by using the feature.
   (`MacWindow.printPdf` → `printPdf` on `corplex/window`; needs the
   `com.apple.security.print` entitlement). Both act on the focused editor,
   else on the note open in the pane (`HomeShell._onCommand`).
-- **Spell check** (`features/spell/`): the `corplex/spell` channel
+- **Spell check** (`features/spell/`; reworked in 1.16): each paragraph is
+  checked in its own language (NaturalLanguage guess among the user's
+  languages, regional variant preferred) — before, `language: nil` meant the
+  Spelling panel's language, which on a bilingual Mac was the wrong one.
+  macOS also reports grammar (`checkString` with `.grammar`: dotted accent
+  underline, the checker's message and corrections, `SpellIssue`), guesses
+  get the paragraph and offset for context with the autocorrection first,
+  and Ignore uses one app-wide spell document tag (iOS: one shared
+  `UITextChecker`). The `corplex/spell` channel
   (NSSpellChecker in macOS `AppDelegate.swift`, UITextChecker in iOS
   `AppDelegate.swift`, none on Android) behind the `SpellChecker` seam;
   the default provider is inert and `main()` installs `ChannelSpellChecker`
@@ -866,6 +874,107 @@ the default screens until the user opts in by using the feature.
 - **Fixed**: on the Mac, Format commands sent while no note editor had
   focus fell through an empty `switch` case into "Close All Locked Notes"
   (⌘B in the list locked every note); `mac_layout_test` guards it.
+
+### 1.16 — Obsidian parity (built; not yet on a device)
+Designed as one contract (stored formats below), built in parallel. Schema
+v22 (server file `20261012000000_obsidian_parity.sql`, **apply it before
+schema-v22 data syncs**): `Notes.dailyDate`, `Notes.aliases`,
+`Notes.isTemplate` (integer 0/1 on the server, like `pinned`) and the synced
+`SavedSearches` table. Trash restore defaults `pinned`/`isTemplate` for
+snapshots taken before those columns existed.
+
+| Thing | Stored as | Editor shows |
+|---|---|---|
+| Link to a heading / block | note link + `#heading=<enc>` / `#block=<id>` (`noteLink`, `parseNoteLinkTarget`) | link `Title › Heading` |
+| Block id | paragraph text ending ` ^id` (Obsidian) | `blockid` embed (muted ¶) |
+| Embedded note | `noteembed` block embed, data `{"link": …}` | live read-only card |
+| Footnote | pandoc `^[text]` | `footnote` embed (superscript number) |
+| Callout | quote line starting `[!type]` (+ title) | `callout` chip |
+
+`editorDocument` order (stored → editor): footnotes first (their text keeps
+`[@key]`/`$x$` raw), then maths → citations → figures, callouts, block ids
+last; `storedFromEditor` mirrors it. Every reader of `corplex://note/<id>`
+(backlinks, Map) sees part links and embeds without knowing about them.
+
+- **Daily notes and templates** (`notes/daily_notes.dart`, `daily_settings*.dart`,
+  `templates.dart`, `template_variables.dart`): `openTodaysNote` takes the
+  oldest note with today's local `dailyDate`, else creates one (long-date
+  title, body from the per-device daily template with variables filled,
+  per-device folder; `DailyNoteSettings`, shared_preferences). Entry points:
+  app-icon shortcut `quickTodaysNote`, `corplex://today`, Mac File → Today's
+  Note ⌘T (`MenuCommand.todaysNote`), ⌘/Ctrl+T elsewhere, and the New note
+  long-press / secondary-click sheet (`NewNoteMenuRegion`). Daily notes get
+  ⋮ → Previous/Next day's note. A template (⋮ → Use as template) leaves every
+  ordinary list (`watchNoteList`, folder/project counts); the `TemplatesFilter`
+  chip / sidebar row exists only once a template does. `/` → Insert template
+  (only when templates exist) composes a Delta through `editorDocument`;
+  File → New Note from Template… and the sheet copy body and tags. Variables
+  `{{date}}`, `{{time}}`, `{{title}}`, `{{date:FORMAT}}` (moment tokens);
+  unknown ones stay as written.
+- **Links to headings and blocks, embedded notes, unlinked mentions, aliases**
+  (`notes/block_ids.dart`, `note_sections.dart`, `note_embed.dart`,
+  `note_link_open.dart`, `unlinked_mentions.dart`, `note_aliases.dart`,
+  `note_link_sheet.dart`). The `[[` picker (`parseLinkQuery`) takes
+  `Title#Head`, `Title#^text`, `#…` for the open note, and aliases (an alias
+  match becomes the link text). Marking a paragraph writes the id into the
+  live controller for the open note (never the DB), else into that note's
+  stored content (re-encrypting a locked, unlocked note; locked unreadable
+  notes link whole). Opening a part resolves it on editor offsets and goes
+  through `openNoteAtSelection` (folds revealed); a missing part opens the
+  note at the top. `![[` or `/` → Embed a note inserts a `noteembed` card
+  (220 px cap, Show all, title-only cards inside). Exports inline embeds
+  (`inlineNoteEmbeds`, depth ≤ 3, cycle guard — pass `ExportNote.id`) and
+  strip block ids; the vault writes `![[Title#…]]`, `[[Title#Heading]]`,
+  `[[Title#^id]]`, keeps `^id` and adds `aliases:`. Unlinked mentions: FTS
+  candidates verified in Dart (whole word, outside links, no locked notes,
+  names ≥ 3 chars); "Link" formats the first mention in that note's stored
+  Delta. Aliases: ⋮ → Aliases…, "Also: …" under the title. Not done: "Copy
+  link to heading/paragraph"; pasting a paragraph can duplicate its block id
+  (the first wins).
+- **Footnotes and callouts** (`notes/footnote_markers.dart`,
+  `footnote_embed.dart`, `callout_markers.dart`, `callout_embed.dart`):
+  footnotes are one line, balanced brackets, `\[`/`\]` escapes, not in code
+  or `$…$`; numbers from `FootnoteScope.of(controller)` (counts folded ones
+  too). `/` → Footnote, Format → Footnote ⌥⌘F; tap to edit. Word count adds
+  "+N in footnotes". DOCX writes real footnotes (`word/footnotes.xml`),
+  LaTeX `\footnote{}`, **PDF endnotes** ("Notes" before References,
+  numbering per note), Markdown/vault keep `^[…]`. Callout tones: note/info
+  primary, tip/success/example tertiary, important/question/todo secondary,
+  warning/caution/danger/bug error; unknown words show as a note. `/` →
+  Callout; tap the chip to change or remove; exports: Markdown `> [!type]`,
+  DOCX shaded paragraph with bar and label, PDF tinted box, LaTeX `quote`
+  (export colours fixed, `calloutExportColors`). Footnote text isn't
+  reached by Find in note, spell check or the to-do/abbreviation scans.
+- **Markdown / Obsidian vault import** (`features/markdown_import/`): account
+  sheet → "Import Markdown or Obsidian vault", Mac File → Import Markdown…;
+  folder, `.md` files or `.zip` via the `markdownImportPickerProvider` seam.
+  `markdownToDelta` is a pure hand-written parser producing the formats above
+  (plus `NoteTable`, checklists, `code-block`, `==x==` highlights, `[^1]`
+  definitions → inline footnotes; maths, `[@key]`, callouts and `^id` stay
+  text; inline `#tags` also tag the note). Two passes: index and assign UUIDs,
+  then convert with links resolved (relative path → file name → title →
+  alias; ties go to the same folder); unresolved links stay text and are
+  counted. One transaction per note with a yield between. Folders `A / B`;
+  Corplex's own vault layout is recognised (`Notes/` isn't a folder, paper
+  pages skipped, `[[@key Title|@key]]` → `[@key]`); `locked: true` and
+  identical notes are skipped, so re-importing adds nothing. Attachments are
+  copied into the note. Limits: loose `.md` files can't resolve relative
+  attachments; each source line is one paragraph.
+- **Search operators and saved searches** (`search/search_query.dart`,
+  `search_filters.dart`, `saved_searches*.dart`): `parseSearchQuery` (pure,
+  total) — words (prefix AND), `"phrase"`, `-word`, `tag:`, `folder:`/`path:`,
+  `project:`, `in:notes|papers|highlights|pdfs`, `is:pinned|template|daily`,
+  `-` before any operator. The FTS string is built only from quoted parsed
+  terms (`(pos) NOT (neg OR neg)`); filters are `id IN (subquery)` on live
+  tables (no re-index on tag edits); no positive word → scan with
+  `SearchQuery.matchesText`; the no-FTS fallback uses the same parse. Aliases
+  are indexed in the title column after `\u001F` (`indexedNoteTitle`).
+  Saved searches: bookmark in the search field (Mac: "Save this search" in
+  the results column), listed on the empty search screen (rename, delete with
+  Undo; "Search tips" only while none exist), Mac sidebar section via
+  `savedSearchRunRequestProvider`.
+- **Markdown share/vault** now write checklists (`- [ ]`/`- [x]`) and nested
+  list indents (four spaces a level), which the importer reads back.
 
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the

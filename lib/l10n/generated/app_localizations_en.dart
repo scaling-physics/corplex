@@ -10,6 +10,23 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get aliasesAdd => 'Add an alias';
+
+  @override
+  String aliasesAlso(String names) {
+    return 'Also: $names';
+  }
+
+  @override
+  String get aliasesMenu => 'Aliases…';
+
+  @override
+  String get aliasesMenuHint => 'Other names, found by [[ and in mentions';
+
+  @override
+  String get aliasesTitle => 'Aliases';
+
+  @override
   String get attachmentsAddPodcastLink => 'Add podcast link';
 
   @override
@@ -178,6 +195,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authWelcomeBack => 'Welcome back';
+
+  @override
+  String get calloutsCommand => 'Callout';
+
+  @override
+  String get calloutsCommandHint =>
+      'Set a passage apart as a note, tip or warning';
+
+  @override
+  String calloutsLabel(String type) {
+    return 'Callout: $type';
+  }
+
+  @override
+  String get calloutsPickTitle => 'Callout type';
+
+  @override
+  String get calloutsRemove => 'Remove callout';
+
+  @override
+  String get calloutsTypeBug => 'Bug';
+
+  @override
+  String get calloutsTypeCaution => 'Caution';
+
+  @override
+  String get calloutsTypeDanger => 'Danger';
+
+  @override
+  String get calloutsTypeExample => 'Example';
+
+  @override
+  String get calloutsTypeImportant => 'Important';
+
+  @override
+  String get calloutsTypeInfo => 'Info';
+
+  @override
+  String get calloutsTypeNote => 'Note';
+
+  @override
+  String get calloutsTypeQuestion => 'Question';
+
+  @override
+  String get calloutsTypeSuccess => 'Success';
+
+  @override
+  String get calloutsTypeTip => 'Tip';
+
+  @override
+  String get calloutsTypeTodo => 'To do';
+
+  @override
+  String get calloutsTypeWarning => 'Warning';
 
   @override
   String get commentsAddComment => 'Add comment';
@@ -394,6 +465,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cslStyleCantBeUsed => 'That style can\'t be used';
+
+  @override
+  String get dailyFolder => 'Folder';
+
+  @override
+  String get dailyKeyTodaysNote => 'Today\'s note';
+
+  @override
+  String get dailyNext => 'Next day\'s note';
+
+  @override
+  String get dailyNoEarlier => 'No earlier daily note';
+
+  @override
+  String get dailyNoLater => 'No later daily note';
+
+  @override
+  String get dailyNone => 'None';
+
+  @override
+  String get dailyPrevious => 'Previous day\'s note';
+
+  @override
+  String get dailySettingsSubtitle => 'Template and folder for today\'s note';
+
+  @override
+  String get dailySettingsTitle => 'Daily notes';
+
+  @override
+  String get dailyTemplate => 'Template';
+
+  @override
+  String get dailyTemplateHint =>
+      'Use a note as a template (note menu) to choose one here.';
+
+  @override
+  String get dailyTodaysNote => 'Today\'s note';
 
   @override
   String get dataNewerVersion =>
@@ -755,6 +863,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get foldShowSection => 'Show section';
+
+  @override
+  String get footnotesCommand => 'Footnote';
+
+  @override
+  String get footnotesCommandHint => 'A note at the foot of the page';
+
+  @override
+  String get footnotesEditTitle => 'Footnote';
+
+  @override
+  String get footnotesHint => 'Write the footnote';
+
+  @override
+  String footnotesLabel(String number) {
+    return 'Footnote $number';
+  }
+
+  @override
+  String footnotesStatsInFootnotes(String count) {
+    return '+$count in footnotes';
+  }
 
   @override
   String get graphCouldntDraw => 'Couldn’t draw the map';
@@ -1237,6 +1367,72 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get libraryStatusToRead => 'To read';
+
+  @override
+  String get linksCmdEmbed => 'Embed a note';
+
+  @override
+  String get linksCmdEmbedHint => 'Show another note here, live. Or type ![[';
+
+  @override
+  String get linksEmbedANote => 'Embed a note…';
+
+  @override
+  String get linksEmbedEmpty => 'Empty note';
+
+  @override
+  String get linksEmbedLocked => 'Locked';
+
+  @override
+  String get linksEmbedMissing => 'Note not found';
+
+  @override
+  String linksEmbedOpen(String title) {
+    return 'Open $title';
+  }
+
+  @override
+  String get linksEmbedSectionMissing => 'Section not found';
+
+  @override
+  String get linksEmbedShowAll => 'Show all';
+
+  @override
+  String get linksEmbedShowLess => 'Show less';
+
+  @override
+  String get linksHeadingsOf => 'Headings';
+
+  @override
+  String get linksLinkMention => 'Link';
+
+  @override
+  String linksMentionLinked(String title) {
+    return 'Linked in “$title”';
+  }
+
+  @override
+  String get linksNoHeadings => 'No headings in this note';
+
+  @override
+  String get linksNoParagraphs => 'No paragraphs in this note';
+
+  @override
+  String get linksParagraphUnavailable => 'Couldn\'t mark that paragraph';
+
+  @override
+  String get linksPartsLocked => 'A locked note can only be linked as a whole.';
+
+  @override
+  String get linksToParagraph => 'Link to a paragraph';
+
+  @override
+  String get linksToParagraphHint => 'Or type Title#^';
+
+  @override
+  String linksUnlinkedMentions(int count) {
+    return 'Unlinked mentions ($count)';
+  }
 
   @override
   String get listAddToProject => 'Add to project…';
@@ -1776,6 +1972,97 @@ class AppLocalizationsEn extends AppLocalizations {
   String matrixShareSubject(String project) {
     return '$project matrix';
   }
+
+  @override
+  String get mdImportAction => 'Import Markdown or Obsidian vault';
+
+  @override
+  String get mdImportActionSubtitle => 'A folder, .md files or a zip';
+
+  @override
+  String get mdImportChooseTitle => 'Import Markdown';
+
+  @override
+  String get mdImportDoneTitle => 'Import finished';
+
+  @override
+  String get mdImportFiles => 'Markdown files';
+
+  @override
+  String get mdImportFolder => 'A folder (an Obsidian vault)';
+
+  @override
+  String get mdImportNothing => 'No Markdown notes were found there.';
+
+  @override
+  String mdImportProgress(int done, int total) {
+    return 'Importing $done of $total…';
+  }
+
+  @override
+  String get mdImportReadFailed => 'That couldn\'t be read.';
+
+  @override
+  String get mdImportReading => 'Reading files…';
+
+  @override
+  String mdImportSummaryAttachments(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attachments copied',
+      one: '1 attachment copied',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mdImportSummaryFailed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes couldn\'t be saved',
+      one: '1 note couldn\'t be saved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mdImportSummaryNotes(int notes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: '$notes notes imported',
+      one: '1 note imported',
+      zero: 'No notes imported',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mdImportSummarySkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count skipped (already here, locked, or paper pages)',
+      one: '1 skipped (already here, locked, or a paper page)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mdImportSummaryUnresolved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count links matched nothing and were left as text',
+      one: '1 link matched nothing and was left as text',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mdImportZip => 'A zip of Markdown files';
 
   @override
   String get notesAddTag => 'Add tag';
@@ -2688,6 +2975,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewTomorrow => 'They will come back tomorrow.';
 
   @override
+  String get savedSearchDelete => 'Delete';
+
+  @override
+  String savedSearchDeleted(String name) {
+    return 'Deleted “$name”';
+  }
+
+  @override
+  String get savedSearchDialogTitle => 'Save search';
+
+  @override
+  String get savedSearchHeading => 'Saved searches';
+
+  @override
+  String get savedSearchNameLabel => 'Name';
+
+  @override
+  String get savedSearchRename => 'Rename';
+
+  @override
+  String get savedSearchRenameTitle => 'Rename search';
+
+  @override
+  String get savedSearchSave => 'Save this search';
+
+  @override
+  String get savedSearchSection => 'Saved Searches';
+
+  @override
+  String get savedSearchTipsBody =>
+      '\"exact phrase\" and -word to leave a word out\ntag:name, folder:name, project:name\nin:notes, in:papers, in:highlights, in:pdfs\nis:pinned, is:template, is:daily\nPut - in front of any of these to exclude it. Use quotes for names with spaces: tag:\"deep learning\"';
+
+  @override
+  String get savedSearchTipsLink => 'Search tips';
+
+  @override
   String get searchAttachments => 'Attachments';
 
   @override
@@ -2958,6 +3281,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spellIgnore => 'Ignore Spelling';
 
   @override
+  String get spellIgnoreGrammar => 'Ignore Grammar';
+
+  @override
   String get spellLearn => 'Learn Spelling';
 
   @override
@@ -3042,6 +3368,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tableTooltip => 'Table';
+
+  @override
+  String get templatesInsert => 'Insert template';
+
+  @override
+  String get templatesInsertHint => 'Fill one of your templates in here';
+
+  @override
+  String get templatesLiterature => 'Literature note';
+
+  @override
+  String get templatesStopUsing => 'Stop using as template';
+
+  @override
+  String get templatesTitle => 'Templates';
+
+  @override
+  String get templatesUnlockReason => 'Unlock to use this template';
+
+  @override
+  String get templatesUntitled => 'Untitled template';
+
+  @override
+  String get templatesUse => 'Use as template';
 
   @override
   String trashDaysLeft(int days) {

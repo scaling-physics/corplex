@@ -3,8 +3,9 @@ import 'package:quick_actions/quick_actions.dart';
 
 import '../../l10n/l10n.dart';
 
-/// The two app shortcuts (long-press the icon).
+/// The app shortcuts (long-press the icon).
 const quickNewNote = 'new_note';
+const quickTodaysNote = 'todays_note';
 const quickImportPdf = 'import_pdf';
 
 /// Where app-icon shortcuts come from. A seam so widget tests don't need
@@ -25,6 +26,10 @@ class PluginQuickActionSource implements QuickActionSource {
       final l10n = deviceL10n();
       await quick.setShortcutItems([
         ShortcutItem(type: quickNewNote, localizedTitle: l10n.commonNewNote),
+        ShortcutItem(
+          type: quickTodaysNote,
+          localizedTitle: l10n.dailyTodaysNote,
+        ),
         ShortcutItem(
           type: quickImportPdf,
           localizedTitle: l10n.commonImportPdf,

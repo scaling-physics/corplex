@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 
 import '../ink/ink_model.dart';
+import '../notes/callout_markers.dart';
 import '../ink/sketch_render.dart';
 import '../notes/note_table.dart';
 import 'export_images.dart' show ExportPhoto;
@@ -42,10 +43,11 @@ List<int> exportToDocx(
 }) {
   final body = StringBuffer();
   final media = <({Uint8List bytes, String ext})>[];
+  _footnotes = [];
   if (doc.title.trim().isNotEmpty) {
     body.write(_para('Title', [Run(doc.title.trim())]));
   }
-  for (final b in doc.blocks) {
+  for (final (i, b) in doc.blocks.indexed) {
     body.write(switch (b.kind) {
       BlockKind.heading1 => _para('Heading1', b.runs),
       BlockKind.heading2 => _para('Heading2', b.runs),
@@ -55,6 +57,14 @@ List<int> exportToDocx(
         Run('${b.ordinal}.\t'),
         ...b.runs,
       ]),
+      BlockKind.quote when b.callout != null => _callout(
+        b,
+        last:
+            i + 1 >= doc.blocks.length ||
+            doc.blocks[i + 1].kind != BlockKind.quote ||
+            doc.blocks[i + 1].callout == null ||
+            doc.blocks[i + 1].callout!.head,
+      ),
       BlockKind.quote => _para('Quote', b.runs),
       BlockKind.paragraph => _para(null, b.runs),
       BlockKind.caption => _para('Caption', b.runs),
@@ -73,6 +83,8 @@ List<int> exportToDocx(
     });
   }
 
+  final footnotes = _footnotes;
+  _footnotes = [];
   final archive = Archive()
     ..addFile(
       ArchiveFile.string(
@@ -80,6 +92,7 @@ List<int> exportToDocx(
         _contentTypes(
           hasPng: media.any((m) => m.ext == 'png'),
           hasJpeg: media.any((m) => m.ext == 'jpg'),
+          hasFootnotes: footnotes.isNotEmpty,
         ),
       ),
     )
@@ -87,7 +100,9 @@ List<int> exportToDocx(
     ..addFile(
       ArchiveFile.string(
         'word/_rels/document.xml.rels',
-        _documentRels([for (final m in media) m.ext]),
+        _documentRels([
+          for (final m in media) m.ext,
+        ], hasFootnotes: footnotes.isNotEmpty),
       ),
     )
     ..addFile(ArchiveFile.string('word/styles.xml', _styles))
@@ -103,6 +118,13 @@ List<int> exportToDocx(
             '</w:sectPr></w:body></w:document>',
       ),
     );
+  if (footnotes.isNotEmpty) {
+    archive
+      ..addFile(
+        ArchiveFile.string('word/footnotes.xml', _footnotesPart(footnotes)),
+      )
+      ..addFile(ArchiveFile.string('word/settings.xml', _settingsPart));
+  }
   for (var i = 0; i < media.length; i++) {
     archive.addFile(
       ArchiveFile.bytes(
@@ -113,6 +135,10 @@ List<int> exportToDocx(
   }
   return ZipEncoder().encode(archive);
 }
+
+/// The footnotes met while writing the body, in order; Word numbers them.
+/// Word's ids start at 1 (-1 and 0 are the separators).
+var _footnotes = <List<Run>>[];
 
 const _ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const _nsR =
@@ -241,6 +267,17 @@ String _table(NoteTable t) {
   return out.toString();
 }
 
+/// A callout line: a shaded paragraph with a coloured bar on the left. The
+/// lines of one callout share fill and border, so Word draws them as one box.
+String _callout(ExportBlock b, {required bool last}) {
+  final c = calloutExportColors(b.callout!.tone);
+  return '<w:p><w:pPr>'
+      '<w:pBdr><w:left w:val="single" w:sz="24" w:space="8" w:color="${c.bar}"/></w:pBdr>'
+      '<w:shd w:val="clear" w:color="auto" w:fill="${c.fill}"/>'
+      '<w:spacing w:before="${b.callout!.head ? 60 : 0}" w:after="${last ? 160 : 0}"/>'
+      '<w:ind w:left="240"/></w:pPr>${b.runs.map(_run).join()}</w:p>';
+}
+
 String _para(
   String? style,
   List<Run> runs, {
@@ -258,6 +295,11 @@ String _para(
 }
 
 String _run(Run r, {bool mono = false}) {
+  if (r.footnote != null) {
+    _footnotes.add(r.footnote!);
+    return '<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>'
+        '<w:footnoteReference w:id="${_footnotes.length}"/></w:r>';
+  }
   if (r.text.isEmpty) return '';
   final text = r.math || r.link == null ? r.text : '${r.text} (${r.link})';
   final props = [
@@ -290,7 +332,11 @@ String _escape(String s) => s
     // Control characters aren't allowed in XML 1.0.
     .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'), '');
 
-String _contentTypes({required bool hasPng, bool hasJpeg = false}) =>
+String _contentTypes({
+  required bool hasPng,
+  bool hasJpeg = false,
+  bool hasFootnotes = false,
+}) =>
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
@@ -299,6 +345,8 @@ String _contentTypes({required bool hasPng, bool hasJpeg = false}) =>
     '${hasJpeg ? '<Default Extension="jpg" ContentType="image/jpeg"/>' : ''}'
     '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
     '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+    '${hasFootnotes ? '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>'
+              '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>' : ''}'
     '</Types>';
 
 const _rootRels =
@@ -308,12 +356,30 @@ const _rootRels =
     '</Relationships>';
 
 /// Ties document.xml to its styles part and its pictures (`rId2…`).
-String _documentRels(List<String> images) =>
+String _documentRels(List<String> images, {bool hasFootnotes = false}) =>
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
     '${[for (var i = 1; i <= images.length; i++) '<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image$i.${images[i - 1]}"/>'].join()}'
+    '${hasFootnotes ? '<Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>'
+              '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>' : ''}'
     '</Relationships>';
+
+/// `word/footnotes.xml`: the two separators Word expects, then each footnote
+/// (id = its position, 1-based) opening with the auto-numbered reference mark.
+String _footnotesPart(List<List<Run>> notes) =>
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<w:footnotes xmlns:w="$_ns" xmlns:r="$_nsR">'
+    '<w:footnote w:type="separator" w:id="-1"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:separator/></w:r></w:p></w:footnote>'
+    '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>'
+    '${[for (final (i, runs) in notes.indexed) '<w:footnote w:id="${i + 1}"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r>${runs.map((r) => _run(r.math ? Run('\$${r.text}\$', math: true) : r)).join()}</w:p></w:footnote>'].join()}'
+    '</w:footnotes>';
+
+const _settingsPart =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<w:settings xmlns:w="$_ns">'
+    '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>'
+    '</w:settings>';
 
 const _styles =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -338,4 +404,8 @@ const _styles =
     '<w:pPr><w:ind w:left="720"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>'
     '<w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="caption"/><w:basedOn w:val="Normal"/>'
     '<w:pPr><w:spacing w:before="60" w:after="200"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="FootnoteText"><w:name w:val="footnote text"/><w:basedOn w:val="Normal"/>'
+    '<w:pPr><w:spacing w:after="40" w:line="240" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style>'
+    '<w:style w:type="character" w:styleId="FootnoteReference"><w:name w:val="footnote reference"/>'
+    '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:style>'
     '</w:styles>';

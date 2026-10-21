@@ -1,0 +1,23 @@
+{
+  "@@locale": "de",
+  "linksEmbedANote": "Notiz einbetten …",
+  "linksCmdEmbed": "Notiz einbetten",
+  "linksCmdEmbedHint": "Eine andere Notiz live hier anzeigen. Oder ![[ tippen",
+  "linksPartsLocked": "Eine gesperrte Notiz lässt sich nur als Ganzes verlinken.",
+  "linksNoHeadings": "Keine Überschriften in dieser Notiz",
+  "linksNoParagraphs": "Keine Absätze in dieser Notiz",
+  "linksToParagraph": "Auf einen Absatz verlinken",
+  "linksToParagraphHint": "Oder Titel#^ tippen",
+  "linksHeadingsOf": "Überschriften",
+  "linksParagraphUnavailable": "Dieser Absatz ließ sich nicht markieren",
+  "linksEmbedLocked": "Gesperrt",
+  "linksEmbedMissing": "Notiz nicht gefunden",
+  "linksEmbedSectionMissing": "Abschnitt nicht gefunden",
+  "linksEmbedShowAll": "Alles anzeigen",
+  "linksEmbedShowLess": "Weniger anzeigen",
+  "linksEmbedOpen": "{title} öffnen",
+  "linksEmbedEmpty": "Leere Notiz",
+  "linksUnlinkedMentions": "Nicht verlinkte Erwähnungen ({count})",
+  "linksLinkMention": "Verlinken",
+  "linksMentionLinked": "In „{title}“ verlinkt"
+}

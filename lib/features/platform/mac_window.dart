@@ -61,10 +61,13 @@ double macPanePadding(double available) {
 enum MenuCommand {
   // File
   newNote,
+  todaysNote,
+  newNoteFromTemplate,
   importPdf,
   importReferences,
   backup,
   exportMarkdown,
+  importMarkdown,
   trash,
   moveToTrash,
   lockNote,
@@ -94,6 +97,7 @@ enum MenuCommand {
   addComment,
   linkNote,
   citePaper,
+  footnote,
   // View
   showNotes,
   showLibrary,

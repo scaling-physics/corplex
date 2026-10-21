@@ -44,12 +44,17 @@ void main() {
     db = AppDatabase.inMemoryForTesting();
     noteId = const Uuid().v4();
     paperId = const Uuid().v4();
-    await db.into(db.notes).insert(
-          NotesCompanion.insert(id: Value(noteId), title: const Value('My note')),
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: Value(noteId),
+            title: const Value('My note'),
+          ),
         );
-    await db.into(db.papers).insert(
-          PapersCompanion.insert(id: Value(paperId), title: 'A paper'),
-        );
+    await db
+        .into(db.papers)
+        .insert(PapersCompanion.insert(id: Value(paperId), title: 'A paper'));
 
     container = ProviderContainer(
       overrides: [databaseProvider.overrideWithValue(db)],
@@ -63,7 +68,11 @@ void main() {
 
   test('linking a paper to a note is visible from both sides', () async {
     expect(
-      await waitFor(container, linkedPapersForNoteProvider(noteId), (_) => true),
+      await waitFor(
+        container,
+        linkedPapersForNoteProvider(noteId),
+        (_) => true,
+      ),
       isEmpty,
     );
 

@@ -1,5 +1,6 @@
 {
   "@@locale": "en",
   "spellLearn": "Learn Spelling",
-  "spellIgnore": "Ignore Spelling"
+  "spellIgnore": "Ignore Spelling",
+  "spellIgnoreGrammar": "Ignore Grammar"
 }

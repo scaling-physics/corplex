@@ -1,0 +1,19 @@
+{
+  "@@locale": "de",
+  "mdImportAction": "Markdown oder Obsidian-Vault importieren",
+  "mdImportActionSubtitle": "Ein Ordner, .md-Dateien oder eine Zip-Datei",
+  "mdImportChooseTitle": "Markdown importieren",
+  "mdImportFolder": "Ein Ordner (Obsidian-Vault)",
+  "mdImportFiles": "Markdown-Dateien",
+  "mdImportZip": "Eine Zip-Datei mit Markdown-Dateien",
+  "mdImportReading": "Dateien werden gelesen…",
+  "mdImportProgress": "{done} von {total} werden importiert…",
+  "mdImportDoneTitle": "Import abgeschlossen",
+  "mdImportNothing": "Dort wurden keine Markdown-Notizen gefunden.",
+  "mdImportReadFailed": "Das konnte nicht gelesen werden.",
+  "mdImportSummaryNotes": "{notes, plural, =0{Keine Notizen importiert} =1{1 Notiz importiert} other{{notes} Notizen importiert}}",
+  "mdImportSummaryAttachments": "{count, plural, =1{1 Anhang kopiert} other{{count} Anhänge kopiert}}",
+  "mdImportSummaryUnresolved": "{count, plural, =1{1 Link passte zu nichts und blieb Text} other{{count} Links passten zu nichts und blieben Text}}",
+  "mdImportSummarySkipped": "{count, plural, =1{1 übersprungen (schon vorhanden, gesperrt oder eine Paper-Seite)} other{{count} übersprungen (schon vorhanden, gesperrt oder Paper-Seiten)}}",
+  "mdImportSummaryFailed": "{count, plural, =1{1 Notiz konnte nicht gespeichert werden} other{{count} Notizen konnten nicht gespeichert werden}}"
+}

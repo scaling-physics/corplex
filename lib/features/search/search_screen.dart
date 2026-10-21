@@ -16,7 +16,11 @@ import '../library/paper_detail_screen.dart';
 import '../library/pdf_viewer_screen.dart';
 import '../notes/note_editor_screen.dart';
 import 'pdf_text_index.dart';
+import 'saved_searches.dart';
+import 'saved_searches_ui.dart';
+import 'search_filters.dart';
 import 'search_index.dart';
+import 'search_query.dart';
 
 /// Search across everything: notes, papers and highlighted passages.
 /// Results appear as you type; tapping one opens it (a highlight opens the
@@ -44,15 +48,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onChanged(String text) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 180), () {
-      setState(() {
-        _query = text.trim();
-        _results = _query.isEmpty ? null : _find(_query);
-        _indexing = _query.isEmpty
-            ? null
-            : ref.read(pdfTextIndexProvider).incomplete;
-      });
+    _debounce = Timer(const Duration(milliseconds: 180), () => _apply(text));
+  }
+
+  void _apply(String text) {
+    if (!mounted) return;
+    setState(() {
+      _query = text.trim();
+      _results = _query.isEmpty ? null : _find(_query);
+      _indexing = _query.isEmpty
+          ? null
+          : ref.read(pdfTextIndexProvider).incomplete;
     });
+  }
+
+  /// Runs a saved search now: its text goes into the field.
+  void _run(SavedSearchEntry saved) {
+    _debounce?.cancel();
+    _controller.text = saved.query;
+    _controller.selection = TextSelection.collapsed(offset: saved.query.length);
+    _apply(saved.query);
   }
 
   Future<List<SearchHit>> _find(String query) => searchEverything(ref, query);
@@ -66,12 +81,34 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       SearchKind.paper => MaterialPageRoute<void>(
         builder: (_) => PaperDetailScreen(paperId: hit.id),
       ),
-      SearchKind.highlight ||
-      SearchKind.pdfText => await highlightRoute(db, hit, _query),
+      SearchKind.highlight || SearchKind.pdfText => await highlightRoute(
+        db,
+        hit,
+        parseSearchQuery(_query).plainText,
+      ),
     };
     if (route != null && mounted) {
       await Navigator.of(context).push(route);
     }
+  }
+
+  /// Saved searches when there are some, else the usual prompt with a quiet
+  /// "Search tips" line under it.
+  Widget _emptyBody(BuildContext context) {
+    final saved = ref.watch(savedSearchesProvider).value ?? const [];
+    if (saved.isNotEmpty) return SavedSearchList(searches: saved, onRun: _run);
+    return Column(
+      children: [
+        Expanded(
+          child: EmptyState(
+            icon: Icons.search,
+            title: context.l10n.searchEmptyTitle,
+            message: context.l10n.searchEmptyMessage,
+          ),
+        ),
+        const SearchTips(),
+      ],
+    );
   }
 
   @override
@@ -93,13 +130,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             focusedBorder: InputBorder.none,
             suffixIcon: _query.isEmpty
                 ? null
-                : IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: context.l10n.searchClear,
-                    onPressed: () {
-                      _controller.clear();
-                      _onChanged('');
-                    },
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        key: const ValueKey('save-search'),
+                        icon: const Icon(Icons.bookmark_add_outlined),
+                        tooltip: context.l10n.savedSearchSave,
+                        onPressed: () => saveSearchDialog(context, ref, _query),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: context.l10n.searchClear,
+                        onPressed: () {
+                          _controller.clear();
+                          _onChanged('');
+                        },
+                      ),
+                    ],
                   ),
           ),
           style: theme.textTheme.titleMedium,
@@ -122,11 +170,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: ReadableColumn(
         child: _results == null
-            ? EmptyState(
-                icon: Icons.search,
-                title: context.l10n.searchEmptyTitle,
-                message: context.l10n.searchEmptyMessage,
-              )
+            ? _emptyBody(context)
             : FutureBuilder<List<SearchHit>>(
                 future: _results,
                 builder: (context, snapshot) {
@@ -154,11 +198,52 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 /// Notes, papers, highlights and PDF text matching [query], each kind
 /// starting the PDF indexer if papers' text isn't all indexed yet.
 Future<List<SearchHit>> searchEverything(WidgetRef ref, String query) async {
+  final parsed = parseSearchQuery(query);
   final pdf = ref.read(pdfTextIndexProvider);
   // Papers' text may not be indexed yet (or since a restart): carry on.
   pdf.kickIfIncomplete();
-  final hits = await ref.read(searchIndexProvider).search(query);
-  return [...hits, ...await pdf.search(query)];
+  final hits = await ref.read(searchIndexProvider).searchParsed(parsed);
+  return [...hits, ...await _pdfHits(ref, pdf, parsed)];
+}
+
+/// Matches inside papers' text. They need a positive word; `project:`
+/// narrows them to that project's papers and `-word` drops passages
+/// containing it (the index only knows the positive words).
+Future<List<SearchHit>> _pdfHits(
+  WidgetRef ref,
+  PdfTextIndex pdf,
+  SearchQuery query,
+) async {
+  if (!query.allowsKind(SearchKind.pdfText) || !query.hasPositiveTerms) {
+    return const [];
+  }
+  final filter = searchFilterSql(query, SearchKind.pdfText, 'id');
+  if (filter == null) return const [];
+  final found = await pdf.search(
+    query.plainText,
+    limit: filter.isEmpty ? 30 : 120,
+  );
+  Set<String>? allowed;
+  if (!filter.isEmpty) {
+    final rows = await ref
+        .read(databaseProvider)
+        .customSelect(
+          'SELECT id FROM papers WHERE ${filter.where}',
+          variables: filter.variables,
+        )
+        .get();
+    allowed = {for (final r in rows) r.read<String>('id')};
+  }
+  final negatives = [
+    for (final t in query.negative)
+      SearchQuery(terms: [SearchTerm(t.words, phrase: t.phrase)]),
+  ];
+  return [
+    for (final h in found)
+      if ((allowed == null || allowed.contains(h.paperId)) &&
+          !negatives.any((n) => n.matchesText(h.snippet, '')))
+        h,
+  ].take(30).toList();
 }
 
 /// A highlight (or a match in a paper's text) opens its PDF at the right
@@ -236,7 +321,7 @@ class _SearchResultsViewState extends ConsumerState<SearchResultsView> {
         final route = await highlightRoute(
           ref.read(databaseProvider),
           hit,
-          widget.query,
+          parseSearchQuery(widget.query).plainText,
         );
         if (route != null && mounted) await Navigator.of(context).push(route);
     }
@@ -255,11 +340,29 @@ class _SearchResultsViewState extends ConsumerState<SearchResultsView> {
           message: context.l10n.searchNoMatchesHint,
         );
       }
-      return SearchResultsList(
-        hits: hits,
-        onTap: _open,
-        indexing: _indexing,
-        dense: true,
+      return Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
+              child: TextButton.icon(
+                key: const ValueKey('save-search'),
+                icon: const Icon(Icons.bookmark_add_outlined, size: 16),
+                label: Text(context.l10n.savedSearchSave),
+                onPressed: () => saveSearchDialog(context, ref, widget.query),
+              ),
+            ),
+          ),
+          Expanded(
+            child: SearchResultsList(
+              hits: hits,
+              onTap: _open,
+              indexing: _indexing,
+              dense: true,
+            ),
+          ),
+        ],
       );
     },
   );

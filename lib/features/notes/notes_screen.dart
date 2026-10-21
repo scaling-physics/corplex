@@ -18,6 +18,7 @@ import '../home/open_card.dart';
 import 'note_editor_screen.dart'
     show NoteEditorScreen, noteBodyFocusRequestProvider;
 import 'notes_providers.dart';
+import 'templates.dart' show templateNotesProvider;
 import 'tags_providers.dart';
 import '../../theme/context_menu.dart';
 import '../../theme/swipe_to_trash.dart';
@@ -31,10 +32,18 @@ import '../projects/projects_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/motion_widgets.dart';
 
-/// Creates an empty note (filed into whatever folder/tag is being viewed,
-/// so it doesn't vanish from the list) and opens it. Used by the home
-/// screen's "New note" button.
-Future<void> createNote(BuildContext context, WidgetRef ref) async {
+/// Creates a note (filed into whatever folder/tag is being viewed, so it
+/// doesn't vanish from the list) and opens it. Used by the home screen's
+/// "New note" button. [title], [content] and [tagIds] start it from a
+/// template (see `createNoteFromTemplate`); while the Templates list is
+/// showing, the new note is itself a template.
+Future<void> createNote(
+  BuildContext context,
+  WidgetRef ref, {
+  String title = '',
+  String content = '',
+  Iterable<String> tagIds = const [],
+}) async {
   final id = const Uuid().v4();
   final db = ref.read(databaseProvider);
   final filter = ref.read(notesFilterProvider);
@@ -43,11 +52,17 @@ Future<void> createNote(BuildContext context, WidgetRef ref) async {
       .insert(
         NotesCompanion.insert(
           id: Value(id),
+          title: Value(title),
+          content: Value(content),
           folderId: Value(filter is FolderFilter ? filter.folderId : null),
+          isTemplate: Value(filter is TemplatesFilter),
         ),
       );
   if (!context.mounted) return;
   openNote(context, ref, id);
+  for (final tagId in tagIds) {
+    await addTagToNote(db, noteId: id, tagId: tagId);
+  }
   if (filter is TagFilter) {
     await addTagToNote(db, noteId: id, tagId: filter.tagId);
   }
@@ -141,6 +156,17 @@ class NotesScreen extends ConsumerWidget {
     final tagsAsync = ref.watch(tagsListProvider);
     final folders = foldersAsync.value ?? const <Folder>[];
     final projects = ref.watch(projectsListProvider).value ?? const <Project>[];
+    final hasTemplates =
+        ref.watch(templateNotesProvider).value?.isNotEmpty ?? false;
+    // The last template stopped being one while its list was showing.
+    ref.listen(templateNotesProvider, (_, next) {
+      if (next.value?.isEmpty ?? false) {
+        final filter = ref.read(notesFilterProvider);
+        if (filter is TemplatesFilter) {
+          ref.read(notesFilterProvider.notifier).state = const AllNotes();
+        }
+      }
+    });
     // On a Mac the sidebar lists folders, projects and tags, as in Notes.
     final sidebarFilters =
         isDesktop(context) && ref.watch(macSidebarVisibleProvider);
@@ -148,6 +174,7 @@ class NotesScreen extends ConsumerWidget {
         !sidebarFilters &&
         (folders.isNotEmpty ||
             (tagsAsync.value?.isNotEmpty ?? false) ||
+            hasTemplates ||
             projects.isNotEmpty);
     final filter = ref.watch(notesFilterProvider);
     final folderNames = {for (final f in folders) f.id: f.name};
@@ -164,6 +191,7 @@ class NotesScreen extends ConsumerWidget {
                     folders: folders,
                     tags: tagsAsync.value ?? const [],
                     projects: projects,
+                    hasTemplates: hasTemplates,
                   )
                 : const SizedBox(width: double.infinity),
           ),
@@ -514,8 +542,10 @@ class _FilterBar extends ConsumerWidget {
     required this.folders,
     required this.tags,
     required this.projects,
+    required this.hasTemplates,
   });
 
+  final bool hasTemplates;
   final List<Folder> folders;
   final List<Tag> tags;
   final List<Project> projects;
@@ -609,6 +639,18 @@ class _FilterBar extends ConsumerWidget {
                         tag.id,
                       ),
                 ),
+              ),
+            ),
+          if (hasTemplates)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                key: const ValueKey('templates-chip'),
+                avatar: const Icon(Icons.description_outlined, size: 18),
+                label: Text(context.l10n.templatesTitle),
+                selected: filter is TemplatesFilter,
+                onSelected: (_) => ref.read(notesFilterProvider.notifier).state =
+                    const TemplatesFilter(),
               ),
             ),
           Padding(

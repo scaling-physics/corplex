@@ -283,6 +283,9 @@ void main() {
           .insert(NotePaperRefsCompanion.insert(noteId: 'n1', paperId: 'p1'));
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
+      // The menu is taller than the test screen; it scrolls.
+      await tester.ensureVisible(find.text('Word count'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Word count'));
       await tester.pumpAndSettle();
       expect(find.text('Words'), findsOneWidget);

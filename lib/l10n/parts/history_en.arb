@@ -1,0 +1,14 @@
+{
+  "@@locale": "en",
+  "historyBack": "Back",
+  "historyForward": "Forward",
+  "historyKeyForward": "Forward",
+  "historyPeekLocked": "Locked",
+  "historyPeekMissing": "This note or paper is no longer here",
+  "historyPeekEmpty": "Nothing written yet",
+  "historyPeekPage": "p. {page}",
+  "@historyPeekPage": {
+    "placeholders": { "page": { "type": "int" } }
+  },
+  "historyPeekPaperNoAuthors": "No authors"
+}

@@ -1,0 +1,7 @@
+{
+  "@@locale": "en",
+  "panesSetting": "Open links in new panes",
+  "panesSettingSubtitle": "A link in a note or paper opens beside it instead of replacing it",
+  "panesClose": "Close pane",
+  "panesUntitled": "Untitled"
+}

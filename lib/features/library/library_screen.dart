@@ -15,6 +15,9 @@ import '../../data/local_files.dart';
 import '../home/adaptive.dart';
 import '../home/open_card.dart';
 import 'paper_cover.dart';
+import 'library_grid.dart';
+import '../navigation/outline_pinch.dart';
+import '../settings/appearance_settings.dart';
 import 'retraction_notice.dart';
 import 'paper_detail_screen.dart';
 import '../../data/tables/papers_table.dart';
@@ -220,7 +223,10 @@ class LibraryScreen extends ConsumerWidget {
                 : const SizedBox(width: double.infinity),
           ),
           Expanded(
-            child: StateSwitcher(
+            child: _libraryPinch(
+              context,
+              ref,
+              StateSwitcher(
               stateKey: switch (papersAsync) {
                 AsyncData(value: []) => searching ? 'no-results' : 'empty',
                 AsyncData() => 'list',
@@ -247,6 +253,26 @@ class LibraryScreen extends ConsumerWidget {
                             title: context.l10n.libraryEmptyTitle,
                             message: context.l10n.libraryEmptyMessage,
                           );
+                  }
+                  if (ref.watch(
+                    appearanceSettingsProvider.select((s) => s.libraryGrid),
+                  )) {
+                    final pane = hasDetailPane(context);
+                    return LibraryGrid(
+                      papers: papers,
+                      selectedId: pane ? ref.watch(selectedPaperProvider) : null,
+                      onOpen: (paper) => pane
+                          ? openPaper(context, ref, paper.id)
+                          : Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    PaperDetailScreen(paperId: paper.id),
+                              ),
+                            ),
+                      actionsFor: isDesktop(context)
+                          ? (paper) => paperContextActions(context, ref, paper)
+                          : null,
+                    );
                   }
                   if (isMac(context)) return _MacPaperList(papers: papers);
                   return NewItemScope(
@@ -276,11 +302,23 @@ class LibraryScreen extends ConsumerWidget {
                 },
               ),
             ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Pinch out on a Mac trackpad: the grid of covers; pinch in: rows again.
+Widget _libraryPinch(BuildContext context, WidgetRef ref, Widget child) {
+  if (!isMac(context)) return child;
+  final settings = ref.read(appearanceSettingsProvider);
+  return PinchDetector(
+    onPinchOut: () => settings.setLibraryGrid(true),
+    onPinchIn: () => settings.setLibraryGrid(false),
+    child: child,
+  );
 }
 
 /// Moves a paper to the trash with the usual Undo snackbar.
@@ -683,6 +721,9 @@ class LibraryMenuButton extends ConsumerWidget {
         'import' => importBibtexFile(context, ref),
         'export' => exportLibraryBibtex(context, ref),
         'zotero' => importFromZotero(context, ref),
+        'grid' => ref
+            .read(appearanceSettingsProvider)
+            .setLibraryGrid(!ref.read(appearanceSettingsProvider).libraryGrid),
         'highlights' => Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => const AllHighlightsScreen())),
@@ -698,6 +739,21 @@ class LibraryMenuButton extends ConsumerWidget {
               trailing: const Text('\u23183'),
             ),
           ),
+        PopupMenuItem(
+          value: 'grid',
+          child: ListTile(
+            leading: Icon(
+              ref.read(appearanceSettingsProvider).libraryGrid
+                  ? Icons.view_list_outlined
+                  : Icons.grid_view_outlined,
+            ),
+            title: Text(
+              ref.read(appearanceSettingsProvider).libraryGrid
+                  ? context.l10n.outlineShowList
+                  : context.l10n.outlineShowGrid,
+            ),
+          ),
+        ),
         PopupMenuItem(
           value: 'highlights',
           child: ListTile(

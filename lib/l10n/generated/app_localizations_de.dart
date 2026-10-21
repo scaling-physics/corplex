@@ -983,6 +983,33 @@ class AppLocalizationsDe extends AppLocalizations {
   String get highlightsTooltip => 'Markierungen';
 
   @override
+  String get historyBack => 'Zurück';
+
+  @override
+  String get historyForward => 'Vorwärts';
+
+  @override
+  String get historyKeyForward => 'Vorwärts';
+
+  @override
+  String get historyPeekEmpty => 'Noch nichts geschrieben';
+
+  @override
+  String get historyPeekLocked => 'Gesperrt';
+
+  @override
+  String get historyPeekMissing =>
+      'Diese Notiz oder dieses Paper gibt es nicht mehr';
+
+  @override
+  String historyPeekPage(int page) {
+    return 'S. $page';
+  }
+
+  @override
+  String get historyPeekPaperNoAuthors => 'Keine Autor:innen';
+
+  @override
   String get homeAttachments => 'Anhänge';
 
   @override
@@ -2447,6 +2474,34 @@ class AppLocalizationsDe extends AppLocalizations {
   String get ocrRecogniseTextHint => 'Scan durchsuchen und markieren';
 
   @override
+  String get outlineEmpty => 'Diese Notiz hat noch keine Überschriften';
+
+  @override
+  String get outlineKeyOutline => 'Gliederung anzeigen';
+
+  @override
+  String get outlineShowGrid => 'Als Raster anzeigen';
+
+  @override
+  String get outlineShowList => 'Als Liste anzeigen';
+
+  @override
+  String get outlineTitle => 'Gliederung';
+
+  @override
+  String get panesClose => 'Bereich schließen';
+
+  @override
+  String get panesSetting => 'Links in neuen Fenstern öffnen';
+
+  @override
+  String get panesSettingSubtitle =>
+      'Ein Link in einer Notiz oder einem Paper öffnet sich daneben, statt sie zu ersetzen';
+
+  @override
+  String get panesUntitled => 'Ohne Titel';
+
+  @override
   String get paperAbstract => 'Abstract';
 
   @override
@@ -3322,6 +3377,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get spellLearn => 'Schreibweise lernen';
 
   @override
+  String get spotlightSetting => 'In Spotlight anzeigen';
+
+  @override
+  String get spotlightSettingSubtitle =>
+      'Notizen, Papers und Projekte über die Spotlight-Suche von macOS finden. Eine gesperrte Notiz zeigt nur ihren Titel.';
+
+  @override
   String get studyAdd => 'Studiendetails hinzufügen';
 
   @override
@@ -3361,6 +3423,130 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get studyMinSampleSize => 'Minimale Stichprobengröße (n)';
+
+  @override
+  String get switcherCmdAttachments => 'Anhänge anzeigen';
+
+  @override
+  String get switcherCmdBibliography => 'Literaturverzeichnis einfügen';
+
+  @override
+  String get switcherCmdExport => 'Als Markdown exportieren…';
+
+  @override
+  String get switcherCmdImportPdf => 'PDF importieren…';
+
+  @override
+  String get switcherCmdLockAll => 'Alle Notizen sperren';
+
+  @override
+  String get switcherCmdLockNote => 'Notiz sperren';
+
+  @override
+  String get switcherCmdNewNote => 'Neue Notiz';
+
+  @override
+  String get switcherCmdOpenProject => 'Projekt öffnen…';
+
+  @override
+  String get switcherCmdSettings => 'Einstellungen';
+
+  @override
+  String get switcherCmdShortcuts => 'Tastaturkurzbefehle…';
+
+  @override
+  String get switcherCmdToday => 'Heutige Notiz';
+
+  @override
+  String get switcherCommands => 'Befehle';
+
+  @override
+  String get switcherFolders => 'Ordner';
+
+  @override
+  String get switcherHeadings => 'Überschriften dieser Notiz';
+
+  @override
+  String get switcherHelp =>
+      '# Überschriften dieser Notiz · > Befehle · ⌘↩ daneben · ⌥↩ öffnet das PDF';
+
+  @override
+  String get switcherHintJump => 'Springen';
+
+  @override
+  String get switcherHintOpen => 'Öffnen';
+
+  @override
+  String get switcherHintRun => 'Ausführen';
+
+  @override
+  String get switcherHintShow => 'Zeigen';
+
+  @override
+  String get switcherKeyGoTo => 'Gehe zu…';
+
+  @override
+  String get switcherKeyNextHeading => 'Nächste Überschrift';
+
+  @override
+  String get switcherKeyOpenLink => 'Link öffnen';
+
+  @override
+  String get switcherKeyPrevHeading => 'Vorherige Überschrift';
+
+  @override
+  String get switcherNoLink => 'Kein Link an der Schreibmarke.';
+
+  @override
+  String get switcherNoNote =>
+      'Öffne eine Notiz, um zu ihren Überschriften zu springen.';
+
+  @override
+  String switcherNoResults(String query) {
+    return 'Nichts passt zu „$query“';
+  }
+
+  @override
+  String get switcherNotes => 'Notizen';
+
+  @override
+  String get switcherPapers => 'Papers';
+
+  @override
+  String get switcherPinned => 'Angeheftet';
+
+  @override
+  String get switcherPlaceholder => 'Zu Notiz, Paper oder Projekt springen';
+
+  @override
+  String get switcherProjects => 'Projekte';
+
+  @override
+  String get switcherRecent => 'Zuletzt';
+
+  @override
+  String get switcherSearches => 'Gespeicherte Suchen';
+
+  @override
+  String get switcherSubFolder => 'Ordner';
+
+  @override
+  String get switcherSubLocked => 'Gesperrt';
+
+  @override
+  String get switcherSubProject => 'Projekt';
+
+  @override
+  String get switcherSubSearch => 'Gespeicherte Suche';
+
+  @override
+  String get switcherSubTag => 'Tag';
+
+  @override
+  String get switcherTags => 'Tags';
+
+  @override
+  String get switcherTitle => 'Schnellwechsler';
 
   @override
   String get syncAccountMismatch =>

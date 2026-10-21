@@ -1,3 +1,5 @@
+import '../navigation/nav_history.dart';
+import '../navigation/nav_target.dart';
 import 'dart:async';
 
 import 'package:drift/drift.dart' show TableUpdateQuery;
@@ -106,6 +108,13 @@ class _AllHighlightsScreenState extends ConsumerState<AllHighlightsScreen> {
   String _query = '';
 
   void _open(HighlightWithPaper e) {
+    recordNavVisit(
+      ref,
+      PaperTarget(
+        e.paper.id,
+        page: e.paper.pdfPath == null ? null : e.highlight.pageNumber,
+      ),
+    );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => e.paper.pdfPath == null

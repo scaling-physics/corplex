@@ -16,7 +16,7 @@ import '../projects/project_menu.dart' show showProjectMenu;
 import '../../theme/app_theme.dart';
 import '../library/papers_providers.dart';
 import '../platform/mac_window.dart';
-import '../projects/project_page.dart';
+import '../navigation/back_forward.dart';
 import '../search/saved_searches.dart';
 import '../search/saved_searches_ui.dart';
 import '../projects/projects_providers.dart';
@@ -418,11 +418,7 @@ class MacSidebar extends ConsumerWidget {
                           ContextMenuAction(
                             label: l10n.macOpenProjectPage,
                             icon: Icons.open_in_new,
-                            onSelected: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ProjectScreen(projectId: p.id),
-                              ),
-                            ),
+                            onSelected: () => openProjectPage(context, ref, p.id),
                           ),
                           ContextMenuAction(
                             label: l10n.macMoreMenu,

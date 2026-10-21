@@ -1,0 +1,11 @@
+{
+  "@@locale": "de",
+  "historyBack": "Zurück",
+  "historyForward": "Vorwärts",
+  "historyKeyForward": "Vorwärts",
+  "historyPeekLocked": "Gesperrt",
+  "historyPeekMissing": "Diese Notiz oder dieses Paper gibt es nicht mehr",
+  "historyPeekEmpty": "Noch nichts geschrieben",
+  "historyPeekPage": "S. {page}",
+  "historyPeekPaperNoAuthors": "Keine Autor:innen"
+}

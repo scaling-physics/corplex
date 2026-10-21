@@ -976,6 +976,84 @@ last; `storedFromEditor` mirrors it. Every reader of `corplex://note/<id>`
 - **Markdown share/vault** now write checklists (`- [ ]`/`- [x]`) and nested
   list indents (four spaces a level), which the importer reads back.
 
+### 1.17 — Mac navigation (built; not yet on a real Mac session)
+Shared model: `navigation/nav_target.dart` (`NoteTarget`, `PaperTarget`,
+`ProjectTarget`; `key` identifies a place) and `nav_history.dart` (pure
+`NavHistory`, `navHistoryProvider`, `navReplayingProvider`). `openNote`,
+`openPaper`, `openNoteAtSelection`, `openProjectPage` and PDF-at-page opens
+record visits (`recordNavVisit`); anything new that opens a place must end up
+in one of them. Agents built the four parts in parallel; no schema change.
+
+- **Sliding panes** (`navigation/panes.dart`, `PaneHost` inside
+  `DetailPane`): the detail area is a stack of panes, one stack per tab in
+  `panesProvider`; `selectedNoteProvider`/`selectedPaperProvider` mirror the
+  focused pane (setting them from outside replaces the stack, null closes the
+  focused pane). A link opened from inside a pane, or with ⌘ held, opens in a
+  new pane to its right (`PaneScope` carries the source pane id through
+  `openNote`/`openPaper`/`openNoteAtSelection`'s `newPane`; panes beyond the
+  source are dropped); opening from a list replaces the stack; a note or paper
+  is never open twice. Two or more panes only on a Mac with ≥ 1,100 pt of
+  detail width; panes are 520–760 pt (`paneWidthFor`), the row scrolls to the
+  newest, below 1,100 pt the stack collapses to the focused pane. Only the
+  focused pane carries `MacPaneChrome`; others show a slim header with ×.
+  **⌘W is Close Pane; Close Window moved to ⇧⌘W.** Settings → "Open links in
+  new panes" (`AppearanceSettings.openLinksInPanes`) turns off the automatic
+  new pane (⌘-click and `openInNewPane` still work). Nothing persists across
+  launches. Pane editors take no `NoteEditorHandle`, so Quote to note still
+  targets the split reader's paired note. Limits: a paper page or project in a
+  pane isn't handled in-pane (screen / pushed page); clicking the list row of
+  the focused note doesn't reset a multi-pane stack.
+- **Quick switcher** (`navigation/quick_switcher*.dart`, `switcher_rank.dart`):
+  ⌘K via Go → "Go to…" on the Mac; a focused editor keeps ⌘K for "link a
+  note" and uses **⇧⌘O** (⌘P stays Print); Ctrl+K / Ctrl+Shift+O with any
+  hardware keyboard; long-press the search icon on phones. A 560 pt panel on
+  desktop, a bottom sheet elsewhere. Items come from the tables
+  (`switcherItemsProvider`: titles, aliases, authors, citekeys, no bodies, no
+  FTS), ranked by the pure `rankSwitcherItems`; empty query shows recents (from
+  the history) and pinned notes. ⌘↩ opens in a new pane, ⌥↩ a paper's PDF at its
+  last page. `#heading` jumps in the last-focused editor (a `NoteNavigator`
+  in `noteNavigatorRegistryProvider`); `>command` runs menu commands
+  (note-only ones through the navigator, the rest through `HomeShell._onCommand`);
+  `?` shows help. Editor keys: ⌥⌘↑/↓ previous/next heading, ⌘L or Format →
+  Open Link follows the link at the caret. Every new `MenuCommand` must be
+  handled in the exhaustive `_onCommand`.
+- **Back/Forward and hover peek** (`navigation/back_forward.dart`,
+  `link_peek.dart`): Go → Back ⌘[ / Forward ⌘], and toolbar buttons that appear
+  only once there is history (`MacPaneChrome.extraLeading`; pane app bars must
+  use `leadingExtent`, not `leadingWidth`). Back pops a pushed page first;
+  otherwise the entry is replayed through the normal openers with
+  `navReplayingProvider` up until the next frame, so replays aren't recorded;
+  entries for places that no longer exist are forgotten at replay. Scroll
+  fractions are reported by key as screens close (`reportScrollFor`) and
+  restored via `navScrollRequestProvider` (the PDF viewer is page-level only).
+  A mouse resting 500 ms on a note link, paper-page link or "Linked from" chip
+  (or a long-press) shows `LinkPeek`, a flat 360×240 card (note start, linked
+  heading's section or block, paper title/authors/year/page, "Locked", or
+  missing); it stays while the pointer is on it, closes 250 ms after leaving
+  or on Escape. Not done: two-finger trackpad swipe (it fights Quill, tables
+  and the pane row). Limits: a PDF or project page closed by its own back arrow
+  isn't reported to the history (one extra Back may be needed); Library/search
+  PDF opens aren't recorded.
+- **Spotlight, outline, Library grid** (`features/spotlight/`, channel
+  `corplex/spotlight`, `SpotlightBridge` in `AppDelegate.swift`):
+  `SpotlightIndexer` pushes notes (title, aliases, 300-char snippet; locked
+  notes by title only — the stamp's low bit), papers and projects to
+  CoreSpotlight, diffing `updated_at` stamps kept per device in
+  shared_preferences (`spotlight.stamps`; missing means clear and rebuild), 100
+  per batch with yields, again 3 s after writes. The unique id is
+  `NavTarget.key`; a result arrives as `open(id)` after Dart's `ready` (native
+  queues earlier ones) and Dart maps it to `corplex://note|paper|project/<id>`
+  for `openWidgetLink`. The default seam is inert; `main()` installs
+  `ChannelSpotlight` on macOS only. Settings → "Show in Spotlight"
+  (`AppearanceSettings.spotlight`) off clears the index. **Outline**: ⋮ →
+  Outline, View → Outline ⌃⌘O, or a trackpad pinch out in a note opens
+  `OutlineOverlay` (`navigation/outline_*.dart`). `PinchDetector` (a
+  translucent `Listener` on `PointerPanZoom`, scale < 0.8 out, > 1.25 in, once
+  per gesture) never claims the pointer and must not wrap the PDF viewer.
+  **Library**: pinch out, or ⋮ → "Show as grid / list", switches to
+  `LibraryGrid` (`AppearanceSettings.libraryGrid`, per device). Not done: iOS
+  Spotlight. Untried on a Mac: indexing, opening a result, the real pinch.
+
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
 locked notes — said plainly when the password is set), **one notes

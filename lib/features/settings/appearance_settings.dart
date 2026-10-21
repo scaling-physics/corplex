@@ -123,6 +123,9 @@ class AppearanceSettings extends ChangeNotifier {
     this.interfaceScale = 1.0,
     this.quickNoteHotKey = true,
     this.spellCheck = true,
+    this.spotlight = true,
+    this.libraryGrid = false,
+    this.openLinksInPanes = true,
   });
 
   ThemeMode themeMode;
@@ -144,6 +147,15 @@ class AppearanceSettings extends ChangeNotifier {
   /// Mac: the global ⌃⌥N Quick Note shortcut is registered.
   bool quickNoteHotKey;
 
+  /// Mac: notes, papers and projects are indexed for Spotlight.
+  bool spotlight;
+
+  /// Library: covers in a grid instead of rows (pinch out, or ⋮ → Grid).
+  bool libraryGrid;
+
+  /// Mac: a link opened from inside a pane opens in a new pane to its right.
+  bool openLinksInPanes;
+
   static const interfaceScales = [0.9, 1.0, 1.1, 1.25, 1.4, 1.6];
 
   static const _modeKey = 'appearance.themeMode';
@@ -152,6 +164,9 @@ class AppearanceSettings extends ChangeNotifier {
   static const _spellKey = 'appearance.spellCheck';
   static const _scaleKey = 'appearance.interfaceScale';
   static const _quickNoteKey = 'appearance.quickNoteHotKey';
+  static const _spotlightKey = 'appearance.spotlight';
+  static const _libraryGridKey = 'appearance.libraryGrid';
+  static const _panesKey = 'appearance.openLinksInPanes';
 
   static Future<AppearanceSettings> load() async {
     try {
@@ -169,6 +184,9 @@ class AppearanceSettings extends ChangeNotifier {
         interfaceScale: _nearestScale(prefs.getDouble(_scaleKey) ?? 1.0),
         spellCheck: prefs.getBool(_spellKey) ?? true,
         quickNoteHotKey: prefs.getBool(_quickNoteKey) ?? true,
+        spotlight: prefs.getBool(_spotlightKey) ?? true,
+        libraryGrid: prefs.getBool(_libraryGridKey) ?? false,
+        openLinksInPanes: prefs.getBool(_panesKey) ?? true,
       );
     } catch (_) {
       return AppearanceSettings();
@@ -200,6 +218,33 @@ class AppearanceSettings extends ChangeNotifier {
     notifyListeners();
     try {
       await (await SharedPreferences.getInstance()).setBool(_quickNoteKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setSpotlight(bool on) async {
+    spotlight = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_spotlightKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setOpenLinksInPanes(bool on) async {
+    openLinksInPanes = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_panesKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setLibraryGrid(bool on) async {
+    libraryGrid = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool(
+        _libraryGridKey,
+        on,
+      );
     } catch (_) {}
   }
 

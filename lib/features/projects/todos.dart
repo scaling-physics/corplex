@@ -5,6 +5,9 @@ import '../../l10n/l10n.dart';
 import '../../data/database_provider.dart';
 import '../home/adaptive.dart';
 import '../lock/note_lock_service.dart';
+import '../navigation/nav_history.dart';
+import '../navigation/nav_target.dart';
+import '../navigation/panes.dart' show openInPanes;
 import '../notes/editor_document.dart';
 import '../notes/note_editor_screen.dart';
 import 'coverage.dart' show ChapterQuery;
@@ -205,8 +208,17 @@ void openNoteAtSelection(
   BuildContext context,
   WidgetRef ref,
   String noteId,
-  TextSelection selection,
-) {
+  TextSelection selection, {
+  bool? newPane,
+}) {
+  recordNavVisit(
+    ref,
+    NoteTarget(
+      noteId,
+      selectionStart: selection.start,
+      selectionEnd: selection.end,
+    ),
+  );
   if (hasDetailPane(context)) {
     final navigator = Navigator.of(context);
     navigator.popUntil((r) => r.isFirst);
@@ -214,7 +226,16 @@ void openNoteAtSelection(
       noteId: noteId,
       selection: selection,
     );
-    ref.read(selectedNoteProvider.notifier).state = noteId;
+    openInPanes(
+      context,
+      ref,
+      NoteTarget(
+        noteId,
+        selectionStart: selection.start,
+        selectionEnd: selection.end,
+      ),
+      newPane: newPane,
+    );
     return;
   }
   Navigator.of(context).push(

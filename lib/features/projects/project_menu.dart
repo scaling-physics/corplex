@@ -15,7 +15,7 @@ import 'chapters.dart';
 import 'chapters_section.dart' show pickProjectDueDate;
 import 'matrix_screen.dart';
 import 'project_bibliography.dart';
-import 'project_page.dart';
+import '../navigation/back_forward.dart';
 import 'projects_providers.dart';
 import 'readable_content.dart';
 
@@ -93,11 +93,7 @@ Future<void> showProjectMenu(
   final db = ref.read(databaseProvider);
 
   if (action == 'open') {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ProjectScreen(projectId: project.id),
-      ),
-    );
+    await openProjectPage(context, ref, project.id);
     return;
   }
   if (action == 'matrix') {

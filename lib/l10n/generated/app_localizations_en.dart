@@ -971,6 +971,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get highlightsTooltip => 'Highlights';
 
   @override
+  String get historyBack => 'Back';
+
+  @override
+  String get historyForward => 'Forward';
+
+  @override
+  String get historyKeyForward => 'Forward';
+
+  @override
+  String get historyPeekEmpty => 'Nothing written yet';
+
+  @override
+  String get historyPeekLocked => 'Locked';
+
+  @override
+  String get historyPeekMissing => 'This note or paper is no longer here';
+
+  @override
+  String historyPeekPage(int page) {
+    return 'p. $page';
+  }
+
+  @override
+  String get historyPeekPaperNoAuthors => 'No authors';
+
+  @override
   String get homeAttachments => 'Attachments';
 
   @override
@@ -2420,6 +2446,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ocrRecogniseTextHint => 'Search and highlight a scan';
 
   @override
+  String get outlineEmpty => 'No headings in this note yet';
+
+  @override
+  String get outlineKeyOutline => 'Show outline';
+
+  @override
+  String get outlineShowGrid => 'Show as grid';
+
+  @override
+  String get outlineShowList => 'Show as list';
+
+  @override
+  String get outlineTitle => 'Outline';
+
+  @override
+  String get panesClose => 'Close pane';
+
+  @override
+  String get panesSetting => 'Open links in new panes';
+
+  @override
+  String get panesSettingSubtitle =>
+      'A link in a note or paper opens beside it instead of replacing it';
+
+  @override
+  String get panesUntitled => 'Untitled';
+
+  @override
   String get paperAbstract => 'Abstract';
 
   @override
@@ -3287,6 +3341,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spellLearn => 'Learn Spelling';
 
   @override
+  String get spotlightSetting => 'Show in Spotlight';
+
+  @override
+  String get spotlightSettingSubtitle =>
+      'Find notes, papers and projects from macOS Spotlight. A locked note shows only its title.';
+
+  @override
   String get studyAdd => 'Add study details';
 
   @override
@@ -3326,6 +3387,129 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get studyMinSampleSize => 'Minimum sample size (n)';
+
+  @override
+  String get switcherCmdAttachments => 'Show attachments';
+
+  @override
+  String get switcherCmdBibliography => 'Add bibliography';
+
+  @override
+  String get switcherCmdExport => 'Export as Markdown…';
+
+  @override
+  String get switcherCmdImportPdf => 'Import PDF…';
+
+  @override
+  String get switcherCmdLockAll => 'Lock all notes';
+
+  @override
+  String get switcherCmdLockNote => 'Lock note';
+
+  @override
+  String get switcherCmdNewNote => 'New note';
+
+  @override
+  String get switcherCmdOpenProject => 'Open project…';
+
+  @override
+  String get switcherCmdSettings => 'Settings';
+
+  @override
+  String get switcherCmdShortcuts => 'Keyboard shortcuts…';
+
+  @override
+  String get switcherCmdToday => 'Today\'s note';
+
+  @override
+  String get switcherCommands => 'Commands';
+
+  @override
+  String get switcherFolders => 'Folders';
+
+  @override
+  String get switcherHeadings => 'Headings in this note';
+
+  @override
+  String get switcherHelp =>
+      '# headings in this note · > commands · ⌘↩ beside · ⌥↩ opens the PDF';
+
+  @override
+  String get switcherHintJump => 'Jump';
+
+  @override
+  String get switcherHintOpen => 'Open';
+
+  @override
+  String get switcherHintRun => 'Run';
+
+  @override
+  String get switcherHintShow => 'Show';
+
+  @override
+  String get switcherKeyGoTo => 'Go to…';
+
+  @override
+  String get switcherKeyNextHeading => 'Next heading';
+
+  @override
+  String get switcherKeyOpenLink => 'Open link';
+
+  @override
+  String get switcherKeyPrevHeading => 'Previous heading';
+
+  @override
+  String get switcherNoLink => 'No link at the cursor.';
+
+  @override
+  String get switcherNoNote => 'Open a note to jump to its headings.';
+
+  @override
+  String switcherNoResults(String query) {
+    return 'Nothing matches “$query”';
+  }
+
+  @override
+  String get switcherNotes => 'Notes';
+
+  @override
+  String get switcherPapers => 'Papers';
+
+  @override
+  String get switcherPinned => 'Pinned';
+
+  @override
+  String get switcherPlaceholder => 'Go to a note, paper or project';
+
+  @override
+  String get switcherProjects => 'Projects';
+
+  @override
+  String get switcherRecent => 'Recent';
+
+  @override
+  String get switcherSearches => 'Saved searches';
+
+  @override
+  String get switcherSubFolder => 'Folder';
+
+  @override
+  String get switcherSubLocked => 'Locked';
+
+  @override
+  String get switcherSubProject => 'Project';
+
+  @override
+  String get switcherSubSearch => 'Saved search';
+
+  @override
+  String get switcherSubTag => 'Tag';
+
+  @override
+  String get switcherTags => 'Tags';
+
+  @override
+  String get switcherTitle => 'Quick switcher';
 
   @override
   String get syncAccountMismatch =>

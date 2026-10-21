@@ -74,6 +74,7 @@ enum MenuCommand {
   lockAllNotes,
   duplicateNote,
   printNote,
+  closePane,
   // Edit → Find
   find,
   findNext,
@@ -98,12 +99,16 @@ enum MenuCommand {
   linkNote,
   citePaper,
   footnote,
+  openLink,
+  // Quick switcher's command list only (no menu item).
+  addBibliography,
   // View
   showNotes,
   showLibrary,
   showAttachments,
   search,
   toggleSidebar,
+  outline,
   collapseSections,
   expandSections,
   zoomIn,
@@ -114,6 +119,10 @@ enum MenuCommand {
   interfaceDefault,
   // Go
   back,
+  forward,
+  goTo,
+  previousHeading,
+  nextHeading,
   // App / Help
   settings,
   keyboardShortcuts,

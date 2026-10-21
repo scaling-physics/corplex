@@ -1,0 +1,50 @@
+{
+  "@@locale": "en",
+  "switcherTitle": "Quick switcher",
+  "switcherPlaceholder": "Go to a note, paper or project",
+  "switcherRecent": "Recent",
+  "switcherPinned": "Pinned",
+  "switcherNotes": "Notes",
+  "switcherPapers": "Papers",
+  "switcherProjects": "Projects",
+  "switcherSearches": "Saved searches",
+  "switcherFolders": "Folders",
+  "switcherTags": "Tags",
+  "switcherCommands": "Commands",
+  "switcherHeadings": "Headings in this note",
+  "switcherNoResults": "Nothing matches “{query}”",
+  "@switcherNoResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "switcherHelp": "# headings in this note · > commands · ⌘↩ beside · ⌥↩ opens the PDF",
+  "switcherNoNote": "Open a note to jump to its headings.",
+  "switcherSubProject": "Project",
+  "switcherSubFolder": "Folder",
+  "switcherSubTag": "Tag",
+  "switcherSubSearch": "Saved search",
+  "switcherSubLocked": "Locked",
+  "switcherHintOpen": "Open",
+  "switcherHintShow": "Show",
+  "switcherHintRun": "Run",
+  "switcherHintJump": "Jump",
+  "switcherCmdToday": "Today's note",
+  "switcherCmdNewNote": "New note",
+  "switcherCmdImportPdf": "Import PDF…",
+  "switcherCmdExport": "Export as Markdown…",
+  "switcherCmdBibliography": "Add bibliography",
+  "switcherCmdLockNote": "Lock note",
+  "switcherCmdLockAll": "Lock all notes",
+  "switcherCmdAttachments": "Show attachments",
+  "switcherCmdOpenProject": "Open project…",
+  "switcherCmdSettings": "Settings",
+  "switcherCmdShortcuts": "Keyboard shortcuts…",
+  "switcherKeyGoTo": "Go to…",
+  "switcherKeyPrevHeading": "Previous heading",
+  "switcherKeyNextHeading": "Next heading",
+  "switcherKeyOpenLink": "Open link",
+  "switcherNoLink": "No link at the cursor."
+}

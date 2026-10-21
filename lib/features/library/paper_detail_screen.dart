@@ -19,6 +19,8 @@ import '../audio/audio_player_bar.dart';
 import 'add_attachment_sheet.dart';
 import 'authors.dart';
 import 'highlights.dart';
+import '../navigation/back_forward.dart';
+import '../navigation/nav_history.dart';
 import '../projects/project_picker_sheet.dart';
 import '../trash/trash_actions.dart';
 import '../projects/projects_providers.dart';
@@ -112,6 +114,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
 
   final _scroll = ScrollController();
   final _scrollKey = GlobalKey();
+  late final NavHistoryNotifier _navHistory;
   final _titleKey = GlobalKey();
 
   /// 0 while the large title is on screen, 1 once it has scrolled under
@@ -123,6 +126,15 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_scheduleCollapse);
+    _navHistory = ref.read(navHistoryProvider.notifier);
+    ref.listenManual<NavScrollRequest?>(navScrollRequestProvider, (_, r) {
+      if (r == null || r.key != 'paper:${widget.paperId}') return;
+      ref.read(navScrollRequestProvider.notifier).state = null;
+      restoreScrollFraction(_scroll, r.fraction, () => mounted);
+    });
+    if (takeScrollRequest(ref, 'paper:${widget.paperId}') case final f?) {
+      restoreScrollFraction(_scroll, f, () => mounted);
+    }
     _loadPaper();
     _titleController.addListener(_scheduleSave);
     _authorsController.addListener(_scheduleSave);
@@ -326,6 +338,10 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
 
   @override
   void dispose() {
+    _navHistory.reportScrollFor(
+      'paper:${widget.paperId}',
+      scrollFractionOf(_scroll),
+    );
     _debounce?.cancel();
     _pmidController.dispose();
     _urlController.dispose();
@@ -740,9 +756,7 @@ class _PaperDetailScreenState extends ConsumerState<PaperDetailScreen> {
                     ? kToolbarHeight
                     : macToolbarHeight,
                 leading: chrome == null ? null : Center(child: chrome.leading),
-                leadingWidth: chrome == null
-                    ? null
-                    : MacPaneChrome.leadingWidth,
+                leadingWidth: chrome?.leadingExtent,
                 flexibleSpace: chrome == null
                     ? null
                     : const MacWindowDragArea(),

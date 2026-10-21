@@ -22,6 +22,7 @@ import 'note_highlight.dart' show noteStyleFor;
 import 'note_link_open.dart';
 import 'note_links.dart';
 import 'note_sections.dart';
+import '../navigation/link_peek.dart';
 import 'notes_providers.dart';
 import 'table_embed.dart';
 
@@ -183,31 +184,34 @@ class _NoteEmbedCardState extends ConsumerState<NoteEmbedCard> {
           fontWeight: FontWeight.w600,
         ),
       );
-      return Semantics(
-        button: true,
-        label: l10n.linksEmbedOpen(title),
-        child: InkWell(
-          onTap: _openTarget,
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.subdirectory_arrow_right,
-                  size: 16,
-                  color: tone ?? c.primary,
-                ),
-                const SizedBox(width: 6),
-                Expanded(child: label),
-                if (trailing != null)
-                  Text(
-                    trailing,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: tone ?? c.onSurfaceVariant,
-                    ),
+      return LinkPeek(
+        request: PeekRequest.note(target),
+        child: Semantics(
+          button: true,
+          label: l10n.linksEmbedOpen(title),
+          child: InkWell(
+            onTap: _openTarget,
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.subdirectory_arrow_right,
+                    size: 16,
+                    color: tone ?? c.primary,
                   ),
-              ],
+                  const SizedBox(width: 6),
+                  Expanded(child: label),
+                  if (trailing != null)
+                    Text(
+                      trailing,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: tone ?? c.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

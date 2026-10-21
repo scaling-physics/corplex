@@ -58,6 +58,10 @@ import 'figure_embed.dart';
 import 'footnote_embed.dart';
 import 'figure_markers.dart';
 import '../projects/figures.dart';
+import '../navigation/back_forward.dart';
+import '../navigation/link_peek.dart';
+import '../navigation/nav_history.dart';
+import '../navigation/nav_target.dart';
 import '../projects/todos.dart' show openNoteAtSelection;
 import 'note_stats.dart';
 import 'table_embed.dart';
@@ -93,6 +97,10 @@ import 'note_link_open.dart';
 import 'note_link_sheet.dart';
 import 'note_links.dart';
 import 'note_sections.dart';
+import '../navigation/outline_overlay.dart';
+import '../navigation/quick_switcher_nav.dart';
+import '../navigation/switcher_rank.dart' show adjacentHeading;
+import '../navigation/outline_pinch.dart';
 import 'unlinked_mentions.dart';
 import 'note_templates.dart';
 import 'daily_notes.dart' show openNeighbouringDailyNote;
@@ -323,6 +331,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   void _closeFind() => setState(() => _finding = false);
   Timer? _debounce;
   bool _loaded = false;
+  late final NoteNavigatorRegistry _navRegistry;
+  late final CallbackNoteNavigator _navigator;
   // Captured up front: dispose() must be able to flush a pending save, and
   // `ref` can't be used there.
   late final AppDatabase _db = ref.read(databaseProvider);
@@ -355,6 +365,11 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   // The page scrolls (the editor inside it doesn't), so typewriter mode
   // moves this controller, measuring against the editor's caret.
   final _pageScroll = ScrollController();
+
+  /// Back/forward: where this note was scrolled when it closed, and the
+  /// peek card for note and paper links under a resting mouse.
+  late final NavHistoryNotifier _navHistory;
+  late final _peek = LinkPeekController(context: () => context);
   final _viewportKey = GlobalKey();
   final _editorKey = GlobalKey<EditorState>();
 
@@ -402,6 +417,27 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _rescue = ref.read(lockedEditRescueProvider);
     _flushRegistry = ref.read(openNoteFlushProvider);
     _flushRegistry[widget.noteId] = _save;
+    _navHistory = ref.read(navHistoryProvider.notifier);
+    // Back/forward to this note while it is already open.
+    ref.listenManual<NavScrollRequest?>(navScrollRequestProvider, (_, r) {
+      if (r == null || r.key != 'note:${widget.noteId}' || !_loaded) return;
+      ref.read(navScrollRequestProvider.notifier).state = null;
+      restoreScrollFraction(_pageScroll, r.fraction, () => mounted);
+    });
+    _navRegistry = ref.read(noteNavigatorRegistryProvider);
+    _navigator = CallbackNoteNavigator(
+      noteId: widget.noteId,
+      titleOf: () => _titleController.text,
+      headingsOf: _switcherHeadings,
+      jumpToHeading: _jumpToHeading,
+      runCommand: (command) {
+        final action = _commands[command];
+        action?.call();
+        return action != null;
+      },
+    );
+    _navRegistry.register(_navigator);
+    _bodyFocus.addListener(_registerNavigator);
     _loadNote();
     ref.listenManual<String?>(
       pendingCommentsPanelProvider,
@@ -505,6 +541,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (mounted) setState(() => _loaded = true);
     _openCommentsIfAsked();
     if (want != null) _revealInitialSelection();
+    if (takeScrollRequest(ref, 'note:${widget.noteId}') case final f?) {
+      restoreScrollFraction(_pageScroll, f, () => mounted);
+    }
     _restoreRescued();
     unawaited(_restoreFolds());
   }
@@ -888,6 +927,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       ).showSnackBar(SnackBar(content: Text(context.l10n.editorPaperRemoved)));
       return;
     }
+    recordNavVisit(
+      ref,
+      PaperTarget(paperId, page: paper.pdfPath == null ? null : page),
+    );
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => paper.pdfPath == null
@@ -1107,13 +1150,13 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                 if (c != _Command.insertTemplate ||
                     (ref.read(templateNotesProvider).value?.isNotEmpty ??
                         false))
-                ListTile(
-                  leading: Icon(c.icon),
-                  title: Text(c.label(context.l10n)),
-                  subtitle: Text(c.hint(context.l10n)),
-                  dense: isDesktop(context),
-                  onTap: () => Navigator.pop(context, c),
-                ),
+                  ListTile(
+                    leading: Icon(c.icon),
+                    title: Text(c.label(context.l10n)),
+                    subtitle: Text(c.hint(context.l10n)),
+                    dense: isDesktop(context),
+                    onTap: () => Navigator.pop(context, c),
+                  ),
           ],
         ),
       );
@@ -1430,6 +1473,57 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   /// A tap on a note link: the note, or one heading or paragraph of it
   /// (selected, with folds opened). Links into this very note just move
   /// the selection.
+  /// The note or paper link under a mouse pointer (global [position]), or
+  /// null. The pointer must be on the link's text, not merely on its line.
+  PeekRequest? _peekAt(Offset position) {
+    if (!_loaded) return null;
+    final render = _editorKey.currentState?.renderEditor;
+    if (render == null || !render.attached) return null;
+    final TextPosition pos;
+    final Rect caret;
+    final Offset local;
+    try {
+      pos = render.getPositionForOffset(position);
+      caret = render.getLocalRectForCaret(pos);
+      local = render.globalToLocal(position);
+    } on Object {
+      return null;
+    }
+    if (local.dy < caret.top - 2 ||
+        local.dy > caret.bottom + 2 ||
+        (local.dx - caret.left).abs() > 16) {
+      return null;
+    }
+    final document = _quillController.document;
+    for (final offset in [pos.offset, pos.offset - 1]) {
+      if (offset < 0 || offset >= document.length) continue;
+      final leaf = document.querySegmentLeafNode(offset).leaf;
+      final link = leaf?.style.attributes[Attribute.link.key]?.value
+          ?.toString();
+      if (link == null) continue;
+      if (parseNoteLinkTarget(link) case final t?) {
+        return PeekRequest.note(t);
+      }
+      if (parsePaperPageLink(link) case final p?) {
+        return PeekRequest(PaperTarget(p.paperId, page: p.page));
+      }
+    }
+    return null;
+  }
+
+  void _onPointerHover(PointerHoverEvent event) {
+    if (event.kind != PointerDeviceKind.mouse) return;
+    final request = _peekAt(event.position);
+    if (request == null) {
+      _peek.leave();
+    } else {
+      _peek.hover(
+        request,
+        Rect.fromCenter(center: event.position, width: 2, height: 18),
+      );
+    }
+  }
+
   void _openLinkTarget(NoteLinkTarget target) {
     if (target.heading == null && target.block == null) {
       _openNote(target.noteId);
@@ -1453,7 +1547,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     unawaited(openNoteLink(context, ref, target));
   }
 
-  void _openNote(String id) => Navigator.of(context)
+  void _openNote(String id) {
+    recordNavVisit(ref, NoteTarget(id));
+    _pushNote(id);
+  }
+
+  void _pushNote(String id) => Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: id)));
 
   /// Leaves the editor first so a pending autosave can't recreate the
@@ -1585,6 +1684,120 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     );
   }
 
+  /// Outline (⋮, View → Outline ⌃⌘O, pinch out on a trackpad): the note
+  /// zoomed out to its headings.
+  bool _outlineOpen = false;
+
+  void _toggleOutline() {
+    if (!_loaded) return;
+    setState(() => _outlineOpen = !_outlineOpen);
+  }
+
+  void _closeOutline() {
+    if (_outlineOpen) setState(() => _outlineOpen = false);
+  }
+
+  void _pickHeading(NoteHeading heading) {
+    setState(() => _outlineOpen = false);
+    _selectUnfolded(TextSelection.collapsed(offset: heading.offset));
+    _revealInitialSelection();
+  }
+
+  /// Wraps the page with the pinch gesture (Mac) and the outline overlay.
+  Widget _withOutline(Widget page) {
+    if (!_loaded) return page;
+    Widget body = page;
+    if (isMac(context)) {
+      body = PinchDetector(
+        onPinchOut: _outlineOpen ? null : _toggleOutline,
+        onPinchIn: _outlineOpen ? _closeOutline : null,
+        child: page,
+      );
+    }
+    if (!_outlineOpen) return body;
+    final headings = headingsOf(docLines(_folds.unfoldedDocument().toDelta()));
+    final caret = _folds.unfoldedOffset(
+      _quillController.selection.isValid ? _quillController.selection.start : 0,
+    );
+    return Stack(
+      children: [
+        Positioned.fill(child: body),
+        Positioned.fill(
+          child: OutlineOverlay(
+            headings: headings,
+            current: currentHeadingIndex(headings, caret),
+            onPick: _pickHeading,
+            onClose: _closeOutline,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Quick switcher and heading keys -------------------------------------
+
+  void _registerNavigator() {
+    if (_bodyFocus.hasFocus) _navRegistry.register(_navigator);
+  }
+
+  List<NoteHeading> _switcherHeadings() =>
+      _loaded ? headingsOf(docLines(_folds.unfoldedDocument().toDelta())) : [];
+
+  void _jumpToHeading(NoteHeading heading) {
+    if (!_loaded || !mounted) return;
+    _selectUnfolded(TextSelection.collapsed(offset: heading.offset));
+    _revealInitialSelection();
+  }
+
+  /// ⌥⌘↑ / ⌥⌘↓: the caret to the previous / next heading.
+  void _stepHeading({required bool forward}) {
+    if (!_loaded) return;
+    final caret = _folds.unfoldedOffset(
+      _quillController.selection.extentOffset,
+    );
+    final target = adjacentHeading(
+      _switcherHeadings(),
+      caret,
+      forward: forward,
+    );
+    if (target != null) _jumpToHeading(target);
+  }
+
+  /// The link under the caret or selection, if any.
+  String? _linkAtCaret() {
+    final doc = _quillController.document;
+    final sel = _quillController.selection;
+    if (!sel.isValid) return null;
+    String? at(int index, int length) {
+      if (index < 0 || index + length > doc.length - 1 + 1) return null;
+      final v = doc.collectStyle(index, length).attributes[Attribute.link.key];
+      return v?.value?.toString();
+    }
+
+    if (!sel.isCollapsed) return at(sel.start, sel.end - sel.start);
+    return at(sel.start, 1) ?? at(sel.start - 1, 1);
+  }
+
+  /// ⌘L / Format → Open Link: follows the link at the caret like a tap.
+  void _openLinkAtCaret() {
+    if (!_loaded) return;
+    final link = _linkAtCaret();
+    if (link == null || link.isEmpty) {
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(context.l10n.switcherNoLink)));
+      return;
+    }
+    if (parseAudioTimestampLink(link) case final t?) {
+      unawaited(_playFrom(t.attachmentId, t.at));
+    } else if (parsePaperPageLink(link) case final p?) {
+      unawaited(_openPaperAt(p.paperId, p.page));
+    } else if (parseNoteLinkTarget(link) case final target?) {
+      _openLinkTarget(target);
+    } else if (Uri.tryParse(link) case final uri? when uri.hasScheme) {
+      unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+    }
+  }
+
   Future<void> _showWordCount(BuildContext context) async {
     final stats = noteStats(_folds.unfoldedDocument());
     final linked = await ref.read(
@@ -1624,6 +1837,13 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
 
   @override
   void dispose() {
+    if (_loaded) {
+      _navHistory.reportScrollFor(
+        'note:${widget.noteId}',
+        scrollFractionOf(_pageScroll),
+      );
+    }
+    _peek.dispose();
     _findStep.dispose();
     _hoverY.dispose();
     _spellHelper?.dispose();
@@ -1633,6 +1853,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     if (_flushRegistry[widget.noteId] == _save) {
       _flushRegistry.remove(widget.noteId);
     }
+    _bodyFocus.removeListener(_registerNavigator);
+    _navRegistry.unregister(_navigator);
     _docChanges?.cancel();
     // Leaving right after typing must not drop the last edit.
     if (_debounce?.isActive ?? false) _save();
@@ -1694,7 +1916,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
         automaticallyImplyLeading: !widget.embedded,
         toolbarHeight: chrome == null ? null : macToolbarHeight,
         leading: chrome == null ? null : Center(child: chrome.leading),
-        leadingWidth: chrome == null ? null : MacPaneChrome.leadingWidth,
+        leadingWidth: chrome?.leadingExtent,
         flexibleSpace: chrome == null ? null : const MacWindowDragArea(),
         // One toolbar row, as in Apple Notes: the formatting controls on
         // the left of the header, the note's actions on the right. The
@@ -1779,6 +2001,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                     false),
               ),
               'find' => _openFind(),
+              'outline' => _toggleOutline(),
               'collapse' => _folds.collapseAll(),
               'expand' => _folds.expandAll(),
               'comments' => _openComments(),
@@ -1899,6 +2122,14 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                   title: Text(context.l10n.editorFindInNote),
                 ),
               ),
+              if (_loaded)
+                PopupMenuItem(
+                  value: 'outline',
+                  child: ListTile(
+                    leading: const Icon(Icons.format_list_bulleted),
+                    title: Text(context.l10n.outlineTitle),
+                  ),
+                ),
               if (_loaded && _folds.headings().any((h) => !h.folded))
                 PopupMenuItem(
                   value: 'collapse',
@@ -1937,7 +2168,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                 child: ListTile(
                   leading: const Icon(Icons.dashboard_customize_outlined),
                   title: Text(
-                    ref.read(noteByIdProvider(widget.noteId)).value
+                    ref
+                                .read(noteByIdProvider(widget.noteId))
+                                .value
                                 ?.isTemplate ??
                             false
                         ? context.l10n.templatesStopUsing
@@ -2246,7 +2479,9 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                   session: _ink!,
                                   editorKey: _editorKey,
                                   onTapBelow: _focusEnd,
-                                  child: QuillEditor.basic(
+                                  child: Listener(
+ onPointerHover: _onPointerHover,
+ child: QuillEditor.basic(
                                     controller: _quillController,
                                     focusNode: _bodyFocus,
                                     scrollController: _bodyScroll,
@@ -2351,6 +2586,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                           },
                                     ),
                                   ),
+),
                                 ),
                               ),
                             ),
@@ -2475,7 +2711,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               ),
             ),
     );
-    final shown = _withCommentsPanel(scaffold);
+    final shown = _withOutline(_withCommentsPanel(scaffold));
     if (!desktop) return shown;
     return MenuCommandHandler(
       commands: _commands,
@@ -2524,6 +2760,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.monospaced: () => _toggle(Attribute.codeBlock),
     MenuCommand.highlight: _toggleHighlight,
     MenuCommand.insertTable: _insertTable,
+    MenuCommand.outline: _toggleOutline,
     MenuCommand.collapseSections: () => _folds.collapseAll(),
     MenuCommand.expandSections: () => _folds.expandAll(),
     MenuCommand.linkNote: () => _linkNote(context),
@@ -2544,6 +2781,12 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.printNote: () => printNote(context, ref, widget.noteId),
     // File → Lock Note: lock this note, or, if it already is, lock now.
     MenuCommand.lockNote: () => _locked ? _lock.lockNow() : _lockNote(),
+    MenuCommand.openLink: _openLinkAtCaret,
+    MenuCommand.addBibliography: () => _addBibliography(context),
+    MenuCommand.previousHeading: () => _stepHeading(forward: false),
+    MenuCommand.nextHeading: () => _stepHeading(forward: true),
+    MenuCommand.goTo: () =>
+        ref.read(quickSwitcherRequestProvider.notifier).state++,
   };
 
   void _toggle(Attribute attribute) {
@@ -2614,6 +2857,15 @@ class _PassKeyIntent extends Intent {
 final Map<ShortcutActivator, Intent> _desktopShortcuts = {
   const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
       const _NoteCommandIntent(MenuCommand.linkNote),
+  // Where ⌘K is "link a note", the quick switcher is ⇧⌘O (⌘P stays Print).
+  const SingleActivator(LogicalKeyboardKey.keyO, meta: true, shift: true):
+      const _NoteCommandIntent(MenuCommand.goTo),
+  const SingleActivator(LogicalKeyboardKey.keyL, meta: true):
+      const _NoteCommandIntent(MenuCommand.openLink),
+  const SingleActivator(LogicalKeyboardKey.arrowUp, meta: true, alt: true):
+      const _NoteCommandIntent(MenuCommand.previousHeading),
+  const SingleActivator(LogicalKeyboardKey.arrowDown, meta: true, alt: true):
+      const _NoteCommandIntent(MenuCommand.nextHeading),
   const SingleActivator(LogicalKeyboardKey.keyK, meta: true, shift: true):
       const _NoteCommandIntent(MenuCommand.citePaper),
   const SingleActivator(LogicalKeyboardKey.keyB, meta: true, shift: true):
@@ -2719,7 +2971,9 @@ class _Backlinks extends ConsumerWidget {
                     runSpacing: 8,
                     children: [
                       for (final n in notes)
-                        ActionChip(
+                        LinkPeek.target(
+                          target: NoteTarget(n.id),
+                          child: ActionChip(
                           avatar: const Icon(Icons.north_west, size: 16),
                           label: Text(
                             n.title.isEmpty
@@ -2727,11 +2981,15 @@ class _Backlinks extends ConsumerWidget {
                                 : n.title,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => NoteEditorScreen(noteId: n.id),
-                            ),
-                          ),
+                          onPressed: () {
+                            recordNavVisit(ref, NoteTarget(n.id));
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => NoteEditorScreen(noteId: n.id),
+                              ),
+                            );
+                          },
+                        ),
                         ),
                     ],
                   ),

@@ -1,5 +1,6 @@
 import AVFoundation
 import Cocoa
+import CoreSpotlight
 import FlutterMacOS
 import NaturalLanguage
 import Speech
@@ -13,6 +14,22 @@ class AppDelegate: FlutterAppDelegate {
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
+  }
+
+  /// A Spotlight result opened: hands its unique id (a Dart `NavTarget.key`)
+  /// to Dart on `corplex/spotlight`, held until Dart says it is ready.
+  override func application(
+    _ application: NSApplication, continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void
+  ) -> Bool {
+    if userActivity.activityType == CSSearchableItemActionType,
+      let id = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String
+    {
+      SpotlightBridge.shared.open(id)
+      return true
+    }
+    return super.application(
+      application, continue: userActivity, restorationHandler: restorationHandler)
   }
 
   /// Right-click the Dock icon → New Note (quick capture, like the ⌃⌥N
@@ -39,6 +56,7 @@ func registerNativeChannels(_ messenger: FlutterBinaryMessenger) {
   registerSpeechChannel(messenger)
   registerSpellChannel(messenger)
   registerSpeakChannel(messenger)
+  SpotlightBridge.shared.register(messenger)
 }
 
 private var speakChannel: FlutterMethodChannel?
@@ -370,5 +388,95 @@ private final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
   func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
     report(utterance, finished: false)
+  }
+}
+
+/// Spotlight (`corplex/spotlight`): `index` (list of {id, title, subtitle,
+/// text, keywords}), `remove` (ids), `clear`; `ready` from Dart releases the
+/// ids of results opened before it listened (a cold launch from Spotlight),
+/// which go back as `open`. `CSSearchableIndex` is touched only on a call,
+/// never at registration. Needs no entitlement in the sandbox.
+final class SpotlightBridge {
+  static let shared = SpotlightBridge()
+  private static let domain = "com.corplex.items"
+
+  private var channel: FlutterMethodChannel?
+  private var dartReady = false
+  private var pending: [String] = []
+
+  func register(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "corplex/spotlight", binaryMessenger: messenger)
+    self.channel = channel
+    channel.setMethodCallHandler { [weak self] call, result in
+      self?.handle(call, result)
+    }
+  }
+
+  func open(_ id: String) {
+    if let window = NSApp.windows.compactMap({ $0 as? MainFlutterWindow }).first {
+      window.bringForward()
+    }
+    if dartReady {
+      channel?.invokeMethod("open", arguments: id)
+    } else {
+      pending.append(id)
+    }
+  }
+
+  private func handle(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    switch call.method {
+    case "ready":
+      dartReady = true
+      let queued = pending
+      pending = []
+      for id in queued { channel?.invokeMethod("open", arguments: id) }
+      result(nil)
+    case "index":
+      guard let list = call.arguments as? [[String: Any]] else {
+        result(FlutterError(code: "bad_args", message: "Expected a list", details: nil))
+        return
+      }
+      let items = list.compactMap { entry -> CSSearchableItem? in
+        guard let id = entry["id"] as? String, let title = entry["title"] as? String else {
+          return nil
+        }
+        let attributes = CSSearchableItemAttributeSet(contentType: .text)
+        attributes.title = title
+        if let subtitle = entry["subtitle"] as? String, !subtitle.isEmpty {
+          attributes.contentDescription = subtitle
+        }
+        if let text = entry["text"] as? String, !text.isEmpty { attributes.textContent = text }
+        attributes.keywords = entry["keywords"] as? [String]
+        let item = CSSearchableItem(
+          uniqueIdentifier: id, domainIdentifier: SpotlightBridge.domain,
+          attributeSet: attributes)
+        item.expirationDate = Date.distantFuture
+        return item
+      }
+      CSSearchableIndex.default().indexSearchableItems(items) { error in
+        DispatchQueue.main.async { Self.reply(result, error) }
+      }
+    case "remove":
+      let ids = call.arguments as? [String] ?? []
+      CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ids) { error in
+        DispatchQueue.main.async { Self.reply(result, error) }
+      }
+    case "clear":
+      CSSearchableIndex.default().deleteSearchableItems(
+        withDomainIdentifiers: [SpotlightBridge.domain]
+      ) { error in
+        DispatchQueue.main.async { Self.reply(result, error) }
+      }
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private static func reply(_ result: FlutterResult, _ error: Error?) {
+    if let error = error {
+      result(FlutterError(code: "spotlight_failed", message: error.localizedDescription, details: nil))
+    } else {
+      result(nil)
+    }
   }
 }

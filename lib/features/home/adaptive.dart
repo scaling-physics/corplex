@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import '../../data/database_provider.dart';
 import '../../l10n/l10n.dart';
-import '../../theme/app_theme.dart';
 import '../library/paper_detail_screen.dart';
+import '../navigation/nav_history.dart';
+import '../navigation/nav_target.dart';
+import '../navigation/panes.dart';
 import '../notes/note_editor_screen.dart';
 import 'mac_toolbar.dart';
 
@@ -46,10 +47,26 @@ final selectedPaperProvider = StateProvider<String?>((ref) => null);
 bool hasDetailPane(BuildContext context) =>
     homeLayoutFor(MediaQuery.sizeOf(context).width) == HomeLayout.expanded;
 
+/// Notes the visit in the window's history, unless back/forward is
+/// replaying one.
+void _record(WidgetRef ref, NavTarget target) {
+  if (ref.read(navReplayingProvider)) return;
+  ref.read(navHistoryProvider.notifier).visit(target);
+}
+
 /// Opens a note: in the detail pane when there is one, otherwise as a page.
-void openNote(BuildContext context, WidgetRef ref, String noteId) {
+///
+/// On a wide Mac window a link opened from inside a pane opens a new pane
+/// beside it ([newPane] forces or forbids that; see `panes.dart`).
+void openNote(
+  BuildContext context,
+  WidgetRef ref,
+  String noteId, {
+  bool? newPane,
+}) {
+  _record(ref, NoteTarget(noteId));
   if (hasDetailPane(context)) {
-    ref.read(selectedNoteProvider.notifier).state = noteId;
+    openInPanes(context, ref, NoteTarget(noteId), newPane: newPane);
     return;
   }
   Navigator.of(
@@ -58,9 +75,15 @@ void openNote(BuildContext context, WidgetRef ref, String noteId) {
 }
 
 /// Opens a paper: in the detail pane when there is one, otherwise as a page.
-void openPaper(BuildContext context, WidgetRef ref, String paperId) {
+void openPaper(
+  BuildContext context,
+  WidgetRef ref,
+  String paperId, {
+  bool? newPane,
+}) {
+  _record(ref, PaperTarget(paperId));
   if (hasDetailPane(context)) {
-    ref.read(selectedPaperProvider.notifier).state = paperId;
+    openInPanes(context, ref, PaperTarget(paperId), newPane: newPane);
     return;
   }
   Navigator.of(context).push(
@@ -68,28 +91,9 @@ void openPaper(BuildContext context, WidgetRef ref, String paperId) {
   );
 }
 
-final _noteExistsProvider = StreamProvider.autoDispose.family<bool, String>((
-  ref,
-  id,
-) {
-  final db = ref.watch(databaseProvider);
-  return (db.select(
-    db.notes,
-  )..where((n) => n.id.equals(id))).watchSingleOrNull().map((n) => n != null);
-});
-
-final _paperExistsProvider = StreamProvider.autoDispose.family<bool, String>((
-  ref,
-  id,
-) {
-  final db = ref.watch(databaseProvider);
-  return (db.select(
-    db.papers,
-  )..where((p) => p.id.equals(id))).watchSingleOrNull().map((p) => p != null);
-});
-
-/// The right-hand pane of the expanded layout: the selected note (Notes
-/// tab) or paper (Library tab), or a quiet placeholder.
+/// The right-hand pane of the expanded layout: the open note(s) (Notes
+/// tab) or paper(s) (Library tab) as a stack of panes (`panes.dart`), or a
+/// quiet placeholder.
 class DetailPane extends ConsumerWidget {
   const DetailPane({super.key, required this.tab});
 
@@ -98,51 +102,19 @@ class DetailPane extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Widget child;
-    if (tab == 0) {
-      final id = ref.watch(selectedNoteProvider);
-      // A note deleted (swiped away, trashed, synced away) leaves the pane.
-      final exists = id == null
-          ? false
-          : ref.watch(_noteExistsProvider(id)).value ?? true;
-      child = id != null && exists
-          ? NoteEditorScreen(
-              key: ValueKey('note-$id'),
-              noteId: id,
-              embedded: true,
-              onClose: () =>
-                  ref.read(selectedNoteProvider.notifier).state = null,
-            )
-          : _Placeholder(
+    return PaneHost(
+      tab: tab,
+      placeholder: tab == 0
+          ? _Placeholder(
               key: const ValueKey('note-none'),
               icon: Icons.edit_note_outlined,
               text: context.l10n.homePickNote,
-            );
-    } else {
-      final id = ref.watch(selectedPaperProvider);
-      final exists = id == null
-          ? false
-          : ref.watch(_paperExistsProvider(id)).value ?? true;
-      child = id != null && exists
-          ? PaperDetailScreen(
-              key: ValueKey('paper-$id'),
-              paperId: id,
-              embedded: true,
-              onClose: () =>
-                  ref.read(selectedPaperProvider.notifier).state = null,
             )
           : _Placeholder(
               key: const ValueKey('paper-none'),
               icon: Icons.library_books_outlined,
               text: context.l10n.homePickPaper,
-            );
-    }
-    // Cross-fade when the selection changes (or empties).
-    return AnimatedSwitcher(
-      duration: AppMotion.of(context, AppMotion.medium),
-      switchInCurve: AppMotion.enter,
-      switchOutCurve: Curves.easeOut,
-      child: child,
+            ),
     );
   }
 }

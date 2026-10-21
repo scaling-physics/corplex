@@ -22,7 +22,14 @@ class MacPaneChrome extends InheritedWidget {
     required this.leading,
     required this.trailing,
     required super.child,
+    this.extraLeading = 0,
   });
+
+  /// Room [leading] needs beyond [leadingWidth] (Back/Forward buttons, shown
+  /// only once there is history).
+  final double extraLeading;
+
+  double get leadingExtent => leadingWidth + extraLeading;
 
   /// The space's primary action (New note, Import PDF).
   final Widget leading;
@@ -38,7 +45,9 @@ class MacPaneChrome extends InheritedWidget {
 
   @override
   bool updateShouldNotify(MacPaneChrome old) =>
-      leading != old.leading || trailing != old.trailing;
+      leading != old.leading ||
+      trailing != old.trailing ||
+      extraLeading != old.extraLeading;
 }
 
 /// A toolbar button as in Notes' row: an icon in a soft round well.
@@ -263,7 +272,7 @@ PreferredSizeWidget macPaneBar(MacPaneChrome chrome) => AppBar(
   toolbarHeight: macToolbarHeight,
   automaticallyImplyLeading: false,
   leading: Center(child: chrome.leading),
-  leadingWidth: MacPaneChrome.leadingWidth,
+  leadingWidth: chrome.leadingExtent,
   actions: [chrome.trailing],
   flexibleSpace: const MacWindowDragArea(),
 );

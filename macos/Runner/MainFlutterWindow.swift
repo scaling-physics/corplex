@@ -22,6 +22,7 @@ private let germanMenuTitles: [String: String] = [
   "Close All Locked Notes": "Alle gesperrten Notizen schließen",
   "Move to Trash": "In den Papierkorb legen", "Show Trash": "Papierkorb anzeigen",
   "Print…": "Drucken…", "Close Window": "Fenster schließen",
+  "Close Pane": "Bereich schließen",
   "Find": "Suchen", "Find…": "Suchen…", "Find Next": "Nächster Treffer",
   "Find Previous": "Vorheriger Treffer",
   "Title": "Titel", "Heading": "Überschrift", "Subheading": "Zwischenüberschrift",
@@ -33,12 +34,15 @@ private let germanMenuTitles: [String: String] = [
   "Add Comment…": "Kommentar hinzufügen…", "Footnote": "Fußnote",
   "Notes": "Notizen", "Library": "Bibliothek", "Attachments": "Anhänge", "Search": "Suchen",
   "Toggle Sidebar": "Seitenleiste ein-/ausblenden",
+  "Outline": "Gliederung",
   "Collapse All Sections": "Alle Abschnitte einklappen",
   "Expand All Sections": "Alle Abschnitte ausklappen", "Zoom In": "Vergrößern",
   "Zoom Out": "Verkleinern", "Actual Size": "Originalgröße",
   "Interface Size": "Oberflächengröße", "Larger": "Größer", "Smaller": "Kleiner",
-  "Default Size": "Standardgröße", "Back": "Zurück",
+  "Default Size": "Standardgröße", "Back": "Zurück", "Forward": "Vorwärts",
   "Keyboard Shortcuts": "Tastaturkurzbefehle",
+  "Go to…": "Gehe zu…", "Previous Heading": "Vorherige Überschrift",
+  "Next Heading": "Nächste Überschrift", "Open Link": "Link öffnen",
 ]
 
 private let usesGerman: Bool =
@@ -283,9 +287,14 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         .separator(),
         item("Print…", "printNote", key: "p"),
         .separator(),
-        NSMenuItem(
-          title: menuTitle("Close Window"), action: #selector(NSWindow.performClose(_:)),
-          keyEquivalent: "w"),
+        item("Close Pane", "closePane", key: "w"),
+        {
+          let closeWindow = NSMenuItem(
+            title: menuTitle("Close Window"), action: #selector(NSWindow.performClose(_:)),
+            keyEquivalent: "w")
+          closeWindow.keyEquivalentModifierMask = [.command, .shift]
+          return closeWindow
+        }(),
       ])
     main.insertItem(file, at: 1)
 
@@ -339,6 +348,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Cite Paper…", "citePaper", key: "k", modifiers: shift),
         item("Add Comment…", "addComment", key: "k", modifiers: [.command, .option]),
         item("Footnote", "footnote", key: "f", modifiers: [.command, .option]),
+        item("Open Link", "openLink", key: "l"),
       ])
     let viewItem = main.items.first {
       $0.submenu?.items.contains { $0.action == #selector(NSWindow.toggleFullScreen(_:)) }
@@ -359,6 +369,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         .separator(),
         item("Toggle Sidebar", "toggleSidebar", key: "s", modifiers: [.command, .control]),
         .separator(),
+        item("Outline", "outline", key: "o", modifiers: [.command, .control]),
         item("Collapse All Sections", "collapseSections"),
         item("Expand All Sections", "expandSections"),
         .separator(),
@@ -377,7 +388,17 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       for (i, entry) in entries.enumerated() { view.insertItem(entry, at: i) }
     }
 
-    let go = menu("Go", [item("Back", "back", key: "[")])
+    let up = String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))
+    let down = String(Character(UnicodeScalar(NSDownArrowFunctionKey)!))
+    let go = menu(
+      "Go",
+      [
+        item("Back", "back", key: "["), item("Forward", "forward", key: "]"),
+        .separator(),
+        item("Go to…", "goTo", key: "k"),
+        item("Previous Heading", "previousHeading", key: up, modifiers: [.command, .option]),
+        item("Next Heading", "nextHeading", key: down, modifiers: [.command, .option]),
+      ])
     let windowItem = main.items.first { $0.submenu === NSApp.windowsMenu }
     if let windowItem = windowItem, let windowIndex = main.items.firstIndex(of: windowItem) {
       main.insertItem(go, at: windowIndex)

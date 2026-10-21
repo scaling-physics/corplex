@@ -8,6 +8,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
+import '../navigation/back_forward.dart';
+import '../navigation/nav_history.dart';
+import '../navigation/panes.dart';
+import '../navigation/quick_switcher.dart';
+import '../navigation/quick_switcher_nav.dart';
 import '../auth/sign_in_screen.dart';
 import '../../data/database_provider.dart';
 import '../../data/trash.dart';
@@ -25,6 +30,7 @@ import '../platform/mac_window.dart';
 import 'adaptive.dart';
 import '../trash/trash_actions.dart';
 import 'keyboard_shortcuts.dart';
+import '../spotlight/spotlight_service.dart';
 import 'mac_sidebar.dart';
 import '../sync/sync_messages.dart';
 import '../sync/sync_ring.dart';
@@ -109,6 +115,34 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ref.read(savedSearchRunRequestProvider.notifier).state = null;
       _runSavedSearch(query);
     });
+    // The note editor's own key for the quick switcher (its ⌘K is "link").
+    ref.listenManual(quickSwitcherRequestProvider, (_, _) => _openSwitcher());
+  }
+
+  bool _switcherOpen = false;
+
+  /// ⌘K (Ctrl+K): the quick switcher; what it picks runs through the same
+  /// openers and menu commands as everything else.
+  Future<void> _openSwitcher() async {
+    if (!mounted || _switcherOpen) return;
+    _switcherOpen = true;
+    final SwitcherChoice? choice;
+    try {
+      choice = await showQuickSwitcher(context, ref);
+    } finally {
+      _switcherOpen = false;
+    }
+    if (choice == null || !mounted) return;
+    await runSwitcherChoice(
+      context,
+      ref,
+      choice,
+      home: _home,
+      showTab: (tab) {
+        if (_index != tab) setState(() => _index = tab);
+      },
+      runCommand: _onCommand,
+    );
   }
 
   @override
@@ -221,7 +255,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.settings:
         _showAccountMenu(context);
       case MenuCommand.back:
-        Navigator.of(context, rootNavigator: true).maybePop();
+        navigateBack(context, ref);
+      case MenuCommand.forward:
+        navigateForward(context, ref);
+      case MenuCommand.goTo:
+        _openSwitcher();
       case MenuCommand.find:
         _openSearch();
       case MenuCommand.moveToTrash:
@@ -249,6 +287,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.linkNote:
       case MenuCommand.citePaper:
       case MenuCommand.footnote:
+      case MenuCommand.openLink:
+      case MenuCommand.addBibliography:
+      case MenuCommand.previousHeading:
+      case MenuCommand.nextHeading:
+      case MenuCommand.outline:
       case MenuCommand.collapseSections:
       case MenuCommand.expandSections:
         // Editor commands; no note editor has focus, so nothing to format.
@@ -260,6 +303,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.lockNote:
         // The open note's editor handles it; nothing open, nothing to lock.
         break;
+      case MenuCommand.closePane:
+        ref.read(panesProvider.notifier).closeFocused(_index);
       case MenuCommand.duplicateNote:
       case MenuCommand.printNote:
         // The open note's editor takes these when it has focus; from the
@@ -383,6 +428,20 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       for (final entry in actions.entries)
         for (final meta in const [true, false])
           SingleActivator(entry.key, meta: meta, control: !meta): entry.value,
+      // The quick switcher: the Mac menu owns ⌘K (Go → Go to…), so only
+      // elsewhere is it bound here.
+      if (!mac)
+        for (final meta in const [true, false])
+          SingleActivator(LogicalKeyboardKey.keyK, meta: meta, control: !meta):
+              _openSwitcher,
+      // Where a focused editor keeps ⌘K for "link a note".
+      for (final meta in const [true, false])
+        SingleActivator(
+          LogicalKeyboardKey.keyO,
+          meta: meta,
+          control: !meta,
+          shift: true,
+        ): _openSwitcher,
     };
   }
 
@@ -503,6 +562,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       enabled: _index == 0,
       child: primary,
     );
+    // Back / Forward appear once there is somewhere to go.
+    ref.watch(navHistoryProvider);
+    final historyButtons = navHasHistory(
+      ref.read(navHistoryProvider.notifier).history,
+    )
+        ? const BackForwardButtons()
+        : null;
     Widget search(double width) => MacToolbarSearch(
       controller: _searchController,
       focusNode: _searchFocus,
@@ -646,7 +712,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           Expanded(
             child: FocusTraversalGroup(
               child: MacPaneChrome(
-                leading: primaryWithMenu,
+                leading: historyButtons == null
+                    ? primaryWithMenu
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [primaryWithMenu, historyButtons],
+                      ),
+                extraLeading: historyButtons == null
+                    ? 0
+                    : BackForwardButtons.width,
                 trailing: searchInList
                     ? const SizedBox(width: 6)
                     : search(pane >= 1000 ? 220 : 180),
@@ -754,11 +828,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.search),
-          tooltip: context.l10n.commonSearch,
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const SearchScreen())),
+        // Long-press: the quick switcher (phones have no ⌘K).
+        GestureDetector(
+          onLongPress: _openSwitcher,
+          child: IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: context.l10n.commonSearch,
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const SearchScreen())),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.only(right: 12),
@@ -946,6 +1024,19 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                   );
                 },
               ),
+            if (isMac(context))
+              Consumer(
+                builder: (context, ref, _) {
+                  final settings = ref.watch(appearanceSettingsProvider);
+                  return SwitchListTile(
+                    secondary: const Icon(Icons.view_column_outlined),
+                    title: Text(l10n.panesSetting),
+                    subtitle: Text(l10n.panesSettingSubtitle),
+                    value: settings.openLinksInPanes,
+                    onChanged: settings.setOpenLinksInPanes,
+                  );
+                },
+              ),
             Consumer(
               builder: (context, ref, _) {
                 final settings = ref.watch(appearanceSettingsProvider);
@@ -960,6 +1051,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 );
               },
             ),
+            const SpotlightSettingsTile(),
             const DailyNotesSettingsTile(),
             const NotesPasswordSettings(),
             Consumer(

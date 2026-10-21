@@ -15,6 +15,7 @@ import 'features/read_aloud/speaker.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
 import 'features/spell/spell_checker.dart';
+import 'features/spotlight/spotlight_channel.dart';
 import 'features/sync/supabase_setup.dart';
 import 'features/sync/transfer_settings.dart';
 
@@ -34,6 +35,7 @@ Future<void> main() async {
         // widget plugins; it has a window with a menu bar instead.
         if (mac) ...[
           macWindowProvider.overrideWithValue(ChannelMacWindow()),
+          spotlightChannelProvider.overrideWithValue(ChannelSpotlight()),
           shareIntentSourceProvider.overrideWithValue(
             const NoShareIntentSource(),
           ),

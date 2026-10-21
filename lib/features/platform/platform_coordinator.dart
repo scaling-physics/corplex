@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../home/adaptive.dart';
+import '../navigation/nav_history.dart';
+import '../navigation/nav_target.dart';
 import '../library/highlights.dart' show parsePaperPageLink;
 import '../library/library_screen.dart';
 import '../../data/database_provider.dart';
@@ -12,6 +14,10 @@ import '../library/papers_providers.dart';
 import '../library/pdf_viewer_screen.dart';
 import '../notes/daily_notes.dart' show openTodaysNote;
 import '../notes/notes_screen.dart';
+import '../spotlight/spotlight_channel.dart';
+import '../spotlight/spotlight_links.dart';
+import '../spotlight/spotlight_service.dart';
+import '../projects/project_page.dart';
 import 'quick_action_source.dart';
 import 'widget_data.dart';
 
@@ -30,6 +36,7 @@ class PlatformCoordinator extends ConsumerStatefulWidget {
 
 class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
   StreamSubscription<Uri?>? _clicks;
+  StreamSubscription<String>? _spotlight;
   Timer? _debounce;
   WidgetPayload? _published;
 
@@ -40,6 +47,10 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
     final bridge = ref.read(homeWidgetBridgeProvider);
     _clicks = bridge.clicks.listen(_onLink);
     bridge.initialLaunch().then(_onLink);
+    // A Spotlight result: its id becomes the same link a widget tap uses.
+    _spotlight = ref.read(spotlightChannelProvider).opens.listen((id) {
+      _onLink(spotlightLinkFor(id));
+    });
   }
 
   /// Runs [action] once the first frame is up (the launch action can
@@ -81,12 +92,14 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
   @override
   void dispose() {
     _clicks?.cancel();
+    _spotlight?.cancel();
     _debounce?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(spotlightStartupProvider);
     ref.listen(papersListProvider, (_, next) {
       final papers = next.value;
       if (papers != null) _papersChanged(papers);
@@ -113,6 +126,35 @@ Future<void> openWidgetLink(
     await openTodaysNote(context, ref);
     return;
   }
+  // Places by id: Spotlight results, `corplex://note/<id>` and friends.
+  switch (navTargetForLink(uri)) {
+    case NoteTarget(:final noteId):
+      openNote(context, ref, noteId);
+      return;
+    case ProjectTarget(:final projectId):
+      final db = ref.read(databaseProvider);
+      final exists = await (db.select(
+        db.projects,
+      )..where((p) => p.id.equals(projectId))).getSingleOrNull();
+      if (exists == null || !context.mounted) return;
+      if (hasDetailPane(context)) {
+        Navigator.of(context).popUntil((r) => r.isFirst);
+      }
+      recordNavVisit(ref, ProjectTarget(projectId));
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ProjectScreen(projectId: projectId),
+        ),
+      );
+      return;
+    case PaperTarget(:final paperId)
+        when !uri.queryParameters.containsKey('page'):
+      // No page named (a Spotlight result): the paper's own screen.
+      openPaper(context, ref, paperId);
+      return;
+    case PaperTarget() || null:
+      break;
+  }
   final link = parsePaperPageLink(uri.toString());
   if (link == null) return;
   final db = ref.read(databaseProvider);
@@ -124,6 +166,7 @@ Future<void> openWidgetLink(
     openPaper(context, ref, paper.id);
     return;
   }
+  recordNavVisit(ref, PaperTarget(paper.id, page: link.page));
   await Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => PdfViewerScreen(

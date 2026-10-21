@@ -1850,6 +1850,54 @@ abstract class AppLocalizations {
   /// **'Highlights'**
   String get highlightsTooltip;
 
+  /// No description provided for @historyBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get historyBack;
+
+  /// No description provided for @historyForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get historyForward;
+
+  /// No description provided for @historyKeyForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get historyKeyForward;
+
+  /// No description provided for @historyPeekEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing written yet'**
+  String get historyPeekEmpty;
+
+  /// No description provided for @historyPeekLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get historyPeekLocked;
+
+  /// No description provided for @historyPeekMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This note or paper is no longer here'**
+  String get historyPeekMissing;
+
+  /// No description provided for @historyPeekPage.
+  ///
+  /// In en, this message translates to:
+  /// **'p. {page}'**
+  String historyPeekPage(int page);
+
+  /// No description provided for @historyPeekPaperNoAuthors.
+  ///
+  /// In en, this message translates to:
+  /// **'No authors'**
+  String get historyPeekPaperNoAuthors;
+
   /// No description provided for @homeAttachments.
   ///
   /// In en, this message translates to:
@@ -4346,6 +4394,60 @@ abstract class AppLocalizations {
   /// **'Search and highlight a scan'**
   String get ocrRecogniseTextHint;
 
+  /// No description provided for @outlineEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No headings in this note yet'**
+  String get outlineEmpty;
+
+  /// No description provided for @outlineKeyOutline.
+  ///
+  /// In en, this message translates to:
+  /// **'Show outline'**
+  String get outlineKeyOutline;
+
+  /// No description provided for @outlineShowGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as grid'**
+  String get outlineShowGrid;
+
+  /// No description provided for @outlineShowList.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as list'**
+  String get outlineShowList;
+
+  /// No description provided for @outlineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline'**
+  String get outlineTitle;
+
+  /// No description provided for @panesClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close pane'**
+  String get panesClose;
+
+  /// No description provided for @panesSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Open links in new panes'**
+  String get panesSetting;
+
+  /// No description provided for @panesSettingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A link in a note or paper opens beside it instead of replacing it'**
+  String get panesSettingSubtitle;
+
+  /// No description provided for @panesUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get panesUntitled;
+
   /// No description provided for @paperAbstract.
   ///
   /// In en, this message translates to:
@@ -5726,6 +5828,18 @@ abstract class AppLocalizations {
   /// **'Learn Spelling'**
   String get spellLearn;
 
+  /// No description provided for @spotlightSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in Spotlight'**
+  String get spotlightSetting;
+
+  /// No description provided for @spotlightSettingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find notes, papers and projects from macOS Spotlight. A locked note shows only its title.'**
+  String get spotlightSettingSubtitle;
+
   /// No description provided for @studyAdd.
   ///
   /// In en, this message translates to:
@@ -5803,6 +5917,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Minimum sample size (n)'**
   String get studyMinSampleSize;
+
+  /// No description provided for @switcherCmdAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Show attachments'**
+  String get switcherCmdAttachments;
+
+  /// No description provided for @switcherCmdBibliography.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bibliography'**
+  String get switcherCmdBibliography;
+
+  /// No description provided for @switcherCmdExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Markdown…'**
+  String get switcherCmdExport;
+
+  /// No description provided for @switcherCmdImportPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Import PDF…'**
+  String get switcherCmdImportPdf;
+
+  /// No description provided for @switcherCmdLockAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock all notes'**
+  String get switcherCmdLockAll;
+
+  /// No description provided for @switcherCmdLockNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock note'**
+  String get switcherCmdLockNote;
+
+  /// No description provided for @switcherCmdNewNote.
+  ///
+  /// In en, this message translates to:
+  /// **'New note'**
+  String get switcherCmdNewNote;
+
+  /// No description provided for @switcherCmdOpenProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Open project…'**
+  String get switcherCmdOpenProject;
+
+  /// No description provided for @switcherCmdSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get switcherCmdSettings;
+
+  /// No description provided for @switcherCmdShortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts…'**
+  String get switcherCmdShortcuts;
+
+  /// No description provided for @switcherCmdToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s note'**
+  String get switcherCmdToday;
+
+  /// No description provided for @switcherCommands.
+  ///
+  /// In en, this message translates to:
+  /// **'Commands'**
+  String get switcherCommands;
+
+  /// No description provided for @switcherFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get switcherFolders;
+
+  /// No description provided for @switcherHeadings.
+  ///
+  /// In en, this message translates to:
+  /// **'Headings in this note'**
+  String get switcherHeadings;
+
+  /// No description provided for @switcherHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'# headings in this note · > commands · ⌘↩ beside · ⌥↩ opens the PDF'**
+  String get switcherHelp;
+
+  /// No description provided for @switcherHintJump.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump'**
+  String get switcherHintJump;
+
+  /// No description provided for @switcherHintOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get switcherHintOpen;
+
+  /// No description provided for @switcherHintRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get switcherHintRun;
+
+  /// No description provided for @switcherHintShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get switcherHintShow;
+
+  /// No description provided for @switcherKeyGoTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to…'**
+  String get switcherKeyGoTo;
+
+  /// No description provided for @switcherKeyNextHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Next heading'**
+  String get switcherKeyNextHeading;
+
+  /// No description provided for @switcherKeyOpenLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Open link'**
+  String get switcherKeyOpenLink;
+
+  /// No description provided for @switcherKeyPrevHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous heading'**
+  String get switcherKeyPrevHeading;
+
+  /// No description provided for @switcherNoLink.
+  ///
+  /// In en, this message translates to:
+  /// **'No link at the cursor.'**
+  String get switcherNoLink;
+
+  /// No description provided for @switcherNoNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a note to jump to its headings.'**
+  String get switcherNoNote;
+
+  /// No description provided for @switcherNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches “{query}”'**
+  String switcherNoResults(String query);
+
+  /// No description provided for @switcherNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get switcherNotes;
+
+  /// No description provided for @switcherPapers.
+  ///
+  /// In en, this message translates to:
+  /// **'Papers'**
+  String get switcherPapers;
+
+  /// No description provided for @switcherPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get switcherPinned;
+
+  /// No description provided for @switcherPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to a note, paper or project'**
+  String get switcherPlaceholder;
+
+  /// No description provided for @switcherProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get switcherProjects;
+
+  /// No description provided for @switcherRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get switcherRecent;
+
+  /// No description provided for @switcherSearches.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved searches'**
+  String get switcherSearches;
+
+  /// No description provided for @switcherSubFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get switcherSubFolder;
+
+  /// No description provided for @switcherSubLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get switcherSubLocked;
+
+  /// No description provided for @switcherSubProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get switcherSubProject;
+
+  /// No description provided for @switcherSubSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved search'**
+  String get switcherSubSearch;
+
+  /// No description provided for @switcherSubTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get switcherSubTag;
+
+  /// No description provided for @switcherTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get switcherTags;
+
+  /// No description provided for @switcherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick switcher'**
+  String get switcherTitle;
 
   /// No description provided for @syncAccountMismatch.
   ///

@@ -125,3 +125,6 @@ app.*.symbols
 .DS_Store
 
 tool/demo/*/
+
+# Local Supabase credentials for release builds
+tool/supabase.env

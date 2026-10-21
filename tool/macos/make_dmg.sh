@@ -2,6 +2,7 @@
 # Builds the macOS release app and packages it as a drag-to-Applications DMG:
 #   tool/macos/make_dmg.sh            -> build/dmg/Corplex-<version>.dmg
 #   tool/macos/make_dmg.sh --no-build -> package the existing release build
+#                                        (it keeps whatever the build had)
 #
 # Without a Developer ID certificate the app is ad-hoc signed: it runs on the
 # Mac that built it, but a copy downloaded elsewhere is blocked by Gatekeeper
@@ -11,8 +12,23 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
+# Sync needs the Supabase project's URL and publishable key compiled in; a
+# build without them runs offline with a greyed-out "Sync now". They live in
+# tool/supabase.env (gitignored, see supabase.env.example).
 if [[ "${1:-}" != "--no-build" ]]; then
-  flutter build macos --release
+  env_file="tool/supabase.env"
+  [[ -f "$env_file" ]] || {
+    echo "Missing $env_file: copy tool/supabase.env.example and fill it in." >&2
+    exit 1
+  }
+  set -a; source "$env_file"; set +a
+  [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_PUBLISHABLE_KEY:-}" ]] || {
+    echo "$env_file must set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY." >&2
+    exit 1
+  }
+  flutter build macos --release \
+    --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+    --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 fi
 
 app="build/macos/Build/Products/Release/Corplex.app"

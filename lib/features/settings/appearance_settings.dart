@@ -125,6 +125,7 @@ class AppearanceSettings extends ChangeNotifier {
     this.spellCheck = true,
     this.spotlight = true,
     this.libraryGrid = false,
+    this.libraryView = '',
     this.openLinksInPanes = true,
   });
 
@@ -153,6 +154,9 @@ class AppearanceSettings extends ChangeNotifier {
   /// Library: covers in a grid instead of rows (pinch out, or ⋮ → Grid).
   bool libraryGrid;
 
+  /// Library: '' (rows / grid), 'board' or 'table'. Per device.
+  String libraryView;
+
   /// Mac: a link opened from inside a pane opens in a new pane to its right.
   bool openLinksInPanes;
 
@@ -166,6 +170,7 @@ class AppearanceSettings extends ChangeNotifier {
   static const _quickNoteKey = 'appearance.quickNoteHotKey';
   static const _spotlightKey = 'appearance.spotlight';
   static const _libraryGridKey = 'appearance.libraryGrid';
+  static const _libraryViewKey = 'appearance.libraryView';
   static const _panesKey = 'appearance.openLinksInPanes';
 
   static Future<AppearanceSettings> load() async {
@@ -186,6 +191,7 @@ class AppearanceSettings extends ChangeNotifier {
         quickNoteHotKey: prefs.getBool(_quickNoteKey) ?? true,
         spotlight: prefs.getBool(_spotlightKey) ?? true,
         libraryGrid: prefs.getBool(_libraryGridKey) ?? false,
+        libraryView: prefs.getString(_libraryViewKey) ?? '',
         openLinksInPanes: prefs.getBool(_panesKey) ?? true,
       );
     } catch (_) {
@@ -234,6 +240,17 @@ class AppearanceSettings extends ChangeNotifier {
     notifyListeners();
     try {
       await (await SharedPreferences.getInstance()).setBool(_panesKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setLibraryView(String view) async {
+    libraryView = view;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setString(
+        _libraryViewKey,
+        view,
+      );
     } catch (_) {}
   }
 

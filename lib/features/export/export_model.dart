@@ -11,6 +11,7 @@ import '../notes/note_content.dart';
 import '../notes/note_sections.dart' show inlineNoteEmbeds;
 import '../notes/note_highlight.dart' show highlightHex;
 import '../notes/callout_markers.dart';
+import '../notes/contents_block.dart' show contentsEmbedType, contentsLines;
 import '../notes/figure_markers.dart';
 import '../notes/footnote_markers.dart';
 import '../notes/math_markers.dart';
@@ -420,6 +421,15 @@ List<ExportBlock> _blocks(
           runs = [];
         }
         blocks.add(ExportBlock.sketch(Sketch.decode(json)));
+      } else if (data.containsKey(contentsEmbedType)) {
+        // A contents block: the headings as a plain list.
+        if (runs.isNotEmpty) {
+          blocks.add(ExportBlock(BlockKind.paragraph, runs));
+          runs = [];
+        }
+        for (final line in contentsLines(delta)) {
+          blocks.add(ExportBlock(BlockKind.bullet, [Run(line.trim())]));
+        }
       } else if (data[tableEmbedType] case final String json) {
         if (runs.isNotEmpty) {
           blocks.add(ExportBlock(BlockKind.paragraph, runs));

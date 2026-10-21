@@ -200,6 +200,86 @@ class AppLocalizationsDe extends AppLocalizations {
   String get authWelcomeBack => 'Willkommen zurück';
 
   @override
+  String get blocksBulleted => 'Aufzählung';
+
+  @override
+  String get blocksCallout => 'Hinweisbox';
+
+  @override
+  String get blocksChecklist => 'Checkliste';
+
+  @override
+  String get blocksCode => 'Codeblock';
+
+  @override
+  String get blocksContentsCommand => 'Inhaltsverzeichnis';
+
+  @override
+  String get blocksContentsEmpty => 'Hier erscheinen die Überschriften.';
+
+  @override
+  String get blocksContentsHint =>
+      'Überschriften dieser Notiz auflisten; Tippen springt dorthin';
+
+  @override
+  String get blocksCopyLink => 'Link zum Block kopieren';
+
+  @override
+  String get blocksDelete => 'Löschen';
+
+  @override
+  String get blocksDuplicate => 'Duplizieren';
+
+  @override
+  String get blocksHandleLabel => 'Diesen Block verschieben oder ändern';
+
+  @override
+  String get blocksHeading => 'Überschrift';
+
+  @override
+  String get blocksKeyMoveDown => 'Block nach unten';
+
+  @override
+  String get blocksKeyMoveUp => 'Block nach oben';
+
+  @override
+  String get blocksLinkCopied => 'Link kopiert';
+
+  @override
+  String get blocksMoveDown => 'Nach unten';
+
+  @override
+  String get blocksMoveUp => 'Nach oben';
+
+  @override
+  String get blocksNumbered => 'Nummerierte Liste';
+
+  @override
+  String get blocksQuote => 'Zitat';
+
+  @override
+  String get blocksSubheading => 'Unterüberschrift';
+
+  @override
+  String get blocksText => 'Text';
+
+  @override
+  String get blocksTitle => 'Titel';
+
+  @override
+  String get blocksToggle => 'Aufklappliste';
+
+  @override
+  String get blocksToggleCommand => 'Aufklappliste';
+
+  @override
+  String get blocksToggleHint =>
+      'Eine Zeile, die die Zeilen darunter einklappt';
+
+  @override
+  String get blocksTurnInto => 'Umwandeln in';
+
+  @override
   String get calloutsCommand => 'Hinweisbox';
 
   @override
@@ -3842,6 +3922,125 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get viewerUnlockToQuote =>
       'Notiz entsperren, um dieses Zitat hinzuzufügen.';
+
+  @override
+  String get viewsCalendar => 'Kalender';
+
+  @override
+  String get viewsColAuthors => 'Autor:innen';
+
+  @override
+  String get viewsColRating => 'Bewertung';
+
+  @override
+  String get viewsColStatus => 'Status';
+
+  @override
+  String get viewsColTitle => 'Titel';
+
+  @override
+  String get viewsColVenue => 'Erschienen in';
+
+  @override
+  String get viewsColYear => 'Jahr';
+
+  @override
+  String get viewsCopied => 'Kopiert';
+
+  @override
+  String get viewsCopyCsv => 'Als CSV kopieren';
+
+  @override
+  String get viewsCopyMarkdown => 'Als Markdown-Tabelle kopieren';
+
+  @override
+  String get viewsKindDaily => 'Tagesnotiz';
+
+  @override
+  String get viewsKindDue => 'Abgabetermin';
+
+  @override
+  String get viewsKindNote => 'Notiz erstellt';
+
+  @override
+  String get viewsKindPaper => 'Paper hinzugefügt';
+
+  @override
+  String get viewsLocked => 'Gesperrt';
+
+  @override
+  String get viewsMoveTo => 'Verschieben nach …';
+
+  @override
+  String viewsMoveToStatus(String status) {
+    return 'Nach $status verschieben';
+  }
+
+  @override
+  String viewsMovedTo(String title, String status) {
+    return '„$title“ nach $status verschoben';
+  }
+
+  @override
+  String get viewsNewDayNote => 'Neue Notiz für diesen Tag';
+
+  @override
+  String get viewsNewTodaysNote => 'Neue Notiz für heute';
+
+  @override
+  String get viewsNextMonth => 'Nächster Monat';
+
+  @override
+  String get viewsNoStatus => 'Ohne Status';
+
+  @override
+  String get viewsOpenDayNote => 'Notiz dieses Tages öffnen';
+
+  @override
+  String get viewsOpenTodaysNote => 'Heutige Notiz';
+
+  @override
+  String get viewsPreviousMonth => 'Vorheriger Monat';
+
+  @override
+  String get viewsTimeline => 'Zeitplan';
+
+  @override
+  String viewsTimelinePace(
+    String words,
+    String target,
+    String perDay,
+    String date,
+  ) {
+    return '$words / $target Wörter · ca. $perDay Wörter/Tag nötig, um bis $date fertig zu werden';
+  }
+
+  @override
+  String viewsTimelinePastDue(String words, String target) {
+    return '$words / $target Wörter · Abgabetermin überschritten';
+  }
+
+  @override
+  String viewsTimelineWords(String words, String target) {
+    return '$words / $target Wörter';
+  }
+
+  @override
+  String viewsTimelineWordsOnly(String words) {
+    return '$words Wörter';
+  }
+
+  @override
+  String get viewsViewBoard => 'Als Board anzeigen';
+
+  @override
+  String get viewsViewGrid => 'Als Raster anzeigen';
+
+  @override
+  String get viewsViewList => 'Als Liste anzeigen';
+
+  @override
+  String get viewsViewTable => 'Als Tabelle anzeigen';
 
   @override
   String get voiceDictate => 'Diktieren';

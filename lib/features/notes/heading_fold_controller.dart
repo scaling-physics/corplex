@@ -127,7 +127,7 @@ class HeadingFolds extends ChangeNotifier {
     var at = 0;
     for (var i = 0; i < ls.length; i++) {
       final l = ls[i];
-      final level = l.header;
+      final level = l.isRoot ? (l.header ?? 7) : null;
       if (level != null) {
         final folded = i + 1 < ls.length && ls[i + 1].isFold;
         if (folded || canCollapse(ls, i)) {

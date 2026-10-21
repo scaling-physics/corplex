@@ -16,6 +16,9 @@ import '../home/adaptive.dart';
 import '../home/open_card.dart';
 import 'paper_cover.dart';
 import 'library_grid.dart';
+import '../projects/calendar.dart';
+import 'views/board_view.dart';
+import 'views/table_view.dart';
 import '../navigation/outline_pinch.dart';
 import '../settings/appearance_settings.dart';
 import 'retraction_notice.dart';
@@ -253,6 +256,23 @@ class LibraryScreen extends ConsumerWidget {
                             title: context.l10n.libraryEmptyTitle,
                             message: context.l10n.libraryEmptyMessage,
                           );
+                  }
+                  final view = ref.watch(
+                    appearanceSettingsProvider.select((s) => s.libraryView),
+                  );
+                  if (view == 'board' || view == 'table') {
+                    final pane = hasDetailPane(context);
+                    void open(Paper paper) => pane
+                        ? openPaper(context, ref, paper.id)
+                        : Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  PaperDetailScreen(paperId: paper.id),
+                            ),
+                          );
+                    return view == 'board'
+                        ? ReadingBoard(papers: papers, onOpen: open)
+                        : PapersTable(papers: papers, onOpen: open);
                   }
                   if (ref.watch(
                     appearanceSettingsProvider.select((s) => s.libraryGrid),
@@ -699,6 +719,12 @@ void _openPdf(BuildContext context, Paper paper) => Navigator.of(context).push(
   ),
 );
 
+String _currentView(WidgetRef ref) {
+  final s = ref.read(appearanceSettingsProvider);
+  if (s.libraryView.isNotEmpty) return s.libraryView;
+  return s.libraryGrid ? 'grid' : 'list';
+}
+
 /// The Library's ⋯ menu: all highlights, add by identifier, import and
 /// export references, Zotero. Beside the search field on phones and
 /// tablets; in the list column's toolbar row on a Mac.
@@ -721,9 +747,19 @@ class LibraryMenuButton extends ConsumerWidget {
         'import' => importBibtexFile(context, ref),
         'export' => exportLibraryBibtex(context, ref),
         'zotero' => importFromZotero(context, ref),
-        'grid' => ref
-            .read(appearanceSettingsProvider)
-            .setLibraryGrid(!ref.read(appearanceSettingsProvider).libraryGrid),
+        'view:list' || 'view:grid' || 'view:board' || 'view:table' => () {
+          final settings = ref.read(appearanceSettingsProvider);
+          final view = v.substring(5);
+          settings.setLibraryView(
+            view == 'board' || view == 'table' ? view : '',
+          );
+          if (view == 'list' || view == 'grid') {
+            settings.setLibraryGrid(view == 'grid');
+          }
+        }(),
+        'calendar' => Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const CalendarScreen())),
         'highlights' => Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => const AllHighlightsScreen())),
@@ -739,19 +775,22 @@ class LibraryMenuButton extends ConsumerWidget {
               trailing: const Text('\u23183'),
             ),
           ),
+        for (final (id, icon, label) in [
+          ('list', Icons.view_list_outlined, context.l10n.viewsViewList),
+          ('grid', Icons.grid_view_outlined, context.l10n.viewsViewGrid),
+          ('board', Icons.view_kanban_outlined, context.l10n.viewsViewBoard),
+          ('table', Icons.table_rows_outlined, context.l10n.viewsViewTable),
+        ])
+          if (id != _currentView(ref))
+            PopupMenuItem(
+              value: 'view:$id',
+              child: ListTile(leading: Icon(icon), title: Text(label)),
+            ),
         PopupMenuItem(
-          value: 'grid',
+          value: 'calendar',
           child: ListTile(
-            leading: Icon(
-              ref.read(appearanceSettingsProvider).libraryGrid
-                  ? Icons.view_list_outlined
-                  : Icons.grid_view_outlined,
-            ),
-            title: Text(
-              ref.read(appearanceSettingsProvider).libraryGrid
-                  ? context.l10n.outlineShowList
-                  : context.l10n.outlineShowGrid,
-            ),
+            leading: const Icon(Icons.calendar_month_outlined),
+            title: Text(context.l10n.viewsCalendar),
           ),
         ),
         PopupMenuItem(

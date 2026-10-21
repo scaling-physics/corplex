@@ -19,6 +19,12 @@ import 'package:flutter_quill/quill_delta.dart';
 /// `QuillController`.
 const foldEmbedType = 'fold';
 
+/// A toggle line starts with this (U+25B8 and a space), stored as plain
+/// text: the lines under it with a greater `indent` are its children and
+/// fold like the section under a heading. Everything that doesn't know
+/// about toggles just sees a paragraph and indented lines.
+const toggleMark = '\u25B8 ';
+
 /// One line of a document: its content (no newline) and the attributes of
 /// its newline (headings, lists, quotes… are block attributes).
 class FoldLine {
@@ -44,6 +50,22 @@ class FoldLine {
     final h = attrs?['header'];
     return h is int && h > 0 ? h : null;
   }
+
+  /// The indent level of the line (0 when it has none).
+  int get indent {
+    final v = attrs?['indent'];
+    return v is int ? v : 0;
+  }
+
+  /// A toggle line: a paragraph (or list item) that starts with [toggleMark].
+  bool get isToggle {
+    if (header != null || ops.isEmpty) return false;
+    final d = ops.first.data;
+    return d is String && d.startsWith(toggleMark);
+  }
+
+  /// Something that can fold the lines under it: a heading or a toggle.
+  bool get isRoot => header != null || isToggle;
 
   /// The hidden lines when this line is a fold (a lone fold embed).
   String? get foldData {
@@ -171,7 +193,7 @@ List<FoldLine> expandLines(List<FoldLine> lines) {
   for (final line in lines) {
     final data = line.foldData;
     if (data != null) {
-      if (out.isNotEmpty && out.last.header != null) out.last.folded = true;
+      if (out.isNotEmpty && out.last.isRoot) out.last.folded = true;
       out.addAll(expandLines(_hiddenOf(data)));
       continue;
     }
@@ -204,8 +226,17 @@ Delta unfoldDelta(Delta live) => deltaHasFolds(live)
 /// The index of the end of the section under the heading at [i]: the first
 /// later heading of the same or a higher level, else the end.
 int sectionEnd(List<FoldLine> lines, int i) {
-  final level = lines[i].header!;
   var j = i + 1;
+  if (lines[i].header == null) {
+    // A toggle: the lines after it that are indented deeper (a fold among
+    // them is a collapsed part of its children).
+    final base = lines[i].indent;
+    while (j < lines.length && (lines[j].isFold || lines[j].indent > base)) {
+      j++;
+    }
+    return j;
+  }
+  final level = lines[i].header!;
   while (j < lines.length) {
     final h = lines[j].header;
     if (h != null && h <= level) break;
@@ -217,7 +248,7 @@ int sectionEnd(List<FoldLine> lines, int i) {
 /// Whether the heading at [i] has lines under it to hide (and isn't
 /// already collapsed).
 bool canCollapse(List<FoldLine> lines, int i) {
-  if (lines[i].header == null) return false;
+  if (!lines[i].isRoot) return false;
   if (i + 1 < lines.length && lines[i + 1].isFold) return false;
   return sectionEnd(lines, i) > i + 1;
 }
@@ -258,10 +289,10 @@ List<FoldHeading> headingsOf(List<FoldLine> full) {
   final seen = <String, int>{};
   return [
     for (final line in full)
-      if (line.header != null)
+      if (line.isRoot)
         FoldHeading(
           line,
-          line.header!,
+          line.header ?? 7,
           line.text,
           seen[line.text] = (seen[line.text] ?? -1) + 1,
         ),

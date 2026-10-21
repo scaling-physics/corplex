@@ -123,6 +123,8 @@ enum MenuCommand {
   goTo,
   previousHeading,
   nextHeading,
+  moveBlockUp,
+  moveBlockDown,
   // App / Help
   settings,
   keyboardShortcuts,

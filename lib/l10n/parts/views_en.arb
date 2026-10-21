@@ -1,0 +1,97 @@
+{
+  "@@locale": "en",
+  "viewsNoStatus": "No status",
+  "viewsMovedTo": "Moved “{title}” to {status}",
+  "@viewsMovedTo": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsMoveTo": "Move to…",
+  "viewsMoveToStatus": "Move to {status}",
+  "@viewsMoveToStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsViewList": "View as list",
+  "viewsViewGrid": "View as grid",
+  "viewsViewBoard": "View as board",
+  "viewsViewTable": "View as table",
+  "viewsCalendar": "Calendar",
+  "viewsTimeline": "Timeline",
+  "viewsColTitle": "Title",
+  "viewsColAuthors": "Authors",
+  "viewsColYear": "Year",
+  "viewsColVenue": "Venue",
+  "viewsColStatus": "Status",
+  "viewsColRating": "Rating",
+  "viewsCopied": "Copied",
+  "viewsCopyMarkdown": "Copy as Markdown table",
+  "viewsCopyCsv": "Copy as CSV",
+  "viewsPreviousMonth": "Previous month",
+  "viewsNextMonth": "Next month",
+  "viewsOpenTodaysNote": "Today’s note",
+  "viewsOpenDayNote": "Open note for this day",
+  "viewsNewTodaysNote": "New note for today",
+  "viewsNewDayNote": "New note for this day",
+  "viewsKindDaily": "Daily note",
+  "viewsKindNote": "Note created",
+  "viewsKindPaper": "Paper added",
+  "viewsKindDue": "Due date",
+  "viewsLocked": "Locked",
+  "viewsTimelinePace": "{words} / {target} words · needs ~{perDay} words/day to finish by {date}",
+  "@viewsTimelinePace": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "perDay": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsTimelinePastDue": "{words} / {target} words · past the due date",
+  "@viewsTimelinePastDue": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsTimelineWords": "{words} / {target} words",
+  "@viewsTimelineWords": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsTimelineWordsOnly": "{words} words",
+  "@viewsTimelineWordsOnly": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      }
+    }
+  }
+}

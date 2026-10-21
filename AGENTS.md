@@ -1054,6 +1054,50 @@ in one of them. Agents built the four parts in parallel; no schema change.
   `LibraryGrid` (`AppearanceSettings.libraryGrid`, per device). Not done: iOS
   Spotlight. Untried on a Mac: indexing, opening a result, the real pinch.
 
+### 1.18 — Block handles, toggles, contents, Library & project views (built; widget-tested only)
+All quiet by design: nothing is shown until the mouse hovers a margin, a menu
+is opened or a view is chosen. No schema change.
+
+- **Block handles** (`notes/block_handles.dart`, `block_ops.dart`): a small
+  low-contrast `⋮⋮` in a line's left margin, invisible until the mouse
+  hovers the margin or a touch long-presses there (`BlockHandleHub`; it sits
+  under the heading chevrons). Drag moves the block (⌥ takes the heading's
+  section; a collapsed heading or toggle moves with its fold); tap opens Turn
+  into (Text, Title, Heading, Subheading, Bulleted, Numbered, Checklist,
+  Quote, Code, Callout, Toggle) / Duplicate / Delete / Move up-down / Copy link
+  to block. Edits apply to the editor's lines as one `compose`; Quill's
+  `compose` keeps the old selection, so `applyBlockEdit` calls
+  `updateSelection` and zeroes `history.lastRecorded` so a move is its own undo
+  step. Mac Format → Move Block Up/Down ⌃⌘↑/↓ (`MenuCommand.moveBlockUp/Down`).
+  Limits: no autoscroll while dragging; multi-line code blocks move a line at
+  a time; comments anchored in a moved block fall back to quote relocation;
+  on narrow margins the handle can overlap the first glyph.
+- **Toggle lists**: stored as a paragraph starting `▸ ` (`toggleMark`) with the
+  following lines at a greater `indent`; `FoldLine.isRoot` makes them fold
+  roots like headings, so chevrons, fold persistence and Collapse/Expand All
+  cover them. `/` → Toggle list, Turn into → Toggle.
+- **Contents block** (`notes/contents_block.dart`): block embed `contents`
+  (`{}`) listing the note's headings as muted tappable text, live; `/` → Table
+  of contents. Exports write the headings as a bullet list; word count and
+  search ignore it.
+- **Library views** (Library ⋮ only; per-device `AppearanceSettings.libraryView`,
+  '' = list/grid): **Board** (`library/views/board_view.dart`: To read /
+  Reading / Done, "No status" only when needed; drag a card to set the status —
+  one write, haptic, Undo; phones get a PageView and a "Move to…" menu) and
+  **Table** (`table_view.dart`: sortable columns, sticky title, study columns
+  only when some paper has study details, inline Status/Rating, ↑/↓/Return,
+  copy as Markdown/CSV). Pure logic in `views_model.dart`. Pinching out while
+  in board/table does nothing.
+- **Calendar** (`projects/calendar.dart`, Library ⋮ and a project chip): month
+  grid of daily notes, notes created, papers added and project due dates; a
+  day can open or create its daily note (`openNoteForDay` in
+  `daily_notes.dart`; `openTodaysNote` delegates to it). **Timeline**
+  (`projects/timeline.dart`, project chip only for a project with chapters and a
+  due date or word target): one bar per chapter (words vs target, status tint),
+  today and due-date markers, a pace line from `timelinePace`.
+- Not done from the Notion list: @date mentions with reminders; link preview
+  cards, emoji icons, automatic version snapshots, Notion import cleanup.
+
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
 locked notes — said plainly when the password is set), **one notes

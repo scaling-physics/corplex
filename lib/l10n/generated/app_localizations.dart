@@ -440,6 +440,162 @@ abstract class AppLocalizations {
   /// **'Welcome back'**
   String get authWelcomeBack;
 
+  /// No description provided for @blocksBulleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulleted list'**
+  String get blocksBulleted;
+
+  /// No description provided for @blocksCallout.
+  ///
+  /// In en, this message translates to:
+  /// **'Callout'**
+  String get blocksCallout;
+
+  /// No description provided for @blocksChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist'**
+  String get blocksChecklist;
+
+  /// No description provided for @blocksCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code block'**
+  String get blocksCode;
+
+  /// No description provided for @blocksContentsCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Table of contents'**
+  String get blocksContentsCommand;
+
+  /// No description provided for @blocksContentsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Headings will be listed here.'**
+  String get blocksContentsEmpty;
+
+  /// No description provided for @blocksContentsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'List this note\'s headings; tap one to jump'**
+  String get blocksContentsHint;
+
+  /// No description provided for @blocksCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link to block'**
+  String get blocksCopyLink;
+
+  /// No description provided for @blocksDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get blocksDelete;
+
+  /// No description provided for @blocksDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get blocksDuplicate;
+
+  /// No description provided for @blocksHandleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Move or change this block'**
+  String get blocksHandleLabel;
+
+  /// No description provided for @blocksHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Heading'**
+  String get blocksHeading;
+
+  /// No description provided for @blocksKeyMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move block down'**
+  String get blocksKeyMoveDown;
+
+  /// No description provided for @blocksKeyMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move block up'**
+  String get blocksKeyMoveUp;
+
+  /// No description provided for @blocksLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get blocksLinkCopied;
+
+  /// No description provided for @blocksMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get blocksMoveDown;
+
+  /// No description provided for @blocksMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get blocksMoveUp;
+
+  /// No description provided for @blocksNumbered.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbered list'**
+  String get blocksNumbered;
+
+  /// No description provided for @blocksQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get blocksQuote;
+
+  /// No description provided for @blocksSubheading.
+  ///
+  /// In en, this message translates to:
+  /// **'Subheading'**
+  String get blocksSubheading;
+
+  /// No description provided for @blocksText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get blocksText;
+
+  /// No description provided for @blocksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get blocksTitle;
+
+  /// No description provided for @blocksToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle list'**
+  String get blocksToggle;
+
+  /// No description provided for @blocksToggleCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle list'**
+  String get blocksToggleCommand;
+
+  /// No description provided for @blocksToggleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A line that folds the lines under it'**
+  String get blocksToggleHint;
+
+  /// No description provided for @blocksTurnInto.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn into'**
+  String get blocksTurnInto;
+
   /// No description provided for @calloutsCommand.
   ///
   /// In en, this message translates to:
@@ -6631,6 +6787,215 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock the note to add this quote to it.'**
   String get viewerUnlockToQuote;
+
+  /// No description provided for @viewsCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar'**
+  String get viewsCalendar;
+
+  /// No description provided for @viewsColAuthors.
+  ///
+  /// In en, this message translates to:
+  /// **'Authors'**
+  String get viewsColAuthors;
+
+  /// No description provided for @viewsColRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get viewsColRating;
+
+  /// No description provided for @viewsColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get viewsColStatus;
+
+  /// No description provided for @viewsColTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get viewsColTitle;
+
+  /// No description provided for @viewsColVenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Venue'**
+  String get viewsColVenue;
+
+  /// No description provided for @viewsColYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get viewsColYear;
+
+  /// No description provided for @viewsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get viewsCopied;
+
+  /// No description provided for @viewsCopyCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as CSV'**
+  String get viewsCopyCsv;
+
+  /// No description provided for @viewsCopyMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as Markdown table'**
+  String get viewsCopyMarkdown;
+
+  /// No description provided for @viewsKindDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily note'**
+  String get viewsKindDaily;
+
+  /// No description provided for @viewsKindDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date'**
+  String get viewsKindDue;
+
+  /// No description provided for @viewsKindNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note created'**
+  String get viewsKindNote;
+
+  /// No description provided for @viewsKindPaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper added'**
+  String get viewsKindPaper;
+
+  /// No description provided for @viewsLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get viewsLocked;
+
+  /// No description provided for @viewsMoveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to…'**
+  String get viewsMoveTo;
+
+  /// No description provided for @viewsMoveToStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to {status}'**
+  String viewsMoveToStatus(String status);
+
+  /// No description provided for @viewsMovedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved “{title}” to {status}'**
+  String viewsMovedTo(String title, String status);
+
+  /// No description provided for @viewsNewDayNote.
+  ///
+  /// In en, this message translates to:
+  /// **'New note for this day'**
+  String get viewsNewDayNote;
+
+  /// No description provided for @viewsNewTodaysNote.
+  ///
+  /// In en, this message translates to:
+  /// **'New note for today'**
+  String get viewsNewTodaysNote;
+
+  /// No description provided for @viewsNextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get viewsNextMonth;
+
+  /// No description provided for @viewsNoStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'No status'**
+  String get viewsNoStatus;
+
+  /// No description provided for @viewsOpenDayNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Open note for this day'**
+  String get viewsOpenDayNote;
+
+  /// No description provided for @viewsOpenTodaysNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Today’s note'**
+  String get viewsOpenTodaysNote;
+
+  /// No description provided for @viewsPreviousMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get viewsPreviousMonth;
+
+  /// No description provided for @viewsTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get viewsTimeline;
+
+  /// No description provided for @viewsTimelinePace.
+  ///
+  /// In en, this message translates to:
+  /// **'{words} / {target} words · needs ~{perDay} words/day to finish by {date}'**
+  String viewsTimelinePace(
+    String words,
+    String target,
+    String perDay,
+    String date,
+  );
+
+  /// No description provided for @viewsTimelinePastDue.
+  ///
+  /// In en, this message translates to:
+  /// **'{words} / {target} words · past the due date'**
+  String viewsTimelinePastDue(String words, String target);
+
+  /// No description provided for @viewsTimelineWords.
+  ///
+  /// In en, this message translates to:
+  /// **'{words} / {target} words'**
+  String viewsTimelineWords(String words, String target);
+
+  /// No description provided for @viewsTimelineWordsOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'{words} words'**
+  String viewsTimelineWordsOnly(String words);
+
+  /// No description provided for @viewsViewBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'View as board'**
+  String get viewsViewBoard;
+
+  /// No description provided for @viewsViewGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'View as grid'**
+  String get viewsViewGrid;
+
+  /// No description provided for @viewsViewList.
+  ///
+  /// In en, this message translates to:
+  /// **'View as list'**
+  String get viewsViewList;
+
+  /// No description provided for @viewsViewTable.
+  ///
+  /// In en, this message translates to:
+  /// **'View as table'**
+  String get viewsViewTable;
 
   /// No description provided for @voiceDictate.
   ///

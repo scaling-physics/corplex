@@ -291,6 +291,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       case MenuCommand.addBibliography:
       case MenuCommand.previousHeading:
       case MenuCommand.nextHeading:
+      case MenuCommand.moveBlockUp:
+      case MenuCommand.moveBlockDown:
       case MenuCommand.outline:
       case MenuCommand.collapseSections:
       case MenuCommand.expandSections:

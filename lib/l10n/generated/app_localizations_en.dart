@@ -197,6 +197,85 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authWelcomeBack => 'Welcome back';
 
   @override
+  String get blocksBulleted => 'Bulleted list';
+
+  @override
+  String get blocksCallout => 'Callout';
+
+  @override
+  String get blocksChecklist => 'Checklist';
+
+  @override
+  String get blocksCode => 'Code block';
+
+  @override
+  String get blocksContentsCommand => 'Table of contents';
+
+  @override
+  String get blocksContentsEmpty => 'Headings will be listed here.';
+
+  @override
+  String get blocksContentsHint =>
+      'List this note\'s headings; tap one to jump';
+
+  @override
+  String get blocksCopyLink => 'Copy link to block';
+
+  @override
+  String get blocksDelete => 'Delete';
+
+  @override
+  String get blocksDuplicate => 'Duplicate';
+
+  @override
+  String get blocksHandleLabel => 'Move or change this block';
+
+  @override
+  String get blocksHeading => 'Heading';
+
+  @override
+  String get blocksKeyMoveDown => 'Move block down';
+
+  @override
+  String get blocksKeyMoveUp => 'Move block up';
+
+  @override
+  String get blocksLinkCopied => 'Link copied';
+
+  @override
+  String get blocksMoveDown => 'Move down';
+
+  @override
+  String get blocksMoveUp => 'Move up';
+
+  @override
+  String get blocksNumbered => 'Numbered list';
+
+  @override
+  String get blocksQuote => 'Quote';
+
+  @override
+  String get blocksSubheading => 'Subheading';
+
+  @override
+  String get blocksText => 'Text';
+
+  @override
+  String get blocksTitle => 'Title';
+
+  @override
+  String get blocksToggle => 'Toggle list';
+
+  @override
+  String get blocksToggleCommand => 'Toggle list';
+
+  @override
+  String get blocksToggleHint => 'A line that folds the lines under it';
+
+  @override
+  String get blocksTurnInto => 'Turn into';
+
+  @override
   String get calloutsCommand => 'Callout';
 
   @override
@@ -3802,6 +3881,125 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewerUnlockToQuote => 'Unlock the note to add this quote to it.';
+
+  @override
+  String get viewsCalendar => 'Calendar';
+
+  @override
+  String get viewsColAuthors => 'Authors';
+
+  @override
+  String get viewsColRating => 'Rating';
+
+  @override
+  String get viewsColStatus => 'Status';
+
+  @override
+  String get viewsColTitle => 'Title';
+
+  @override
+  String get viewsColVenue => 'Venue';
+
+  @override
+  String get viewsColYear => 'Year';
+
+  @override
+  String get viewsCopied => 'Copied';
+
+  @override
+  String get viewsCopyCsv => 'Copy as CSV';
+
+  @override
+  String get viewsCopyMarkdown => 'Copy as Markdown table';
+
+  @override
+  String get viewsKindDaily => 'Daily note';
+
+  @override
+  String get viewsKindDue => 'Due date';
+
+  @override
+  String get viewsKindNote => 'Note created';
+
+  @override
+  String get viewsKindPaper => 'Paper added';
+
+  @override
+  String get viewsLocked => 'Locked';
+
+  @override
+  String get viewsMoveTo => 'Move to…';
+
+  @override
+  String viewsMoveToStatus(String status) {
+    return 'Move to $status';
+  }
+
+  @override
+  String viewsMovedTo(String title, String status) {
+    return 'Moved “$title” to $status';
+  }
+
+  @override
+  String get viewsNewDayNote => 'New note for this day';
+
+  @override
+  String get viewsNewTodaysNote => 'New note for today';
+
+  @override
+  String get viewsNextMonth => 'Next month';
+
+  @override
+  String get viewsNoStatus => 'No status';
+
+  @override
+  String get viewsOpenDayNote => 'Open note for this day';
+
+  @override
+  String get viewsOpenTodaysNote => 'Today’s note';
+
+  @override
+  String get viewsPreviousMonth => 'Previous month';
+
+  @override
+  String get viewsTimeline => 'Timeline';
+
+  @override
+  String viewsTimelinePace(
+    String words,
+    String target,
+    String perDay,
+    String date,
+  ) {
+    return '$words / $target words · needs ~$perDay words/day to finish by $date';
+  }
+
+  @override
+  String viewsTimelinePastDue(String words, String target) {
+    return '$words / $target words · past the due date';
+  }
+
+  @override
+  String viewsTimelineWords(String words, String target) {
+    return '$words / $target words';
+  }
+
+  @override
+  String viewsTimelineWordsOnly(String words) {
+    return '$words words';
+  }
+
+  @override
+  String get viewsViewBoard => 'View as board';
+
+  @override
+  String get viewsViewGrid => 'View as grid';
+
+  @override
+  String get viewsViewList => 'View as list';
+
+  @override
+  String get viewsViewTable => 'View as table';
 
   @override
   String get voiceDictate => 'Dictate';

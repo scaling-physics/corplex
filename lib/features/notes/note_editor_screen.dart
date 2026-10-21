@@ -52,7 +52,11 @@ import '../library/metadata_lookup.dart';
 import '../../l10n/l10n.dart';
 import 'editor_document.dart';
 import 'heading_fold_controller.dart';
+import 'heading_fold.dart' show FoldLine;
 import 'heading_fold_ui.dart';
+import 'block_handles.dart';
+import 'block_ops.dart';
+import 'contents_block.dart';
 import 'callout_embed.dart';
 import 'figure_embed.dart';
 import 'footnote_embed.dart';
@@ -348,6 +352,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
 
   /// Where the pointer is over the page, for the heading chevrons.
   final _hoverY = ValueNotifier<double?>(null);
+  final _blockHub = BlockHandleHub();
 
   /// The figures index counts the whole note, hidden sections included.
   void _figuresChanged() => _figures.documentChanged(_folds.unfoldedDocument());
@@ -1223,6 +1228,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           _quillController.formatSelection(Attribute.h2);
         case _Command.checklist:
           _quillController.formatSelection(Attribute.unchecked);
+        case _Command.toggle:
+          _insertToggle();
+        case _Command.contents:
+          insertContentsAtCursor(_quillController);
         case _Command.template:
           _insertTemplate();
         case _Command.insertTemplate:
@@ -1846,6 +1855,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     _peek.dispose();
     _findStep.dispose();
     _hoverY.dispose();
+    _blockHub.dispose();
     _spellHelper?.dispose();
     _commentsHelper?.dispose();
     widget.handle?.appendQuote = null;
@@ -2222,11 +2232,18 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           ?chrome?.trailing,
         ],
       ),
-      body: MouseRegion(
-        // Where the pointer is on the page, for the heading chevrons (an
-        // ancestor of them, so reaching for one doesn't hide it).
-        onHover: (e) => _hoverY.value = e.position.dy,
-        onExit: (_) => _hoverY.value = null,
+      body: BlockHandleTouch(hub: _blockHub, child: MouseRegion(
+        // Where the pointer is on the page, for the heading chevrons and
+        // block handles (an ancestor of them, so reaching for one doesn't
+        // hide it).
+        onHover: (e) {
+          _hoverY.value = e.position.dy;
+          _blockHub.setHover(e.position);
+        },
+        onExit: (_) {
+          _hoverY.value = null;
+          _blockHub.setHover(null);
+        },
         child: Stack(
           children: [
             Positioned.fill(
@@ -2535,8 +2552,11 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                       customLinkPrefixes: const [
                                         audioLinkScheme,
                                       ],
-                                      embedBuilders: const [
-                                        FoldEmbedBuilder(),
+                                      embedBuilders: [
+                                        const FoldEmbedBuilder(),
+                                        ContentsEmbedBuilder(
+                                          onJump: _jumpToHeading,
+                                        ),
                                         FigureDefEmbedBuilder(),
                                         FigureRefEmbedBuilder(),
                                         SketchEmbedBuilder(),
@@ -2597,6 +2617,19 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                       ),
               ),
             ),
+            // Drag handles: only ever visible beside a line the pointer is at.
+            if (_loaded && !_quillController.readOnly)
+              Positioned.fill(
+                child: BlockHandles(
+                  folds: _folds,
+                  controller: _quillController,
+                  editorKey: _editorKey,
+                  scroll: _pageScroll,
+                  hub: _blockHub,
+                  onCopyLink: _copyBlockLink,
+                ),
+              ),
+            // (Above the handles, so a chevron wins where the two meet.)
             // Fold chevrons in the left margin of the headings.
             if (_loaded)
               Positioned.fill(
@@ -2618,7 +2651,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
               ),
           ],
         ),
-      ),
+      )),
       // A Scaffold leaves its bottom bar under the keyboard; pad it up by the
       // keyboard's height so formatting and Draw stay in reach while typing.
       bottomNavigationBar: !_loaded
@@ -2724,6 +2757,59 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   /// Menu-bar and shortcut commands the editor takes (Format menu, text
   /// zoom, Move to Trash). Clicking a Format item while editing applies it
   /// at the selection, exactly like the toolbar buttons.
+  /// `/` → Toggle list: the cursor's line becomes a toggle (starting `▸ `)
+  /// with an empty indented line under it for its first child, the caret at
+  /// the end of the toggle's own line.
+  void _insertToggle() {
+    final sel = _quillController.selection;
+    if (!sel.isValid) return;
+    final lines = _folds.lines;
+    final i = lineAtOffset(lines, sel.start);
+    if (i == null) return;
+    final next = [...lines];
+    next[i] = turnLineInto(lines[i], TurnInto.toggle);
+    final base = next[i].indent;
+    final hasChild =
+        i + 1 < lines.length &&
+        (lines[i + 1].isFold || lines[i + 1].indent > base);
+    if (!hasChild) {
+      next.insert(i + 1, FoldLine([], {'indent': base + 1}));
+    }
+    applyBlockEdit(
+      _quillController,
+      lines,
+      next,
+      caretLine: i,
+      caretAtEnd: true,
+    );
+    _folds.documentChanged();
+  }
+
+  /// Handle menu → Copy link to block: a heading links to the heading, any
+  /// other line gets a block id (written in the open editor) and links to
+  /// that.
+  Future<void> _copyBlockLink(int liveStart) async {
+    final lines = docLines(_quillController.document.toDelta());
+    final line = lines.where((l) => l.start == liveStart).firstOrNull;
+    if (line == null) return;
+    final String link;
+    if (line.isHeading) {
+      link = noteLink(widget.noteId, heading: line.text.trim());
+    } else if (line.hasText) {
+      link = noteLink(
+        widget.noteId,
+        block: _assignBlockIdHere(_folds.unfoldedOffset(liveStart)),
+      );
+    } else {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(context.l10n.blocksLinkCopied)));
+  }
+
   /// A 3×3 table at the cursor, its first cell ready to type in.
   void _insertTable() {
     insertTableAtCursor(
@@ -2783,6 +2869,10 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
     MenuCommand.lockNote: () => _locked ? _lock.lockNow() : _lockNote(),
     MenuCommand.openLink: _openLinkAtCaret,
     MenuCommand.addBibliography: () => _addBibliography(context),
+    MenuCommand.moveBlockUp: () =>
+        moveBlockAtCaret(_quillController, _folds, -1),
+    MenuCommand.moveBlockDown: () =>
+        moveBlockAtCaret(_quillController, _folds, 1),
     MenuCommand.previousHeading: () => _stepHeading(forward: false),
     MenuCommand.nextHeading: () => _stepHeading(forward: true),
     MenuCommand.goTo: () =>
@@ -2862,6 +2952,15 @@ final Map<ShortcutActivator, Intent> _desktopShortcuts = {
       const _NoteCommandIntent(MenuCommand.goTo),
   const SingleActivator(LogicalKeyboardKey.keyL, meta: true):
       const _NoteCommandIntent(MenuCommand.openLink),
+  const SingleActivator(LogicalKeyboardKey.arrowUp, meta: true, control: true):
+      const _NoteCommandIntent(MenuCommand.moveBlockUp),
+  const SingleActivator(
+    LogicalKeyboardKey.arrowDown,
+    meta: true,
+    control: true,
+  ): const _NoteCommandIntent(
+    MenuCommand.moveBlockDown,
+  ),
   const SingleActivator(LogicalKeyboardKey.arrowUp, meta: true, alt: true):
       const _NoteCommandIntent(MenuCommand.previousHeading),
   const SingleActivator(LogicalKeyboardKey.arrowDown, meta: true, alt: true):
@@ -3432,7 +3531,9 @@ enum _Command {
   insertTemplate(Icons.dashboard_customize_outlined),
   bibliography(Icons.list_alt),
   footnote(Icons.notes),
-  callout(Icons.campaign_outlined);
+  callout(Icons.campaign_outlined),
+  toggle(Icons.arrow_right),
+  contents(Icons.toc);
 
   const _Command(this.icon);
 
@@ -3443,6 +3544,8 @@ enum _Command {
     equation => l.editorCmdEquation,
     footnote => l.footnotesCommand,
     callout => l.calloutsCommand,
+    toggle => l.blocksToggleCommand,
+    contents => l.blocksContentsCommand,
     figure => l.editorCmdFigure,
     table => l.editorCmdTable,
     refer => l.editorCmdRefer,
@@ -3465,6 +3568,8 @@ enum _Command {
     equation => l.editorCmdEquationHint,
     footnote => l.footnotesCommandHint,
     callout => l.calloutsCommandHint,
+    toggle => l.blocksToggleHint,
+    contents => l.blocksContentsHint,
     figure => l.editorCmdFigureHint,
     table => l.editorCmdTableHint,
     refer => l.editorCmdReferHint,

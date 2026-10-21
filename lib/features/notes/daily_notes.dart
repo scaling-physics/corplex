@@ -121,12 +121,20 @@ Future<void> openTodaysNote(
   BuildContext context,
   WidgetRef ref, {
   DateTime? now,
-}) async {
+}) => openNoteForDay(context, ref, now ?? DateTime.now());
+
+/// Opens the daily note of any [day], making it first (same template and
+/// folder as today's) if there is none.
+Future<void> openNoteForDay(
+  BuildContext context,
+  WidgetRef ref,
+  DateTime day,
+) async {
   final db = ref.read(databaseProvider);
   final settings = ref.read(dailyNoteSettingsProvider);
   await settings.ready;
   if (!context.mounted) return;
-  final moment = now ?? DateTime.now();
+  final moment = day;
   final locale = context.l10n.localeName;
   final key = dailyKey(moment);
 

@@ -42,7 +42,8 @@ private let germanMenuTitles: [String: String] = [
   "Default Size": "Standardgröße", "Back": "Zurück", "Forward": "Vorwärts",
   "Keyboard Shortcuts": "Tastaturkurzbefehle",
   "Go to…": "Gehe zu…", "Previous Heading": "Vorherige Überschrift",
-  "Next Heading": "Nächste Überschrift", "Open Link": "Link öffnen",
+  "Next Heading": "Nächste Überschrift",
+  "Move Block Up": "Block nach oben", "Move Block Down": "Block nach unten", "Open Link": "Link öffnen",
 ]
 
 private let usesGerman: Bool =
@@ -323,6 +324,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
           ]))
     }
 
+    let up = String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))
+    let down = String(Character(UnicodeScalar(NSDownArrowFunctionKey)!))
     let format = menu(
       "Format",
       [
@@ -349,6 +352,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         item("Add Comment…", "addComment", key: "k", modifiers: [.command, .option]),
         item("Footnote", "footnote", key: "f", modifiers: [.command, .option]),
         item("Open Link", "openLink", key: "l"),
+        .separator(),
+        item("Move Block Up", "moveBlockUp", key: up, modifiers: [.command, .control]),
+        item("Move Block Down", "moveBlockDown", key: down, modifiers: [.command, .control]),
       ])
     let viewItem = main.items.first {
       $0.submenu?.items.contains { $0.action == #selector(NSWindow.toggleFullScreen(_:)) }
@@ -388,8 +394,6 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       for (i, entry) in entries.enumerated() { view.insertItem(entry, at: i) }
     }
 
-    let up = String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))
-    let down = String(Character(UnicodeScalar(NSDownArrowFunctionKey)!))
     let go = menu(
       "Go",
       [

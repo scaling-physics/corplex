@@ -54,6 +54,8 @@ List<(String, List<ShortcutEntry>)> shortcutSections(AppLocalizations l) => [
       ShortcutEntry(l.macKeyCitePaper, ['⇧', '⌘', 'K']),
       ShortcutEntry(l.footnotesCommand, ['⌥', '⌘', 'F']),
       ShortcutEntry(l.switcherKeyOpenLink, ['⌘', 'L']),
+      ShortcutEntry(l.blocksKeyMoveUp, ['⌃', '⌘', '↑']),
+      ShortcutEntry(l.blocksKeyMoveDown, ['⌃', '⌘', '↓']),
     ],
   ),
   (

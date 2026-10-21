@@ -12,12 +12,14 @@ import '../graph/graph_screen.dart';
 import '../home/adaptive.dart' show ReadableColumn;
 import '../library/authors.dart' show displayAuthors;
 import '../library/paper_cover.dart';
+import 'calendar.dart';
 import 'chapters.dart';
 import 'chapters_section.dart';
 import 'matrix_screen.dart';
 import 'open_from_page.dart';
 import 'project_bibliography.dart';
 import 'project_menu.dart';
+import 'timeline.dart';
 
 final projectByIdProvider = StreamProvider.autoDispose.family<Project?, String>(
   (ref, id) {
@@ -147,6 +149,26 @@ class ProjectScreen extends ConsumerWidget {
                   context,
                   ref.read(databaseProvider),
                   project,
+                ),
+              ),
+            if (timelineApplies(project, chapters))
+              ActionChip(
+                avatar: const Icon(Icons.stacked_bar_chart, size: 18),
+                label: Text(context.l10n.viewsTimeline),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => TimelineScreen(projectId: project.id),
+                  ),
+                ),
+              ),
+            if (notes.isNotEmpty && project.dueDate != null)
+              ActionChip(
+                avatar: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: Text(context.l10n.viewsCalendar),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => CalendarScreen(projectId: project.id),
+                  ),
                 ),
               ),
             if (papers.isNotEmpty || notes.isNotEmpty)

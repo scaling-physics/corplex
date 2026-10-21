@@ -81,6 +81,32 @@
     }
   },
   "authWelcomeBack": "Welcome back",
+  "blocksBulleted": "Bulleted list",
+  "blocksCallout": "Callout",
+  "blocksChecklist": "Checklist",
+  "blocksCode": "Code block",
+  "blocksContentsCommand": "Table of contents",
+  "blocksContentsEmpty": "Headings will be listed here.",
+  "blocksContentsHint": "List this note's headings; tap one to jump",
+  "blocksCopyLink": "Copy link to block",
+  "blocksDelete": "Delete",
+  "blocksDuplicate": "Duplicate",
+  "blocksHandleLabel": "Move or change this block",
+  "blocksHeading": "Heading",
+  "blocksKeyMoveDown": "Move block down",
+  "blocksKeyMoveUp": "Move block up",
+  "blocksLinkCopied": "Link copied",
+  "blocksMoveDown": "Move down",
+  "blocksMoveUp": "Move up",
+  "blocksNumbered": "Numbered list",
+  "blocksQuote": "Quote",
+  "blocksSubheading": "Subheading",
+  "blocksText": "Text",
+  "blocksTitle": "Title",
+  "blocksToggle": "Toggle list",
+  "blocksToggleCommand": "Toggle list",
+  "blocksToggleHint": "A line that folds the lines under it",
+  "blocksTurnInto": "Turn into",
   "calloutsCommand": "Callout",
   "calloutsCommandHint": "Set a passage apart as a note, tip or warning",
   "calloutsLabel": "Callout: {type}",
@@ -2028,6 +2054,100 @@
   "viewerStopReadAloud": "Stop reading aloud",
   "viewerUnlockToAdd": "Unlock the note to add to it.",
   "viewerUnlockToQuote": "Unlock the note to add this quote to it.",
+  "viewsCalendar": "Calendar",
+  "viewsColAuthors": "Authors",
+  "viewsColRating": "Rating",
+  "viewsColStatus": "Status",
+  "viewsColTitle": "Title",
+  "viewsColVenue": "Venue",
+  "viewsColYear": "Year",
+  "viewsCopied": "Copied",
+  "viewsCopyCsv": "Copy as CSV",
+  "viewsCopyMarkdown": "Copy as Markdown table",
+  "viewsKindDaily": "Daily note",
+  "viewsKindDue": "Due date",
+  "viewsKindNote": "Note created",
+  "viewsKindPaper": "Paper added",
+  "viewsLocked": "Locked",
+  "viewsMoveTo": "Move to…",
+  "viewsMoveToStatus": "Move to {status}",
+  "@viewsMoveToStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsMovedTo": "Moved “{title}” to {status}",
+  "@viewsMovedTo": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsNewDayNote": "New note for this day",
+  "viewsNewTodaysNote": "New note for today",
+  "viewsNextMonth": "Next month",
+  "viewsNoStatus": "No status",
+  "viewsOpenDayNote": "Open note for this day",
+  "viewsOpenTodaysNote": "Today’s note",
+  "viewsPreviousMonth": "Previous month",
+  "viewsTimeline": "Timeline",
+  "viewsTimelinePace": "{words} / {target} words · needs ~{perDay} words/day to finish by {date}",
+  "@viewsTimelinePace": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "perDay": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsTimelinePastDue": "{words} / {target} words · past the due date",
+  "@viewsTimelinePastDue": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsTimelineWords": "{words} / {target} words",
+  "@viewsTimelineWords": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsTimelineWordsOnly": "{words} words",
+  "@viewsTimelineWordsOnly": {
+    "placeholders": {
+      "words": {
+        "type": "String"
+      }
+    }
+  },
+  "viewsViewBoard": "View as board",
+  "viewsViewGrid": "View as grid",
+  "viewsViewList": "View as list",
+  "viewsViewTable": "View as table",
   "voiceDictate": "Dictate",
   "voiceFinishing": "Finishing…",
   "voiceMicDenied": "Corplex needs the microphone to record. You can allow it in Settings.",

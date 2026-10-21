@@ -15,6 +15,7 @@ import 'features/read_aloud/speaker.dart';
 import 'features/settings/appearance_settings.dart';
 import 'features/share/share_import.dart';
 import 'features/spell/spell_checker.dart';
+import 'features/reminders/reminder_channel.dart';
 import 'features/spotlight/spotlight_channel.dart';
 import 'features/sync/supabase_setup.dart';
 import 'features/sync/transfer_settings.dart';
@@ -45,6 +46,8 @@ Future<void> main() async {
           ),
           homeWidgetBridgeProvider.overrideWithValue(PluginHomeWidgetBridge()),
         ],
+        // Local notifications for dates written in notes.
+        reminderChannelProvider.overrideWithValue(ChannelReminders()),
         biometricKeyStoreProvider.overrideWithValue(PluginBiometricKeyStore()),
         speakerProvider.overrideWithValue(ChannelSpeaker()),
         // Handwriting in drawings is read with the on-device OCR.

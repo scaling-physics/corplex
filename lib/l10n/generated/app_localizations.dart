@@ -5360,6 +5360,84 @@ abstract class AppLocalizations {
   /// **'Stop reading'**
   String get readAloudStop;
 
+  /// No description provided for @remindersChannelName.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders'**
+  String get remindersChannelName;
+
+  /// No description provided for @remindersCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Date reminder'**
+  String get remindersCommand;
+
+  /// No description provided for @remindersCommandHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A date, with a reminder on this device'**
+  String get remindersCommandHint;
+
+  /// No description provided for @remindersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Date: {text}'**
+  String remindersLabel(String text);
+
+  /// No description provided for @remindersNextWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Next week'**
+  String get remindersNextWeek;
+
+  /// No description provided for @remindersNoTime.
+  ///
+  /// In en, this message translates to:
+  /// **'No time'**
+  String get remindersNoTime;
+
+  /// No description provided for @remindersNotificationFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get remindersNotificationFallback;
+
+  /// No description provided for @remindersPickDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a date…'**
+  String get remindersPickDate;
+
+  /// No description provided for @remindersSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders'**
+  String get remindersSetting;
+
+  /// No description provided for @remindersSettingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify on this device for dates written in notes'**
+  String get remindersSettingSubtitle;
+
+  /// No description provided for @remindersTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get remindersTime;
+
+  /// No description provided for @remindersToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get remindersToday;
+
+  /// No description provided for @remindersTomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get remindersTomorrow;
+
   /// No description provided for @reviewCaughtUp.
   ///
   /// In en, this message translates to:

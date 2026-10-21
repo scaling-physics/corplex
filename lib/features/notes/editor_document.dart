@@ -3,6 +3,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'block_ids.dart';
 import 'callout_markers.dart';
 import 'citation_embed.dart';
+import 'date_markers.dart';
 import 'figure_markers.dart';
 import 'footnote_markers.dart';
 import 'heading_fold.dart';
@@ -21,7 +22,9 @@ Document editorDocument(String stored) => decodeNoteContent(
   blockIdsToEmbeds(
     calloutsToEmbeds(
       figuresToEmbeds(
-        citationsToEmbeds(mathToEmbeds(footnotesToEmbeds(stored))),
+        citationsToEmbeds(
+          dateMentionsToEmbeds(mathToEmbeds(footnotesToEmbeds(stored))),
+        ),
       ),
     ),
   ),
@@ -41,9 +44,11 @@ String storedFromEditor(Document document) {
   // first is the same as turning them back last (the design's order).
   return citationEmbedsToText(
     figureEmbedsToText(
-      mathEmbedsToText(
-        footnoteEmbedsToText(
-          calloutEmbedsToText(blockIdEmbedsToText(encodeNoteContent(whole))),
+      dateMentionEmbedsToText(
+        mathEmbedsToText(
+          footnoteEmbedsToText(
+            calloutEmbedsToText(blockIdEmbedsToText(encodeNoteContent(whole))),
+          ),
         ),
       ),
     ),

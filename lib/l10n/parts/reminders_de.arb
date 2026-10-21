@@ -1,0 +1,16 @@
+{
+  "@@locale": "de",
+  "remindersToday": "Heute",
+  "remindersTomorrow": "Morgen",
+  "remindersNextWeek": "Nächste Woche",
+  "remindersPickDate": "Datum wählen …",
+  "remindersCommand": "Datumserinnerung",
+  "remindersCommandHint": "Ein Datum, mit Erinnerung auf diesem Gerät",
+  "remindersTime": "Uhrzeit",
+  "remindersNoTime": "Keine Uhrzeit",
+  "remindersSetting": "Erinnerungen",
+  "remindersSettingSubtitle": "Auf diesem Gerät an in Notizen geschriebene Daten erinnern",
+  "remindersNotificationFallback": "Erinnerung",
+  "remindersChannelName": "Erinnerungen",
+  "remindersLabel": "Datum: {text}"
+}

@@ -13,6 +13,7 @@ import '../notes/note_highlight.dart' show highlightHex;
 import '../notes/callout_markers.dart';
 import '../notes/contents_block.dart' show contentsEmbedType, contentsLines;
 import '../notes/figure_markers.dart';
+import '../notes/date_markers.dart';
 import '../notes/footnote_markers.dart';
 import '../notes/math_markers.dart';
 import '../projects/figures.dart';
@@ -305,7 +306,9 @@ Future<ExportDoc> buildExportDoc(
     for (final n in notes)
       // Block ids (` ^abc123`) are bookkeeping, not text.
       withoutBlockIds(
-        decodeNoteContent(footnotesToEmbeds(n.content)).toDelta(),
+        decodeNoteContent(
+          dateMentionsToEmbeds(footnotesToEmbeds(n.content)),
+        ).toDelta(),
       ),
   ];
   final keys = <String>[];
@@ -397,6 +400,9 @@ List<ExportBlock> _blocks(
     if (data is Map) {
       if (data[mathInlineType] case final String tex) {
         runs.add(Run(tex, math: true));
+      } else if (data[dateEmbedType] case final String raw) {
+        final m = parseDateMention(raw);
+        runs.add(Run(m == null ? raw : dateMentionExportText(m)));
       } else if (data[footnoteEmbedType] case final String text) {
         runs.add(
           Run(

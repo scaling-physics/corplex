@@ -1098,6 +1098,40 @@ is opened or a view is chosen. No schema change.
 - Not done from the Notion list: @date mentions with reminders; link preview
   cards, emoji icons, automatic version snapshots, Notion import cleanup.
 
+### 1.19 — Date mentions and reminders (built; not yet on a device)
+- **Date mentions** (`notes/date_markers.dart`, `date_embed.dart`; no schema
+  change): stored as plain text `@{2026-11-14}` or `@{2026-11-14 09:30}` (ISO
+  date, optional 24 h time), shown as a one-character `date` embed chip
+  ("Today", "Tomorrow", "Sat 14 Nov", plus the time; error tone only when past
+  and not in a checked checklist item). Converted in `editorDocument` /
+  `storedFromEditor` like footnotes; not matched in code, maths, URLs or glued
+  to a word. Typing `@` at a line start or after a space opens
+  `DateMentionPicker` (dialog on desktop, sheet on phones); dismissing leaves
+  the `@`; `/` → Date reminder also inserts one. DOCX/PDF/LaTeX write English
+  text (`dateMentionExportText`); Markdown and the vault keep the marker. The
+  Calendar view rings a mention's day (`CalendarKind.mention`).
+- **Reminders** (`features/reminders/`): each device derives its local
+  notifications from the notes' text — no table, no server. `ReminderScheduler`
+  (started from `PlatformCoordinator` via `remindersStartupProvider`: 5 s after
+  launch, 3 s after note writes) scans notes containing `@{` (`remindersInNote`),
+  diffs against per-device stamps in shared_preferences (`reminders.stamps`),
+  schedules new or changed reminders and cancels removed, passed, checked-off or
+  locked ones, capped at 60. A date alone fires at 09:00; the body is the
+  paragraph (≤ 120 characters); locked notes are skipped. The seam is
+  `ReminderChannel` (inert default; `main()` installs `ChannelReminders` — don't
+  make the default real). **No plugin**: native channel `corplex/reminders` —
+  `RemindersBridge` in the iOS and macOS `AppDelegate.swift`
+  (`UNUserNotificationCenter`; permission asked on the first `schedule`),
+  `RemindersChannel.kt` on Android (inexact `AlarmManager.set`,
+  `ReminderReceiver`, `POST_NOTIFICATIONS` asked on the first schedule; alarms
+  are lost on reboot until the app next runs). A tapped notification arrives as
+  `open` (note id, queued until `ready`) and opens `corplex://note/<id>`.
+  Settings → "Reminders" (`AppearanceSettings.reminders`, per device). Untested
+  on devices: delivery, permission prompts, tap-to-open. Limits: locked notes get
+  no reminder; a tap opens the note, not the mention.
+- Not done from the Notion list: link preview cards, emoji icons, automatic
+  version snapshots, Notion import cleanup.
+
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
 locked notes — said plainly when the password is set), **one notes

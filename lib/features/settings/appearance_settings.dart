@@ -124,6 +124,7 @@ class AppearanceSettings extends ChangeNotifier {
     this.quickNoteHotKey = true,
     this.spellCheck = true,
     this.spotlight = true,
+    this.reminders = true,
     this.libraryGrid = false,
     this.libraryView = '',
     this.openLinksInPanes = true,
@@ -151,6 +152,9 @@ class AppearanceSettings extends ChangeNotifier {
   /// Mac: notes, papers and projects are indexed for Spotlight.
   bool spotlight;
 
+  /// Notify on this device for dates written in notes (`@{…}`).
+  bool reminders;
+
   /// Library: covers in a grid instead of rows (pinch out, or ⋮ → Grid).
   bool libraryGrid;
 
@@ -169,6 +173,7 @@ class AppearanceSettings extends ChangeNotifier {
   static const _scaleKey = 'appearance.interfaceScale';
   static const _quickNoteKey = 'appearance.quickNoteHotKey';
   static const _spotlightKey = 'appearance.spotlight';
+  static const _remindersKey = 'appearance.reminders';
   static const _libraryGridKey = 'appearance.libraryGrid';
   static const _libraryViewKey = 'appearance.libraryView';
   static const _panesKey = 'appearance.openLinksInPanes';
@@ -190,6 +195,7 @@ class AppearanceSettings extends ChangeNotifier {
         spellCheck: prefs.getBool(_spellKey) ?? true,
         quickNoteHotKey: prefs.getBool(_quickNoteKey) ?? true,
         spotlight: prefs.getBool(_spotlightKey) ?? true,
+        reminders: prefs.getBool(_remindersKey) ?? true,
         libraryGrid: prefs.getBool(_libraryGridKey) ?? false,
         libraryView: prefs.getString(_libraryViewKey) ?? '',
         openLinksInPanes: prefs.getBool(_panesKey) ?? true,
@@ -232,6 +238,14 @@ class AppearanceSettings extends ChangeNotifier {
     notifyListeners();
     try {
       await (await SharedPreferences.getInstance()).setBool(_spotlightKey, on);
+    } catch (_) {}
+  }
+
+  Future<void> setReminders(bool on) async {
+    reminders = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_remindersKey, on);
     } catch (_) {}
   }
 

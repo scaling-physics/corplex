@@ -59,6 +59,7 @@ import 'block_ops.dart';
 import 'contents_block.dart';
 import 'callout_embed.dart';
 import 'figure_embed.dart';
+import 'date_embed.dart';
 import 'footnote_embed.dart';
 import 'figure_markers.dart';
 import '../projects/figures.dart';
@@ -1036,6 +1037,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           convertTypedDollar(context, _quillController, at);
           return;
         }
+        if (op.data == '@') _maybeShowDatePicker(at);
         if (op.data == '[' || op.data == '@') end = at + 1;
         break;
       }
@@ -1063,6 +1065,16 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
       } else {
         await _linkNote(context, embed: embed);
       }
+    });
+  }
+
+  /// An "@" typed at the start of a line or after a space offers a date;
+  /// dismissing leaves the "@".
+  void _maybeShowDatePicker(int at) {
+    if (!dateTriggerAt(_quillController.document.toPlainText(), at)) return;
+    Future.microtask(() async {
+      if (!mounted) return;
+      await pickDateForAt(context, _quillController, at);
     });
   }
 
@@ -1208,6 +1220,8 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
           await insertDisplayMath(context, _quillController);
         case _Command.footnote:
           await insertFootnote(context, _quillController);
+        case _Command.date:
+          await insertDateMention(context, _quillController);
         case _Command.callout:
           await insertCallout(context, _quillController);
         case _Command.figure:
@@ -2565,6 +2579,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                         MathInlineEmbedBuilder(),
                                         MathBlockEmbedBuilder(),
                                         FootnoteEmbedBuilder(),
+                                        DateEmbedBuilder(),
                                         CalloutEmbedBuilder(),
                                         BlockIdEmbedBuilder(),
                                         NoteEmbedBuilder(),
@@ -3531,6 +3546,7 @@ enum _Command {
   insertTemplate(Icons.dashboard_customize_outlined),
   bibliography(Icons.list_alt),
   footnote(Icons.notes),
+  date(Icons.event_outlined),
   callout(Icons.campaign_outlined),
   toggle(Icons.arrow_right),
   contents(Icons.toc);
@@ -3543,6 +3559,7 @@ enum _Command {
     cite => l.notesCiteAPaper,
     equation => l.editorCmdEquation,
     footnote => l.footnotesCommand,
+    date => l.remindersCommand,
     callout => l.calloutsCommand,
     toggle => l.blocksToggleCommand,
     contents => l.blocksContentsCommand,
@@ -3567,6 +3584,7 @@ enum _Command {
     cite => l.editorCmdCiteHint,
     equation => l.editorCmdEquationHint,
     footnote => l.footnotesCommandHint,
+    date => l.remindersCommandHint,
     callout => l.calloutsCommandHint,
     toggle => l.blocksToggleHint,
     contents => l.blocksContentsHint,

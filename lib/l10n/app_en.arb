@@ -1620,6 +1620,26 @@
   "readAloudPrevious": "Previous sentence",
   "readAloudSpeed": "Speed",
   "readAloudStop": "Stop reading",
+  "remindersChannelName": "Reminders",
+  "remindersCommand": "Date reminder",
+  "remindersCommandHint": "A date, with a reminder on this device",
+  "remindersLabel": "Date: {text}",
+  "@remindersLabel": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "remindersNextWeek": "Next week",
+  "remindersNoTime": "No time",
+  "remindersNotificationFallback": "Reminder",
+  "remindersPickDate": "Pick a date…",
+  "remindersSetting": "Reminders",
+  "remindersSettingSubtitle": "Notify on this device for dates written in notes",
+  "remindersTime": "Time",
+  "remindersToday": "Today",
+  "remindersTomorrow": "Tomorrow",
   "reviewCaughtUp": "All caught up",
   "reviewDismiss": "Dismiss until tomorrow",
   "reviewEmptyMessage": "Highlights come back here a day after you make them, then less and less often.",

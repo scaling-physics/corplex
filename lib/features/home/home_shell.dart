@@ -30,6 +30,7 @@ import '../platform/mac_window.dart';
 import 'adaptive.dart';
 import '../trash/trash_actions.dart';
 import 'keyboard_shortcuts.dart';
+import '../reminders/reminder_service.dart';
 import '../spotlight/spotlight_service.dart';
 import 'mac_sidebar.dart';
 import '../sync/sync_messages.dart';
@@ -1054,6 +1055,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               },
             ),
             const SpotlightSettingsTile(),
+            const RemindersSettingsTile(),
             const DailyNotesSettingsTile(),
             const NotesPasswordSettings(),
             Consumer(

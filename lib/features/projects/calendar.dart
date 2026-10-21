@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show StringExpressionOperators;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,10 +8,12 @@ import '../../data/database.dart';
 import '../../data/database_provider.dart';
 import '../../l10n/l10n.dart';
 import '../home/adaptive.dart';
+import '../lock/note_crypto.dart' show isLockedContent;
 import '../notes/daily_notes.dart';
+import '../notes/date_markers.dart';
 import 'projects_providers.dart';
 
-enum CalendarKind { daily, note, paper, due }
+enum CalendarKind { daily, note, paper, due, mention }
 
 class CalendarItem {
   const CalendarItem(this.kind, this.id, this.title);
@@ -34,6 +37,7 @@ Map<String, List<CalendarItem>> collectCalendarItems({
   required Iterable<CalendarNote> notes,
   required Iterable<Paper> papers,
   required Iterable<Project> projects,
+  Iterable<({String id, String title, String content})> mentions = const [],
 }) {
   final out = <String, List<CalendarItem>>{};
   void add(String key, CalendarItem item) =>
@@ -51,6 +55,16 @@ Map<String, List<CalendarItem>> collectCalendarItems({
   }
   for (final p in papers) {
     add(dailyKey(p.createdAt), CalendarItem(CalendarKind.paper, p.id, p.title));
+  }
+  // A date written in a note (`@{…}`): a ring on its day, once per note.
+  for (final n in mentions) {
+    final days = {
+      for (final s in findDateMentions(n.content.replaceAll('\\n', ' ')))
+        dailyKey(s.mention.date),
+    };
+    for (final day in days) {
+      add(day, CalendarItem(CalendarKind.mention, n.id, n.title));
+    }
   }
   for (final p in projects) {
     final due = p.dueDate;
@@ -109,7 +123,17 @@ final _calendarProvider = StreamProvider.autoDispose
           for (final p in await db.select(db.projects).get())
             if (projectId == null || p.id == projectId) p,
         ];
+        final inNotes = [
+          for (final n
+              in await (db.select(db.notes)
+                    ..where((n) => n.content.like('%@{%')))
+                  .get())
+            if ((noteIds == null || noteIds.contains(n.id)) &&
+                !isLockedContent(n.content))
+              (id: n.id, title: n.title, content: n.content),
+        ];
         return collectCalendarItems(
+          mentions: inNotes,
           notes: ns,
           papers: papers,
           projects: projects,
@@ -151,7 +175,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   void _open(CalendarItem item) {
     switch (item.kind) {
-      case CalendarKind.daily || CalendarKind.note:
+      case CalendarKind.daily || CalendarKind.note || CalendarKind.mention:
         openNote(context, ref, item.id);
       case CalendarKind.paper:
         openPaper(context, ref, item.id);
@@ -221,6 +245,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     if (has(CalendarKind.note)) dot(c.onSurfaceVariant),
                     if (has(CalendarKind.paper))
                       dot(c.onSurfaceVariant, hollow: true),
+                    if (has(CalendarKind.mention))
+                      dot(c.tertiary, hollow: true),
                     if (has(CalendarKind.due))
                       Icon(Icons.flag, size: 10, color: c.tertiary),
                   ],
@@ -359,6 +385,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                             CalendarKind.note => Icons.notes,
                             CalendarKind.paper => Icons.description_outlined,
                             CalendarKind.due => Icons.flag_outlined,
+                            CalendarKind.mention => Icons.event_outlined,
                           }, size: 20),
                           title: Text(
                             i.title.trim().isEmpty
@@ -372,6 +399,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                             CalendarKind.note => l10n.viewsKindNote,
                             CalendarKind.paper => l10n.viewsKindPaper,
                             CalendarKind.due => l10n.viewsKindDue,
+                            CalendarKind.mention => l10n.remindersCommand,
                           }),
                           onTap: i.kind == CalendarKind.due
                               ? null

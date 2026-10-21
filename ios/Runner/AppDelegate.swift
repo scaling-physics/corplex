@@ -2,6 +2,7 @@ import AVFoundation
 import Flutter
 import NaturalLanguage
 import UIKit
+import UserNotifications
 import Vision
 
 @main
@@ -18,6 +19,7 @@ import Vision
     registerOcrChannel(engineBridge.applicationRegistrar.messenger())
     registerSpellChannel(engineBridge.applicationRegistrar.messenger())
     registerSpeakChannel(engineBridge.applicationRegistrar.messenger())
+    RemindersBridge.shared.register(engineBridge.applicationRegistrar.messenger())
   }
 
   private func registerSpeakChannel(_ messenger: FlutterBinaryMessenger) {
@@ -245,5 +247,106 @@ private final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
   func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
     report(utterance, finished: false)
+  }
+}
+
+/// Date reminders (`corplex/reminders`): local notifications through
+/// `UNUserNotificationCenter`. `schedule` ({items: [{id, noteId, title, body,
+/// at (ms since epoch)}]}) asks for permission the first time it is called —
+/// never at launch — then adds one calendar-triggered request per item
+/// (same id replaces); `cancel` (ids) and `cancelAll`. A tapped notification
+/// goes back as `open` (the note id), held until Dart says `ready`. The
+/// notification centre is touched only on a call, except the delegate that
+/// receives taps.
+final class RemindersBridge: NSObject, UNUserNotificationCenterDelegate {
+  static let shared = RemindersBridge()
+
+  private var channel: FlutterMethodChannel?
+  private var dartReady = false
+  private var pending: [String] = []
+
+  func register(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "corplex/reminders", binaryMessenger: messenger)
+    self.channel = channel
+    UNUserNotificationCenter.current().delegate = self
+    channel.setMethodCallHandler { [weak self] call, result in
+      self?.handle(call, result)
+    }
+  }
+
+  private func open(_ noteId: String) {
+    if dartReady {
+      channel?.invokeMethod("open", arguments: noteId)
+    } else {
+      pending.append(noteId)
+    }
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    if let id = response.notification.request.content.userInfo["noteId"] as? String {
+      open(id)
+    }
+    completionHandler()
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+    withCompletionHandler completionHandler:
+      @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound, .list])
+  }
+
+  private func handle(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    let center = UNUserNotificationCenter.current()
+    switch call.method {
+    case "ready":
+      dartReady = true
+      let queued = pending
+      pending = []
+      for id in queued { channel?.invokeMethod("open", arguments: id) }
+      result(nil)
+    case "schedule":
+      guard let args = call.arguments as? [String: Any],
+        let list = args["items"] as? [[String: Any]]
+      else {
+        result(FlutterError(code: "bad_args", message: "Expected items", details: nil))
+        return
+      }
+      center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+        guard granted else {
+          DispatchQueue.main.async { result(nil) }
+          return
+        }
+        for entry in list {
+          guard let id = (entry["id"] as? NSNumber)?.intValue,
+            let at = (entry["at"] as? NSNumber)?.doubleValue
+          else { continue }
+          let content = UNMutableNotificationContent()
+          content.title = entry["title"] as? String ?? ""
+          content.body = entry["body"] as? String ?? ""
+          content.sound = .default
+          content.userInfo = ["noteId": entry["noteId"] as? String ?? ""]
+          let date = Date(timeIntervalSince1970: at / 1000)
+          let parts = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute], from: date)
+          let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+          center.add(UNNotificationRequest(identifier: "r\(id)", content: content, trigger: trigger))
+        }
+        DispatchQueue.main.async { result(nil) }
+      }
+    case "cancel":
+      let ids = (call.arguments as? [NSNumber] ?? []).map { "r\($0.intValue)" }
+      center.removePendingNotificationRequests(withIdentifiers: ids)
+      result(nil)
+    case "cancelAll":
+      center.removeAllPendingNotificationRequests()
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
   }
 }

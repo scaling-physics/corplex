@@ -14,6 +14,8 @@ import '../library/papers_providers.dart';
 import '../library/pdf_viewer_screen.dart';
 import '../notes/daily_notes.dart' show openTodaysNote;
 import '../notes/notes_screen.dart';
+import '../reminders/reminder_channel.dart';
+import '../reminders/reminder_service.dart';
 import '../spotlight/spotlight_channel.dart';
 import '../spotlight/spotlight_links.dart';
 import '../spotlight/spotlight_service.dart';
@@ -37,6 +39,7 @@ class PlatformCoordinator extends ConsumerStatefulWidget {
 class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
   StreamSubscription<Uri?>? _clicks;
   StreamSubscription<String>? _spotlight;
+  StreamSubscription<String>? _reminders;
   Timer? _debounce;
   WidgetPayload? _published;
 
@@ -50,6 +53,10 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
     // A Spotlight result: its id becomes the same link a widget tap uses.
     _spotlight = ref.read(spotlightChannelProvider).opens.listen((id) {
       _onLink(spotlightLinkFor(id));
+    });
+    // A tapped reminder opens its note.
+    _reminders = ref.read(reminderChannelProvider).opens.listen((id) {
+      _onLink(Uri(scheme: 'corplex', host: 'note', pathSegments: [id]));
     });
   }
 
@@ -93,6 +100,7 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
   void dispose() {
     _clicks?.cancel();
     _spotlight?.cancel();
+    _reminders?.cancel();
     _debounce?.cancel();
     super.dispose();
   }
@@ -100,6 +108,7 @@ class _PlatformCoordinatorState extends ConsumerState<PlatformCoordinator> {
   @override
   Widget build(BuildContext context) {
     ref.watch(spotlightStartupProvider);
+    ref.watch(remindersStartupProvider);
     ref.listen(papersListProvider, (_, next) {
       final papers = next.value;
       if (papers != null) _papersChanged(papers);

@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "remindersToday": "Today",
+  "remindersTomorrow": "Tomorrow",
+  "remindersNextWeek": "Next week",
+  "remindersPickDate": "Pick a date…",
+  "remindersCommand": "Date reminder",
+  "remindersCommandHint": "A date, with a reminder on this device",
+  "remindersTime": "Time",
+  "remindersNoTime": "No time",
+  "remindersSetting": "Reminders",
+  "remindersSettingSubtitle": "Notify on this device for dates written in notes",
+  "remindersNotificationFallback": "Reminder",
+  "remindersChannelName": "Reminders",
+  "remindersLabel": "Date: {text}",
+  "@remindersLabel": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  }
+}

@@ -3045,6 +3045,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readAloudStop => 'Stop reading';
 
   @override
+  String get remindersChannelName => 'Reminders';
+
+  @override
+  String get remindersCommand => 'Date reminder';
+
+  @override
+  String get remindersCommandHint => 'A date, with a reminder on this device';
+
+  @override
+  String remindersLabel(String text) {
+    return 'Date: $text';
+  }
+
+  @override
+  String get remindersNextWeek => 'Next week';
+
+  @override
+  String get remindersNoTime => 'No time';
+
+  @override
+  String get remindersNotificationFallback => 'Reminder';
+
+  @override
+  String get remindersPickDate => 'Pick a date…';
+
+  @override
+  String get remindersSetting => 'Reminders';
+
+  @override
+  String get remindersSettingSubtitle =>
+      'Notify on this device for dates written in notes';
+
+  @override
+  String get remindersTime => 'Time';
+
+  @override
+  String get remindersToday => 'Today';
+
+  @override
+  String get remindersTomorrow => 'Tomorrow';
+
+  @override
   String get reviewCaughtUp => 'All caught up';
 
   @override

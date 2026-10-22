@@ -42,6 +42,7 @@ import '../ink/ink_canvas.dart' show inkPolicy;
 import '../ink/ink_catcher.dart';
 import '../ink/ink_session.dart';
 import '../ink/sketch_embed.dart';
+import '../ink/free_ink.dart' show FreeInkEmbedBuilder;
 import '../../theme/app_theme.dart';
 import '../projects/project_picker_sheet.dart';
 import '../spell/note_spell.dart';
@@ -1662,6 +1663,11 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
   /// when Quill has settled the selection.
   void _leaveDrawingIfTyping() {
     final ink = _ink;
+    // Free ink's tools go as soon as the text is tapped into.
+    if (ink != null && ink.freeActive && _bodyFocus.hasFocus) {
+      ink.deactivate();
+      return;
+    }
     if (ink == null || ink.active == null || !_bodyFocus.hasFocus) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final active = ink.active;
@@ -2574,6 +2580,7 @@ class _NoteEditorBodyState extends ConsumerState<_NoteEditorBody> {
                                         FigureDefEmbedBuilder(),
                                         FigureRefEmbedBuilder(),
                                         SketchEmbedBuilder(),
+                                        FreeInkEmbedBuilder(),
                                         TableEmbedBuilder(),
                                         CitationEmbedBuilder(),
                                         MathInlineEmbedBuilder(),

@@ -4,7 +4,7 @@ import WidgetKit
 // Must match `widgetAppGroupId` / `widgetName` in
 // lib/features/platform/widget_data.dart. The app writes `title`, `detail`
 // and `uri` with home_widget; `updateWidget(iOSName:)` reloads this kind.
-private let appGroupId = "group.com.corplex.corplex"
+private let appGroupId = "group.dev.corplex.app"
 private let widgetKind = "CorplexWidget"
 private let newNoteURL = widgetLink(URL(string: "corplex://new-note")!)
 

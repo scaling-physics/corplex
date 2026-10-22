@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>AppGroupId</key>
-	<string>group.com.corplex.corplex</string>
+	<string>group.dev.corplex.app</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

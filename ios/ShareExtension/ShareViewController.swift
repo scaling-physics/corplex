@@ -20,7 +20,7 @@ final class ShareViewController: UIViewController {
   private let lock = NSLock()
 
   private var hostBundleId: String {
-    let id = Bundle.main.bundleIdentifier ?? "com.corplex.corplex.ShareExtension"
+    let id = Bundle.main.bundleIdentifier ?? "dev.corplex.app.ShareExtension"
     return id.split(separator: ".").dropLast().joined(separator: ".")
   }
 

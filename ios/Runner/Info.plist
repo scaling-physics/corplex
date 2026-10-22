@@ -34,7 +34,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>AppGroupId</key>
-	<string>group.com.corplex.corplex</string>
+	<string>group.dev.corplex.app</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

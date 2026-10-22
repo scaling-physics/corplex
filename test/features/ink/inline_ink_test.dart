@@ -12,6 +12,7 @@ import 'package:corplex/app.dart';
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
 import 'package:corplex/features/audio/audio_playback.dart';
+import 'package:corplex/features/ink/free_ink.dart';
 import 'package:corplex/features/ink/ink_canvas.dart';
 import 'package:corplex/features/ink/ink_model.dart';
 import 'package:corplex/features/ink/sketch_editor_screen.dart';
@@ -169,30 +170,35 @@ void main() {
     await dispose(tester);
   });
 
-  testWidgets('writing with a pen on the text opens a drawing after that '
-      'line', (tester) async {
+  testWidgets('writing with a pen on the text is free ink: nothing moves', (
+    tester,
+  ) async {
     await openNote(tester, '[{"insert":"First line\\nSecond line\\n"}]');
     final first = find.textContaining('First line', findRichText: true);
+    final second = find.textContaining('Second', findRichText: true);
+    final secondBefore = tester.getRect(second);
     await drag(
       tester,
       tester.getCenter(first) + const Offset(-40, 0),
       const Offset(120, 30),
     );
-    expect(text(tester), 'First line\n#\nSecond line\n');
-    // On screen too, between the two lines.
-    expect(shown(tester).single.strokes, hasLength(1));
-    final drawing = tester.getRect(find.byType(InkCanvas));
-    expect(drawing.top, greaterThan(tester.getRect(first).bottom - 1));
-    final second = tester.getRect(
-      find.textContaining('Second', findRichText: true),
-    );
-    expect(drawing.bottom, lessThan(second.top + 1));
-    final sketch = sketches(tester).single;
-    expect(sketch.strokes, hasLength(1));
-    expect(sketch.strokes.single.points.length, greaterThan(4));
-    // No text was selected by the stroke.
+    // No drawing: one invisible marker at the start of the line it began on.
+    expect(sketches(tester), isEmpty);
+    expect(find.byType(InkCanvas), findsNothing);
+    expect(text(tester), '#First line\nSecond line\n');
+    final ink = freeInkIn(controller(tester).document).single;
+    expect(ink.lineStart, 0);
+    expect(ink.ink.strokes.single.points.length, greaterThan(4));
+    // The text below stayed where it was, and the ink is on screen.
+    expect(tester.getRect(second), secondBefore);
+    expect(find.byKey(const ValueKey('free-ink')), findsOneWidget);
     expect(controller(tester).selection.isCollapsed, isTrue);
+    // The tools show (without the drawing-only items) until Done.
     expect(toolbar, findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(toolbar, findsNothing);
+    expect(find.byKey(const ValueKey('free-ink')), findsOneWidget);
     await dispose(tester);
   });
 
@@ -211,9 +217,23 @@ void main() {
     await dispose(tester);
   });
 
-  testWidgets('a pen in the space under the note adds a drawing at the end', (
-    tester,
-  ) async {
+  testWidgets('a second stroke on the same line joins its ink', (tester) async {
+    await openNote(tester, '[{"insert":"Only line\\n"}]');
+    final line = tester.getCenter(
+      find.textContaining('Only', findRichText: true),
+    );
+    await drag(tester, line, const Offset(80, 4));
+    await drag(tester, line + const Offset(0, 6), const Offset(60, -4));
+    expect(
+      freeInkIn(controller(tester).document).single.ink.strokes,
+      hasLength(2),
+    );
+    expect(text(tester), '#Only line\n');
+    await dispose(tester);
+  });
+
+  testWidgets('a pen in the space under the note writes there, pinned to '
+      'the last line', (tester) async {
     await openNote(tester, '[{"insert":"Only line\\n"}]');
     final blank = find.byKey(const ValueKey('note-blank-below'));
     await drag(
@@ -221,13 +241,79 @@ void main() {
       tester.getTopLeft(blank) + const Offset(60, 40),
       const Offset(150, 20),
     );
-    expect(text(tester), 'Only line\n#\n');
-    expect(shown(tester), hasLength(1));
-    expect(sketches(tester).single.strokes, hasLength(1));
+    expect(sketches(tester), isEmpty);
+    expect(text(tester), '#Only line\n');
+    final stroke = freeInkIn(controller(tester).document)
+        .single
+        .ink
+        .strokes
+        .single;
+    // Well below the line's top (in canvas-width units of a 400 pt page).
+    expect(stroke.points.first.y, greaterThan(0.05));
     await dispose(tester);
   });
 
-  testWidgets('writing just below a drawing extends it', (tester) async {
+  testWidgets('free ink moves with its paragraph when text is added above', (
+    tester,
+  ) async {
+    await openNote(tester, '[{"insert":"Top\\nMarked line\\n"}]');
+    final marked = find.textContaining('Marked', findRichText: true);
+    await drag(tester, tester.getCenter(marked), const Offset(80, 0));
+    final before = freeInkIn(controller(tester).document).single;
+    expect(before.lineStart, 4);
+    controller(tester).replaceText(0, 0, 'New\n', null);
+    await tester.pumpAndSettle();
+    final after = freeInkIn(controller(tester).document).single;
+    // Still on "Marked line", with the same strokes.
+    expect(after.lineStart, 8);
+    expect(after.ink.encode(), before.ink.encode());
+    await dispose(tester);
+  });
+
+  testWidgets('the eraser end rubs out free ink; the line keeps its text', (
+    tester,
+  ) async {
+    // A line across the middle of "First line" (y from the line's top).
+    final ink = FreeInk([
+      const InkStroke(
+        tool: InkTool.pen,
+        color: Color(0xFF2B2F2B),
+        width: 0.007,
+        points: [InkPoint(0.02, 0.03, 0.5), InkPoint(0.4, 0.03, 0.5)],
+      ),
+    ]);
+    await openNote(
+      tester,
+      jsonEncode([
+        {
+          'insert': {freeInkEmbedType: ink.encode()},
+        },
+        {'insert': 'First line\nSecond line\n'},
+      ]),
+    );
+    expect(find.byKey(const ValueKey('free-ink')), findsOneWidget);
+    final first = tester.getRect(
+      find.textContaining('First line', findRichText: true),
+    );
+    await drag(
+      tester,
+      Offset(first.left + 40, first.center.dy - 7),
+      const Offset(0, 14),
+      kind: PointerDeviceKind.invertedStylus,
+    );
+    expect(freeInkIn(controller(tester).document), isEmpty);
+    expect(find.byKey(const ValueKey('free-ink')), findsNothing);
+    expect(text(tester), 'First line\nSecond line\n');
+    // Undo brings it back.
+    controller(tester).undo();
+    await tester.pumpAndSettle();
+    expect(freeInkIn(controller(tester).document), hasLength(1));
+    await dispose(tester);
+  });
+
+  testWidgets('writing just below a drawing is free ink; the drawing stays', (
+    tester,
+  ) async {
     await openNote(
       tester,
       '[{"insert":"Before\\n"},'
@@ -240,11 +326,8 @@ void main() {
       Offset(paper.left + 50, paper.bottom + 20),
       const Offset(150, 10),
     );
-    final sketch = sketches(tester).single;
-    expect(sketch.strokes, hasLength(2));
-    expect(shown(tester).single.strokes, hasLength(2));
-    expect(sketch.aspect, greaterThan(0.3));
-    expect(text(tester), 'Before\n#\nAfter\n');
+    expect(sketches(tester).single.strokes, hasLength(1));
+    expect(freeInkIn(controller(tester).document), hasLength(1));
     await dispose(tester);
   });
 

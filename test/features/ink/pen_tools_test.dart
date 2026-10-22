@@ -14,6 +14,7 @@ import 'package:corplex/app.dart';
 import 'package:corplex/data/database.dart';
 import 'package:corplex/data/database_provider.dart';
 import 'package:corplex/features/audio/audio_playback.dart';
+import 'package:corplex/features/ink/free_ink.dart';
 import 'package:corplex/features/ink/handwriting.dart';
 import 'package:corplex/features/ink/ink_canvas.dart';
 import 'package:corplex/features/ink/ink_model.dart';
@@ -228,8 +229,8 @@ void main() {
       await dispose(tester);
     });
 
-    testWidgets('a held line from a pen on the text makes a clean line in '
-        'a new drawing', (tester) async {
+    testWidgets('a held line from a pen on the text makes a clean line of '
+        'free ink', (tester) async {
       await openNote(tester, '[{"insert":"First line\\nSecond line\\n"}]');
       final c = tester.getCenter(
         find.textContaining('First line', findRichText: true),
@@ -243,12 +244,17 @@ void main() {
         ], per: 8),
         hold: const Duration(milliseconds: 600),
       );
-      expect(text(tester), 'First line\n#\nSecond line\n');
-      final pts = sketches(tester).single.strokes.single.points;
+      expect(text(tester), '#First line\nSecond line\n');
+      expect(sketches(tester), isEmpty);
+      final pts = freeInkIn(controller(tester).document)
+          .single
+          .ink
+          .strokes
+          .single
+          .points;
       expect(pts.length, greaterThan(15));
       // Straight: the same y all along.
       expect(pts.map((p) => p.y).toSet().length, 1);
-      expect(shown(tester).single.strokes, hasLength(1));
       await dispose(tester);
     });
   });

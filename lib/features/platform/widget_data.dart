@@ -9,7 +9,7 @@ import '../library/highlights.dart' show paperPageLink;
 
 /// Shared container the iOS widget extension reads (create it in Xcode as
 /// an App Group capability on both the app and the widget targets).
-const widgetAppGroupId = 'group.com.corplex.corplex';
+const widgetAppGroupId = 'group.dev.corplex.app';
 
 /// Name of the Android provider class / iOS widget kind.
 const widgetName = 'CorplexWidget';

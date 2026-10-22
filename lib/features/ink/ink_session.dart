@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/haptics.dart';
 import '../ocr/ocr_engine.dart';
 import '../platform/mac_window.dart' show isDesktop;
+import 'free_ink.dart';
 import 'handwriting.dart';
 import 'ink_canvas.dart';
 import 'ink_model.dart';
@@ -37,11 +38,12 @@ abstract class InlineDrawing {
   Rect? get globalRect;
 }
 
-/// Pen input for one open note, like Apple Notes: drawings sit inline among
-/// the text and are drawn on in place. A pen draws on any drawing, and
-/// writing anywhere else in the note opens a new one there; a finger or
-/// mouse draws on the drawing that is *chosen* (tapped, or just drawn on),
-/// which also shows the floating tools. Every stroke is written straight
+/// Pen input for one open note: drawings sit inline among the text and are
+/// drawn on in place, and anywhere else a pen writes straight onto the note
+/// as free ink (`free_ink.dart`) — over the text, in the margins, under it.
+/// A finger or mouse draws on the drawing that is *chosen* (tapped, or just
+/// drawn on); the floating tools show while a drawing is chosen or free ink
+/// was just written. Every stroke is written straight
 /// into the note's document — one Quill edit, so ⌘Z and the editor's undo
 /// take strokes back like typing.
 class InkSession extends InkTools {
@@ -82,7 +84,11 @@ class InkSession extends InkTools {
   /// Drawings that were only looked at are never recognised or rewritten.
   final _pending = <String>{};
   int? _active;
+  bool _freeActive = false;
   final drawings = <InlineDrawing>{};
+
+  /// Whether the tools are showing for free ink (no drawing chosen).
+  bool get freeActive => _freeActive;
 
   /// The document offset of the chosen drawing, if any.
   int? get active => _active;
@@ -103,6 +109,7 @@ class InkSession extends InkTools {
   /// Chooses the drawing at [offset] (showing the tools). The previously
   /// chosen one is removed if nothing was drawn in it.
   void activate(int offset) {
+    _freeActive = false;
     if (_active == offset) return;
     final previous = _active;
     _active = offset;
@@ -117,6 +124,13 @@ class InkSession extends InkTools {
   /// Puts the tools away (tapping into the text, Done). A drawing left
   /// empty — Draw tapped by mistake — leaves no trace.
   void deactivate() {
+    if (_freeActive) {
+      _freeActive = false;
+      if (_active == null) {
+        notifyListeners();
+        return;
+      }
+    }
     final previous = _active;
     if (previous == null) return;
     _active = null;
@@ -144,6 +158,69 @@ class InkSession extends InkTools {
       _idle = Timer(recognitionDelay, () => unawaited(_recognizeNext()));
     }
     return true;
+  }
+
+  /// Adds [stroke] to the free ink of the line [lineOffset] is on (making
+  /// its marker if it has none), as one undoable edit, and shows the tools.
+  /// [stroke]'s y is measured from that line's top. False if no text line
+  /// could take it.
+  bool addFreeInk(int lineOffset, InkStroke stroke) {
+    final line = freeInkLine(controller.document, lineOffset);
+    if (line == null) return false;
+    final existing = freeInkOn(line);
+    final ink = FreeInk([...?existing?.ink.strokes, stroke]);
+    controller.replaceText(
+      existing?.offset ?? line.documentOffset,
+      existing == null ? 0 : 1,
+      Embeddable(freeInkEmbedType, ink.encode()),
+      null,
+      ignoreFocus: true,
+    );
+    onQuietEdit?.call();
+    activateFree();
+    return true;
+  }
+
+  /// Replaces the free ink at each offset in [changed] (offset → what's
+  /// left; empty removes the marker), as one undoable edit: an eraser swipe.
+  void replaceFreeInk(Map<int, FreeInk> changed) {
+    if (changed.isEmpty) return;
+    final delta = Delta();
+    var at = 0;
+    for (final offset in changed.keys.toList()..sort()) {
+      final ink = changed[offset]!;
+      delta.retain(offset - at);
+      if (!ink.isEmpty) {
+        delta.insert(Embeddable(freeInkEmbedType, ink.encode()).toJson());
+      }
+      delta.delete(1);
+      at = offset + 1;
+    }
+    final sel = controller.selection;
+    controller.ignoreFocusOnTextChange = true;
+    try {
+      controller.compose(
+        delta,
+        sel.isValid
+            ? sel.copyWith(
+                baseOffset: delta.transformPosition(sel.baseOffset),
+                extentOffset: delta.transformPosition(sel.extentOffset),
+              )
+            : const TextSelection.collapsed(offset: 0),
+        ChangeSource.local,
+      );
+    } finally {
+      controller.ignoreFocusOnTextChange = false;
+    }
+    onQuietEdit?.call();
+  }
+
+  /// Shows the tools for free ink, putting away any chosen drawing.
+  void activateFree() {
+    if (_active != null) deactivate();
+    if (_freeActive) return;
+    _freeActive = true;
+    notifyListeners();
   }
 
   /// Stores recognised text in a drawing without making an undo step (so ⌘Z
@@ -381,10 +458,10 @@ class InkSessionScope extends InheritedNotifier<InkSession> {
       context.dependOnInheritedWidgetOfExactType<InkSessionScope>()?.notifier;
 }
 
-/// The floating tools while a drawing is chosen: pen, highlighter, eraser,
-/// inks and thickness, then undo / redo (the note's own history), the
-/// finger switch on touch screens, Expand and Done. Nothing while no
-/// drawing is chosen.
+/// The floating tools while a drawing is chosen or free ink was just
+/// written: pen, highlighter, eraser, inks and thickness, then undo / redo
+/// (the note's own history), the finger switch on touch screens, Expand and
+/// Done (Expand and Convert only for a drawing). Nothing otherwise.
 class InlineInkToolbar extends StatelessWidget {
   const InlineInkToolbar({super.key, required this.session});
 
@@ -395,7 +472,9 @@ class InlineInkToolbar extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([session, session.controller]),
       builder: (context, _) {
-        final show = session.active != null;
+        final show = session.active != null || session.freeActive;
+        // Expand and Convert act on a drawing; free ink has neither.
+        final drawing = session.active != null;
         final controller = session.controller;
         final desktop = isDesktop(context);
         final fingersDraw = inkPolicy.fingersDraw;
@@ -449,14 +528,15 @@ class InlineInkToolbar extends StatelessWidget {
                           }
                         },
                         itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'expand',
-                            child: ListTile(
-                              leading: const Icon(Icons.open_in_full),
-                              title: Text(context.l10n.inkExpand),
+                          if (drawing)
+                            PopupMenuItem(
+                              value: 'expand',
+                              child: ListTile(
+                                leading: const Icon(Icons.open_in_full),
+                                title: Text(context.l10n.inkExpand),
+                              ),
                             ),
-                          ),
-                          if (session.ocr != null)
+                          if (drawing && session.ocr != null)
                             PopupMenuItem(
                               value: 'convert',
                               child: ListTile(

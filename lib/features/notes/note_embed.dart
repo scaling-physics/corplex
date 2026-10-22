@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/l10n.dart';
 import '../ink/sketch_embed.dart';
+import '../ink/free_ink.dart' show FreeInkEmbedBuilder;
 import '../lock/note_lock_service.dart';
 import '../projects/readable_content.dart';
 import '../home/adaptive.dart';
@@ -60,6 +61,7 @@ List<EmbedBuilder> _innerBuilders() => const [
   FigureDefEmbedBuilder(),
   FigureRefEmbedBuilder(),
   SketchEmbedBuilder(),
+  FreeInkEmbedBuilder(),
   TableEmbedBuilder(),
   CitationEmbedBuilder(),
   MathInlineEmbedBuilder(),

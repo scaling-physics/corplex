@@ -363,6 +363,19 @@ the default screens until the user opts in by using the feature.
   uses one; AltStore may strip extensions and App Groups are unreliable on
   free accounts, so without them the app works minus sharing and the
   widget.
+  **iOS bundle ids** are `dev.corplex.app` (+ `.ShareExtension`,
+  `.CorplexWidget`) and the App Group `group.dev.corplex.app`:
+  `com.corplex.corplex` belongs to another Apple team (Android and macOS
+  keep it). **Free Personal Team install** (no App Groups, so
+  `CODE_SIGN_ENTITLEMENTS=` drops them; profiles last 7 days):
+  `flutter build ios --release --config-only
+  --dart-define-from-file=tool/supabase.env` (without it the app has no
+  sync and signs in to the offline stub), then `xcodebuild -workspace
+  ios/Runner.xcworkspace -scheme Runner -configuration Release -destination
+  id=<udid> -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+  DEVELOPMENT_TEAM=<team> CODE_SIGN_ENTITLEMENTS= -derivedDataPath
+  build/ios-device build` and `xcrun devicectl device install app --device
+  <udid> build/ios-device/Build/Products/Release-iphoneos/Runner.app`.
 
 ### v1.7 — Thesis writing (built; not yet on a device)
 - **Thesis outline** (`projects/chapters*.dart`, schema v14, server file
@@ -1132,6 +1145,14 @@ is opened or a view is chosen. No schema change.
 - Not done from the Notion list: link preview cards, emoji icons, automatic
   version snapshots, Notion import cleanup.
 
+### 1.20 — Free ink (built; widget-tested, not yet with a real Pencil)
+- A pen writes anywhere in a note — over the text, in the margins, between
+  paragraphs, under it — and the ink stays where it was drawn; no drawing
+  pops up and nothing moves. Pinned to its line, so it moves with the
+  paragraph. Eraser end / barrel button / eraser tool rub it out. Drawings
+  stay for Draw and `/` → Draw. Details and limits (no export, search or
+  embedded-card display yet) under "Free ink" in the ink notes below.
+
 ### Locked notes (built; biometrics untested on real hardware)
 Decided with the user: **real encryption** (a forgotten password loses the
 locked notes — said plainly when the password is set), **one notes
@@ -1853,13 +1874,34 @@ Local DB (`drift`) and state management (`flutter_riverpod`) are decided
     (read-only views) a drawing is a picture that opens full screen.
   * `InkCatcher` (`ink_catcher.dart`) wraps the body editor plus 160 pt of
     blank space under it (a finger tap there types at the end). A pen
-    stroke that starts on the text or in that space opens a new drawing
-    after that line (`RenderEditor.getPositionForOffset`, line bottom via
-    `getLocalRectForCaret`), keeping the stroke where it was drawn when it
-    can; starting within 56 pt below a drawing extends it instead. Its
-    recognizer accepts after 3 px of pen movement — before text selection
-    or scrolling — and lets a still tap through, so a pen tap still places
-    the cursor.
+    stroke that starts on a drawing is the drawing's; anywhere else (on the
+    text, margins, between paragraphs, under the note) it is **free ink**:
+    it stays exactly where it was drawn, over the text, and nothing moves
+    (no drawing pops up). Its recognizer accepts after 3 px of pen movement
+    — before text selection or scrolling — and lets a still tap through, so
+    a pen tap still places the cursor. The eraser end (`invertedStylus`),
+    the barrel button or the eraser tool rub free ink out (whole strokes,
+    hidden at once, one undoable edit at the end of the swipe).
+  * **Free ink** (`free_ink.dart`): each line carrying ink holds one
+    invisible inline embed `ink` *at the start of the line* (at the end, a
+    plain Backspace while fixing a typo would delete the ink) whose data is
+    that line's strokes (`FreeInk`, `{"v":1,"s":[…]}`), x in canvas-width
+    units of the catcher, y from the line's top on the same scale. Being
+    text, the ink moves with its paragraph through edits, undo, sync and
+    merges; a line that is a drawing/table/other lone embed can't hold one,
+    so the nearest text line before (else after) takes it (`freeInkLine`).
+    `InkCatcher` measures each marker's line top after layout (document
+    changes, size changes via `SizeChangedLayoutNotifier`) and paints all
+    free ink in one `CustomPaint` (key `free-ink`, highlighter first); ink
+    low in the blank space grows it. `InkSession.addFreeInk` /
+    `replaceFreeInk` write it; `freeActive` shows `InlineInkToolbar`
+    without Expand/Convert until Done or a tap into the text. Free ink is
+    not exported (PDF/Word/LaTeX/Markdown skip the unknown embed), not
+    searched (no handwriting recognition) and not shown in embedded-note
+    cards (`FreeInkEmbedBuilder` draws nothing); at another window width
+    it scales with the page while text reflows, so ink over words lines up
+    exactly only at the width it was written. The Draw button and `/` →
+    Draw still make drawings.
   * **Gestures**: `InkCanvas` claims a pointer it draws with on touch-down
     (`InkClaimRecognizer`, eager accept), so Quill's selection and the
     page's scrolling never see a stroke; it commits an eraser swipe once,
